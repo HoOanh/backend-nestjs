@@ -1,8 +1,11 @@
 import React from 'react';
 import type { Lesson } from '../data/curriculum.ts';
+import { TutorChat } from './TutorChat.tsx';
 
 interface TheoryTabProps {
   lesson: Lesson;
+  isLessonCleared: boolean;
+  onMarkCleared: () => void;
   onNextTab: () => void;
 }
 
@@ -20,7 +23,12 @@ function formatMarkdown(text: string): string {
     .replace(/\n\n/g, '<p></p>');
 }
 
-export const TheoryTab: React.FC<TheoryTabProps> = ({ lesson, onNextTab }) => {
+export const TheoryTab: React.FC<TheoryTabProps> = ({
+  lesson,
+  isLessonCleared,
+  onMarkCleared,
+  onNextTab
+}) => {
   return (
     <div>
       <div className="theory-card">
@@ -41,8 +49,14 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({ lesson, onNextTab }) => {
         </div>
       </div>
 
+      <TutorChat
+        lesson={lesson}
+        isLessonCleared={isLessonCleared}
+        onMarkCleared={onMarkCleared}
+      />
+
       <div style={{ textAlign: 'right', marginTop: '20px' }}>
-        <button className="btn btn-primary" onClick={onNextTab}>
+        <button className="btn btn-primary" onClick={onNextTab} disabled={!isLessonCleared}>
           Tiếp tục sang Trắc Nghiệm ➡️
         </button>
       </div>

@@ -25,6 +25,7 @@ interface AppState {
   } | null;
   streakDays: number;
   lastActiveDate: string;
+  clearedLessons: Record<string, boolean>;
 }
 
 export const App: React.FC = () => {
@@ -39,7 +40,8 @@ export const App: React.FC = () => {
       sprintExamScores: {},
       finalExam: null,
       streakDays: 1,
-      lastActiveDate: new Date().toISOString().split('T')[0]
+      lastActiveDate: new Date().toISOString().split('T')[0],
+      clearedLessons: {}
     };
   });
 
@@ -91,6 +93,13 @@ export const App: React.FC = () => {
         ...prev.completedLessons,
         [lessonId]: { completedAt: new Date().toISOString() }
       }
+    }));
+  };
+
+  const handleLessonCleared = (lessonId: string) => {
+    setState((prev) => ({
+      ...prev,
+      clearedLessons: { ...(prev.clearedLessons || {}), [lessonId]: true }
     }));
   };
 
@@ -166,10 +175,11 @@ export const App: React.FC = () => {
                   📖 Lý Thuyết & Code Mẫu
                 </button>
                 <button
-                  className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('quiz')}
+                  className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''} ${!state.clearedLessons?.[currentLesson.id] ? 'locked' : ''}`}
+                  onClick={() => state.clearedLessons?.[currentLesson.id] && setActiveTab('quiz')}
+                  disabled={!state.clearedLessons?.[currentLesson.id]}
                 >
-                  ❓ Trắc Nghiệm Ôn Luyện{' '}
+                  {state.clearedLessons?.[currentLesson.id] ? '❓' : '🔒'} Trắc Nghiệm Ôn Luyện{' '}
                   <span className="tab-badge">{currentLesson.quiz.length}</span>
                 </button>
                 <button
@@ -186,6 +196,8 @@ export const App: React.FC = () => {
               {activeTab === 'theory' && (
                 <TheoryTab
                   lesson={currentLesson}
+                  isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
+                  onMarkCleared={() => handleLessonCleared(currentLesson.id)}
                   onNextTab={() => setActiveTab('quiz')}
                 />
               )}

@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tutorHandler from './api/tutor';
-import { handleApiRequest } from './api/router';
+import { handleApiRequest } from './api/index';
 
 function localBackendApi(): Plugin {
   return {

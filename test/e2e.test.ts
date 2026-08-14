@@ -1,5 +1,4 @@
-import { dbService, verifyPassword, hashPassword } from '../api/db.ts';
-import { handleApiRequest } from '../api/router.ts';
+import { handleApiRequest, verifyPassword, hashPassword } from '../api/index.ts';
 
 interface MockResponse {
   statusCode: number;

@@ -28,7 +28,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
 
   const [studentName, setStudentName] = useState<string>('Đại Ca Kỹ Sư');
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
-  const [code, setCode] = useState<string>(exam.codeChallenge.starterCode);
+  const [codes, setCodes] = useState<string[]>(exam.codeChallenges.map(c => c.starterCode));
   const [timeLeft, setTimeLeft] = useState<number>(exam.timeLimitMinutes * 60);
 
   useEffect(() => {
@@ -67,16 +67,19 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
     });
     const quizScore = Math.round((correctCount / exam.questions.length) * 100);
 
-    const codeOutcome = await CodeEvaluator.runTests(
-      code,
-      exam.codeChallenge.testCases,
-      true
-    );
-    const codeScore = codeOutcome.passed
-      ? 100
-      : Math.round((codeOutcome.passedCount / codeOutcome.total) * 100);
+    let totalCodeScore = 0;
+    for (let i = 0; i < exam.codeChallenges.length; i++) {
+      const outcome = await CodeEvaluator.runTests(
+        codes[i],
+        exam.codeChallenges[i].testCases,
+        true
+      );
+      const score = outcome.passed ? 100 : Math.round((outcome.passedCount / outcome.total) * 100);
+      totalCodeScore += score;
+    }
+    const avgCodeScore = Math.round(totalCodeScore / exam.codeChallenges.length);
 
-    const finalScore = Math.round(quizScore * 0.5 + codeScore * 0.5);
+    const finalScore = Math.round(quizScore * 0.5 + avgCodeScore * 0.5);
     const passed = finalScore >= exam.passingScore;
 
     onFinalExamSubmitted(finalScore, passed, studentName);
@@ -158,19 +161,30 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
         ))}
       </div>
 
-      <div className="sandbox-card" style={{ marginBottom: '32px' }}>
-        <div className="sandbox-header">
-          <h3 className="sandbox-title">Phần 2: {exam.codeChallenge.title}</h3>
-          <p className="sandbox-desc">{exam.codeChallenge.description}</p>
-        </div>
-        <div className="editor-container">
-          <textarea
-            className="code-textarea"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            spellCheck="false"
-          />
-        </div>
+      <div style={{ marginBottom: '32px' }}>
+        <h3 style={{ color: 'var(--text-primary)', fontSize: '18px', marginBottom: '16px' }}>
+          Phần 2: Thực Hành Code ({exam.codeChallenges.length} bài)
+        </h3>
+        {exam.codeChallenges.map((challenge, idx) => (
+          <div key={idx} className="sandbox-card" style={{ marginBottom: '24px' }}>
+            <div className="sandbox-header">
+              <h3 className="sandbox-title">Bài {idx + 1}: {challenge.title}</h3>
+              <p className="sandbox-desc">{challenge.description}</p>
+            </div>
+            <div className="editor-container">
+              <textarea
+                className="code-textarea"
+                value={codes[idx]}
+                onChange={(e) => {
+                  const newCodes = [...codes];
+                  newCodes[idx] = e.target.value;
+                  setCodes(newCodes);
+                }}
+                spellCheck="false"
+              />
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: '60px' }}>

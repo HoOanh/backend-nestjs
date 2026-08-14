@@ -145,15 +145,30 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
       <div className="sandbox-card" style={{ marginBottom: '32px' }}>
         <div className="sandbox-header">
-          <h3 className="sandbox-title">Phần 2: {exam.codeChallenge.title}</h3>
+          <h3 className="sandbox-title">Phần 2: Lab Thực Hành — {exam.codeChallenge.title}</h3>
           <p className="sandbox-desc">{exam.codeChallenge.description}</p>
         </div>
-        <div className="editor-container">
+        <div className="editor-container" style={{ position: 'relative' }}>
           <textarea
             className="code-textarea"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             spellCheck="false"
+            style={{
+              width: '100%',
+              minHeight: '280px',
+              fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
+              fontSize: '13.5px',
+              lineHeight: '1.6',
+              padding: '16px',
+              background: 'var(--code-bg)',
+              color: 'var(--code-content-color)',
+              border: '1px solid var(--code-border)',
+              borderRadius: 'var(--radius-sm)',
+              resize: 'vertical',
+              tabSize: 2,
+              outline: 'none'
+            }}
           />
         </div>
       </div>

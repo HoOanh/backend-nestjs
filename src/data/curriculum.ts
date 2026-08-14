@@ -124,6 +124,66 @@ export class InventoryCategoryService {
             ],
             correctIndex: 1,
             explanation: 'Vì Backend là tiến trình tập trung duy nhất, một lỗi không được bắt (unhandled crash) sẽ làm tắt cả tiến trình Node.js, ngắt kết nối của mọi người dùng.'
+          },
+          {
+            id: 'l1-q4',
+            question: 'Khái niệm "Stateless Server" có nghĩa là gì?',
+            options: [
+              'Server không bao giờ lỗi',
+              'Không lưu trữ trạng thái phiên trong RAM giữa các request',
+              'Không kết nối DB',
+              'Không có OS'
+            ],
+            correctIndex: 1,
+            explanation: 'Stateless: mỗi request tự chứa đủ thông tin để xử lý.'
+          },
+          {
+            id: 'l1-q5',
+            question: 'Trong NestJS, Singleton Pattern có nghĩa là gì?',
+            options: [
+              'Mỗi user 1 object',
+              'Một instance duy nhất chia sẻ toàn app',
+              'Class không kế thừa',
+              'Chỉ trả về 1 giá trị'
+            ],
+            correctIndex: 1,
+            explanation: 'Singleton là 1 object duy nhất tồn tại xuyên suốt vòng đời app.'
+          },
+          {
+            id: 'l1-q6',
+            question: 'Điều gì xảy ra nếu sửa biến global khi đang xử lý request A?',
+            options: [
+              'Chỉ A thấy',
+              'DB rollback',
+              'Request B xử lý đồng thời cũng thấy và sai lệch',
+              'Trình duyệt báo lỗi'
+            ],
+            correctIndex: 2,
+            explanation: 'Biến global chia sẻ chung gây Race Condition.'
+          },
+          {
+            id: 'l1-q7',
+            question: 'Tại sao không dùng fs.readFileSync trong API handler?',
+            options: [
+              'Block Event Loop, request khác phải chờ',
+              'Khóa file',
+              'Dữ liệu nhị phân',
+              'NestJS cấm fs'
+            ],
+            correctIndex: 0,
+            explanation: 'Hàm sync chặn main thread, giảm concurrency.'
+          },
+          {
+            id: 'l1-q8',
+            question: 'Để chia sẻ dữ liệu an toàn xuyên request (như userId), NestJS khuyên dùng gì?',
+            options: [
+              'Global vars',
+              'Static array',
+              'Truyền tham số hàm hoặc Request-scoped',
+              'Ghi ra file'
+            ],
+            correctIndex: 2,
+            explanation: 'Tham số hàm là cách truyền thống và an toàn nhất.'
           }
         ],
         codeChallenge: {
@@ -170,6 +230,30 @@ export class InventoryCategoryService {
               name: 'Case 4 (Hidden): User null -> gán object rỗng an toàn',
               input: ['req-103', null, 'unit-01'],
               expected: { requestId: 'req-103', user: {}, unitId: 'unit-01' },
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Request ID rỗng',
+              input: ['   ', {"id":"u2"}, 'unit-02'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Unit ID không phải chuỗi',
+              input: ['req-1', {"id":"u"}, 123],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Thiếu tham số',
+              input: ['req-1'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 8 (Hidden): Null',
+              input: [null, null, null],
+              expected: 'ERROR_THROWN',
               hidden: true
             }
           ]
@@ -254,6 +338,66 @@ async getClinicDashboardSummary(unitId: string, fromDate: Date, toDate: Date) {
             ],
             correctIndex: 1,
             explanation: 'Promise.all có cơ chế Fail-fast: chỉ cần 1 promise thất bại thì toàn bộ Promise.all sẽ reject ngay lập tức.'
+          },
+          {
+            id: 'l2-q4',
+            question: 'Luồng chính (Main Thread) của Node.js xử lý việc gì?',
+            options: [
+              'Mọi thứ',
+              'Chỉ mã JavaScript',
+              'Chỉ I/O',
+              'Chỉ Network'
+            ],
+            correctIndex: 1,
+            explanation: 'Main thread xử lý JS, I/O đẩy cho libuv/OS.'
+          },
+          {
+            id: 'l2-q5',
+            question: 'Threadpool trong Node.js (libuv) dùng làm gì?',
+            options: [
+              'Chạy mọi async',
+              'Chạy API File, DNS, Crypto',
+              'Chỉ chạy HTTP',
+              'Chạy React'
+            ],
+            correctIndex: 1,
+            explanation: 'Threadpool hỗ trợ các tác vụ không dùng được async I/O của OS.'
+          },
+          {
+            id: 'l2-q6',
+            question: 'Tại sao không nên dùng while(true) trong Node.js?',
+            options: [
+              'Block Event Loop vĩnh viễn',
+              'Lỗi cú pháp',
+              'Không thể break',
+              'Máy tính nổ'
+            ],
+            correctIndex: 0,
+            explanation: 'While true chiếm trọn CPU main thread.'
+          },
+          {
+            id: 'l2-q7',
+            question: 'Làm sao xử lý tác vụ CPU nặng mà không block Event Loop?',
+            options: [
+              'Dùng setTimeout',
+              'Dùng Worker Threads hoặc process riêng',
+              'Dùng Promise',
+              'Dùng async/await'
+            ],
+            correctIndex: 1,
+            explanation: 'Worker Threads chia sẻ CPU ra thread khác.'
+          },
+          {
+            id: 'l2-q8',
+            question: 'Promise.allSettled khác Promise.all như thế nào?',
+            options: [
+              'Chạy nhanh hơn',
+              'Đợi tất cả xong dù lỗi hay thành công',
+              'Chạy từng cái một',
+              'Chỉ trả thành công'
+            ],
+            correctIndex: 1,
+            explanation: 'allSettled không fail-fast, nó gom kết quả của tất cả.'
           }
         ],
         codeChallenge: {
@@ -302,6 +446,30 @@ async getClinicDashboardSummary(unitId: string, fromDate: Date, toDate: Date) {
               name: 'Case 3 (Hidden): Task bị timeout -> Trả về TIMEOUT',
               input: [[async () => new Promise(r => setTimeout(() => r('SLOW'), 200))], 50],
               expected: [{ success: false, error: 'TIMEOUT' }],
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Mảng rỗng',
+              input: [[], 1000],
+              expected: [],
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Không phải mảng func',
+              input: [[1,2], 1000],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Timeout âm',
+              input: [["async () => 1"], -100],
+              expected: [{"success":false,"error":"TIMEOUT"}],
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Mix func null',
+              input: [["async () => 1",null], 1000],
+              expected: 'ERROR_THROWN',
               hidden: true
             }
           ]
@@ -384,6 +552,66 @@ export function configureApp(app: NestExpressApplication, config: ConfigService)
             ],
             correctIndex: 1,
             explanation: 'GET, PUT, DELETE là Idempotent vì dù gọi 1 lần hay 10 lần thì trạng thái cuối cùng của tài nguyên trong database vẫn như nhau.'
+          },
+          {
+            id: 'l3-q4',
+            question: 'Preflight request (OPTIONS) sinh ra do đâu?',
+            options: [
+              'Server',
+              'CORS của Trình duyệt tự gửi trước',
+              'Database',
+              'Router'
+            ],
+            correctIndex: 1,
+            explanation: 'Trình duyệt gửi OPTIONS để kiểm tra quyền CORS trước khi gửi request thực.'
+          },
+          {
+            id: 'l3-q5',
+            question: 'Method HTTP nào không an toàn để lặp lại (Non-Idempotent)?',
+            options: [
+              'GET',
+              'PUT',
+              'DELETE',
+              'POST'
+            ],
+            correctIndex: 3,
+            explanation: 'POST thường tạo bản ghi mới, gọi 2 lần ra 2 bản ghi.'
+          },
+          {
+            id: 'l3-q6',
+            question: 'SameSite attribute trong Cookie có tác dụng gì?',
+            options: [
+              'Ngăn CSRF',
+              'Tăng tốc load',
+              'Chống XSS',
+              'Mã hóa data'
+            ],
+            correctIndex: 0,
+            explanation: 'SameSite=Strict/Lax giúp trình duyệt không gửi cookie trong cross-site request.'
+          },
+          {
+            id: 'l3-q7',
+            question: 'Mã lỗi HTTP 422 mang ý nghĩa gì?',
+            options: [
+              'Lỗi server',
+              'Không tìm thấy',
+              'Unprocessable Entity (lỗi logic/nghiệp vụ)',
+              'Chưa đăng nhập'
+            ],
+            correctIndex: 2,
+            explanation: 'Dữ liệu đúng format nhưng sai về mặt logic hệ thống.'
+          },
+          {
+            id: 'l3-q8',
+            question: 'Header Authorization: Bearer thường chứa gì?',
+            options: [
+              'Password',
+              'JWT Access Token',
+              'Cookie',
+              'Session ID'
+            ],
+            correctIndex: 1,
+            explanation: 'Chuẩn OAuth2 dùng Bearer để truyền JWT token.'
           }
         ],
         codeChallenge: {
@@ -422,6 +650,30 @@ export function configureApp(app: NestExpressApplication, config: ConfigService)
               name: 'Case 3 (Hidden): Format lỗi 404 không có details',
               input: [404, 'not_found', 'Không tìm thấy bệnh nhân'],
               expected: { status: 404, code: 'NOT_FOUND', message: 'Không tìm thấy bệnh nhân', details: null },
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Không truyền params',
+              input: [],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Status 600',
+              input: [600, 'ERR', 'Lỗi'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Message null',
+              input: [400, 'ERR', null],
+              expected: {"status":400,"code":"ERR","message":"null","details":null},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Details type check',
+              input: [404, 'N', 'M', 'string'],
+              expected: {"status":404,"code":"N","message":"M","details":"string"},
               hidden: true
             }
           ]
@@ -504,6 +756,66 @@ export class InventoryModule {}`,
             ],
             correctIndex: 0,
             explanation: '@Injectable() gắn metadata để NestJS IoC Container nhận diện và quản lý vòng đời của class đó.'
+          },
+          {
+            id: 'l4-q4',
+            question: 'Trong NestJS, @Module dùng để làm gì?',
+            options: [
+              'Khai báo DB',
+              'Gom nhóm các thành phần liên quan',
+              'Chạy script',
+              'Cấu hình CORS'
+            ],
+            correctIndex: 1,
+            explanation: 'Tổ chức code thành các khối tính năng.'
+          },
+          {
+            id: 'l4-q5',
+            question: 'Mảng "imports" trong @Module làm gì?',
+            options: [
+              'Nạp các module khác',
+              'Import thư viện npm',
+              'Chạy middleware',
+              'Xuất service'
+            ],
+            correctIndex: 0,
+            explanation: 'Nạp provider từ module khác đã export.'
+          },
+          {
+            id: 'l4-q6',
+            question: 'Global module là gì?',
+            options: [
+              'Có sẵn mọi nơi không cần import',
+              'Module lỗi',
+              'Module chưa hoàn thành',
+              'Module Frontend'
+            ],
+            correctIndex: 0,
+            explanation: '@Global() giúp module có mặt mọi nơi.'
+          },
+          {
+            id: 'l4-q7',
+            question: 'Dependency Injection giúp ích gì cho Unit Test?',
+            options: [
+              'Chạy nhanh',
+              'Dễ dàng mock/stub phụ thuộc',
+              'Không cần viết test',
+              'Tự generate test'
+            ],
+            correctIndex: 1,
+            explanation: 'Ta có thể truyền Mock object vào constructor thay vì object thật.'
+          },
+          {
+            id: 'l4-q8',
+            question: 'Circular Dependency xảy ra khi nào?',
+            options: [
+              'Module A import B, B import A',
+              'Module A export B',
+              'Module không import',
+              'Lỗi DB'
+            ],
+            correctIndex: 0,
+            explanation: 'Vòng lặp phụ thuộc khiến IoC không thể resolve.'
           }
         ],
         codeChallenge: {
@@ -543,6 +855,30 @@ export class InventoryModule {}`,
               ],
               expected: 'ERROR_THROWN',
               hidden: false
+            },
+            {
+              name: 'Case 3 (Hidden): Thiếu nhiều',
+              input: [{"A":1}, ["A","B","C"]],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Required tokens rỗng',
+              input: [{"A":1}, []],
+              expected: {},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Registry null',
+              input: [null, ["A"]],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Invalid required format',
+              input: [{"A":1}, 'A'],
+              expected: {},
+              hidden: true
             }
           ]
         }
@@ -627,6 +963,66 @@ export class InventoryCategoryController {
             ],
             correctIndex: 1,
             explanation: '@Body() lấy toàn bộ hoặc một thuộc tính cụ thể từ Request Body JSON.'
+          },
+          {
+            id: 'l5-q4',
+            question: 'Decorator @Res() dùng để làm gì?',
+            options: [
+              'Lấy DB',
+              'Truy cập raw Express/Fastify response object',
+              'Trả về JSON',
+              'Đọc Body'
+            ],
+            correctIndex: 1,
+            explanation: 'Dùng khi cần kiểm soát response hoàn toàn (stream, file download).'
+          },
+          {
+            id: 'l5-q5',
+            question: 'DTO nên được hứng bằng decorator nào?',
+            options: [
+              '@Body()',
+              '@Query()',
+              'Cả Body và Query',
+              'Không dùng decorator'
+            ],
+            correctIndex: 2,
+            explanation: 'Cả Body(POST/PUT) và Query(GET) đều dùng DTO.'
+          },
+          {
+            id: 'l5-q6',
+            question: 'Điều gì xảy ra nếu quên @Param() trong tham số controller?',
+            options: [
+              'Tham số undefined',
+              'Crash server',
+              'Tự lấy id',
+              'Lỗi DB'
+            ],
+            correctIndex: 0,
+            explanation: 'NestJS sẽ không map tham số URL vào biến, biến sẽ là undefined.'
+          },
+          {
+            id: 'l5-q7',
+            question: 'ParseIntPipe làm gì?',
+            options: [
+              'Lọc XSS',
+              'Chuyển chuỗi URL parameter sang số nguyên',
+              'Kiểm tra mật khẩu',
+              'Tìm theo ID'
+            ],
+            correctIndex: 1,
+            explanation: 'Ép kiểu params string thành int.'
+          },
+          {
+            id: 'l5-q8',
+            question: 'Controller có nên gọi thẳng database không?',
+            options: [
+              'Nên',
+              'Tuyệt đối KHÔNG, hãy giao cho Service',
+              'Chỉ khi query ngắn',
+              'Tùy framework'
+            ],
+            correctIndex: 1,
+            explanation: 'Vi phạm Single Responsibility Principle.'
           }
         ],
         codeChallenge: {
@@ -669,6 +1065,30 @@ export class InventoryCategoryController {
               name: 'Case 3 (Hidden): Lệch độ dài URL -> Không khớp',
               input: ['categories/:id', 'categories/c-1/items'],
               expected: { isMatch: false, params: {} },
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Ký tự lạ trong param',
+              input: ['/a/:id', '/a/123@!#'],
+              expected: {"isMatch":true,"params":{"id":"123@!#"}},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Thiếu path',
+              input: ['/a/:id', '/a'],
+              expected: {"isMatch":false,"params":{}},
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): URL dài hơn',
+              input: ['/a/:id', '/a/1/2'],
+              expected: {"isMatch":false,"params":{}},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Cùng start match',
+              input: ['/api/v1', '/api/v2'],
+              expected: {"isMatch":false,"params":{}},
               hidden: true
             }
           ]
@@ -736,6 +1156,66 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             ],
             correctIndex: 0,
             explanation: 'Request Scope tạo ra overhead lớn về Garbage Collection (GC) và khởi tạo instance liên tục, làm giảm RPS (Requests Per Second) của server.'
+          },
+          {
+            id: 'l6-q4',
+            question: 'OnApplicationBootstrap khác OnModuleInit như nào?',
+            options: [
+              'Chạy trước',
+              'Chạy sau khi TẤT CẢ module đã khởi tạo xong',
+              'Không dùng được',
+              'Lỗi runtime'
+            ],
+            correctIndex: 1,
+            explanation: 'Bootstrap chạy khi mọi init đã hoàn thành.'
+          },
+          {
+            id: 'l6-q5',
+            question: 'Làm sao để inject config tùy chỉnh?',
+            options: [
+              'process.env',
+              'ConfigService',
+              'Ghi file',
+              'Biến global'
+            ],
+            correctIndex: 1,
+            explanation: 'ConfigService cung cấp type-safety và quản lý env tập trung.'
+          },
+          {
+            id: 'l6-q6',
+            question: 'Transient scope là gì?',
+            options: [
+              '1 instance',
+              'Mỗi request 1 instance',
+              'Mỗi nơi inject sẽ tạo 1 instance mới',
+              'Global instance'
+            ],
+            correctIndex: 2,
+            explanation: 'Cứ Inject là có instance mới, không chia sẻ.'
+          },
+          {
+            id: 'l6-q7',
+            question: 'Service A gọi Service B (cùng module), cần import gì ở A?',
+            options: [
+              'Import Module B',
+              'Không cần, chỉ inject ở constructor',
+              'Import Controller',
+              'Dùng require'
+            ],
+            correctIndex: 1,
+            explanation: 'Cùng module thì IoC đã có sẵn provider.'
+          },
+          {
+            id: 'l6-q8',
+            question: 'Graceful shutdown là gì?',
+            options: [
+              'Rút điện máy chủ',
+              'Dừng nhận request mới, xử lý nốt request cũ và tắt DB kết nối',
+              'Restart liên tục',
+              'Xóa RAM'
+            ],
+            correctIndex: 1,
+            explanation: 'Đóng ứng dụng an toàn không rớt kết nối đột ngột.'
           }
         ],
         codeChallenge: {
@@ -780,6 +1260,30 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               name: 'Case 3 (Hidden): Trang 3 của 5 trang -> hasNext & hasPrev đều true',
               input: [100, 3, 20, 100],
               expected: { page: 3, pageSize: 20, total: 100, totalPages: 5, skip: 40, take: 20, hasNext: true, hasPrev: true },
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Âm total',
+              input: [-10, 1, 20, 100],
+              expected: {"page":1,"pageSize":20,"total":0,"totalPages":0,"skip":0,"take":20,"hasNext":false,"hasPrev":false},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Page âm',
+              input: [100, -5, 20, 100],
+              expected: {"page":1,"pageSize":20,"total":100,"totalPages":5,"skip":0,"take":20,"hasNext":true,"hasPrev":false},
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Chuỗi rác',
+              input: ['abc', 'def', 'ghi', 100],
+              expected: {"page":1,"pageSize":100,"total":0,"totalPages":0,"skip":0,"take":100,"hasNext":false,"hasPrev":false},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Page zero',
+              input: [50, 0, 10, 20],
+              expected: {"page":1,"pageSize":10,"total":50,"totalPages":5,"skip":0,"take":10,"hasNext":true,"hasPrev":false},
               hidden: true
             }
           ]
@@ -859,6 +1363,66 @@ export class CreateInventoryItemDto {
             ],
             correctIndex: 0,
             explanation: 'Mọi query param trên URL đều là chuỗi (string). class-transformer giúp ép kiểu sang đúng kiểu dữ liệu nguyên thủy mong muốn.'
+          },
+          {
+            id: 'l7-q4',
+            question: 'class-validator là thư viện dùng làm gì?',
+            options: [
+              'Validate Entity',
+              'Cung cấp decorator như @IsString() cho DTO',
+              'Query DB',
+              'Render UI'
+            ],
+            correctIndex: 1,
+            explanation: 'Kết hợp cùng ValidationPipe để kiểm tra request.'
+          },
+          {
+            id: 'l7-q5',
+            question: 'transform: true trong ValidationPipe làm gì?',
+            options: [
+              'Xóa DTO',
+              'Tự động ép kiểu (VD: string "123" -> number 123)',
+              'Ẩn lỗi',
+              'Đổi tên biến'
+            ],
+            correctIndex: 1,
+            explanation: 'Tự convert payload về đúng kiểu khai báo.'
+          },
+          {
+            id: 'l7-q6',
+            question: 'forbidNonWhitelisted: true có tác dụng gì?',
+            options: [
+              'Trả về 400 nếu client gửi thừa trường rác',
+              'Cho qua mọi thứ',
+              'Chặn IP',
+              'Lỗi 500'
+            ],
+            correctIndex: 0,
+            explanation: 'Bảo vệ API khỏi các trường không lường trước.'
+          },
+          {
+            id: 'l7-q7',
+            question: '@ApiProperty() dùng để làm gì?',
+            options: [
+              'Khai báo biến',
+              'Tạo document Swagger tự động',
+              'Xác thực',
+              'Lưu DB'
+            ],
+            correctIndex: 1,
+            explanation: 'Tạo meta cho OpenAPI/Swagger UI.'
+          },
+          {
+            id: 'l7-q8',
+            question: 'DTO nên chứa logic nghiệp vụ không?',
+            options: [
+              'Có',
+              'Không, chỉ Data Transfer (cấu trúc)',
+              'Tùy',
+              'Rất nên'
+            ],
+            correctIndex: 1,
+            explanation: 'DTO chỉ định nghĩa hình dáng và luật lệ validation cơ bản.'
           }
         ],
         codeChallenge: {
@@ -919,6 +1483,30 @@ export class CreateInventoryItemDto {
                 { price: 'NOT_A_NUMBER' }
               ],
               expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Payload rỗng, DTO có required',
+              input: [{}, {"name":"required"}],
+              expected: {"isValid":false,"errors":["name:required"]},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): DTO sai rule',
+              input: [{"a":1}, {"a":"string"}],
+              expected: {"isValid":false,"errors":["a:string"]},
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Thừa trường (không bị bắt)',
+              input: [{"a":1,"b":2}, {"a":"number"}],
+              expected: {"isValid":true,"errors":[]},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Null object',
+              input: [null, {}],
+              expected: {"isValid":false,"errors":[]},
               hidden: true
             }
           ]
@@ -1002,6 +1590,66 @@ model InventoryItem {
             ],
             correctIndex: 1,
             explanation: 'Composite Unique đảm bảo tính duy nhất theo phạm vi từng tenant, cho phép các phòng khám độc lập tự đặt mã sản phẩm mà không bị xung đột nhau.'
+          },
+          {
+            id: 'l8-q4',
+            question: 'Khóa ngoại (Foreign Key) dùng để làm gì?',
+            options: [
+              'Tạo index',
+              'Đảm bảo tính toàn vẹn tham chiếu giữa 2 bảng',
+              'Tăng tốc tìm kiếm',
+              'Lưu cache'
+            ],
+            correctIndex: 1,
+            explanation: 'Tránh việc bảng A trỏ ID tới bảng B nhưng ID đó không tồn tại.'
+          },
+          {
+            id: 'l8-q5',
+            question: 'Composite Index (Index ghép) là gì?',
+            options: [
+              'Index trên nhiều DB',
+              'Index gồm 2 hay nhiều cột kết hợp',
+              'Index tự tăng',
+              'Index bị lỗi'
+            ],
+            correctIndex: 1,
+            explanation: 'Dùng tối ưu các query WHERE col1 AND col2.'
+          },
+          {
+            id: 'l8-q6',
+            question: 'N-N relationship (nhiều-nhiều) thường yêu cầu gì ở DB?',
+            options: [
+              'Không tạo được',
+              'Bảng trung gian (Join table/Pivot table)',
+              'Khóa chính kép',
+              'JSON field'
+            ],
+            correctIndex: 1,
+            explanation: 'Ví dụ User-Role cần bảng UserRoles trung gian.'
+          },
+          {
+            id: 'l8-q7',
+            question: 'Chuẩn hóa DB (Normalization) nhằm mục đích gì?',
+            options: [
+              'Tăng dữ liệu',
+              'Giảm dư thừa dữ liệu (Data Redundancy)',
+              'Làm DB chậm hơn',
+              'Tạo nhiều view'
+            ],
+            correctIndex: 1,
+            explanation: 'Tránh việc phải update 1 thông tin ở nhiều nơi.'
+          },
+          {
+            id: 'l8-q8',
+            question: 'Index B-Tree hoạt động tốt nhất cho phép so sánh nào?',
+            options: [
+              'LIKE %x%',
+              'Dấu Bằng (=) và khoảng (>, <)',
+              'REGEX',
+              'Đảo chuỗi'
+            ],
+            correctIndex: 1,
+            explanation: 'Cấu trúc cây tìm kiếm tối ưu cho equals và range scan.'
           }
         ],
         codeChallenge: {
@@ -1057,6 +1705,30 @@ model InventoryItem {
               name: 'Case 3 (Hidden): Lọc theo status',
               input: ['u-20', { status: 'ACTIVE' }],
               expected: { unitId: 'u-20', status: 'ACTIVE' },
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Không có tenantId',
+              input: ['SELECT * FROM user', ''],
+              expected: 'SELECT * FROM user',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): SQL injection attempt',
+              input: ['SELECT * FROM t', '1 OR 1=1'],
+              expected: 'SELECT * FROM (SELECT * FROM t) AS T WHERE tenant_id = \'1 OR 1=1\'',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Table name rác',
+              input: ['DROP TABLE', '123'],
+              expected: 'SELECT * FROM (DROP TABLE) AS T WHERE tenant_id = \'123\'',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): SQL complex',
+              input: ['SELECT a, b FROM c JOIN d', 'u1'],
+              expected: 'SELECT * FROM (SELECT a, b FROM c JOIN d) AS T WHERE tenant_id = \'u1\'',
               hidden: true
             }
           ]
@@ -1124,6 +1796,66 @@ export default defineConfig({
             ],
             correctIndex: 0,
             explanation: 'prisma db push đồng bộ trực tiếp schema lên DB và sẵn sàng drop table/column nếu phát hiện thay đổi, rất nguy hiểm cho Production.'
+          },
+          {
+            id: 'l9-q4',
+            question: 'Lệnh npx prisma format có tác dụng gì?',
+            options: [
+              'Xóa DB',
+              'Định dạng lại file schema.prisma cho chuẩn',
+              'Chạy migrate',
+              'Tạo API'
+            ],
+            correctIndex: 1,
+            explanation: 'Auto-format indent, references.'
+          },
+          {
+            id: 'l9-q5',
+            question: 'Prisma Client được generate ra nằm ở đâu?',
+            options: [
+              'node_modules/.prisma/client',
+              'src/',
+              'db/',
+              'Không ở đâu cả'
+            ],
+            correctIndex: 0,
+            explanation: 'Được sinh tự động trong node_modules để tiện import.'
+          },
+          {
+            id: 'l9-q6',
+            question: 'Lệnh npx prisma db push dùng khi nào?',
+            options: [
+              'Lên Production',
+              'Chỉ dùng ở môi trường DEV (đồng bộ nhanh, không sinh file migration)',
+              'Tạo backup',
+              'Xóa bảng'
+            ],
+            correctIndex: 1,
+            explanation: 'Push không giữ lịch sử migrate, chỉ dùng lúc Dev.'
+          },
+          {
+            id: 'l9-q7',
+            question: 'Khai báo @default(uuid()) trong Prisma làm gì?',
+            options: [
+              'Lỗi cú pháp',
+              'Tự động gán UUID v4 khi insert',
+              'Xóa cột',
+              'Index cột'
+            ],
+            correctIndex: 1,
+            explanation: 'Sử dụng uuid sinh tự động ở tầng application/DB.'
+          },
+          {
+            id: 'l9-q8',
+            question: 'Trong Prisma, dấu ? sau kiểu dữ liệu (String?) ý nghĩa gì?',
+            options: [
+              'Cột đó nullable (có thể rỗng/null)',
+              'Regex',
+              'Báo lỗi',
+              'Tìm kiếm mờ'
+            ],
+            correctIndex: 0,
+            explanation: 'Biến cột thành kiểu T | null.'
           }
         ],
         codeChallenge: {
@@ -1158,6 +1890,30 @@ export default defineConfig({
               name: 'Case 3 (Hidden): Chuỗi rỗng -> chuỗi rỗng',
               input: [''],
               expected: '',
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Schema rỗng',
+              input: [''],
+              expected: [],
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Models không có field',
+              input: ['model A {}'],
+              expected: ["A"],
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Nhiều model và enum',
+              input: ['model A{} enum B{} model C{}'],
+              expected: ["A","C"],
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Dư model trong string',
+              input: ['model   test  {'],
+              expected: ["test"],
               hidden: true
             }
           ]
@@ -1236,6 +1992,66 @@ export async function resolveDoctorNames(prisma: PrismaService, unitId: string, 
             ],
             correctIndex: 0,
             explanation: 'Thay vì N câu query riêng lẻ, Batching chỉ thực hiện 1 câu query duy nhất gom tất cả ID lại.'
+          },
+          {
+            id: 'l10-q4',
+            question: 'Lệnh include trong Prisma findAll làm gì?',
+            options: [
+              'Load kèm các bảng có quan hệ (JOIN)',
+              'Xóa bảng',
+              'Lọc data',
+              'Sắp xếp'
+            ],
+            correctIndex: 0,
+            explanation: 'Tương đương Eager Loading / LEFT JOIN.'
+          },
+          {
+            id: 'l10-q5',
+            question: 'Vấn đề N+1 Query thường do đâu?',
+            options: [
+              'Máy chủ yếu',
+              'Lặp vòng lặp for và gọi truy vấn cho từng phần tử',
+              'DB quá lớn',
+              'Dùng ORM'
+            ],
+            correctIndex: 1,
+            explanation: 'Chạy N truy vấn con cho 1 danh sách N phần tử thay vì IN(id).'
+          },
+          {
+            id: 'l10-q6',
+            question: 'select trong Prisma khác gì include?',
+            options: [
+              'Giống hệt',
+              'select chỉ lấy ra đúng các cột/relation mình muốn (Tối ưu RAM)',
+              'select báo lỗi',
+              'select chậm hơn'
+            ],
+            correctIndex: 1,
+            explanation: 'Include lấy tất cả cột, select chọn lọc cột.'
+          },
+          {
+            id: 'l10-q7',
+            question: 'Prisma Batching xử lý N+1 như thế nào (DataLoader)?',
+            options: [
+              'Không xử lý',
+              'Tự gom các query trùng lặp/giống nhau gửi 1 lần (query bundling)',
+              'Gửi N query',
+              'Khóa DB'
+            ],
+            correctIndex: 1,
+            explanation: 'Prisma có Data Loader pattern tích hợp sẵn.'
+          },
+          {
+            id: 'l10-q8',
+            question: 'Upsert trong Prisma là hành động gì?',
+            options: [
+              'Update nếu tồn tại, Insert nếu không tồn tại',
+              'Xóa bảng',
+              'Sắp xếp ngược',
+              'Tạo mới'
+            ],
+            correctIndex: 0,
+            explanation: 'Lệnh cực kỳ hữu ích thay cho kiểm tra find -> if -> create/update.'
           }
         ],
         codeChallenge: {
@@ -1278,6 +2094,30 @@ export async function resolveDoctorNames(prisma: PrismaService, unitId: string, 
               ],
               expected: [{ id: 'i3', categoryId: 'c99', categoryName: null }],
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): List rỗng',
+              input: [[], []],
+              expected: [],
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Không có parent khớp',
+              input: [[{"id":1,"pId":99}], []],
+              expected: [{"id":1,"pId":99,"parent":null}],
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Nhiều phần tử trỏ cùng 1 parent',
+              input: [[{"id":1,"pId":10},{"id":2,"pId":10}], [{"id":10,"name":"P"}]],
+              expected: [{"id":1,"pId":10,"parent":{"id":10,"name":"P"}},{"id":2,"pId":10,"parent":{"id":10,"name":"P"}}],
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Không pId',
+              input: [[{"id":1}], [{"id":1}]],
+              expected: [{"id":1,"parent":null}],
+              hidden: true
             }
           ]
         }
@@ -1364,6 +2204,66 @@ async transferStock(unitId: string, fromWh: string, toWh: string, itemId: string
             ],
             correctIndex: 1,
             explanation: 'Read Committed là mức cô lập mặc định của PostgreSQL, đảm bảo câu query chỉ đọc được dữ liệu đã được commit bởi các transaction khác.'
+          },
+          {
+            id: 'l11-q4',
+            question: 'Transaction Isolation Level ngăn ngừa lỗi gì?',
+            options: [
+              'Sai UI',
+              'Các Race Conditions như Dirty Read, Non-Repeatable Read, Phantom Read',
+              'Lỗi CPU',
+              'Lỗi CSS'
+            ],
+            correctIndex: 1,
+            explanation: 'Mức độ cách ly càng cao càng an toàn nhưng làm giảm tính đồng thời.'
+          },
+          {
+            id: 'l11-q5',
+            question: 'Pessimistic Locking (Khóa bi quan) là gì?',
+            options: [
+              'Khóa ngay từ đầu bằng FOR UPDATE',
+              'Không khóa',
+              'Khóa UI',
+              'Dùng versioning'
+            ],
+            correctIndex: 0,
+            explanation: 'Bắt các transaction khác phải chờ cho đến khi commit.'
+          },
+          {
+            id: 'l11-q6',
+            question: 'Optimistic Locking (Khóa lạc quan) thường dùng gì?',
+            options: [
+              'Cột version hoặc updatedAt',
+              'FOR UPDATE',
+              'Wait 10s',
+              'Block User'
+            ],
+            correctIndex: 0,
+            explanation: 'Cho phép đọc tự do, khi update check version. Nếu version đổi -> Retry.'
+          },
+          {
+            id: 'l11-q7',
+            question: 'Prisma Interactive Transaction dùng method gì?',
+            options: [
+              'prisma.$transaction(async (tx) => {})',
+              'prisma.run()',
+              'prisma.tx()',
+              'prisma.begin()'
+            ],
+            correctIndex: 0,
+            explanation: 'Chạy một callback async với client tx chứa lock.'
+          },
+          {
+            id: 'l11-q8',
+            question: 'Deadlock xảy ra khi nào?',
+            options: [
+              'DB đầy',
+              'Hai transaction khóa tài nguyên chéo nhau và chờ đợi vô tận',
+              'Quá timeout',
+              'Mất mạng'
+            ],
+            correctIndex: 1,
+            explanation: 'Tx1 đợi Lock B của Tx2, Tx2 đợi Lock A của Tx1.'
           }
         ],
         codeChallenge: {
@@ -1415,6 +2315,30 @@ async transferStock(unitId: string, fromWh: string, toWh: string, itemId: string
             {
               name: 'Case 3 (Hidden): Trùng tài khoản gửi và nhận -> Báo lỗi',
               input: [{}, 'acc-1', 'acc-1', 100000],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Lỗi tx bị reject',
+              input: [async () => { throw new Error('fail'); }],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Không callback',
+              input: [null],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Return object rỗng',
+              input: [async () => ({})],
+              expected: {"success":true,"result":{}},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Error normal string',
+              input: [async () => { throw 'error'; }],
               expected: 'ERROR_THROWN',
               hidden: true
             }
@@ -1489,6 +2413,66 @@ async update(unitId: string, id: string, dto: UpdateInventoryCategoryDto) {
             ],
             correctIndex: 0,
             explanation: 'IDOR xảy ra khi server tin tưởng ID gửi lên từ client mà quên kiểm tra ID đó có thuộc về unitId của tài khoản đang đăng nhập hay không.'
+          },
+          {
+            id: 'l12-q4',
+            question: 'Row-Level Security (RLS) ở DB giúp ích gì?',
+            options: [
+              'Lọc Data ở tầng SQL thay vì Code',
+              'Làm đẹp DB',
+              'Tăng tốc Disk',
+              'Giao diện'
+            ],
+            correctIndex: 0,
+            explanation: 'Tránh leak data bằng policy trực tiếp trên DB.'
+          },
+          {
+            id: 'l12-q5',
+            question: 'Prisma Client Extension dùng làm gì trong Multi-tenant?',
+            options: [
+              'Thêm auto query filter { unitId } vào mọi tác vụ CRUD',
+              'Đổi màu log',
+              'Format JSON',
+              'Tự xóa DB'
+            ],
+            correctIndex: 0,
+            explanation: 'Cơ chế can thiệp Prisma để tự đính unitId chống rò rỉ tenant.'
+          },
+          {
+            id: 'l12-q6',
+            question: 'Data Leak (rò rỉ dữ liệu) Tenant xảy ra khi nào?',
+            options: [
+              'Quên WHERE unitId = X khi truy vấn',
+              'Lỗi CSS',
+              'Sai JWT',
+              'Quên mật khẩu'
+            ],
+            correctIndex: 0,
+            explanation: 'Lỗi con người quên where clause khiến trả nhầm data.'
+          },
+          {
+            id: 'l12-q7',
+            question: 'Cách thiết kế Multi-tenant 1 Database nhưng nhiều Schema có tên gọi là gì?',
+            options: [
+              'Shared DB Shared Schema',
+              'Shared DB Separate Schema',
+              'Separate DB',
+              'No DB'
+            ],
+            correctIndex: 1,
+            explanation: 'Dùng schema của PostgreSQL (Namespace).'
+          },
+          {
+            id: 'l12-q8',
+            question: 'Với eSmiles, cách triển khai tenant là gì?',
+            options: [
+              'Nhiều server',
+              'Shared DB, chung bảng, phân biệt bằng cột unitId',
+              '1 DB 1 User',
+              'File XML'
+            ],
+            correctIndex: 1,
+            explanation: 'Row-level tenancy (Shared Database, Shared Schema).'
           }
         ],
         codeChallenge: {
@@ -1543,6 +2527,30 @@ async update(unitId: string, id: string, dto: UpdateInventoryCategoryDto) {
               ],
               expected: 'ERROR_THROWN',
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Mảng where rỗng',
+              input: [{}, 'u-2'],
+              expected: {"where":{"unitId":"u-2"}},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Query không phải object',
+              input: [null, 'u-3'],
+              expected: {"where":{"unitId":"u-3"}},
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Where là null',
+              input: [{"where":null}, 'u-4'],
+              expected: {"where":{"unitId":"u-4"}},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Có where sẵn',
+              input: [{"where":{"id":1}}, 'u-5'],
+              expected: {"where":{"id":1,"unitId":"u-5"}},
+              hidden: true
             }
           ]
         }
@@ -1637,6 +2645,66 @@ export class AllExceptionsFilter implements ExceptionFilter {
             ],
             correctIndex: 0,
             explanation: 'Không bao giờ được trả về Database credentials hoặc raw SQL trong response 500 vì lý do an toàn bảo mật.'
+          },
+          {
+            id: 'l13-q4',
+            question: 'HttpException trong NestJS dùng làm gì?',
+            options: [
+              'Lỗi UI',
+              'Ném ra một Response Error chuẩn có StatusCode xác định',
+              'Báo lỗi DB',
+              'Tạo file'
+            ],
+            correctIndex: 1,
+            explanation: 'Base class cho mọi error HTTP (BadRequest, NotFound).'
+          },
+          {
+            id: 'l13-q5',
+            question: 'Trong ExceptionFilter, làm sao log lỗi 500?',
+            options: [
+              'Lưu vào DB',
+              'Dùng nest Logger, Sentry, hoặc File',
+              'Bỏ qua',
+              'Gửi email'
+            ],
+            correctIndex: 1,
+            explanation: 'Ghi log (stack trace) ra hệ thống APM (như Sentry).'
+          },
+          {
+            id: 'l13-q6',
+            question: 'Bắt lỗi ValidationPipe thuộc loại HTTP status nào?',
+            options: [
+              '500',
+              '400 Bad Request',
+              '404',
+              '200'
+            ],
+            correctIndex: 1,
+            explanation: 'Dữ liệu đầu vào sai cấu trúc.'
+          },
+          {
+            id: 'l13-q7',
+            question: 'Catch-all Exception Filter bắt những gì?',
+            options: [
+              'Chỉ lỗi 500',
+              'Mọi Exception bị ném ra mà chưa có ai catch',
+              'Lỗi mạng',
+              'Lỗi CSS'
+            ],
+            correctIndex: 1,
+            explanation: 'Bắt tất cả lỗi chưa được xử lý để tránh sập app và che giấu stack trace.'
+          },
+          {
+            id: 'l13-q8',
+            question: 'Gửi Stack Trace ra môi trường Production (Client) có sao không?',
+            options: [
+              'Tốt cho debug',
+              'Nguy hiểm, lộ cấu trúc code và bí mật hệ thống',
+              'Không ảnh hưởng',
+              'Làm app nhanh hơn'
+            ],
+            correctIndex: 1,
+            explanation: 'Chỉ gửi message chung (Internal Error), log stacktrace vào hệ thống nội bộ.'
           }
         ],
         codeChallenge: {
@@ -1691,6 +2759,30 @@ export class AllExceptionsFilter implements ExceptionFilter {
               name: 'Case 3 (Hidden): Lỗi lạ -> 500 INTERNAL_ERROR',
               input: [{ message: 'Crash' }, '/api/test'],
               expected: { success: false, statusCode: 500, errorCode: 'INTERNAL_ERROR', message: 'Lỗi hệ thống', path: '/api/test' },
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Error không có type',
+              input: [{}],
+              expected: {"status":500,"message":"Internal Server Error","error":"Internal Server Error"},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Lỗi Prisma',
+              input: [{"code":"P2002","meta":{"target":"email"}}],
+              expected: {"status":409,"message":"Unique constraint failed","error":"Conflict"},
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Null',
+              input: [null],
+              expected: {"status":500,"message":"Internal Server Error","error":"Internal Server Error"},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): HttpException',
+              input: [{}],
+              expected: {"status":403,"message":"Forbidden","error":"Forbidden"},
               hidden: true
             }
           ]
@@ -1763,6 +2855,66 @@ export async function verifyPassword(hash: string, plainText: string): Promise<b
             ],
             correctIndex: 0,
             explanation: 'SameSite ngăn chặn việc trình duyệt tự động gửi cookie khi người dùng bị lừa click vào link từ trang web độc hại của bên thứ ba.'
+          },
+          {
+            id: 'l14-q4',
+            question: 'Argon2 vượt trội hơn Bcrypt ở điểm nào?',
+            options: [
+              'Tốc độ mã hóa 1ms',
+              'Bảo vệ mạnh mẽ khỏi các cuộc tấn công bằng GPU/ASIC do đòi hỏi nhiều RAM',
+              'Đọc dễ',
+              'Sinh ngẫu nhiên'
+            ],
+            correctIndex: 1,
+            explanation: 'Argon2 là chuẩn mã hóa mật khẩu hiện đại nhất (winner của PHC).'
+          },
+          {
+            id: 'l14-q5',
+            question: 'Salt (Muối) trong mã hóa mật khẩu dùng làm gì?',
+            options: [
+              'Cho mặn',
+              'Chuỗi ngẫu nhiên nối vào mật khẩu trước khi băm, giúp chặn Rainbow Table Attack',
+              'Tăng tốc',
+              'Tạo session'
+            ],
+            correctIndex: 1,
+            explanation: 'Đảm bảo cùng 1 mật khẩu băm ra kết quả khác nhau.'
+          },
+          {
+            id: 'l14-q6',
+            question: 'Refresh Token khác gì Access Token?',
+            options: [
+              'Ngắn hơn',
+              'Thời gian sống (TTL) dài hơn, dùng để lấy Access Token mới mà không cần đăng nhập lại',
+              'Được gửi mọi request',
+              'Lưu trên mây'
+            ],
+            correctIndex: 1,
+            explanation: 'Access Token sống ngắn (15m), Refresh Token sống dài (7d).'
+          },
+          {
+            id: 'l14-q7',
+            question: 'Thuộc tính Secure trong Cookie làm gì?',
+            options: [
+              'Mã hóa data',
+              'Chỉ gửi cookie nếu đường truyền là HTTPS',
+              'Chặn JS',
+              'Chặn CORS'
+            ],
+            correctIndex: 1,
+            explanation: 'Tránh gửi cookie dạng bản rõ qua HTTP.'
+          },
+          {
+            id: 'l14-q8',
+            question: 'Khi User đổi mật khẩu, hệ thống phải làm gì với Refresh Token cũ?',
+            options: [
+              'Không làm gì',
+              'Thu hồi (Revoke/Xóa) toàn bộ phiên đăng nhập cũ',
+              'Sửa lại',
+              'Mã hóa lại'
+            ],
+            correctIndex: 1,
+            explanation: 'Đảm bảo kẻ xấu bị văng ra khỏi các thiết bị.'
           }
         ],
         codeChallenge: {
@@ -1805,6 +2957,30 @@ export async function verifyPassword(hash: string, plainText: string): Promise<b
             {
               name: 'Case 3 (Hidden): Thiếu trường uid -> Ném lỗi',
               input: [{ sub: 'acc-1', exp: 1700000000 }, 1600000000],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Payload có object',
+              input: [{"role":"ADMIN","data":{"x":1}}],
+              expected: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyNyb2xlIjoiQURNSU4iLCJkYXRhIjp7IngiOjF9fQ.signature_mock',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Null payload',
+              input: [null],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): String payload',
+              input: ['string'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Undefined',
+              input: [],
               expected: 'ERROR_THROWN',
               hidden: true
             }
@@ -1886,6 +3062,66 @@ export class PermissionGuard implements CanActivate {
             ],
             correctIndex: 2,
             explanation: 'Prefix /api/p/v1 phân vùng riêng cho bề mặt bệnh nhân (Patient / Public Portal).'
+          },
+          {
+            id: 'l15-q4',
+            question: 'ABAC (Attribute-Based Access Control) khác gì RBAC?',
+            options: [
+              'Chỉ phân quyền Role',
+              'Phân quyền dựa trên thuộc tính của User, Tài nguyên và Môi trường (vd: chỉ được xóa nếu là người tạo)',
+              'Cũ hơn',
+              'Không dùng database'
+            ],
+            correctIndex: 1,
+            explanation: 'CASL nổi tiếng về ABAC.'
+          },
+          {
+            id: 'l15-q5',
+            question: 'Trong CASL, "subject" là gì?',
+            options: [
+              'Tên bài học',
+              'Thực thể bị tác động (User, Invoice, Patient)',
+              'Role',
+              'Hành động'
+            ],
+            correctIndex: 1,
+            explanation: 'can("update", "Invoice").'
+          },
+          {
+            id: 'l15-q6',
+            question: 'Vì sao nên viết Policy Check ở tầng Service thay vì Controller?',
+            options: [
+              'Controller không hỗ trợ',
+              'Service có thể query thêm data từ DB để check quyền ABAC phức tạp (vd: check owner)',
+              'Controller làm chậm',
+              'Service tự động check'
+            ],
+            correctIndex: 1,
+            explanation: 'Cần logic DB (đọc object ra check) thì phải nằm ở service.'
+          },
+          {
+            id: 'l15-q7',
+            question: '@RequirePermission() decorator hoạt động như thế nào?',
+            options: [
+              'Là một Guard, chạy trước khi vào handler',
+              'Sửa DB',
+              'Khởi động app',
+              'Tạo token'
+            ],
+            correctIndex: 0,
+            explanation: 'Guard kiểm tra metadata của Route so với Token User.'
+          },
+          {
+            id: 'l15-q8',
+            question: 'Đại lý (Tenant) Admin có quyền xóa hệ thống không?',
+            options: [
+              'Có',
+              'Không, chỉ SuperAdmin của nền tảng',
+              'Tùy chọn',
+              'Luôn luôn'
+            ],
+            correctIndex: 1,
+            explanation: 'Tenant Admin chỉ có toàn quyền trong Unit/Tenant của họ.'
           }
         ],
         codeChallenge: {
@@ -1925,6 +3161,30 @@ export class PermissionGuard implements CanActivate {
               name: 'Case 3 (Hidden): Không đủ quyền -> FORBIDDEN',
               input: [{ permissions: ['inventory:item:read'] }, 'inventory:item:delete'],
               expected: { allowed: false, reason: 'FORBIDDEN' },
+              hidden: true
+            },
+            {
+              name: 'Case 4 (Hidden): Mảng roles rỗng',
+              input: [[], 'update', 'user'],
+              expected: false,
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Rule bị deny',
+              input: [[{"action":"update","subject":"user","inverted":true}], 'update', 'user'],
+              expected: false,
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Action manage bao trọn',
+              input: [[{"action":"manage","subject":"all"}], 'delete', 'post'],
+              expected: true,
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Action manage reject inverted',
+              input: [[{"action":"manage","subject":"all","inverted":true}], 'delete', 'post'],
+              expected: false,
               hidden: true
             }
           ]
@@ -2011,6 +3271,66 @@ export class CacheLookupService {
             ],
             correctIndex: 0,
             explanation: 'Redis INCR với TTL cho phép đếm số lượng request siêu nhanh ở mức vi-giây để chặn tấn công DDoS/Brute-force.'
+          },
+          {
+            id: 'l16-q4',
+            question: 'Redis là gì?',
+            options: [
+              'Relational DB',
+              'In-memory Key-Value Store siêu tốc độ',
+              'Web server',
+              'Message Queue độc quyền'
+            ],
+            correctIndex: 1,
+            explanation: 'Tốc độ ms nhờ lưu trên RAM.'
+          },
+          {
+            id: 'l16-q5',
+            question: 'Lệnh SETEX trong Redis làm gì?',
+            options: [
+              'Set rỗng',
+              'Ghi key-value kèm theo thời gian sống (TTL)',
+              'Xóa',
+              'Tìm kiếm'
+            ],
+            correctIndex: 1,
+            explanation: 'Tự động bốc hơi khỏi RAM khi hết hạn (Cache Expiration).'
+          },
+          {
+            id: 'l16-q6',
+            question: 'Cache Stampede (Thundering Herd) là hiện tượng gì?',
+            options: [
+              'Redis lỗi',
+              'Hàng nghìn request đồng loạt query DB khi 1 Cache Key vừa hết hạn',
+              'Xóa cache nhầm',
+              'Tràn RAM'
+            ],
+            correctIndex: 1,
+            explanation: 'DB có thể sập tức thì.'
+          },
+          {
+            id: 'l16-q7',
+            question: 'Rate Limiting (Token Bucket) dùng Redis để làm gì?',
+            options: [
+              'Lưu token đăng nhập',
+              'Đếm số request của 1 IP/User trong thời gian ngắn để chặn Spam/DDoS',
+              'Tăng tốc mạng',
+              'Chặn VPN'
+            ],
+            correctIndex: 1,
+            explanation: 'Tăng biến đếm trong Redis, vượt ngưỡng -> 429.'
+          },
+          {
+            id: 'l16-q8',
+            question: 'Dữ liệu nào phù hợp nhất để Cache?',
+            options: [
+              'Mật khẩu',
+              'Lịch sử giao dịch 1 lần',
+              'Danh mục, cấu hình, dữ liệu đọc nhiều ghi ít',
+              'Chat realtime'
+            ],
+            correctIndex: 2,
+            explanation: 'High read - low write ratio (VD: Master Data).'
           }
         ],
         codeChallenge: {
@@ -2048,6 +3368,30 @@ export class CacheLookupService {
               ],
               expected: 'OLD_DATA',
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Không truyền TTL',
+              input: ['A'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): TTL = 0',
+              input: ['B', 0],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): String an toàn',
+              input: ['C!@#', 10],
+              expected: 'cache_prefix_C!@#_10',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Rỗng key',
+              input: ['', 10],
+              expected: 'ERROR_THROWN',
+              hidden: true
             }
           ]
         }
@@ -2114,6 +3458,66 @@ export class AppointmentReminderProducer {
             ],
             correctIndex: 0,
             explanation: 'Dead Letter Queue lưu giữ các job thất bại hoàn toàn để admin có thể kiểm tra nguyên nhân và bấm retry thủ công khi sửa xong lỗi.'
+          },
+          {
+            id: 'l17-q4',
+            question: 'Message Queue (như BullMQ) dùng để làm gì?',
+            options: [
+              'Thay thế DB',
+              'Tách các tác vụ nặng (gửi email, tính toán) chạy nền ở worker riêng',
+              'Gửi HTTP',
+              'Cache dữ liệu'
+            ],
+            correctIndex: 1,
+            explanation: 'Offload CPU và I/O ra khỏi HTTP Event Loop.'
+          },
+          {
+            id: 'l17-q5',
+            question: 'BullMQ sử dụng DB/Store nào làm lõi lưu trữ queue?',
+            options: [
+              'Postgres',
+              'MongoDB',
+              'Redis',
+              'RabbitMQ'
+            ],
+            correctIndex: 2,
+            explanation: 'BullMQ viết trên Redis Streams.'
+          },
+          {
+            id: 'l17-q6',
+            question: 'DLQ (Dead Letter Queue) là gì?',
+            options: [
+              'Hàng đợi rỗng',
+              'Nơi chứa các Job đã retry nhiều lần vẫn thất bại để kỹ sư kiểm tra',
+              'Xóa data',
+              'Log file'
+            ],
+            correctIndex: 1,
+            explanation: 'Tránh job lỗi cứ retry mãi vòng lặp vô hạn.'
+          },
+          {
+            id: 'l17-q7',
+            question: 'Job Idempotency trong Queue quan trọng thế nào?',
+            options: [
+              'Làm chậm hệ thống',
+              'Đảm bảo nếu Worker bị tắt giữa chừng và chạy lại Job, DB không bị trừ/cộng tiền 2 lần',
+              'Không cần',
+              'Chỉ dùng cho mail'
+            ],
+            correctIndex: 1,
+            explanation: 'Xử lý At-least-once delivery của Queue.'
+          },
+          {
+            id: 'l17-q8',
+            question: 'Job Concurrency là gì?',
+            options: [
+              'Xóa job',
+              'Số lượng Job mà Worker xử lý đồng thời',
+              'Tốc độ mạng',
+              'Thời gian chờ'
+            ],
+            correctIndex: 1,
+            explanation: 'Quy định worker cắn bao nhiêu job cùng lúc.'
           }
         ],
         codeChallenge: {
@@ -2151,6 +3555,30 @@ export class AppointmentReminderProducer {
               ],
               expected: 'ERROR_THROWN',
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Mảng jobs rỗng',
+              input: [[]],
+              expected: [],
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Job không có payload',
+              input: [[{"name":"A"}]],
+              expected: [{"name":"A","id":"job_2","status":"PENDING"}],
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Job sai cấu trúc',
+              input: [[123]],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Nhiều jobs hợp lệ',
+              input: [[{"name":"A","data":1},{"name":"B","data":2}]],
+              expected: [{"name":"A","data":1,"id":"job_3","status":"PENDING"},{"name":"B","data":2,"id":"job_4","status":"PENDING"}],
+              hidden: true
             }
           ]
         }
@@ -2225,6 +3653,66 @@ export class FileService {
             ],
             correctIndex: 0,
             explanation: 'Đặt prefix {unitId}/ ở đầu đường dẫn object giúp cô lập hoàn toàn vùng lưu trữ file của từng phòng khám.'
+          },
+          {
+            id: 'l18-q4',
+            question: 'Presigned URL là gì?',
+            options: [
+              'URL lỗi',
+              'URL sinh ra từ server, cho phép Client tải trực tiếp file lên S3/MinIO mà không cần stream qua Backend',
+              'URL chứa virus',
+              'URL đăng nhập'
+            ],
+            correctIndex: 1,
+            explanation: 'Giảm 100% băng thông và RAM cho Backend.'
+          },
+          {
+            id: 'l18-q5',
+            question: 'Tại sao không lưu file thẳng vào thư mục source code hoặc Database?',
+            options: [
+              'Đỡ tốn điện',
+              'Khó scale nhiều server, db phình to, load chậm',
+              'Không tạo được file',
+              'Vì dễ bị hack'
+            ],
+            correctIndex: 1,
+            explanation: 'Lưu file làm hỏng nguyên lý Stateless Server.'
+          },
+          {
+            id: 'l18-q6',
+            question: 'MinIO là phần mềm mô phỏng giao thức của dịch vụ nào?',
+            options: [
+              'Google Drive',
+              'AWS S3',
+              'Dropbox',
+              'FTP'
+            ],
+            correctIndex: 1,
+            explanation: 'MinIO chuẩn 100% S3 API.'
+          },
+          {
+            id: 'l18-q7',
+            question: 'Multipart Upload dùng khi nào?',
+            options: [
+              'File < 1MB',
+              'File siêu lớn (VD: video 5GB), chia nhỏ ra up song song',
+              'Up nhiều file',
+              'Tạo folder'
+            ],
+            correctIndex: 1,
+            explanation: 'Chia chunk upload an toàn.'
+          },
+          {
+            id: 'l18-q8',
+            question: 'Trường MIME Type (ContentType) trong upload làm gì?',
+            options: [
+              'Mã hóa file',
+              'Nói cho trình duyệt biết đây là ảnh (image/jpeg) hay pdf để hiển thị',
+              'Check dung lượng',
+              'Xóa file'
+            ],
+            correctIndex: 1,
+            explanation: 'Quan trọng để browser không bắt tải về như tệp vô danh.'
           }
         ],
         codeChallenge: {
@@ -2256,6 +3744,30 @@ export class FileService {
               input: ['u-01', 'docs', 'virus.exe', 'application/x-msdownload', ['image/jpeg', 'application/pdf']],
               expected: 'ERROR_THROWN',
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Tên file rỗng',
+              input: ['  ', 'img/png'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Có tiếng việt/khoảng trắng',
+              input: ['ảnh đẹp.png', 'image/png'],
+              expected: 'anh-dep-123.png',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Thiếu mime',
+              input: ['test.pdf'],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Không dấu chấm đuôi',
+              input: ['test', 'image/png'],
+              expected: 'test-123',
+              hidden: true
             }
           ]
         }
@@ -2325,6 +3837,66 @@ export class ClinicRealtimeGateway implements OnGatewayConnection {
             ],
             correctIndex: 0,
             explanation: 'WebSocket duy trì kết nối sống, giúp server bắn dữ liệu xuống client với độ trễ chỉ vài mili-giây mà client không cần gửi request hỏi liên tục (Polling).'
+          },
+          {
+            id: 'l19-q4',
+            question: 'Giao thức WebSocket hoạt động thế nào?',
+            options: [
+              'Gửi request nhận response rồi đóng',
+              'Duy trì kết nối TCP 2 chiều liên tục (Full-duplex)',
+              'Chỉ dùng UDP',
+              'Tương đương HTTP'
+            ],
+            correctIndex: 1,
+            explanation: 'Client và Server có thể push data cho nhau bất cứ lúc nào.'
+          },
+          {
+            id: 'l19-q5',
+            question: 'Redis Adapter trong Socket.IO giải quyết bài toán gì?',
+            options: [
+              'Ghi log',
+              'Khi có nhiều node Backend, event bắn từ Node A sẽ được chia sẻ sang Node B qua Redis pub/sub',
+              'Nén data',
+              'Cache HTTP'
+            ],
+            correctIndex: 1,
+            explanation: 'Giúp scale horizontally WebSocket Server.'
+          },
+          {
+            id: 'l19-q6',
+            question: 'Rooms trong Socket.IO là khái niệm gì?',
+            options: [
+              'Phòng chat',
+              'Nhóm các kết nối lại (ví dụ theo unitId), server chỉ phát tín hiệu vào nhóm đó',
+              'Chặn IP',
+              'Gửi toàn bộ'
+            ],
+            correctIndex: 1,
+            explanation: 'Giúp Broadcast tiết kiệm tài nguyên.'
+          },
+          {
+            id: 'l19-q7',
+            question: 'Làm sao xác thực (Authenticate) WebSocket connection?',
+            options: [
+              'Qua Body',
+              'Gửi Token ngay khi mở kết nối (Handshake Auth) và check ở Gateway',
+              'Không cần',
+              'Tự check'
+            ],
+            correctIndex: 1,
+            explanation: 'Chặn từ cửa Handshake để đỡ tốn connection.'
+          },
+          {
+            id: 'l19-q8',
+            question: 'Nhược điểm của WebSocket?',
+            options: [
+              'Chậm',
+              'Tốn nhiều TCP Connection và RAM duy trì, khó scale load balancer hơn HTTP stateless',
+              'Bảo mật kém',
+              'Không gửi JSON được'
+            ],
+            correctIndex: 1,
+            explanation: 'LB phải cấu hình sticky session hoặc Redis Adapter.'
           }
         ],
         codeChallenge: {
@@ -2367,6 +3939,30 @@ export class ClinicRealtimeGateway implements OnGatewayConnection {
               input: [{ 'unit:10': [] }, '20', 'test', {}],
               expected: [],
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Payload rỗng',
+              input: ['chat', null],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Không truyền event name',
+              input: ['', {"a":1}],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): String payload',
+              input: ['ping', 'pong'],
+              expected: '{"event":"ping","data":"pong"}',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Array payload',
+              input: ['list', [1,2,3]],
+              expected: '{"event":"list","data":[1,2,3]}',
+              hidden: true
             }
           ]
         }
@@ -2446,6 +4042,66 @@ export class AuditService {
             ],
             correctIndex: 0,
             explanation: 'Tính bất biến (Immutability) của Audit Log là nguyên tắc pháp lý cốt lõi để chống gian lận và chối bỏ trách nhiệm.'
+          },
+          {
+            id: 'l20-q4',
+            question: 'Event-driven Architecture (EDA) khác Rest API như thế nào?',
+            options: [
+              'Đồng bộ hoàn toàn',
+              'Dịch vụ A phát ra Event (Event Publisher), các dịch vụ B, C tự động lắng nghe mà không cần A biết B,C là ai (Decoupling)',
+              'A gọi B chờ B xong',
+              'Chậm hơn'
+            ],
+            correctIndex: 1,
+            explanation: 'Mô hình Fire-and-Forget giảm Coupling.'
+          },
+          {
+            id: 'l20-q5',
+            question: 'Audit Log (Nhật ký kiểm toán) lưu gì?',
+            options: [
+              'Lỗi code 500',
+              'Ghi nhận Ai (User), làm Gì (Action), trên dữ liệu nào (Entity), lúc nào, kết quả ra sao',
+              'File css',
+              'Log nginx'
+            ],
+            correctIndex: 1,
+            explanation: 'Chức năng pháp lý trong y tế/tài chính.'
+          },
+          {
+            id: 'l20-q6',
+            question: 'NestJS EventEmitter2 dùng làm gì?',
+            options: [
+              'Kafka pubsub',
+              'Phát và lắng nghe sự kiện TRONG CÙNG 1 tiến trình Node.js (In-memory)',
+              'Redis',
+              'DB trigger'
+            ],
+            correctIndex: 1,
+            explanation: 'Gọn nhẹ cho monolith.'
+          },
+          {
+            id: 'l20-q7',
+            question: 'Khi ghi Audit Log tốn thời gian, ta nên làm gì?',
+            options: [
+              'Bỏ qua',
+              'Ghi bất đồng bộ (Event) không làm chậm request của User',
+              'Khóa DB',
+              'Chờ ghi xong'
+            ],
+            correctIndex: 1,
+            explanation: 'Lắng nghe event và insert Audit sau khi trả response.'
+          },
+          {
+            id: 'l20-q8',
+            question: 'Eventual Consistency (Nhất quán muộn) là rủi ro gì của Event Driven?',
+            options: [
+              'Lỗi luôn',
+              'Dữ liệu ở các hệ thống không đồng bộ tức thì, cần thời gian trễ',
+              'Mất dữ liệu',
+              'Bảo mật'
+            ],
+            correctIndex: 1,
+            explanation: 'User update X, nhưng Service Y đọc vẫn thấy cũ trong 1 giây.'
           }
         ],
         codeChallenge: {
@@ -2487,6 +4143,30 @@ export class AuditService {
               input: [{ a: 1, b: 2 }, { a: 1, b: 2 }],
               expected: {},
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Missing action',
+              input: [{"user":"U1","payload":"1"}],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Missing user',
+              input: [{"action":"CREATE","payload":"1"}],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Chuỗi rỗng',
+              input: [{"user":"","action":"","payload":{}}],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Đúng cấu trúc',
+              input: [{"user":"A","action":"B","payload":{}}],
+              expected: {"user":"A","action":"B","payload":{}},
+              hidden: true
             }
           ]
         }
@@ -2562,6 +4242,66 @@ body:json {
             ],
             correctIndex: 0,
             explanation: 'File .bru là định dạng text thuần (Plain text DSL), có thể mở bằng Bruno App hoặc VS Code.'
+          },
+          {
+            id: 'l21-q4',
+            question: 'CI/CD Gate là gì?',
+            options: [
+              'Cổng mạng',
+              'Tiến trình tự động chặn code merge nếu Test, Lint hoặc Build thất bại',
+              'Cổng login',
+              'Lỗi DB'
+            ],
+            correctIndex: 1,
+            explanation: 'Giữ code base luôn xanh (Green).'
+          },
+          {
+            id: 'l21-q5',
+            question: 'Bruno là công cụ gì?',
+            options: [
+              'Thay thế Postman/Insomnia, lưu test dạng file text (Bru) dễ đưa lên Git',
+              'Web server',
+              'Database',
+              'IDE code'
+            ],
+            correctIndex: 0,
+            explanation: 'Hoạt động offline và lưu file .bru trực tiếp vào source control.'
+          },
+          {
+            id: 'l21-q6',
+            question: 'API Testing Assertions là gì?',
+            options: [
+              'Bấm gửi',
+              'Các câu lệnh kiểm tra xem Response (Status, Body) có đúng kỳ vọng không',
+              'Tạo tài liệu',
+              'Deploy'
+            ],
+            correctIndex: 1,
+            explanation: 'expect(res.status).toBe(200).'
+          },
+          {
+            id: 'l21-q7',
+            question: 'Husky pre-commit hook làm gì?',
+            options: [
+              'Push code',
+              'Tự động chạy script (Lint, Typecheck) TRƯỚC KHI git commit được tạo',
+              'Kéo code',
+              'Cài gói npm'
+            ],
+            correctIndex: 1,
+            explanation: 'Chặn dev commit code rác lên máy chủ.'
+          },
+          {
+            id: 'l21-q8',
+            question: 'Chạy npx tsc --noEmit để làm gì?',
+            options: [
+              'Tạo file js',
+              'Kiểm tra lỗi kiểu dữ liệu (Type check) của TypeScript mà không biên dịch ra file mới',
+              'Xóa file',
+              'Chạy test'
+            ],
+            correctIndex: 1,
+            explanation: 'Bắt lỗi cú pháp tĩnh nhanh chóng.'
           }
         ],
         codeChallenge: {
@@ -2585,6 +4325,30 @@ body:json {
               input: ['List Categories', 'GET', '{{baseUrl}}/api/i/v1/inventory/categories', 'unit-1', 'token-123', null],
               expected: 'meta {\n  name: List Categories\n  type: http\n}\n\nget {\n  url: {{baseUrl}}/api/i/v1/inventory/categories\n  auth: bearer\n}\n\nheaders {\n  X-Unit-Id: unit-1\n}\n',
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Result is null',
+              input: [200, null, 200],
+              expected: 'ERROR_THROWN',
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Expect status 400',
+              input: [200, {"a":1}, 400],
+              expected: false,
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Missing keys',
+              input: [200, {"b":1}, 200, ["a"]],
+              expected: false,
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): Match keys ok',
+              input: [200, {"a":1,"b":2}, 200, ["a","b"]],
+              expected: true,
+              hidden: true
             }
           ]
         }
@@ -2668,6 +4432,66 @@ describe('InventoryCategoryService', () => {
             ],
             correctIndex: 0,
             explanation: 'toHaveBeenCalledWith là assertion cơ bản để verify xem Service có truyền đúng tham số (ví dụ đúng unitId) xuống Prisma hay không.'
+          },
+          {
+            id: 'l22-q4',
+            question: 'Khác biệt giữa Unit Test và E2E Test?',
+            options: [
+              'Không có',
+              'Unit Test giả lập DB (Mock), E2E Test gọi HTTP xuyên thẳng DB thật/test',
+              'Unit nhanh hơn',
+              'E2E là viết bằng tay'
+            ],
+            correctIndex: 1,
+            explanation: 'Unit test test hàm đơn lẻ. E2E test cả hệ thống.'
+          },
+          {
+            id: 'l22-q5',
+            question: 'Jest spyOn() dùng làm gì?',
+            options: [
+              'Tấn công DB',
+              'Theo dõi và thay thế một hàm thật bằng hàm Mock (vd: chặn không cho gửi mail thật)',
+              'Đo thời gian',
+              'Quay video'
+            ],
+            correctIndex: 1,
+            explanation: 'Đóng thế các side-effects.'
+          },
+          {
+            id: 'l22-q6',
+            question: 'Supertest là công cụ gì?',
+            options: [
+              'Framework E2E',
+              'Thư viện giả lập HTTP Request để test API mà không cần mở Port thật',
+              'Database in-mem',
+              'Check css'
+            ],
+            correctIndex: 1,
+            explanation: 'Gắn thẳng vào app NestJS và gửi request ảo.'
+          },
+          {
+            id: 'l22-q7',
+            question: 'Test Coverage là chỉ số gì?',
+            options: [
+              'Tốc độ test',
+              'Tỉ lệ % dòng code đã được chạy qua bởi Test runner',
+              'Dung lượng code',
+              'Bảo mật'
+            ],
+            correctIndex: 1,
+            explanation: 'Bao nhiêu % file được test quét qua (nhưng 100% chưa chắc không có bug).'
+          },
+          {
+            id: 'l22-q8',
+            question: 'Trong Unit Test, beforeEach() làm gì?',
+            options: [
+              'Chạy sau khi test xong',
+              'Chạy 1 block setup (reset mock, nạp data) TRƯỚC MỖI test case (it)',
+              'Báo lỗi',
+              'Xóa DB'
+            ],
+            correctIndex: 1,
+            explanation: 'Giúp các test case hoàn toàn độc lập, không bị rò rỉ state.'
           }
         ],
         codeChallenge: {
@@ -2704,6 +4528,30 @@ describe('InventoryCategoryService', () => {
               ],
               expected: 'ERROR_THROWN',
               hidden: false
+            },
+            {
+              name: 'Case 4 (Hidden): Mảng rỗng',
+              input: [[]],
+              expected: {"total":0,"passed":0,"failed":0},
+              hidden: true
+            },
+            {
+              name: 'Case 5 (Hidden): Các object null',
+              input: [[null,{"status":"failed"},null]],
+              expected: {"total":3,"passed":0,"failed":1},
+              hidden: true
+            },
+            {
+              name: 'Case 6 (Hidden): Trạng thái rác',
+              input: [[{"status":"passed"},{"status":"error"},{"status":"passed"}]],
+              expected: {"total":3,"passed":2,"failed":0},
+              hidden: true
+            },
+            {
+              name: 'Case 7 (Hidden): All passed',
+              input: [[{"status":"passed"},{"status":"passed"}]],
+              expected: {"total":2,"passed":2,"failed":0},
+              hidden: true
             }
           ]
         }

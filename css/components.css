@@ -1,0 +1,550 @@
+/* ==========================================================================
+   eSmiles Backend Academy - Components Stylesheet
+   Interactive Lesson View, Quizzes, Code Sandbox, Exam & Certificate
+   ========================================================================== */
+
+/* Navigation Tabs */
+.lesson-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 24px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+.tab-badge {
+  font-size: 11px;
+  background: var(--bg-surface-elevated);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+/* Theory & Real Code Section */
+.theory-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 28px;
+}
+
+.theory-content h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 20px 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theory-content h3:first-child {
+  margin-top: 0;
+}
+
+.theory-content p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+.theory-content ul, .theory-content ol {
+  margin-left: 24px;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.theory-content li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.theory-content strong {
+  color: var(--text-primary);
+}
+
+.theory-content code {
+  font-family: var(--font-mono);
+  background: var(--bg-surface-subtle);
+  color: #38bdf8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13.5px;
+}
+
+/* Code Blocks */
+.code-block-wrapper {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-md);
+  margin: 16px 0 24px 0;
+  overflow: hidden;
+}
+
+.code-block-header {
+  background: #090e17;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--code-border);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.code-block-content {
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #e2e8f0;
+  white-space: pre;
+}
+
+.real-source-callout {
+  background: rgba(14, 165, 233, 0.08);
+  border-left: 4px solid var(--accent-primary);
+  padding: 16px 20px;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-bottom: 24px;
+}
+
+.callout-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent-primary);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Quiz Section */
+.quiz-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.question-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.question-header {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.question-num {
+  background: var(--bg-surface-elevated);
+  color: var(--accent-primary);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14.5px;
+  color: var(--text-secondary);
+}
+
+.option-item:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.option-item.selected {
+  border-color: var(--accent-primary);
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.option-item.correct {
+  border-color: var(--accent-success);
+  background: var(--accent-success-bg);
+  color: #34d399;
+}
+
+.option-item.incorrect {
+  border-color: var(--accent-error);
+  background: var(--accent-error-bg);
+  color: #f87171;
+}
+
+.quiz-explanation {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: var(--bg-surface-subtle);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent-primary);
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.quiz-explanation.correct {
+  border-left-color: var(--accent-success);
+}
+
+.quiz-explanation.incorrect {
+  border-left-color: var(--accent-error);
+}
+
+/* Code Sandbox Section */
+.sandbox-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.sandbox-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sandbox-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.sandbox-desc {
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.editor-toolbar {
+  background: #090e17;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--code-border);
+}
+
+.toolbar-left {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-secondary:hover {
+  background: #475569;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: #0f172a;
+}
+
+.btn-primary:hover {
+  background: var(--accent-primary-hover);
+}
+
+.btn-success {
+  background: var(--accent-success);
+  color: white;
+}
+
+.btn-success:hover {
+  background: #059669;
+}
+
+.editor-container {
+  position: relative;
+  min-height: 240px;
+  background: var(--code-bg);
+}
+
+.code-textarea {
+  width: 100%;
+  min-height: 240px;
+  padding: 18px;
+  background: transparent;
+  color: #f1f5f9;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  border: none;
+  outline: none;
+  resize: vertical;
+  tab-size: 2;
+}
+
+/* Test Results Output Console */
+.test-results-panel {
+  background: var(--bg-surface-subtle);
+  border-top: 1px solid var(--border-subtle);
+  padding: 20px 24px;
+}
+
+.test-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.test-summary-badge.pass {
+  background: var(--accent-success-bg);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.test-summary-badge.fail {
+  background: var(--accent-error-bg);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.test-case-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.test-case-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.test-case-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.test-case-status {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.test-case-status.pass { color: #34d399; }
+.test-case-status.fail { color: #f87171; }
+
+.test-case-error {
+  color: #f87171;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Sprint & Final Exam Styles */
+.exam-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.05));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.exam-info h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 6px;
+}
+
+.exam-info p {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.exam-timer {
+  background: var(--bg-surface);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.timer-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Certificate Card */
+.certificate-container {
+  background: linear-gradient(135deg, #091e2b, #0f172a);
+  border: 4px double #0ea5e9;
+  border-radius: var(--radius-lg);
+  padding: 48px 36px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  margin: 32px 0;
+  overflow: hidden;
+}
+
+.cert-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 240px;
+  opacity: 0.03;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cert-header {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--accent-primary);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.cert-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin-bottom: 24px;
+  letter-spacing: -0.5px;
+}
+
+.cert-recipient-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.cert-student-name {
+  font-size: 32px;
+  font-weight: 800;
+  color: #38bdf8;
+  margin-bottom: 16px;
+  text-decoration: underline;
+  text-underline-offset: 8px;
+}
+
+.cert-body-text {
+  max-width: 680px;
+  margin: 0 auto 32px auto;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.cert-footer-row {
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 24px;
+  margin-top: 24px;
+}
+
+.cert-seal {
+  font-size: 36px;
+  margin-bottom: 6px;
+}
+
+.cert-meta-item {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}

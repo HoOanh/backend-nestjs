@@ -14,11 +14,20 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     credentials: 'include'
   });
 
-  const data = await res.json();
+  const responseText = await res.text();
+  let data: { error?: string } = {};
+  if (responseText.trim()) {
+    try {
+      data = JSON.parse(responseText) as { error?: string };
+    } catch {
+      throw new Error(`Máy chủ trả về dữ liệu không hợp lệ (${res.status}).`);
+    }
+  }
+
   if (!res.ok) {
     throw new Error(data.error || `HTTP ${res.status}: Lỗi máy chủ`);
   }
-  return data;
+  return data as T;
 }
 
 function mapUserResponse(u: any): UserProfile {

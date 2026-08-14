@@ -5,10 +5,14 @@
   "functions": {
     "api/tutor.ts": {
       "maxDuration": 30
+    },
+    "api/index.ts": {
+      "maxDuration": 15
     }
   },
   "routes": [
     { "src": "/api/tutor", "dest": "/api/tutor.ts" },
+    { "src": "/api/(.*)", "dest": "/api/index.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

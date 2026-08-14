@@ -68,7 +68,8 @@ function formatUserResponse(u: DbUser) {
 export async function handleApiRequest(req: ApiRequest, res: ApiResponse): Promise<void> {
 
   const url = req.url || '';
-  const pathname = url.split('?')[0];
+  const rawPathname = url.split('?')[0];
+  const pathname = rawPathname.startsWith('/api') ? rawPathname : '/api' + rawPathname;
   const method = (req.method || 'GET').toUpperCase();
 
   const queryString = url.includes('?') ? url.split('?')[1] : '';

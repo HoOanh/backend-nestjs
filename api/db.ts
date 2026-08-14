@@ -90,7 +90,8 @@ export function generateSessionToken(): string {
 
 function initDatabase(): DatabaseSync {
   try {
-    const DATA_DIR = path.resolve(process.cwd(), 'data');
+    const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const DATA_DIR = isVercel ? '/tmp' : path.resolve(process.cwd(), 'data');
     if (!fs.existsSync(DATA_DIR)) {
       try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
     }

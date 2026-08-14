@@ -13,6 +13,10 @@ interface VercelResponse {
   json(payload: { error?: string; reply?: string }): VercelResponse;
 }
 
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] as const;
 type GeminiModel = (typeof ALLOWED_MODELS)[number];
 

@@ -49,11 +49,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const rawUrl = req.url || '';
   const normalizedUrl = rawUrl.startsWith('/api') ? rawUrl : '/api' + rawUrl;
 
+  let parsedBody = req.body;
+  if (typeof parsedBody === 'string' && parsedBody.trim().startsWith('{')) {
+    try {
+      parsedBody = JSON.parse(parsedBody);
+    } catch {}
+  }
+
   await handleApiRequest(
     {
       method: req.method,
       url: normalizedUrl,
-      body: req.body,
+      body: parsedBody,
       headers: req.headers
     },
     resAdapter

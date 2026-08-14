@@ -17,7 +17,7 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] as const;
+const ALLOWED_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'] as const;
 type GeminiModel = (typeof ALLOWED_MODELS)[number];
 
 interface TutorRequestBody {
@@ -56,7 +56,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
   const model: GeminiModel = ALLOWED_MODELS.includes(body.model as GeminiModel)
     ? (body.model as GeminiModel)
-    : 'gemini-2.5-flash';
+    : 'gemini-2.5-flash-lite';
   if (!lesson?.title || messages.length === 0) {
     return response.status(400).json({ error: 'Dữ liệu bài học hoặc hội thoại không hợp lệ.' });
   }

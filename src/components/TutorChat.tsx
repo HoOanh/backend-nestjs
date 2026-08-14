@@ -2,9 +2,9 @@ import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 're
 import type { Lesson } from '../data/curriculum.ts';
 
 const MODEL_OPTIONS = [
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', hint: 'Nhanh · ổn định' },
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Nhanh · cân bằng' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', hint: 'Sâu · phân tích kỹ' },
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', hint: 'Ổn định · tiết kiệm' }
 ] as const;
 
 interface ChatMessage {

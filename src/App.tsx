@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CURRICULUM } from './data/curriculum.ts';
 import { SPRINT_EXAMS } from './data/sprintExams.ts';
 import { FINAL_EXAM } from './data/finalExam.ts';
@@ -9,41 +9,63 @@ import { QuizTab } from './components/QuizTab.tsx';
 import { CodeSandboxTab } from './components/CodeSandboxTab.tsx';
 import { SprintExamView } from './components/SprintExamView.tsx';
 import { FinalExamView } from './components/FinalExamView.tsx';
+import { LockedContentNotice } from './components/LockedContentNotice.tsx';
 import { StudentAuthScreen } from './components/auth/StudentAuthScreen.tsx';
 import { AdminAuthScreen } from './components/auth/AdminAuthScreen.tsx';
 import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
 import { LearningHistoryModal } from './components/student/LearningHistoryModal.tsx';
-import { UserProfile } from './types/user.ts';
+import { UserProfile, UserProgressState } from './types/user.ts';
 import { apiClient } from './services/apiClient.ts';
+import { useAppRouter } from './utils/router.ts';
+import {
+  checkLessonUnlockStatus,
+  checkSprintExamUnlockStatus,
+  checkFinalExamUnlockStatus,
+  getFirstIncompleteLessonId
+} from './utils/progressGuard.ts';
 
 const THEME_STORAGE_KEY = 'esmiles_backend_academy_theme';
+const ADMIN_BYPASS_STORAGE_KEY = 'esmiles_admin_bypass_lock';
 
-interface AppState {
-  currentLessonId: string;
-  completedLessons: Record<string, { completedAt: string }>;
-  sprintExamScores: Record<number, { score: number; passed: boolean; completedAt: string }>;
-  finalExam: {
-    score: number;
-    passed: boolean;
-    studentName: string;
-    certificateId: string;
-    completedAt: string;
-  } | null;
-  streakDays: number;
-  lastActiveDate: string;
-  clearedLessons: Record<string, boolean>;
-}
+type AppState = UserProgressState;
 
 export const App: React.FC = () => {
   const contentViewportRef = useRef<HTMLElement | null>(null);
+  const { route, navigate } = useAppRouter();
 
-  // Check URL route to strictly separate Admin CMS vs Student LMS
-  const isAdminRoute = window.location.pathname.startsWith('/admin');
-
-  const [studentUser, setStudentUser] = useState<UserProfile | null>(null);
-  const [adminUser, setAdminUser] = useState<UserProfile | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [studentUser, setStudentUser] = useState<UserProfile | null>(() => {
+    const stored = apiClient.getStoredUser();
+    return stored && stored.role !== 'admin' ? stored : null;
+  });
+  const [adminUser, setAdminUser] = useState<UserProfile | null>(() => {
+    const stored = apiClient.getStoredUser();
+    return stored && stored.role === 'admin' ? stored : null;
+  });
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
+    const stored = apiClient.getStoredUser();
+    const token = apiClient.getToken();
+    return !stored && Boolean(token);
+  });
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+  // Admin Bypass Lock Mode (allow previewing all lessons & exams for verification)
+  const [adminBypassLock, setAdminBypassLock] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(ADMIN_BYPASS_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleAdminBypass = () => {
+    setAdminBypassLock((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(ADMIN_BYPASS_STORAGE_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Theme State
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -66,34 +88,49 @@ export const App: React.FC = () => {
   };
 
   // Learning Progress State
-  const [state, setState] = useState<AppState>({
-    currentLessonId: 'lesson-1',
-    completedLessons: {},
-    sprintExamScores: {},
-    finalExam: null,
-    streakDays: 1,
-    lastActiveDate: new Date().toISOString().split('T')[0],
-    clearedLessons: {}
+  const [state, setState] = useState<AppState>(() => {
+    const storedUser = apiClient.getStoredUser();
+    if (storedUser?.id) {
+      try {
+        const local = localStorage.getItem(`esmiles_progress_${storedUser.id}`);
+        if (local) return JSON.parse(local);
+      } catch {}
+    }
+    return {
+      currentLessonId: 'lesson-1',
+      completedLessons: {},
+      sprintExamScores: {},
+      finalExam: null,
+      streakDays: 1,
+      lastActiveDate: new Date().toISOString().split('T')[0],
+      clearedLessons: {}
+    };
   });
 
   // Verify Real Session Token with SQLite Backend on Boot
   useEffect(() => {
     async function verifyAuth() {
+      const stored = apiClient.getStoredUser();
+      const token = apiClient.getToken();
+      if (!token && !stored) {
+        setIsAuthChecking(false);
+        return;
+      }
+
       try {
         const user = await apiClient.getMe();
         if (user) {
           if (user.role === 'admin') {
             setAdminUser(user);
-            if (!isAdminRoute) {
-              window.location.replace('/admin');
-              return;
-            }
+            setStudentUser(null);
           } else {
             setStudentUser(user);
-            if (isAdminRoute) {
-              window.location.replace('/');
-              return;
-            }
+            setAdminUser(null);
+          }
+        } else {
+          if (!apiClient.getToken()) {
+            setStudentUser(null);
+            setAdminUser(null);
           }
         }
       } catch (e) {
@@ -103,7 +140,7 @@ export const App: React.FC = () => {
       }
     }
     void verifyAuth();
-  }, [isAdminRoute]);
+  }, []);
 
   // Load user progress from SQLite Backend when studentUser logs in
   useEffect(() => {
@@ -116,10 +153,6 @@ export const App: React.FC = () => {
     }
   }, [studentUser?.id, studentUser?.role]);
 
-  const [activeView, setActiveView] = useState<'lesson' | 'sprint-exam' | 'final-exam'>('lesson');
-  const [activeSprintExamId, setActiveSprintExamId] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'theory' | 'quiz' | 'code'>('theory');
-
   // Save Progress to SQLite DB
   useEffect(() => {
     if (studentUser?.id && studentUser.role !== 'admin') {
@@ -127,12 +160,33 @@ export const App: React.FC = () => {
     }
   }, [state, studentUser?.id, studentUser?.role]);
 
-  // Reset viewport scroll to top when changing lesson, tab, or view
+  // Active User profile (student or admin)
+  const activeUser = studentUser || adminUser;
+  const isEffectiveAdmin = adminUser?.role === 'admin' || studentUser?.role === 'admin';
+  const effectiveBypass = isEffectiveAdmin && adminBypassLock;
+
+  // Resolve current active lesson from route
+  const currentLessonId = route.type === 'lesson' ? route.lessonId : state.currentLessonId || 'lesson-1';
+  const currentLesson = useMemo(() => {
+    for (const sprint of CURRICULUM) {
+      const l = sprint.lessons.find((item) => item.id === currentLessonId);
+      if (l) return l;
+    }
+    return CURRICULUM[0]?.lessons[0] || null;
+  }, [currentLessonId]);
+
+  // Resolve active sprint exam from route
+  const activeSprintExamId = route.type === 'sprint-exam' ? route.sprintId : 0;
+  const currentSprintExam = useMemo(() => {
+    return SPRINT_EXAMS.find((e) => e.sprintId === activeSprintExamId);
+  }, [activeSprintExamId]);
+
+  // Reset viewport scroll to top when changing route or tab
   useEffect(() => {
     if (contentViewportRef.current) {
       contentViewportRef.current.scrollTop = 0;
     }
-  }, [state.currentLessonId, activeTab, activeView]);
+  }, [route]);
 
   if (isAuthChecking) {
     return (
@@ -148,12 +202,13 @@ export const App: React.FC = () => {
   // ==========================================
   // 👑 ROUTE: ADMIN CMS (/admin)
   // ==========================================
-  if (isAdminRoute) {
+  if (route.type === 'admin' || route.type === 'admin-login') {
     if (!adminUser || adminUser.role !== 'admin') {
       return (
         <AdminAuthScreen
           onLoginSuccess={(user) => {
             setAdminUser(user);
+            navigate('/admin');
           }}
         />
       );
@@ -167,58 +222,50 @@ export const App: React.FC = () => {
         onLogout={async () => {
           await apiClient.logout();
           setAdminUser(null);
+          navigate('/admin/login');
         }}
       />
     );
   }
 
   // ==========================================
-  // 🎓 ROUTE: STUDENT LMS (/)
+  // 🎓 ROUTE: AUTH (Student Login / Register)
   // ==========================================
-  if (!studentUser || studentUser.role === 'admin') {
+  if (!studentUser && !adminUser) {
     return (
       <StudentAuthScreen
         onLoginSuccess={(user) => {
           if (user.role === 'admin') {
-            window.location.replace('/admin');
+            setAdminUser(user);
+            navigate('/admin');
           } else {
             setStudentUser(user);
+            const firstAvailable = getFirstIncompleteLessonId(state.completedLessons);
+            navigate(`/lessons/${firstAvailable}?tab=theory`);
           }
         }}
       />
     );
   }
 
-  let currentLesson = null;
-  for (const sprint of CURRICULUM) {
-    const l = sprint.lessons.find((item) => item.id === state.currentLessonId);
-    if (l) {
-      currentLesson = l;
-      break;
-    }
-  }
-  if (!currentLesson && CURRICULUM.length > 0) {
-    currentLesson = CURRICULUM[0].lessons[0];
-  }
-
-  const currentSprintExam = SPRINT_EXAMS.find((e) => e.sprintId === activeSprintExamId);
+  // ==========================================
+  // 📚 STUDENT LMS MAIN VIEW (Multi-Route)
+  // ==========================================
   const totalLessons = CURRICULUM.reduce((acc, sp) => acc + sp.lessons.length, 0);
   const completedCount = Object.keys(state.completedLessons).length;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
   const handleSelectLesson = (lessonId: string) => {
-    setActiveView('lesson');
-    setActiveTab('theory');
     setState((prev) => ({ ...prev, currentLessonId: lessonId }));
+    navigate(`/lessons/${lessonId}?tab=theory`);
   };
 
   const handleSelectSprintExam = (sprintId: number) => {
-    setActiveView('sprint-exam');
-    setActiveSprintExamId(sprintId);
+    navigate(`/sprint-exam/${sprintId}`);
   };
 
   const handleSelectFinalExam = () => {
-    setActiveView('final-exam');
+    navigate('/final-exam');
   };
 
   const handleLessonCompleted = (lessonId: string) => {
@@ -230,9 +277,9 @@ export const App: React.FC = () => {
       }
     }));
 
-    if (currentLesson) {
+    if (currentLesson && activeUser) {
       void apiClient.addHistory({
-        userId: studentUser.id,
+        userId: activeUser.id,
         lessonId,
         lessonTitle: currentLesson.title,
         action: 'code_passed',
@@ -250,9 +297,9 @@ export const App: React.FC = () => {
       }
     }));
 
-    if (currentLesson) {
+    if (currentLesson && activeUser) {
       void apiClient.addHistory({
-        userId: studentUser.id,
+        userId: activeUser.id,
         lessonId,
         lessonTitle: currentLesson.title,
         action: 'theory_read',
@@ -270,17 +317,20 @@ export const App: React.FC = () => {
       }
     }));
 
-    await apiClient.submitSprintExam(studentUser.id, sprintId, score, passed);
+    if (activeUser) {
+      await apiClient.submitSprintExam(activeUser.id, sprintId, score, passed);
+    }
   };
 
   const handleFinalExamSubmitted = async (score: number, passed: boolean, studentName: string) => {
-    const studentDisplayName = studentName || studentUser.name || 'Kỹ Sư eSmiles';
-    const res = await apiClient.submitFinalExam(studentUser.id, studentDisplayName, score, passed);
-
-    setState((prev) => ({
-      ...prev,
-      finalExam: res.finalResult
-    }));
+    const studentDisplayName = studentName || activeUser?.name || 'Kỹ Sư eSmiles';
+    if (activeUser) {
+      const res = await apiClient.submitFinalExam(activeUser.id, studentDisplayName, score, passed);
+      setState((prev) => ({
+        ...prev,
+        finalExam: res.finalResult
+      }));
+    }
   };
 
   const handleRetakeFinalExam = () => {
@@ -293,31 +343,76 @@ export const App: React.FC = () => {
   const handleStudentLogout = async () => {
     await apiClient.logout();
     setStudentUser(null);
+    setAdminUser(null);
+    navigate('/login');
   };
 
+  const handleNavigateToAvailable = () => {
+    const nextLessonId = getFirstIncompleteLessonId(state.completedLessons);
+    navigate(`/lessons/${nextLessonId}?tab=theory`);
+  };
+
+  // Determine Topbar Tag & Title based on Route
   let topTag = 'LÝ THUYẾT & THỰC HÀNH';
   let topTitle = currentLesson?.title || '';
+  const currentViewType = route.type === 'sprint-exam' ? 'sprint-exam' : route.type === 'final-exam' ? 'final-exam' : 'lesson';
 
-  if (activeView === 'sprint-exam') {
+  if (route.type === 'sprint-exam') {
     topTag = 'KỲ THI SPRINT';
-    topTitle = currentSprintExam?.title || 'Đánh Giá Tiến Độ Sprint';
-  } else if (activeView === 'final-exam') {
+    topTitle = currentSprintExam?.title || `Đánh Giá Tiến Độ Sprint ${activeSprintExamId}`;
+  } else if (route.type === 'final-exam') {
     topTag = 'TỐT NGHIỆP TOÀN KHÓA';
     topTitle = 'Khảo Thí Cấp Bằng Master Backend NestJS';
   }
+
+  // Active Lesson Tab
+  const activeTab: 'theory' | 'quiz' | 'code' = route.type === 'lesson' ? route.tab : 'theory';
+  const handleTabChange = (tab: 'theory' | 'quiz' | 'code') => {
+    if (currentLesson) {
+      navigate(`/lessons/${currentLesson.id}?tab=${tab}`);
+    }
+  };
+
+  // ==========================================
+  // PROGRESS GATING & LOCK VERIFICATION
+  // ==========================================
+  const lessonUnlockStatus = currentLesson
+    ? checkLessonUnlockStatus(
+        currentLesson.id,
+        state.completedLessons,
+        activeUser?.role,
+        effectiveBypass
+      )
+    : { unlocked: true, requiredPreviousLesson: null };
+
+  const sprintExamUnlockStatus = checkSprintExamUnlockStatus(
+    activeSprintExamId,
+    state.completedLessons,
+    activeUser?.role,
+    effectiveBypass
+  );
+
+  const finalExamUnlockStatus = checkFinalExamUnlockStatus(
+    state.sprintExamScores,
+    activeUser?.role,
+    effectiveBypass,
+    SPRINT_EXAMS
+  );
 
   return (
     <div className="app-container">
       <Sidebar
         curriculum={CURRICULUM}
         sprintExams={SPRINT_EXAMS}
-        activeView={activeView}
+        activeView={currentViewType}
         currentLesson={currentLesson}
         currentSprintExam={currentSprintExam}
         completedLessons={state.completedLessons}
         sprintExamScores={state.sprintExamScores}
         finalExam={state.finalExam}
         progressPercent={progressPercent}
+        userRole={activeUser?.role}
+        bypassLock={effectiveBypass}
         onSelectLesson={handleSelectLesson}
         onSelectSprintExam={handleSelectSprintExam}
         onSelectFinalExam={handleSelectFinalExam}
@@ -330,81 +425,138 @@ export const App: React.FC = () => {
           streakDays={state.streakDays}
           theme={theme}
           onToggleTheme={handleToggleTheme}
-          currentUser={studentUser}
+          currentUser={activeUser || { id: '', name: 'Học Viên', email: '', role: 'student', authProvider: 'email', planId: 'free', createdAt: '', lastLoginAt: '' }}
           onOpenHistory={() => setIsHistoryModalOpen(true)}
           onLogout={handleStudentLogout}
+          isAdminBypass={effectiveBypass}
+          onToggleAdminBypass={isEffectiveAdmin ? handleToggleAdminBypass : undefined}
+          onNavigateToAdmin={isEffectiveAdmin ? () => navigate('/admin') : undefined}
         />
 
         <section className="content-viewport" ref={contentViewportRef}>
-          {activeView === 'lesson' && currentLesson && (
-            <div>
-              <div className="lesson-tabs">
-                <button
-                  className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('theory')}
-                >
-                  📖 Lý Thuyết & Code Mẫu
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''} ${!state.clearedLessons?.[currentLesson.id] ? 'locked' : ''}`}
-                  onClick={() => state.clearedLessons?.[currentLesson.id] && setActiveTab('quiz')}
-                  disabled={!state.clearedLessons?.[currentLesson.id]}
-                >
-                  {state.clearedLessons?.[currentLesson.id] ? '❓' : '🔒'} Trắc Nghiệm Ôn Luyện{' '}
-                  <span className="tab-badge">{currentLesson.quiz.length}</span>
-                </button>
-                <button
-                  className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('code')}
-                >
-                  💻 Bài Tập Code Sandbox{' '}
-                  <span className="tab-badge">
-                    {currentLesson.codeChallenge.testCases.length} Tests
-                  </span>
-                </button>
-              </div>
-
-              {activeTab === 'theory' && (
-                <TheoryTab
-                  lesson={currentLesson}
-                  isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
-                  onMarkCleared={() => handleLessonCleared(currentLesson.id)}
-                  onNextTab={() => setActiveTab('quiz')}
+          {/* 1. LESSON ROUTE */}
+          {route.type === 'lesson' && currentLesson && (
+            <>
+              {!lessonUnlockStatus.unlocked ? (
+                <LockedContentNotice
+                  type="lesson"
+                  title={currentLesson.title}
+                  requiredPreviousLesson={lessonUnlockStatus.requiredPreviousLesson}
+                  onNavigateToAvailable={handleNavigateToAvailable}
+                  isAdmin={isEffectiveAdmin}
+                  onBypassLock={handleToggleAdminBypass}
                 />
-              )}
+              ) : (
+                <div>
+                  <div className="lesson-tabs">
+                    <button
+                      className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
+                      onClick={() => handleTabChange('theory')}
+                    >
+                      📖 Lý Thuyết & Code Mẫu
+                    </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''} ${
+                        !state.clearedLessons?.[currentLesson.id] && !effectiveBypass ? 'locked' : ''
+                      }`}
+                      onClick={() => {
+                        if (state.clearedLessons?.[currentLesson.id] || effectiveBypass) {
+                          handleTabChange('quiz');
+                        }
+                      }}
+                      disabled={!state.clearedLessons?.[currentLesson.id] && !effectiveBypass}
+                      title={
+                        !state.clearedLessons?.[currentLesson.id] && !effectiveBypass
+                          ? 'Cần đọc lý thuyết và bấm "Đã hiểu bài" để mở trắc nghiệm'
+                          : 'Làm trắc nghiệm ôn tập'
+                      }
+                    >
+                      {state.clearedLessons?.[currentLesson.id] || effectiveBypass ? '❓' : '🔒'}{' '}
+                      Trắc Nghiệm Ôn Luyện{' '}
+                      <span className="tab-badge">{currentLesson.quiz.length}</span>
+                    </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
+                      onClick={() => handleTabChange('code')}
+                    >
+                      💻 Bài Tập Code Sandbox{' '}
+                      <span className="tab-badge">
+                        {currentLesson.codeChallenge.testCases.length} Tests
+                      </span>
+                    </button>
+                  </div>
 
-              {activeTab === 'quiz' && (
-                <QuizTab
-                  lesson={currentLesson}
-                  onPrevTab={() => setActiveTab('theory')}
-                  onNextTab={() => setActiveTab('code')}
-                />
-              )}
+                  {activeTab === 'theory' && (
+                    <TheoryTab
+                      lesson={currentLesson}
+                      isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
+                      onMarkCleared={() => handleLessonCleared(currentLesson.id)}
+                      onNextTab={() => handleTabChange('quiz')}
+                    />
+                  )}
 
-              {activeTab === 'code' && (
-                <CodeSandboxTab
-                  lesson={currentLesson}
-                  onLessonCompleted={handleLessonCompleted}
-                />
+                  {activeTab === 'quiz' && (
+                    <QuizTab
+                      lesson={currentLesson}
+                      onPrevTab={() => handleTabChange('theory')}
+                      onNextTab={() => handleTabChange('code')}
+                    />
+                  )}
+
+                  {activeTab === 'code' && (
+                    <CodeSandboxTab
+                      lesson={currentLesson}
+                      onLessonCompleted={handleLessonCompleted}
+                    />
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
 
-          {activeView === 'sprint-exam' && currentSprintExam && (
-            <SprintExamView
-              exam={currentSprintExam}
-              existingScore={state.sprintExamScores[currentSprintExam.sprintId]}
-              onExamSubmitted={handleSprintExamSubmitted}
-            />
+          {/* 2. SPRINT EXAM ROUTE */}
+          {route.type === 'sprint-exam' && currentSprintExam && (
+            <>
+              {!sprintExamUnlockStatus.unlocked ? (
+                <LockedContentNotice
+                  type="sprint-exam"
+                  title={currentSprintExam.title}
+                  missingLessons={sprintExamUnlockStatus.missingLessons}
+                  onNavigateToAvailable={handleNavigateToAvailable}
+                  isAdmin={isEffectiveAdmin}
+                  onBypassLock={handleToggleAdminBypass}
+                />
+              ) : (
+                <SprintExamView
+                  exam={currentSprintExam}
+                  existingScore={state.sprintExamScores[currentSprintExam.sprintId]}
+                  onExamSubmitted={handleSprintExamSubmitted}
+                />
+              )}
+            </>
           )}
 
-          {activeView === 'final-exam' && (
-            <FinalExamView
-              exam={FINAL_EXAM}
-              finalResult={state.finalExam}
-              onFinalExamSubmitted={handleFinalExamSubmitted}
-              onRetakeFinalExam={handleRetakeFinalExam}
-            />
+          {/* 3. FINAL EXAM ROUTE */}
+          {route.type === 'final-exam' && (
+            <>
+              {!finalExamUnlockStatus.unlocked && !state.finalExam?.passed ? (
+                <LockedContentNotice
+                  type="final-exam"
+                  title="Kỳ Thi Tốt Nghiệp Toàn Khóa eSmiles Academy"
+                  missingSprints={finalExamUnlockStatus.missingSprints}
+                  onNavigateToAvailable={handleNavigateToAvailable}
+                  isAdmin={isEffectiveAdmin}
+                  onBypassLock={handleToggleAdminBypass}
+                />
+              ) : (
+                <FinalExamView
+                  exam={FINAL_EXAM}
+                  finalResult={state.finalExam}
+                  onFinalExamSubmitted={handleFinalExamSubmitted}
+                  onRetakeFinalExam={handleRetakeFinalExam}
+                />
+              )}
+            </>
           )}
         </section>
       </main>
@@ -413,7 +565,7 @@ export const App: React.FC = () => {
       <LearningHistoryModal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
-        currentUser={studentUser}
+        currentUser={activeUser || { id: '', name: 'Học Viên', email: '', role: 'student', authProvider: 'email', planId: 'free', createdAt: '', lastLoginAt: '' }}
         completedCount={completedCount}
         totalLessons={totalLessons}
         progressPercent={progressPercent}

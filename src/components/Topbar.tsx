@@ -10,6 +10,9 @@ interface TopbarProps {
   currentUser: UserProfile;
   onOpenHistory: () => void;
   onLogout: () => void;
+  isAdminBypass?: boolean;
+  onToggleAdminBypass?: () => void;
+  onNavigateToAdmin?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -20,9 +23,13 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleTheme,
   currentUser,
   onOpenHistory,
-  onLogout
+  onLogout,
+  isAdminBypass = false,
+  onToggleAdminBypass,
+  onNavigateToAdmin
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const isAdmin = currentUser?.role === 'admin';
 
   return (
     <header className="main-top-bar">
@@ -31,8 +38,24 @@ export const Topbar: React.FC<TopbarProps> = ({
         <h2 className="top-bar-title" title={title}>{title}</h2>
       </div>
       <div className="top-bar-right">
+        {/* Admin Bypass Toggle Button */}
+        {isAdmin && onToggleAdminBypass && (
+          <button
+            className={`admin-mode-toggle-btn ${isAdminBypass ? 'active' : ''}`}
+            onClick={onToggleAdminBypass}
+            title="Bật/tắt chế độ xem trước toàn bộ bài học của Admin"
+          >
+            <span>{isAdminBypass ? '⚡ Unlock All (Admin)' : '🔒 Student Mode'}</span>
+          </button>
+        )}
+
+        {/* User Role Badge */}
+        <div className={`user-role-badge ${currentUser?.role || 'student'}`}>
+          {isAdmin ? '👑 Quản Trị Viên' : currentUser?.role === 'instructor' ? '👨‍🏫 Giảng Viên' : '🎓 Học Viên'}
+        </div>
+
         {/* Streak Badge */}
-        <div className="user-streak-badge">
+        <div className="user-streak-badge" title={`Chuỗi học tập liên tiếp: ${streakDays} ngày`}>
           <span>🔥</span>
           <span>{streakDays} ngày</span>
         </div>
@@ -68,15 +91,42 @@ export const Topbar: React.FC<TopbarProps> = ({
                   <div>
                     <div className="dropdown-user-name">{currentUser?.name || 'Học Viên'}</div>
                     <div className="dropdown-user-email">{currentUser?.email || ''}</div>
-                    <div className="dropdown-user-plan">{(currentUser?.planId || 'free').toUpperCase()} PLAN</div>
+                    <div className="dropdown-user-plan">
+                      {isAdmin ? 'SYSTEM ADMIN' : `${(currentUser?.planId || 'free').toUpperCase()} PLAN`}
+                    </div>
                   </div>
                 </div>
 
                 <div className="user-dropdown-divider" />
 
+                {isAdmin && onNavigateToAdmin && (
+                  <button
+                    className="user-dropdown-item"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onNavigateToAdmin();
+                    }}
+                  >
+                    <span>⚙️</span><span>Trang Quản Trị (Admin CMS)</span>
+                  </button>
+                )}
+
                 <button className="user-dropdown-item" onClick={() => { setIsUserMenuOpen(false); onOpenHistory(); }}>
-                  <span>📊</span><span>Hồ Sơ & Kết Quả Học</span>
+                  <span>📊</span><span>Hồ Sơ & Tiến Độ Học Tập</span>
                 </button>
+
+                {isAdmin && onToggleAdminBypass && (
+                  <button
+                    className="user-dropdown-item"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onToggleAdminBypass();
+                    }}
+                  >
+                    <span>⚡</span>
+                    <span>{isAdminBypass ? 'Tắt Mở Khóa Preview' : 'Bật Mở Khóa Preview (Admin)'}</span>
+                  </button>
+                )}
 
                 <button className="user-dropdown-item" onClick={() => { setIsUserMenuOpen(false); onToggleTheme(); }}>
                   <span>{theme === 'dark' ? '☀️' : '🌙'}</span>

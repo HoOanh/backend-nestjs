@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Lesson } from '../data/curriculum.ts';
+import { FormattedText } from './FormattedText.tsx';
 
 interface QuizTabProps {
   lesson: Lesson;
@@ -29,7 +30,9 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
             <div key={q.id} className="question-card">
               <div className="question-header">
                 <span className="question-num">Câu {idx + 1}</span>
-                <div>{q.question}</div>
+                <div className="question-text">
+                  <FormattedText content={q.question} />
+                </div>
               </div>
 
               <div className="options-list">
@@ -49,10 +52,12 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
                       className={optClass}
                       onClick={() => handleSelect(q.id, optIdx)}
                     >
-                      <span style={{ fontWeight: 700 }}>
+                      <span className="opt-index-badge">
                         {String.fromCharCode(65 + optIdx)}.
                       </span>
-                      <span>{opt}</span>
+                      <div className="opt-text">
+                        <FormattedText content={opt} />
+                      </div>
                     </div>
                   );
                 })}
@@ -61,7 +66,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
               {hasAnswered && (
                 <div className={`quiz-explanation ${isCorrect ? 'correct' : 'incorrect'}`}>
                   <strong>{isCorrect ? 'Chính xác! 🎉 ' : 'Chưa đúng! 💡 '}</strong>
-                  {q.explanation}
+                  <FormattedText content={q.explanation} />
                 </div>
               )}
             </div>
@@ -69,12 +74,12 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '28px', marginBottom: '32px' }}>
         <button className="btn btn-secondary" onClick={onPrevTab}>
           ⬅️ Quay lại Lý thuyết
         </button>
         <button className="btn btn-primary" onClick={onNextTab}>
-          Chuyển sang Bài Tập Code ➡️
+          Chuyển sang Bài Tập Code Sandbox ➡️
         </button>
       </div>
     </div>

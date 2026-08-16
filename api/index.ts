@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+
+
 export interface DbUser {
   id: string;
   name: string;
@@ -84,6 +86,51 @@ export function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || process.env.AUTH_SECRET || 'esmiles_backend_academy_jwt_secret_key_2026_super_secure_987123';
+
+export interface TokenPayload {
+  userId: string;
+  email: string;
+  role: 'student' | 'admin' | 'instructor';
+  name: string;
+  planId: string;
+  exp: number;
+}
+
+export function signJwt(user: DbUser, expiresInDays = 30): string {
+  const exp = Math.floor(Date.now() / 1000) + expiresInDays * 24 * 60 * 60;
+  const payload: TokenPayload = {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+    planId: user.plan_id,
+    exp
+  };
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${signature}`;
+}
+
+export function verifyJwt(token: string): TokenPayload | null {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+    if (signature !== expectedSignature) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf-8')) as TokenPayload;
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 interface StoreState {
   users: DbUser[];
   sessions: DbSession[];
@@ -137,34 +184,35 @@ function saveStore(): void {
 
 loadStore();
 
-// Seed Default Plans if empty
-if (!store.plans || store.plans.length === 0) {
+function seedInitialData(): void {
+  if (store.plans.length > 0) return;
+
   store.plans = [
     {
       id: 'free',
-      name: 'Gói Trải Nghiệm (Free Starter)',
+      name: 'Gói Trải Nghiệm (Free Plan)',
       price: 0,
-      billing_period: 'Vĩnh viễn',
-      description: 'Dành cho người mới bắt đầu tìm hiểu kiến trúc backend NestJS.',
+      billing_period: 'Miễn phí vĩnh viễn',
+      description: 'Dành cho học viên bắt đầu tìm hiểu tư duy Backend & NestJS nền tảng.',
       features: JSON.stringify([
-        'Học Sprint 01: Core Architecture & Dependency Injection',
-        'Thực hành Code Sandbox cơ bản (20 tests)',
-        'Hỏi đáp Tutor AI giới hạn 10 câu/ngày',
-        'Lưu trữ kết quả học tập cá nhân'
+        'Truy cập Sprint 0 (Mental Model & Event Loop)',
+        'Thực hành Code Sandbox tương tác',
+        'Khảo thí trắc nghiệm cơ bản',
+        'Cộng đồng hỗ trợ eSmiles Open'
       ]),
       is_popular: 0,
       is_active: 1
     },
     {
       id: 'pro',
-      name: 'Gói Chuyên Sâu (Pro Master NestJS)',
-      price: 990000,
-      billing_period: 'Trọn đời',
-      description: 'Trọn bộ 6 Sprints kiến trúc thực chiến eSmiles, Prisma 7 & Khảo thí cấp bằng.',
+      name: 'Gói Chuyên Nghiệp (Pro Master)',
+      price: 690000,
+      billing_period: 'Thanh toán 1 lần / Trọn đời',
+      description: 'Lộ trình chuyển đổi toàn diện thành Backend / Fullstack Engineer chuyên nghiệp.',
       features: JSON.stringify([
-        'Mở khóa toàn bộ 6 Sprints (22+ bài học chuyên sâu)',
-        'Không giới hạn bài tập Code Sandbox & Hidden Tests',
-        'AI Tutor Gemini 3.7 Flash hỗ trợ giải thích 24/7',
+        'Toàn bộ 6 Sprints chuyên sâu từ Sprint 0 đến Sprint 5',
+        'Master Prisma 7, High-Concurrency & Multi-Tenancy Scoping',
+        'AI Gia Sư 1-1 (Gemini 2.5 Flash) hướng dẫn giải bài tập',
         'Tham gia 4 kỳ thi Sprint + Thi Tốt Nghiệp Toàn Khóa',
         'Cấp Chứng Chỉ Tốt Nghiệp Danh Dự eSmiles Academy có mã tra cứu'
       ]),
@@ -189,6 +237,8 @@ if (!store.plans || store.plans.length === 0) {
   ];
   saveStore();
 }
+
+seedInitialData();
 
 function bootstrapAdmin(): void {
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@esmiles.vn';
@@ -222,7 +272,8 @@ bootstrapAdmin();
 const dbService = {
   createSession(userId: string): DbSession {
     loadStore();
-    const token = generateSessionToken();
+    const user = store.users.find((u) => u.id === userId);
+    const token = user ? signJwt(user) : generateSessionToken();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const session: DbSession = {
@@ -237,13 +288,57 @@ const dbService = {
     return session;
   },
 
-  getSessionByToken(token: string): { session: DbSession; user: DbUser } | null {
+  getAuthUser(token: string): DbUser | null {
+    if (!token) return null;
     loadStore();
+
+    // 1. Check Stateless Cryptographic JWT Token (Resilient against cold starts & multiple lambdas)
+    const payload = verifyJwt(token);
+    if (payload) {
+      let user = store.users.find(
+        (u) => u.id === payload.userId || u.email.toLowerCase() === payload.email.toLowerCase()
+      );
+      if (!user) {
+        // Automatically restore and persist user in current container
+        user = {
+          id: payload.userId,
+          name: payload.name || 'Học Viên',
+          email: payload.email.toLowerCase(),
+          role: payload.role || 'student',
+          plan_id: (payload.planId as 'free' | 'pro' | 'enterprise') || 'pro',
+          auth_provider: 'email',
+          avatar_color: '#0ea5e9',
+          created_at: new Date().toISOString(),
+          last_login_at: new Date().toISOString()
+        };
+        store.users.push(user);
+        saveStore();
+      }
+      return user;
+    }
+
+    // 2. Fallback to session store for legacy tokens
     const session = store.sessions.find((s) => s.token === token && new Date(s.expires_at) > new Date());
-    if (!session) return null;
-    const user = store.users.find((u) => u.id === session.user_id);
+    if (session) {
+      return store.users.find((u) => u.id === session.user_id) || null;
+    }
+
+    return null;
+  },
+
+  getSessionByToken(token: string): { session: DbSession; user: DbUser } | null {
+    const user = this.getAuthUser(token);
     if (!user) return null;
-    return { session, user };
+    return {
+      session: {
+        id: 'sess_jwt',
+        user_id: user.id,
+        token,
+        created_at: user.created_at,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      user
+    };
   },
 
   deleteSession(token: string): boolean {
@@ -452,7 +547,7 @@ function setSessionCookie(res: ApiResponse, token: string): void {
   if (typeof res.setHeader === 'function') {
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${COOKIE_MAX_AGE}`
+      `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`
     );
   }
 }
@@ -461,7 +556,7 @@ function clearSessionCookie(res: ApiResponse): void {
   if (typeof res.setHeader === 'function') {
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`
+      `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure`
     );
   }
 }

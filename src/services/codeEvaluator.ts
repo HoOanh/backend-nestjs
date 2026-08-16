@@ -1,13 +1,16 @@
-import type { TestCase } from '../data/curriculum';
+import type { TestCase } from '../data/curriculum.ts';
+export type { TestCase };
 
 export interface TestResultItem {
-  name: string;
+  name?: string;
+  description?: string;
   passed: boolean;
   input?: string;
   expected?: string;
   actual?: string;
+  received?: string;
   error?: string;
-  hidden: boolean;
+  hidden?: boolean;
 }
 
 export interface TestOutcome {
@@ -16,6 +19,7 @@ export interface TestOutcome {
   passedCount: number;
   syntaxError?: string;
   results: TestResultItem[];
+  consoleLogs?: string[];
 }
 
 interface SerializedFunction {
@@ -31,6 +35,15 @@ interface WorkerRequest {
 }
 
 const WORKER_SOURCE = `
+const logs = [];
+const originalConsoleLog = console.log;
+console.log = (...args) => {
+  try {
+    logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  } catch (_) {}
+  originalConsoleLog(...args);
+};
+
 const revive = (value) => {
   if (Array.isArray(value)) return value.map(revive);
   if (value && typeof value === 'object') {
@@ -94,17 +107,29 @@ self.onmessage = async (event) => {
         else error = caught && caught.message ? caught.message : String(caught);
       }
       if (passed) passedCount++;
+      const stringActual = testCase.hidden ? (passed ? '[MATCHED]' : '[FAIL]') : JSON.stringify(actual);
       results.push({
-        name: testCase.name,
+        name: testCase.name || testCase.description || 'Test case',
+        description: testCase.description || testCase.name || 'Test case',
         passed,
         input: testCase.hidden ? '[HIDDEN]' : JSON.stringify(testCase.input),
         expected: testCase.hidden ? '[HIDDEN]' : JSON.stringify(testCase.expected),
-        actual: testCase.hidden ? (passed ? '[MATCHED]' : '[FAIL]') : JSON.stringify(actual),
+        actual: stringActual,
+        received: stringActual,
         error,
-        hidden: testCase.hidden
+        hidden: Boolean(testCase.hidden)
       });
     }
-    self.postMessage({ kind: 'result', outcome: { passed: passedCount === request.testCases.length, total: request.testCases.length, passedCount, results } });
+    self.postMessage({
+      kind: 'result',
+      outcome: {
+        passed: passedCount === request.testCases.length,
+        total: request.testCases.length,
+        passedCount,
+        results,
+        consoleLogs: logs
+      }
+    });
   } catch (caught) {
     self.postMessage({ kind: 'syntax', message: caught && caught.message ? caught.message : String(caught) });
   }
@@ -139,7 +164,14 @@ export const CodeEvaluator = {
     try {
       serializedCases = casesToRun.map((testCase) => serialize(testCase));
     } catch (error) {
-      return { passed: false, total: casesToRun.length, passedCount: 0, syntaxError: error instanceof Error ? error.message : String(error), results: [] };
+      return {
+        passed: false,
+        total: casesToRun.length,
+        passedCount: 0,
+        syntaxError: error instanceof Error ? error.message : String(error),
+        results: [],
+        consoleLogs: []
+      };
     }
 
     const blobUrl = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
@@ -155,12 +187,39 @@ export const CodeEvaluator = {
         worker.terminate();
         resolve(outcome);
       };
-      const timeout = window.setTimeout(() => finish({ passed: false, total: casesToRun.length, passedCount: 0, syntaxError: 'Bài chạy quá thời gian giới hạn (4 giây). Worker đã bị dừng.', results: [] }), 4000);
+      const timeout = window.setTimeout(
+        () =>
+          finish({
+            passed: false,
+            total: casesToRun.length,
+            passedCount: 0,
+            syntaxError: 'Bài chạy quá thời gian giới hạn (4 giây). Worker đã bị dừng.',
+            results: [],
+            consoleLogs: []
+          }),
+        4000
+      );
       worker.onmessage = (event: MessageEvent<{ kind: string; outcome?: TestOutcome; message?: string }>) => {
         if (event.data.kind === 'result' && event.data.outcome) finish(event.data.outcome);
-        else if (event.data.kind === 'syntax') finish({ passed: false, total: casesToRun.length, passedCount: 0, syntaxError: event.data.message, results: [] });
+        else if (event.data.kind === 'syntax')
+          finish({
+            passed: false,
+            total: casesToRun.length,
+            passedCount: 0,
+            syntaxError: event.data.message,
+            results: [],
+            consoleLogs: []
+          });
       };
-      worker.onerror = (event) => finish({ passed: false, total: casesToRun.length, passedCount: 0, syntaxError: event.message || 'Sandbox worker error', results: [] });
+      worker.onerror = (event) =>
+        finish({
+          passed: false,
+          total: casesToRun.length,
+          passedCount: 0,
+          syntaxError: event.message || 'Sandbox worker error',
+          results: [],
+          consoleLogs: []
+        });
       worker.postMessage(request);
     });
   }

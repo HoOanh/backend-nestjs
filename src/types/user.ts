@@ -32,3 +32,28 @@ export interface CoursePlan {
   isPopular?: boolean;
   isActive: boolean;
 }
+
+export interface FinalExamResult {
+  score: number;
+  passed: boolean;
+  studentName: string;
+  certificateId: string;
+  completedAt: string;
+}
+
+export interface UserProgressState {
+  currentLessonId: string;
+  completedLessons: Record<string, { completedAt: string }>;
+  sprintExamScores: Record<number, { score: number; passed: boolean; completedAt: string }>;
+  finalExam: FinalExamResult | null;
+  streakDays: number;
+  lastActiveDate: string;
+  clearedLessons: Record<string, boolean>;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalRevenue: number;
+  certifiedStudents: number;
+  totalActivityLogs: number;
+}

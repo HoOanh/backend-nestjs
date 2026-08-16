@@ -1,15 +1,17 @@
 export interface TestCase {
-  name: string;
+  name?: string;
+  description?: string;
   input: unknown[];
   expected: unknown;
-  hidden: boolean;
+  hidden?: boolean;
 }
 
 export interface CodeChallenge {
+  id?: string;
   title: string;
   description: string;
   starterCode: string;
-  solution: string;
+  solution?: string;
   testCases: TestCase[];
 }
 
@@ -93,97 +95,49 @@ export class InventoryCategoryService {
             id: 'q1-1',
             question: 'Tại sao việc lưu trữ "this.currentUser = req.user" trong NestJS Service Singleton là lỗi bảo mật nghiêm trọng?',
             options: [
-              'Vì TypeScript compiler sẽ báo lỗi không cho build',
-              'Vì Service Singleton dùng chung cho mọi request, request sau sẽ ghi đè biến này và request trước sẽ đọc nhầm dữ liệu của người khác',
-              'Vì làm tăng dung lượng file build',
-              'Vì PostgreSQL sẽ từ chối kết nối'
+              'Vì Service Singleton dùng chung 1 instance trong RAM cho mọi request, khiến request sau ghi đè và làm lộ thông tin sang request trước.',
+              'Vì TypeScript compiler sẽ chặn biên dịch dự án khi phát hiện biến state nằm trong class được gắn decorator @Injectable.',
+              'Vì V8 Engine sẽ tự động giải phóng vùng nhớ (garbage collect) của biến này sau khi hoàn tất HTTP request đầu tiên.',
+              'Vì cơ chế Multi-thread của Node.js sẽ cô lập từng request vào worker thread riêng khiến biến này luôn trả về undefined.'
             ],
-            correctIndex: 1,
-            explanation: 'Trong kiến trúc Singleton, toàn bộ người dùng kết nối đến server đều truy cập vào cùng 1 object instance trong RAM. Bất kỳ biến instance nào cũng bị chia sẻ xuyên request (Race Condition).'
+            correctIndex: 0,
+            explanation: 'Trong kiến trúc Singleton mặc định của NestJS, toàn bộ người dùng đều truy cập vào cùng 1 object instance trong RAM. Bất kỳ biến instance nào cũng bị chia sẻ xuyên request (Race Condition).'
           },
           {
             id: 'q1-2',
             question: 'Cách truyền thông tin người dùng (userId, unitId) từ Controller xuống Service chuẩn nhất trong NestJS là gì?',
             options: [
-              'Lưu vào biến global.currentUser',
-              'Truyền trực tiếp qua tham số của hàm trong Service (Function Parameters)',
-              'Gán vào process.env',
-              'Tạo một cookie mới'
+              'Lưu tạm vào đối tượng global.currentUser trên luồng chính để mọi service bên dưới đều có thể đọc được.',
+              'Truyền trực tiếp qua tham số của hàm trong Service (Method Parameters) hoặc dùng Custom Param Decorators.',
+              'Gán thông tin vào biến môi trường process.env tại runtime để chia sẻ xuyên suốt toàn bộ lifecycle của request.',
+              'Khởi tạo một HTTP Cookie mới trên server và đọc lại cookie này ở mỗi tầng service khi thực thi logic nghiệp vụ.'
             ],
             correctIndex: 1,
             explanation: 'Truyền qua tham số hàm (ví dụ: service.createItem(unitId, userId, dto)) đảm bảo tính thuần khiết (pure function), an toàn đa luồng và dễ viết Unit Test.'
           },
           {
             id: 'q1-3',
-            question: 'Nếu một tiến trình Node.js Backend gặp lỗi unhandled exception và crash, điều gì sẽ xảy ra?',
+            question: 'Nếu một tiến trình Node.js Backend gặp lỗi unhandled exception hoặc unhandled rejection trên luồng chính, điều gì sẽ xảy ra?',
             options: [
-              'Chỉ người dùng gây ra lỗi bị ảnh hưởng',
-              'Toàn bộ server bị sập, tất cả người dùng khác đang kết nối đều bị gián đoạn cho đến khi tiến trình được restart',
-              'Trình duyệt của người dùng tự khởi động lại',
-              'Database tự động tắt'
+              'Chỉ riêng HTTP request của người dùng gây ra lỗi bị ngắt kết nối, các request khác vẫn tiếp tục chạy bình thường.',
+              'Toàn bộ process Node.js bị crash và thoát, tất cả người dùng đang kết nối đồng thời đều bị gián đoạn dịch vụ.',
+              'PostgreSQL database sẽ tự động rollback toàn bộ dữ liệu của tất cả người dùng về trạng thái 24 giờ trước.',
+              'NestJS framework sẽ tự động sao chép mã nguồn sang một tiến trình dự phòng mà không gây gián đoạn kết nối.'
             ],
             correctIndex: 1,
             explanation: 'Vì Backend là tiến trình tập trung duy nhất, một lỗi không được bắt (unhandled crash) sẽ làm tắt cả tiến trình Node.js, ngắt kết nối của mọi người dùng.'
           },
           {
             id: 'l1-q4',
-            question: 'Khái niệm "Stateless Server" có nghĩa là gì?',
+            question: 'Khái niệm "Stateless Server" trong kiến trúc backend NestJS mang ý nghĩa cốt lõi nào sau đây?',
             options: [
-              'Server không bao giờ lỗi',
-              'Không lưu trữ trạng thái phiên trong RAM giữa các request',
-              'Không kết nối DB',
-              'Không có OS'
-            ],
-            correctIndex: 1,
-            explanation: 'Stateless: mỗi request tự chứa đủ thông tin để xử lý.'
-          },
-          {
-            id: 'l1-q5',
-            question: 'Trong NestJS, Singleton Pattern có nghĩa là gì?',
-            options: [
-              'Mỗi user 1 object',
-              'Một instance duy nhất chia sẻ toàn app',
-              'Class không kế thừa',
-              'Chỉ trả về 1 giá trị'
-            ],
-            correctIndex: 1,
-            explanation: 'Singleton là 1 object duy nhất tồn tại xuyên suốt vòng đời app.'
-          },
-          {
-            id: 'l1-q6',
-            question: 'Điều gì xảy ra nếu sửa biến global khi đang xử lý request A?',
-            options: [
-              'Chỉ A thấy',
-              'DB rollback',
-              'Request B xử lý đồng thời cũng thấy và sai lệch',
-              'Trình duyệt báo lỗi'
-            ],
-            correctIndex: 2,
-            explanation: 'Biến global chia sẻ chung gây Race Condition.'
-          },
-          {
-            id: 'l1-q7',
-            question: 'Tại sao không dùng fs.readFileSync trong API handler?',
-            options: [
-              'Block Event Loop, request khác phải chờ',
-              'Khóa file',
-              'Dữ liệu nhị phân',
-              'NestJS cấm fs'
+              'Server backend không lưu trạng thái phiên làm việc trong RAM cục bộ, mỗi request tự mang đủ token xác thực.',
+              'Server backend không được phép kết nối với bất kỳ Database nào bên ngoài, chỉ xử lý tính toán trong bộ nhớ RAM.',
+              'Server backend bắt buộc phải chạy dưới dạng Single Page Application và không trả về bất kỳ mã trạng thái HTTP nào.',
+              'Server backend yêu cầu client phải duy trì kết nối WebSocket liên tục 24/7 để không bị mất phiên làm việc.'
             ],
             correctIndex: 0,
-            explanation: 'Hàm sync chặn main thread, giảm concurrency.'
-          },
-          {
-            id: 'l1-q8',
-            question: 'Để chia sẻ dữ liệu an toàn xuyên request (như userId), NestJS khuyên dùng gì?',
-            options: [
-              'Global vars',
-              'Static array',
-              'Truyền tham số hàm hoặc Request-scoped',
-              'Ghi ra file'
-            ],
-            correctIndex: 2,
-            explanation: 'Tham số hàm là cách truyền thống và an toàn nhất.'
+            explanation: 'Stateless backend không lưu trạng thái phiên trong bộ nhớ cục bộ, giúp Load Balancer định tuyến request bất kỳ đến bất kỳ server instance nào mà không sợ mất phiên.'
           }
         ],
         codeChallenge: {
@@ -305,99 +259,51 @@ async getClinicDashboardSummary(unitId: string, fromDate: Date, toDate: Date) {
         quiz: [
           {
             id: 'q2-1',
-            question: 'Khi backend cần thực hiện 3 câu query độc lập không phụ thuộc dữ liệu của nhau, cách nào tối ưu thời gian phản hồi nhất?',
+            question: 'Khi backend cần thực thi 3 câu truy vấn Database độc lập không phụ thuộc dữ liệu của nhau, giải pháp nào tối ưu thời gian phản hồi nhất?',
             options: [
-              'Gọi tuần tự bằng 3 dòng await riêng biệt',
-              'Sử dụng Promise.all([query1(), query2(), query3()]) để DB thực thi đồng thời',
-              'Viết vòng lặp while để chờ từng câu',
-              'Dùng setTimeout ngắt quãng'
+              'Gọi tuần tự từng truy vấn bằng 3 câu lệnh await riêng biệt để tránh làm quá tải Database Connection Pool.',
+              'Dùng Promise.all([query1(), query2(), query3()]) để gửi song song 3 truy vấn và tận dụng connection pool.',
+              'Sử dụng vòng lặp while(true) kết hợp hàm setTimeout 0ms để chờ từng truy vấn hoàn tất theo thứ tự mong muốn.',
+              'Tạo 3 endpoint API riêng biệt trên backend và bắt buộc ứng dụng phía Frontend React phải gọi 3 lần độc lập.'
             ],
             correctIndex: 1,
             explanation: 'Promise.all gửi đồng thời 3 câu query tới Database Connection Pool, thời gian chờ chỉ bằng câu query chậm nhất thay vì cộng dồn 3 câu lại.'
           },
           {
             id: 'q2-2',
-            question: 'Hành động nào sau đây sẽ làm nghẽn (Block) Node.js Event Loop khiến toàn bộ người dùng khác bị đứng hình?',
+            question: 'Hành động nào sau đây sẽ làm nghẽn (Block) Node.js Event Loop khiến toàn bộ request của người dùng khác bị đứng hình?',
             options: [
-              'Đọc file 500MB bằng fs.promises.readFile (bất đồng bộ)',
-              'Thực hiện thuật toán tính toán ma trận / nén file nặng bằng vòng lặp for đồng bộ trên luồng chính',
-              'Gửi email thông qua Message Queue (BullMQ)',
-              'Thực hiện query Prisma có phân trang'
+              'Đọc một tệp tin dung lượng 500MB bằng hàm bất đồng bộ fs.promises.readFile kết hợp cú pháp async/await.',
+              'Thực hiện thuật toán tính toán ma trận hoặc nén ảnh phức tạp bằng vòng lặp CPU nặng đồng bộ trên Main Thread.',
+              'Đẩy một tác vụ gửi email hàng loạt vào hàng đợi tin nhắn Redis Message Queue (BullMQ) để xử lý ngầm.',
+              'Thực hiện câu lệnh truy vấn Prisma findMany có kèm theo điều kiện lọc và giới hạn phân trang (take/skip).'
             ],
             correctIndex: 1,
             explanation: 'Các tác vụ CPU nặng chạy đồng bộ trên Main Thread sẽ độc chiếm Event Loop, khiến Node.js không thể chuyển sang phục vụ request khác.'
           },
           {
             id: 'q2-3',
-            question: 'Trong Promise.all([task1, task2, task3]), nếu task2 bị ném Exception (Reject) thì chuyện gì xảy ra?',
+            question: 'Trong hàm Promise.all([task1, task2, task3]), nếu task2 bị ném Exception (Reject) trong khi task1 và task3 vẫn đang chạy, điều gì xảy ra?',
             options: [
-              'Promise.all vẫn trả về kết quả của task1 và task3',
-              'Promise.all bị reject ngay lập tức với lỗi của task2',
-              'Server Node.js tự động crash',
-              'Task2 sẽ tự động retry 10 lần'
+              'Promise.all vẫn đợi task1 và task3 hoàn tất và trả về mảng kết quả chứa cả giá trị thành công lẫn đối tượng lỗi.',
+              'Promise.all kích hoạt cơ chế Fail-fast, lập tức reject ngay với lỗi của task2 mà không cần chờ kết quả các task còn lại.',
+              'Node.js runtime sẽ tự động retry lại task2 thêm 3 lần trước khi quyết định reject toàn bộ Promise.all.',
+              'Toàn bộ tiến trình server Node.js sẽ lập tức bị crash và tự động khởi động lại từ đầu.'
             ],
             correctIndex: 1,
             explanation: 'Promise.all có cơ chế Fail-fast: chỉ cần 1 promise thất bại thì toàn bộ Promise.all sẽ reject ngay lập tức.'
           },
           {
             id: 'l2-q4',
-            question: 'Luồng chính (Main Thread) của Node.js xử lý việc gì?',
+            question: 'Điểm khác biệt căn bản giữa Promise.all và Promise.allSettled trong xử lý bất đồng bộ là gì?',
             options: [
-              'Mọi thứ',
-              'Chỉ mã JavaScript',
-              'Chỉ I/O',
-              'Chỉ Network'
-            ],
-            correctIndex: 1,
-            explanation: 'Main thread xử lý JS, I/O đẩy cho libuv/OS.'
-          },
-          {
-            id: 'l2-q5',
-            question: 'Threadpool trong Node.js (libuv) dùng làm gì?',
-            options: [
-              'Chạy mọi async',
-              'Chạy API File, DNS, Crypto',
-              'Chỉ chạy HTTP',
-              'Chạy React'
-            ],
-            correctIndex: 1,
-            explanation: 'Threadpool hỗ trợ các tác vụ không dùng được async I/O của OS.'
-          },
-          {
-            id: 'l2-q6',
-            question: 'Tại sao không nên dùng while(true) trong Node.js?',
-            options: [
-              'Block Event Loop vĩnh viễn',
-              'Lỗi cú pháp',
-              'Không thể break',
-              'Máy tính nổ'
+              'Promise.allSettled luôn chờ tất cả promise hoàn thành (dù thành công hay thất bại) và trả về mảng chi tiết trạng thái.',
+              'Promise.allSettled thực thi các tác vụ theo thứ tự tuần tự (Serial) thay vì song song (Parallel) như Promise.all.',
+              'Promise.allSettled chỉ chấp nhận các hàm đồng bộ thuần túy và không hỗ trợ xử lý các async function trả về Promise.',
+              'Promise.allSettled tự động lọc bỏ các promise bị lỗi và chỉ trả về mảng các kết quả thành công cho phía caller.'
             ],
             correctIndex: 0,
-            explanation: 'While true chiếm trọn CPU main thread.'
-          },
-          {
-            id: 'l2-q7',
-            question: 'Làm sao xử lý tác vụ CPU nặng mà không block Event Loop?',
-            options: [
-              'Dùng setTimeout',
-              'Dùng Worker Threads hoặc process riêng',
-              'Dùng Promise',
-              'Dùng async/await'
-            ],
-            correctIndex: 1,
-            explanation: 'Worker Threads chia sẻ CPU ra thread khác.'
-          },
-          {
-            id: 'l2-q8',
-            question: 'Promise.allSettled khác Promise.all như thế nào?',
-            options: [
-              'Chạy nhanh hơn',
-              'Đợi tất cả xong dù lỗi hay thành công',
-              'Chạy từng cái một',
-              'Chỉ trả thành công'
-            ],
-            correctIndex: 1,
-            explanation: 'allSettled không fail-fast, nó gom kết quả của tất cả.'
+            explanation: 'allSettled không fail-fast, nó gom kết quả của tất cả các Promise thành mảng { status: "fulfilled" | "rejected", value/reason }.'
           }
         ],
         codeChallenge: {
@@ -519,99 +425,51 @@ export function configureApp(app: NestExpressApplication, config: ConfigService)
         quiz: [
           {
             id: 'q3-1',
-            question: 'Khi Bác sĩ đăng nhập thành công nhưng bấm vào chức năng "Xóa Phòng Khám" mà tài khoản không có quyền, Server phải trả về HTTP Status Code nào?',
+            question: 'Khi client gửi request tạo mới một bệnh nhân thành công lên server, mã trạng thái HTTP chuẩn RESTful và header đi kèm nên là gì?',
             options: [
-              '401 Unauthorized',
-              '403 Forbidden',
-              '404 Not Found',
-              '500 Internal Server Error'
+              '200 OK kèm theo body chứa thông tin bệnh nhân vừa tạo và header Content-Type: application/json.',
+              '201 Created kèm theo body bản ghi mới tạo và header Location trỏ tới URL chi tiết của tài nguyên vừa tạo.',
+              '204 No Content để tiết kiệm băng thông mạng và bắt buộc client tự suy luận ID của bệnh nhân mới.',
+              '202 Accepted để báo hiệu rằng request đã được lưu vào RAM và sẽ được ghi vào database sau 1 giờ.'
             ],
             correctIndex: 1,
-            explanation: '401 là chưa biết bạn là ai (chưa đăng nhập). 403 là đã biết bạn là ai nhưng bạn không có quyền thực hiện hành động này.'
+            explanation: 'HTTP 201 Created là mã chuẩn RFC khi tạo mới thành công tài nguyên, kèm theo Location header trỏ đến URI của tài nguyên mới.'
           },
           {
             id: 'q3-2',
-            question: 'Tại sao việc lưu trữ JWT Refresh Token trong HttpOnly Cookie an toàn hơn nhiều so với localStorage của trình duyệt?',
+            question: 'Tính chất Idempotent (Bảo toàn trạng thái khi gọi nhiều lần) áp dụng cho các HTTP Method chuẩn nào sau đây?',
             options: [
-              'Vì HttpOnly Cookie có dung lượng lớn hơn 50MB',
-              'Vì mã độc JavaScript (XSS) chạy trên trình duyệt không thể đọc được HttpOnly Cookie',
-              'Vì cookie không bao giờ hết hạn',
-              'Vì cookie giúp tăng tốc độ mạng'
+              'POST và PATCH, vì cả hai đều có thể cập nhật dữ liệu nhiều lần mà không thay đổi cấu trúc bảng.',
+              'GET, PUT, DELETE, HEAD, OPTIONS, vì việc gọi 1 lần hay N lần liên tiếp đều dẫn đến cùng một trạng thái server.',
+              'Chỉ riêng GET, vì mọi HTTP method khác đều làm biến đổi trạng thái của cơ sở dữ liệu trên backend.',
+              'Tất cả các HTTP Method đều có tính Idempotent nếu server được triển khai trên hạ tầng điện toán đám mây.'
             ],
             correctIndex: 1,
-            explanation: 'Cờ HttpOnly cấm JavaScript đọc cookie, nên giảm nguy cơ token bị exfiltrate qua XSS. XSS vẫn có thể gửi request bằng cookie tự động; cần CSP và CSRF defense phù hợp.'
+            explanation: 'GET, PUT, DELETE là idempotent: gọi PUT/DELETE nhiều lần cùng payload sẽ tạo ra cùng 1 trạng thái kết quả trên server, trong khi POST sẽ tạo ra nhiều bản ghi mới.'
           },
           {
             id: 'q3-3',
-            question: 'Khái niệm "Idempotent" trong HTTP Method có ý nghĩa là gì?',
+            question: 'Khi người dùng chưa đăng nhập gửi request vào endpoint yêu cầu quyền hạn, backend nên trả về mã lỗi HTTP nào?',
             options: [
-              'API chạy với tốc độ dưới 10ms',
-              'Thực hiện gọi API đó 1 lần hay nhiều lần liên tiếp với cùng tham số đều mang lại cùng 1 trạng thái dữ liệu trên hệ thống',
-              'API không cần truyền Header',
-              'API luôn trả về status 200'
+              '401 Unauthorized (Chưa xác thực danh tính - Thiếu token hoặc Token không hợp lệ / đã hết hạn).',
+              '403 Forbidden (Đã xác định được danh tính nhưng tài khoản không có quyền truy cập tài nguyên này).',
+              '400 Bad Request (Client gửi dữ liệu sai định dạng JSON hoặc thiếu các trường bắt buộc).',
+              '404 Not Found (Endpoint hoặc đường dẫn URL yêu cầu không tồn tại trên hệ thống máy chủ).'
             ],
-            correctIndex: 1,
-            explanation: 'GET, PUT, DELETE là Idempotent vì dù gọi 1 lần hay 10 lần thì trạng thái cuối cùng của tài nguyên trong database vẫn như nhau.'
+            correctIndex: 0,
+            explanation: '401 Unauthorized chỉ ra lỗi thiếu hoặc sai xác thực (Authentication). 403 Forbidden chỉ ra lỗi thiếu quyền truy cập (Authorization).'
           },
           {
             id: 'l3-q4',
-            question: 'Preflight request (OPTIONS) sinh ra do đâu?',
+            question: 'Tại sao việc lưu trữ JWT Refresh Token trong HttpOnly Cookie an toàn hơn nhiều so với localStorage của trình duyệt?',
             options: [
-              'Server',
-              'CORS của Trình duyệt tự gửi trước',
-              'Database',
-              'Router'
+              'Vì HttpOnly Cookie có dung lượng lưu trữ tối đa lên đến 50MB, lớn hơn nhiều so với 5MB của localStorage.',
+              'Vì mã độc JavaScript (XSS) trên trình duyệt không thể đọc trộm được HttpOnly Cookie qua document.cookie.',
+              'Vì HttpOnly Cookie tự động mã hóa toàn bộ dữ liệu bằng thuật toán RSA trước khi gửi qua đường truyền mạng.',
+              'Vì localStorage chỉ hoạt động trên giao thức HTTP thường, còn HttpOnly Cookie bắt buộc phải có chứng chỉ SSL.'
             ],
             correctIndex: 1,
-            explanation: 'Trình duyệt gửi OPTIONS để kiểm tra quyền CORS trước khi gửi request thực.'
-          },
-          {
-            id: 'l3-q5',
-            question: 'Method HTTP nào không an toàn để lặp lại (Non-Idempotent)?',
-            options: [
-              'GET',
-              'PUT',
-              'DELETE',
-              'POST'
-            ],
-            correctIndex: 3,
-            explanation: 'POST thường tạo bản ghi mới, gọi 2 lần ra 2 bản ghi.'
-          },
-          {
-            id: 'l3-q6',
-            question: 'SameSite attribute trong Cookie có tác dụng gì?',
-            options: [
-              'Ngăn CSRF',
-              'Tăng tốc load',
-              'Chống XSS',
-              'Mã hóa data'
-            ],
-            correctIndex: 0,
-            explanation: 'SameSite=Strict/Lax giúp trình duyệt không gửi cookie trong cross-site request.'
-          },
-          {
-            id: 'l3-q7',
-            question: 'Mã lỗi HTTP 422 mang ý nghĩa gì?',
-            options: [
-              'Lỗi server',
-              'Không tìm thấy',
-              'Unprocessable Entity (lỗi logic/nghiệp vụ)',
-              'Chưa đăng nhập'
-            ],
-            correctIndex: 2,
-            explanation: 'Dữ liệu đúng format nhưng sai về mặt logic hệ thống.'
-          },
-          {
-            id: 'l3-q8',
-            question: 'Header Authorization: Bearer thường chứa gì?',
-            options: [
-              'Password',
-              'JWT Access Token',
-              'Cookie',
-              'Session ID'
-            ],
-            correctIndex: 1,
-            explanation: 'Chuẩn OAuth2 dùng Bearer để truyền JWT token.'
+            explanation: 'Cờ HttpOnly cấm JavaScript đọc cookie, giúp ngăn chặn triệt để việc đánh cắp token phiên làm việc (Token Exfiltration) khi trang web dính lỗ hổng XSS.'
           }
         ],
         codeChallenge: {
@@ -725,10 +583,10 @@ export class InventoryModule {}`,
             id: 'q4-1',
             question: 'Khi ClinicModule muốn sử dụng InventoryItemService từ InventoryModule, ta bắt buộc phải làm 2 bước nào?',
             options: [
-              'InventoryModule phải export InventoryItemService VÀ ClinicModule phải import InventoryModule',
-              'Khai báo InventoryItemService vào providers của cả 2 module',
-              'Tạo biến global window.InventoryItemService',
-              'Dùng từ khóa new InventoryItemService()'
+              'InventoryModule phải export InventoryItemService VÀ ClinicModule phải import InventoryModule vào mảng imports.',
+              'Khai báo InventoryItemService trực tiếp vào mảng providers của cả 2 module mà không cần export.',
+              'Gán đối tượng InventoryItemService vào biến toàn cục global.inventoryService tại file main.ts.',
+              'Sử dụng từ khóa new InventoryItemService() trực tiếp trong constructor của ClinicService.'
             ],
             correctIndex: 0,
             explanation: 'Muốn dùng service của module khác, module sở hữu phải export service đó và module tiêu thụ phải import module sở hữu vào mảng imports.'
@@ -737,85 +595,25 @@ export class InventoryModule {}`,
             id: 'q4-2',
             question: 'Lợi ích lớn nhất của cơ chế Dependency Injection (DI) trong NestJS là gì?',
             options: [
-              'Tự động viết code thay cho lập trình viên',
-              'Tách rời sự phụ thuộc (Decoupling), giúp dễ dàng thay thế Mock Service khi viết Unit Test mà không cần sửa code Controller',
-              'Làm cho file build có dung lượng nhỏ hơn',
-              'Tự động tạo bảng trong Database'
+              'Tự động tăng tốc độ xử lý của CPU bằng cách biên dịch mã nguồn TypeScript thành WebAssembly.',
+              'Tách rời sự phụ thuộc (Decoupling), giúp dễ dàng thay thế Mock Service khi viết Unit Test mà không cần sửa code Controller.',
+              'Cho phép các class trong NestJS truy cập trực tiếp vào vùng nhớ RAM của hệ điều hành mà không qua V8 Engine.',
+              'Tự động đồng bộ hóa cơ sở dữ liệu PostgreSQL với giao diện người dùng React ở thời gian thực.'
             ],
             correctIndex: 1,
             explanation: 'DI cho phép ta dễ dàng inject Mock Database hoặc Mock Service vào Controller/Service khi chạy Unit Test, giúp kiểm thử nhanh và độc lập.'
           },
           {
             id: 'q4-3',
-            question: 'Trong NestJS, decorator nào dùng để đánh dấu một Class có thể được inject bởi IoC Container?',
+            question: 'Khi hai module A và B phụ thuộc vòng tròn (Circular Dependency), NestJS cung cấp cơ chế nào để giải quyết?',
             options: [
-              '@Injectable()',
-              '@Controller()',
-              '@Entity()',
-              '@Component()'
+              'Sử dụng hàm helper forwardRef(() => ModuleB) trong decorator @Module và hàm tiêm @Inject(forwardRef(...)).',
+              'Chuyển đổi toàn bộ mã nguồn của Module A và Module B sang ngôn ngữ JavaScript thuần (CommonJS).',
+              'Tách Module A và Module B thành 2 ứng dụng backend độc lập chạy trên 2 cổng HTTP khác nhau.',
+              'Xóa bỏ toàn bộ decorator @Injectable() và tự quản lý việc khởi tạo instance bằng tay trong main.ts.'
             ],
             correctIndex: 0,
-            explanation: '@Injectable() gắn metadata để NestJS IoC Container nhận diện và quản lý vòng đời của class đó.'
-          },
-          {
-            id: 'l4-q4',
-            question: 'Trong NestJS, @Module dùng để làm gì?',
-            options: [
-              'Khai báo DB',
-              'Gom nhóm các thành phần liên quan',
-              'Chạy script',
-              'Cấu hình CORS'
-            ],
-            correctIndex: 1,
-            explanation: 'Tổ chức code thành các khối tính năng.'
-          },
-          {
-            id: 'l4-q5',
-            question: 'Mảng "imports" trong @Module làm gì?',
-            options: [
-              'Nạp các module khác',
-              'Import thư viện npm',
-              'Chạy middleware',
-              'Xuất service'
-            ],
-            correctIndex: 0,
-            explanation: 'Nạp provider từ module khác đã export.'
-          },
-          {
-            id: 'l4-q6',
-            question: 'Global module là gì?',
-            options: [
-              'Có sẵn mọi nơi không cần import',
-              'Module lỗi',
-              'Module chưa hoàn thành',
-              'Module Frontend'
-            ],
-            correctIndex: 0,
-            explanation: '@Global() giúp module có mặt mọi nơi.'
-          },
-          {
-            id: 'l4-q7',
-            question: 'Dependency Injection giúp ích gì cho Unit Test?',
-            options: [
-              'Chạy nhanh',
-              'Dễ dàng mock/stub phụ thuộc',
-              'Không cần viết test',
-              'Tự generate test'
-            ],
-            correctIndex: 1,
-            explanation: 'Ta có thể truyền Mock object vào constructor thay vì object thật.'
-          },
-          {
-            id: 'l4-q8',
-            question: 'Circular Dependency xảy ra khi nào?',
-            options: [
-              'Module A import B, B import A',
-              'Module A export B',
-              'Module không import',
-              'Lỗi DB'
-            ],
-            correctIndex: 0,
-            explanation: 'Vòng lặp phụ thuộc khiến IoC không thể resolve.'
+            explanation: 'forwardRef cho phép NestJS trì hoãn việc resolve dependency cho đến khi cả hai module đều đã được nạp metadata.'
           }
         ],
         codeChallenge: {
@@ -930,99 +728,39 @@ export class InventoryCategoryController {
         quiz: [
           {
             id: 'q5-1',
-            question: 'Tại sao endpoint @Get("options") phải được đặt TRƯỚC endpoint @Get(":id") trong Controller?',
+            question: 'Tại sao endpoint @Get("options") bắt buộc phải được đặt TRƯỚC endpoint @Get(":id") trong một NestJS Controller?',
             options: [
-              'Vì nếu đặt sau, router sẽ coi chuỗi "options" là giá trị tham số :id và kích hoạt ParseUUIDPipe gây lỗi 400 Bad Request',
-              'Để code trông đẹp hơn',
-              'Vì TypeScript bắt buộc xếp theo bảng chữ cái',
-              'Không có ảnh hưởng gì'
+              'Vì cơ chế Routing duyệt từ trên xuống, nếu đặt sau thì chuỗi "options" sẽ bị nuốt bởi dynamic param ":id" và dính lỗi 400 Bad Request.',
+              'Vì TypeScript compiler bắt buộc các method trong class Controller phải được sắp xếp theo thứ tự bảng chữ cái ABC.',
+              'Vì NestJS cần biên dịch các static route sang WebAssembly trước khi khởi động Express HTTP server.',
+              'Vì trình duyệt web của người dùng sẽ tự động hủy các request có đường dẫn chứa nhiều hơn 2 dấu gạch chéo.'
             ],
             correctIndex: 0,
             explanation: 'Express/NestJS khớp route từ trên xuống. Dynamic param :id khớp với mọi chuỗi, nên nếu đứng trước nó sẽ nuốt mất các static sub-path như options hay export.'
           },
           {
             id: 'q5-2',
-            question: 'ParseUUIDPipe trong @Param("id", ParseUUIDPipe) có tác dụng gì?',
+            question: 'Cơ chế Dependency Injection (DI) trong NestJS mang lại lợi ích cốt lõi nào cho việc phát triển phần mềm?',
             options: [
-              'Tự động tạo ra một UUID mới',
-              'Xác thực chuỗi id từ URL có đúng chuẩn UUID (v4) hay không, nếu sai lập tức trả về 400 Bad Request trước khi vào Controller',
-              'Mã hóa id thành base64',
-              'Tìm kiếm id trong Database'
+              'Tự động tăng tốc độ xử lý của CPU bằng cách biên dịch mã nguồn TypeScript thành WebAssembly.',
+              'Đảo ngược quyền kiểm soát khởi tạo đối tượng (IoC), giảm phụ thuộc cứng (tight coupling) và dễ dàng mock khi test.',
+              'Cho phép các class trong NestJS truy cập trực tiếp vào vùng nhớ RAM của hệ điều hành mà không qua V8 Engine.',
+              'Tự động đồng bộ hóa cơ sở dữ liệu PostgreSQL với giao diện người dùng React ở thời gian thực.'
             ],
             correctIndex: 1,
-            explanation: 'ParseUUIDPipe là built-in pipe của NestJS giúp chặn đứng các request có ID sai định dạng ngay tại tầng HTTP.'
+            explanation: 'DI/IoC giúp class không tự `new` phụ thuộc mà được Container tiêm vào qua constructor, giúp code loosely coupled và dễ dàng truyền Mock Service khi viết Unit Test.'
           },
           {
             id: 'q5-3',
-            question: 'Decorator nào dùng để trích xuất dữ liệu JSON gửi lên từ payload của request POST/PATCH?',
+            question: 'Sự khác biệt giữa Injection Scope DEFAULT (Singleton) và REQUEST trong NestJS là gì?',
             options: [
-              '@Query()',
-              '@Body()',
-              '@Param()',
-              '@Headers()'
-            ],
-            correctIndex: 1,
-            explanation: '@Body() lấy toàn bộ hoặc một thuộc tính cụ thể từ Request Body JSON.'
-          },
-          {
-            id: 'l5-q4',
-            question: 'Decorator @Res() dùng để làm gì?',
-            options: [
-              'Lấy DB',
-              'Truy cập raw Express/Fastify response object',
-              'Trả về JSON',
-              'Đọc Body'
-            ],
-            correctIndex: 1,
-            explanation: 'Dùng khi cần kiểm soát response hoàn toàn (stream, file download).'
-          },
-          {
-            id: 'l5-q5',
-            question: 'DTO nên được hứng bằng decorator nào?',
-            options: [
-              '@Body()',
-              '@Query()',
-              'Cả Body và Query',
-              'Không dùng decorator'
-            ],
-            correctIndex: 2,
-            explanation: 'Cả Body(POST/PUT) và Query(GET) đều dùng DTO.'
-          },
-          {
-            id: 'l5-q6',
-            question: 'Điều gì xảy ra nếu quên @Param() trong tham số controller?',
-            options: [
-              'Tham số undefined',
-              'Crash server',
-              'Tự lấy id',
-              'Lỗi DB'
+              'DEFAULT tạo 1 instance duy nhất toàn app; REQUEST tạo 1 instance mới cho mỗi HTTP request đến, làm tăng chi phí RAM và GC.',
+              'DEFAULT chỉ dùng được cho Controller; REQUEST chỉ dùng được cho Service có kết nối Database.',
+              'DEFAULT tự động hủy sau 60 giây; REQUEST tồn tại vĩnh viễn trong suốt thời gian server hoạt động.',
+              'DEFAULT chạy trên luồng phụ Worker Thread; REQUEST chạy trực tiếp trên Main Thread của Node.js.'
             ],
             correctIndex: 0,
-            explanation: 'NestJS sẽ không map tham số URL vào biến, biến sẽ là undefined.'
-          },
-          {
-            id: 'l5-q7',
-            question: 'ParseIntPipe làm gì?',
-            options: [
-              'Lọc XSS',
-              'Chuyển chuỗi URL parameter sang số nguyên',
-              'Kiểm tra mật khẩu',
-              'Tìm theo ID'
-            ],
-            correctIndex: 1,
-            explanation: 'Ép kiểu params string thành int.'
-          },
-          {
-            id: 'l5-q8',
-            question: 'Controller có nên gọi thẳng database không?',
-            options: [
-              'Nên',
-              'Tuyệt đối KHÔNG, hãy giao cho Service',
-              'Chỉ khi query ngắn',
-              'Tùy framework'
-            ],
-            correctIndex: 1,
-            explanation: 'Vi phạm Single Responsibility Principle.'
+            explanation: 'DEFAULT Scope chia sẻ 1 instance duy nhất (tiết kiệm bộ nhớ). REQUEST Scope tạo mới instance mỗi request và lan truyền (bubble up) lên toàn bộ dependency tree, gây tốn RAM và tải nặng cho Garbage Collector.'
           }
         ],
         codeChallenge: {
@@ -1123,99 +861,39 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         quiz: [
           {
             id: 'q6-1',
-            question: 'Scope mặc định của một Service trong NestJS là gì?',
+            question: 'Tại sao việc đọc biến môi trường qua `process.env.DATABASE_URL` rải rác trong code lại là bad practice so với `ConfigService`?',
             options: [
-              'Request Scope (tạo mới cho mỗi HTTP request)',
-              'Singleton Scope (tạo 1 instance duy nhất cho toàn bộ app)',
-              'Transient Scope (tạo mới mỗi lần inject)',
-              'Prototype Scope'
+              'Vì gọi process.env nhiều lần sẽ làm chậm CPU 50% do phải đọc từ ổ cứng liên tục.',
+              'Vì process.env luôn trả về string/undefined, không có type-safety, không có validation schema khi khởi động ứng dụng.',
+              'Vì hệ điều hành Linux sẽ tự động xóa các biến process.env sau khi server chạy được 1 giờ.',
+              'Vì NestJS cấm hoàn toàn việc truy cập vào biến toàn cục process của Node.js.'
             ],
             correctIndex: 1,
-            explanation: 'Singleton là scope mặc định giúp tối ưu hóa bộ nhớ và tốc độ thực thi của Node.js.'
+            explanation: 'Dùng ConfigService kết hợp validation schema (Joi/Zod) giúp kiểm tra toàn bộ biến môi trường ngay lúc bootstrap. Nếu thiếu biến bắt buộc, server dừng ngay từ đầu thay vì crash bất ngờ giữa đêm.'
           },
           {
             id: 'q6-2',
-            question: 'Khi máy chủ nhận tín hiệu tắt (SIGTERM) để deploy phiên bản mới, Lifecycle Hook nào được gọi để đóng kết nối Database an toàn?',
+            question: 'Khi máy chủ nhận tín hiệu tắt máy (SIGTERM) trong quá trình redeploy, Lifecycle Hook nào giúp đóng kết nối Database an toàn (Graceful Shutdown)?',
             options: [
-              'onModuleInit',
-              'onModuleDestroy',
-              'ngOnDestroy',
-              'componentWillUnmount'
+              'Hook `onModuleDestroy()` hoặc `beforeApplicationShutdown()` để dọn dẹp kết nối, hoàn thành request đang dở trước khi thoát.',
+              'Hook `onModuleInit()` để tải lại toàn bộ cấu hình từ tệp tin .env và khởi động lại container.',
+              'Hook `componentWillUnmount()` của React được chuyển giao qua WebSockets để thông báo cho trình duyệt.',
+              'Hook `ngOnDestroy()` của Angular được kích hoạt tự động bởi V8 Engine khi bộ nhớ RAM đạt ngưỡng 90%.'
             ],
-            correctIndex: 1,
-            explanation: 'onModuleDestroy (hoặc beforeApplicationShutdown) được gọi trong quá trình Graceful Shutdown để giải phóng tài nguyên.'
+            correctIndex: 0,
+            explanation: 'onModuleDestroy và beforeApplicationShutdown được NestJS gọi khi app.enableShutdownHooks() bắt được tín hiệu SIGTERM/SIGINT, cho phép đóng database pool an toàn.'
           },
           {
             id: 'q6-3',
-            question: 'Tại sao nên tránh lạm dụng Scope.REQUEST nếu không thực sự cần thiết?',
+            question: 'Dynamic Module trong NestJS (ví dụ: `ConfigModule.forRootAsync(...)`) thường được sử dụng trong trường hợp nào?',
             options: [
-              'Vì Scope.REQUEST làm tăng độ trễ (latency) và tiêu tốn nhiều RAM do phải khởi tạo lại hàng nghìn object cho mỗi request',
-              'Vì TypeScript không hỗ trợ',
-              'Vì Scope.REQUEST chỉ chạy được trên Windows',
-              'Không có nhược điểm gì'
+              'Khi module cần nhận các tham số cấu hình bất đồng bộ (như đọc DB, vault, env) trước khi khởi tạo providers.',
+              'Khi muốn chuyển đổi ứng dụng backend từ kiến trúc monolithic sang serverless chỉ bằng một dòng lệnh.',
+              'Khi cần nạp các component giao diện React JSX vào bên trong Express HTTP pipeline.',
+              'Khi module chỉ được phép chạy duy nhất một lần và tự động xóa mã nguồn sau khi thực thi.'
             ],
             correctIndex: 0,
-            explanation: 'Request Scope tạo ra overhead lớn về Garbage Collection (GC) và khởi tạo instance liên tục, làm giảm RPS (Requests Per Second) của server.'
-          },
-          {
-            id: 'l6-q4',
-            question: 'OnApplicationBootstrap khác OnModuleInit như nào?',
-            options: [
-              'Chạy trước',
-              'Chạy sau khi TẤT CẢ module đã khởi tạo xong',
-              'Không dùng được',
-              'Lỗi runtime'
-            ],
-            correctIndex: 1,
-            explanation: 'Bootstrap chạy khi mọi init đã hoàn thành.'
-          },
-          {
-            id: 'l6-q5',
-            question: 'Làm sao để inject config tùy chỉnh?',
-            options: [
-              'process.env',
-              'ConfigService',
-              'Ghi file',
-              'Biến global'
-            ],
-            correctIndex: 1,
-            explanation: 'ConfigService cung cấp type-safety và quản lý env tập trung.'
-          },
-          {
-            id: 'l6-q6',
-            question: 'Transient scope là gì?',
-            options: [
-              '1 instance',
-              'Mỗi request 1 instance',
-              'Mỗi nơi inject sẽ tạo 1 instance mới',
-              'Global instance'
-            ],
-            correctIndex: 2,
-            explanation: 'Cứ Inject là có instance mới, không chia sẻ.'
-          },
-          {
-            id: 'l6-q7',
-            question: 'Service A gọi Service B (cùng module), cần import gì ở A?',
-            options: [
-              'Import Module B',
-              'Không cần, chỉ inject ở constructor',
-              'Import Controller',
-              'Dùng require'
-            ],
-            correctIndex: 1,
-            explanation: 'Cùng module thì IoC đã có sẵn provider.'
-          },
-          {
-            id: 'l6-q8',
-            question: 'Graceful shutdown là gì?',
-            options: [
-              'Rút điện máy chủ',
-              'Dừng nhận request mới, xử lý nốt request cũ và tắt DB kết nối',
-              'Restart liên tục',
-              'Xóa RAM'
-            ],
-            correctIndex: 1,
-            explanation: 'Đóng ứng dụng an toàn không rớt kết nối đột ngột.'
+            explanation: 'Dynamic Module cung cấp các phương thức tĩnh như forRoot(), registerAsync() để truyền tham số runtime và cấu hình provider động.'
           }
         ],
         codeChallenge: {
@@ -1330,99 +1008,39 @@ export class CreateInventoryItemDto {
         quiz: [
           {
             id: 'q7-1',
-            question: 'Tại sao DTO trong NestJS bắt buộc phải dùng Class thay vì TypeScript Interface?',
+            question: 'Khi cấu hình `new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true })`, hành vi của server là gì khi client gửi thêm trường lạ?',
             options: [
-              'Vì TypeScript Interface bị xóa sạch ở runtime khi compile sang JS, còn Class tồn tại ở runtime giúp class-validator và Swagger hoạt động',
-              'Vì Class chạy nhanh hơn 10 lần so với Interface',
-              'Vì NestJS không cho phép viết Interface',
-              'Để tăng dung lượng file'
+              'Server tự động lưu trường lạ đó vào một bảng tạm thời trong cơ sở dữ liệu để kiểm tra sau.',
+              'Server lập tức từ chối request và trả về lỗi 400 Bad Request kèm thông báo trường không được phép tồn tại.',
+              'Server âm thầm bỏ qua trường lạ đó và chỉ xử lý các trường đã được khai báo trong class DTO.',
+              'Server tự động mã hóa trường lạ đó bằng thuật toán SHA256 trước khi chuyển tiếp cho Controller.'
             ],
-            correctIndex: 0,
-            explanation: 'TypeScript Interface chỉ tồn tại trong quá trình biên dịch (Compile-time type checking). Class tồn tại ở runtime, cho phép reflect-metadata đọc decorator để validate.'
+            correctIndex: 1,
+            explanation: 'whitelist: true lọc bỏ thuộc tính thừa; forbidNonWhitelisted: true sẽ ném lỗi HTTP 400 nếu phát hiện thuộc tính thừa, ngăn chặn tấn công Over-posting / Mass Assignment.'
           },
           {
             id: 'q7-2',
-            question: 'Cờ "whitelist: true" trong ValidationPipe có tác dụng bảo mật gì?',
+            question: 'Tại sao trong NestJS DTO bắt buộc phải dùng `class` thay vì `interface` của TypeScript?',
             options: [
-              'Cho phép mọi người dùng truy cập API không cần mật khẩu',
-              'Tự động loại bỏ tất cả các trường dữ liệu mà client gửi lên nếu trường đó không được định nghĩa trong DTO (chống Mass Assignment)',
-              'Bật giao diện màu trắng cho Swagger',
-              'Tắt kiểm tra dữ liệu'
+              'Vì TypeScript Interface bị xóa bỏ hoàn toàn (type erasure) khi compile sang JavaScript, không còn metadata runtime cho class-validator đọc.',
+              'Vì NestJS compiler không hỗ trợ cú pháp interface trong các thư mục src của dự án backend.',
+              'Vì class có tốc độ xử lý nhanh hơn interface gấp 10 lần trong V8 Engine của Node.js.',
+              'Vì interface chỉ dùng được cho các ứng dụng chạy trên trình duyệt web Frontend.'
             ],
-            correctIndex: 1,
-            explanation: 'Whitelist ngăn chặn kẻ tấn công gửi thêm các trường nguy hiểm như isSuperAdmin: true hoặc role: "ADMIN" vào body request.'
+            correctIndex: 0,
+            explanation: 'Interface chỉ tồn tại ở thời điểm compile. Khi sang JS runtime, interface biến mất hoàn toàn. Class được giữ lại dưới dạng Constructor Function và chứa Decorator Metadata để class-validator và Reflection API hoạt động.'
           },
           {
             id: 'q7-3',
-            question: 'Decorator @Type(() => Number) từ thư viện class-transformer có nhiệm vụ gì khi nhận dữ liệu từ Query Params?',
+            question: 'Decorator `@Type(() => Number)` từ thư viện class-transformer có nhiệm vụ quan trọng nào khi nhận Query Params?',
             options: [
-              'Chuyển đổi chuỗi string "20" từ URL query thành số number 20 để validate @Min/@Max',
-              'Kiểm tra xem số đó có phải số nguyên tố không',
-              'Làm tròn số thập phân',
-              'Mã hóa số đó'
+              'Chuyển đổi chuỗi ký tự string từ URL (vd: "20") thành số number thực tế để các decorator @Min / @Max validate chính xác.',
+              'Tự động tăng giá trị số đó lên gấp đôi trước khi lưu trữ vào bảng cơ sở dữ liệu PostgreSQL.',
+              'Mã hóa giá trị số thành chuỗi nhị phân bảo mật để truyền tải qua giao thức HTTPS.',
+              'Kiểm tra xem số đó có phải là số nguyên tố trong thuật toán mã hóa khóa công khai RSA.'
             ],
             correctIndex: 0,
-            explanation: 'Mọi query param trên URL đều là chuỗi (string). class-transformer giúp ép kiểu sang đúng kiểu dữ liệu nguyên thủy mong muốn.'
-          },
-          {
-            id: 'l7-q4',
-            question: 'class-validator là thư viện dùng làm gì?',
-            options: [
-              'Validate Entity',
-              'Cung cấp decorator như @IsString() cho DTO',
-              'Query DB',
-              'Render UI'
-            ],
-            correctIndex: 1,
-            explanation: 'Kết hợp cùng ValidationPipe để kiểm tra request.'
-          },
-          {
-            id: 'l7-q5',
-            question: 'transform: true trong ValidationPipe làm gì?',
-            options: [
-              'Xóa DTO',
-              'Tự động ép kiểu (VD: string "123" -> number 123)',
-              'Ẩn lỗi',
-              'Đổi tên biến'
-            ],
-            correctIndex: 1,
-            explanation: 'Tự convert payload về đúng kiểu khai báo.'
-          },
-          {
-            id: 'l7-q6',
-            question: 'forbidNonWhitelisted: true có tác dụng gì?',
-            options: [
-              'Trả về 400 nếu client gửi thừa trường rác',
-              'Cho qua mọi thứ',
-              'Chặn IP',
-              'Lỗi 500'
-            ],
-            correctIndex: 0,
-            explanation: 'Bảo vệ API khỏi các trường không lường trước.'
-          },
-          {
-            id: 'l7-q7',
-            question: '@ApiProperty() dùng để làm gì?',
-            options: [
-              'Khai báo biến',
-              'Tạo document Swagger tự động',
-              'Xác thực',
-              'Lưu DB'
-            ],
-            correctIndex: 1,
-            explanation: 'Tạo meta cho OpenAPI/Swagger UI.'
-          },
-          {
-            id: 'l7-q8',
-            question: 'DTO nên chứa logic nghiệp vụ không?',
-            options: [
-              'Có',
-              'Không, chỉ Data Transfer (cấu trúc)',
-              'Tùy',
-              'Rất nên'
-            ],
-            correctIndex: 1,
-            explanation: 'DTO chỉ định nghĩa hình dáng và luật lệ validation cơ bản.'
+            explanation: 'Query parameters luôn được HTTP parser nạp dưới dạng string. @Type(() => Number) chỉ định class-transformer parse sang number trước khi validation rule chạy.'
           }
         ],
         codeChallenge: {
@@ -1559,97 +1177,37 @@ model InventoryItem {
             id: 'q8-1',
             question: 'Tại sao trong hệ thống y tế như eSmiles, quan hệ giữa Bệnh Nhân và Bệnh Án phải đặt "onDelete: Restrict" thay vì "onDelete: Cascade"?',
             options: [
-              'Để tăng tốc độ load trang',
-              'Để bảo vệ pháp lý: Không cho phép bất kỳ ai vô tình xóa mất hồ sơ bệnh án y khoa đã phát sinh của bệnh nhân',
-              'Vì Prisma không hỗ trợ Cascade',
-              'Để giảm dung lượng ổ cứng'
+              'Để tăng tốc độ load trang và tiết kiệm băng thông mạng khi người dùng thao tác xóa trên giao diện Frontend.',
+              'Để bảo vệ pháp lý: Không cho phép bất kỳ ai vô tình xóa mất hồ sơ bệnh án y khoa đã phát sinh của bệnh nhân.',
+              'Vì Prisma 7 và cơ sở dữ liệu PostgreSQL không hỗ trợ cơ chế Cascade đối với các bảng có khóa chính là UUID.',
+              'Để hệ điều hành Linux không phải kích hoạt cơ chế dọn dẹp rác (Garbage Collection) trên đĩa cứng máy chủ.'
             ],
             correctIndex: 1,
             explanation: 'Restrict là cơ chế bảo vệ tính toàn vẹn và tính pháp lý của dữ liệu y khoa, ngăn chặn việc xóa cha làm biến mất hàng loạt dữ liệu con quan trọng.'
           },
           {
             id: 'q8-2',
-            question: 'B-Tree Index trong PostgreSQL giúp tăng tốc thao tác nào và làm chậm thao tác nào?',
+            question: 'B-Tree Index trong PostgreSQL tác động như thế nào đến hiệu năng của các thao tác dữ liệu?',
             options: [
-              'Tăng tốc SELECT/WHERE, làm chậm nhẹ thao tác INSERT/UPDATE/DELETE (do phải cập nhật lại cây Index)',
-              'Làm chậm SELECT, tăng tốc INSERT',
-              'Tăng tốc tất cả mọi thao tác mà không có nhược điểm nào',
-              'Chỉ có tác dụng với cột kiểu số'
+              'Tăng tốc truy vấn SELECT/WHERE theo cấp số nhân, nhưng làm chậm nhẹ các thao tác ghi INSERT/UPDATE/DELETE.',
+              'Làm chậm đáng kể các câu lệnh SELECT và chỉ có tác dụng tăng tốc độ khi thực hiện câu lệnh chèn INSERT.',
+              'Tăng tốc đồng đều tất cả mọi thao tác đọc/ghi mà hoàn toàn không tiêu tốn thêm dung lượng đĩa cứng lưu trữ.',
+              'Chỉ có tác dụng đối với các cột có kiểu dữ liệu là số nguyên (INTEGER) và vô tác dụng với chuỗi ký tự hay UUID.'
             ],
             correctIndex: 0,
             explanation: 'Index giúp truy vấn SELECT nhanh gấp hàng trăm lần, nhưng mỗi khi INSERT/UPDATE, DB phải cập nhật lại cấu trúc cây Index trên đĩa.'
           },
           {
             id: 'q8-3',
-            question: 'Ràng buộc "@@unique([unitId, code])" (Composite Unique) có ý nghĩa gì trong hệ thống Multi-tenancy?',
+            question: 'Ràng buộc Composite Unique `@@unique([unitId, code])` mang ý nghĩa bảo mật và thiết kế nào trong kiến trúc Multi-tenancy?',
             options: [
-              'Mã code phải là duy nhất trên toàn cầu trong tất cả các phòng khám',
-              'Mã code là duy nhất bên trong 1 phòng khám (unitId), hai phòng khám khác nhau vẫn có thể dùng chung mã code "VTTH-01"',
-              'Mã code tự động tăng',
-              'Mã code không được chứa chữ hoa'
+              'Mã code của sản phẩm bắt buộc phải là duy nhất trên toàn cầu đối với tất cả các phòng khám trong hệ thống.',
+              'Mã code là duy nhất trong phạm vi từng chi nhánh (unitId), hai phòng khám khác nhau vẫn có thể đặt trùng mã code.',
+              'Cơ sở dữ liệu PostgreSQL sẽ tự động tạo chuỗi ngẫu nhiên cho cột code nếu người dùng gửi giá trị rỗng lên server.',
+              'Khóa ngoại của bảng cha sẽ tự động cập nhật giá trị mới khi cột code của bảng con bị thay đổi giá trị.'
             ],
             correctIndex: 1,
             explanation: 'Composite Unique đảm bảo tính duy nhất theo phạm vi từng tenant, cho phép các phòng khám độc lập tự đặt mã sản phẩm mà không bị xung đột nhau.'
-          },
-          {
-            id: 'l8-q4',
-            question: 'Khóa ngoại (Foreign Key) dùng để làm gì?',
-            options: [
-              'Tạo index',
-              'Đảm bảo tính toàn vẹn tham chiếu giữa 2 bảng',
-              'Tăng tốc tìm kiếm',
-              'Lưu cache'
-            ],
-            correctIndex: 1,
-            explanation: 'Tránh việc bảng A trỏ ID tới bảng B nhưng ID đó không tồn tại.'
-          },
-          {
-            id: 'l8-q5',
-            question: 'Composite Index (Index ghép) là gì?',
-            options: [
-              'Index trên nhiều DB',
-              'Index gồm 2 hay nhiều cột kết hợp',
-              'Index tự tăng',
-              'Index bị lỗi'
-            ],
-            correctIndex: 1,
-            explanation: 'Dùng tối ưu các query WHERE col1 AND col2.'
-          },
-          {
-            id: 'l8-q6',
-            question: 'N-N relationship (nhiều-nhiều) thường yêu cầu gì ở DB?',
-            options: [
-              'Không tạo được',
-              'Bảng trung gian (Join table/Pivot table)',
-              'Khóa chính kép',
-              'JSON field'
-            ],
-            correctIndex: 1,
-            explanation: 'Ví dụ User-Role cần bảng UserRoles trung gian.'
-          },
-          {
-            id: 'l8-q7',
-            question: 'Chuẩn hóa DB (Normalization) nhằm mục đích gì?',
-            options: [
-              'Tăng dữ liệu',
-              'Giảm dư thừa dữ liệu (Data Redundancy)',
-              'Làm DB chậm hơn',
-              'Tạo nhiều view'
-            ],
-            correctIndex: 1,
-            explanation: 'Tránh việc phải update 1 thông tin ở nhiều nơi.'
-          },
-          {
-            id: 'l8-q8',
-            question: 'Index B-Tree hoạt động tốt nhất cho phép so sánh nào?',
-            options: [
-              'LIKE %x%',
-              'Dấu Bằng (=) và khoảng (>, <)',
-              'REGEX',
-              'Đảo chuỗi'
-            ],
-            correctIndex: 1,
-            explanation: 'Cấu trúc cây tìm kiếm tối ưu cho equals và range scan.'
           }
         ],
         codeChallenge: {
@@ -1763,99 +1321,39 @@ export default defineConfig({
         quiz: [
           {
             id: 'q9-1',
-            question: 'Lợi ích của việc chia nhỏ schema Prisma thành nhiều file trong thư mục prisma/schema/ là gì?',
+            question: 'Lợi ích lớn nhất của tính năng Multi-file Schema trong Prisma 7 (`prisma/schema/*.prisma`) là gì?',
             options: [
-              'Tránh việc toàn bộ 50+ bảng dữ liệu bị nhồi nhét vào 1 file schema.prisma dài 5,000 dòng, giúp nhiều lập trình viên làm việc cùng lúc không bị conflict Git',
-              'Làm cho database chạy nhanh hơn 2 lần',
-              'Để không cần cài PostgreSQL',
-              'Để tạo backup tự động'
+              'Tránh việc toàn bộ 50+ bảng dữ liệu bị nhồi nhét vào 1 file duy nhất, giúp các team làm việc song song không bị xung đột Git conflict.',
+              'Tự động tăng tốc độ xử lý các câu lệnh JOIN bảng lên gấp đôi nhờ việc chia nhỏ file trên đĩa cứng máy chủ.',
+              'Cho phép kết nối đồng thời với 10 cơ sở dữ liệu khác nhau (MySQL, MongoDB, PostgreSQL) trong cùng một service.',
+              'Tự động sao lưu toàn bộ dữ liệu ra các file Excel trên Google Drive mỗi khi có lệnh migration được kích hoạt.'
             ],
             correctIndex: 0,
             explanation: 'Multi-file schema giúp phân tách ranh giới module rõ ràng, tránh merge conflict khi nhiều team cùng phát triển các domain khác nhau.'
           },
           {
             id: 'q9-2',
-            question: 'Khi triển khai ứng dụng lên môi trường Production (CI/CD), lệnh nào được dùng để áp dụng các file migration vào Database?',
+            question: 'Khi triển khai ứng dụng lên môi trường Production qua CI/CD Pipeline, câu lệnh nào là chuẩn mực để chạy Migration?',
             options: [
-              'prisma migrate dev',
-              'prisma migrate deploy',
-              'prisma db push',
-              'prisma studio'
+              'Lệnh `npx prisma migrate dev` để tạo tự động các file SQL migration mới trực tiếp trên máy chủ Production.',
+              'Lệnh `npx prisma migrate deploy` để áp dụng các file SQL migration đã kiểm duyệt vào DB mà không sinh thêm file mới.',
+              'Lệnh `npx prisma db push --force-reset` để xóa toàn bộ cấu trúc cũ và tạo lại bảng mới từ schema hiện tại.',
+              'Lệnh `npx prisma studio` để mở giao diện quản trị đồ họa và nhấn nút đồng bộ cơ sở dữ liệu bằng tay.'
             ],
             correctIndex: 1,
             explanation: 'prisma migrate deploy chỉ áp dụng các migration SQL chưa chạy vào Production mà không tạo migration mới và không reset database.'
           },
           {
             id: 'q9-3',
-            question: 'Tại sao tuyệt đối KHÔNG ĐƯỢC dùng "prisma db push" trên môi trường Production?',
+            question: 'Tại sao tuyệt đối KHÔNG ĐƯỢC sử dụng câu lệnh `prisma db push` trên môi trường Production của doanh nghiệp?',
             options: [
-              'Vì nó có thể tự ý drop bảng hoặc xóa cột gây mất vĩnh viễn dữ liệu người dùng mà không lưu lại lịch sử migration',
-              'Vì nó chạy rất chậm',
-              'Vì lệnh này chỉ chạy được trên Windows',
-              'Không có rủi ro gì'
+              'Vì `db push` có thể tự ý drop bảng hoặc xóa cột gây mất vĩnh viễn dữ liệu người dùng mà không lưu lại lịch sử migration có thể rollback.',
+              'Vì lệnh `db push` chỉ hoạt động được trên hệ điều hành Windows và hoàn toàn không tương thích với máy chủ Linux/Docker.',
+              'Vì câu lệnh này bắt buộc phải có kết nối Bluetooth trực tiếp với máy chủ cơ sở dữ liệu mới có thể thực thi.',
+              'Vì `db push` sẽ tự động chuyển toàn bộ cơ sở dữ liệu PostgreSQL sang dạng NoSQL MongoDB mà không báo trước.'
             ],
             correctIndex: 0,
             explanation: 'prisma db push đồng bộ trực tiếp schema lên DB và sẵn sàng drop table/column nếu phát hiện thay đổi, rất nguy hiểm cho Production.'
-          },
-          {
-            id: 'l9-q4',
-            question: 'Lệnh npx prisma format có tác dụng gì?',
-            options: [
-              'Xóa DB',
-              'Định dạng lại file schema.prisma cho chuẩn',
-              'Chạy migrate',
-              'Tạo API'
-            ],
-            correctIndex: 1,
-            explanation: 'Auto-format indent, references.'
-          },
-          {
-            id: 'l9-q5',
-            question: 'Prisma Client được generate ra nằm ở đâu?',
-            options: [
-              'node_modules/.prisma/client',
-              'src/',
-              'db/',
-              'Không ở đâu cả'
-            ],
-            correctIndex: 0,
-            explanation: 'Được sinh tự động trong node_modules để tiện import.'
-          },
-          {
-            id: 'l9-q6',
-            question: 'Lệnh npx prisma db push dùng khi nào?',
-            options: [
-              'Lên Production',
-              'Chỉ dùng ở môi trường DEV (đồng bộ nhanh, không sinh file migration)',
-              'Tạo backup',
-              'Xóa bảng'
-            ],
-            correctIndex: 1,
-            explanation: 'Push không giữ lịch sử migrate, chỉ dùng lúc Dev.'
-          },
-          {
-            id: 'l9-q7',
-            question: 'Khai báo @default(uuid()) trong Prisma làm gì?',
-            options: [
-              'Lỗi cú pháp',
-              'Tự động gán UUID v4 khi insert',
-              'Xóa cột',
-              'Index cột'
-            ],
-            correctIndex: 1,
-            explanation: 'Sử dụng uuid sinh tự động ở tầng application/DB.'
-          },
-          {
-            id: 'l9-q8',
-            question: 'Trong Prisma, dấu ? sau kiểu dữ liệu (String?) ý nghĩa gì?',
-            options: [
-              'Cột đó nullable (có thể rỗng/null)',
-              'Regex',
-              'Báo lỗi',
-              'Tìm kiếm mờ'
-            ],
-            correctIndex: 0,
-            explanation: 'Biến cột thành kiểu T | null.'
           }
         ],
         codeChallenge: {
@@ -1959,99 +1457,39 @@ export async function resolveDoctorNames(prisma: PrismaService, unitId: string, 
         quiz: [
           {
             id: 'q10-1',
-            question: 'Tại sao việc gọi query Database lặp đi lặp lại bên trong vòng lặp for (N+1 Query) là nguyên nhân hàng đầu làm sập máy chủ Backend?',
+            question: 'Tại sao việc gọi query Database lặp đi lặp lại bên trong vòng lặp for (N+1 Query) là nguyên nhân hàng đầu làm suy kiệt hệ thống?',
             options: [
-              'Vì nó làm cạn kiệt Connection Pool của Database và làm tăng thời gian phản hồi API từ 10ms lên hàng nghìn ms',
-              'Vì TypeScript không hỗ trợ vòng lặp for',
-              'Vì PostgreSQL sẽ tự động xóa bảng',
-              'Không có ảnh hưởng gì'
+              'Vì làm cạn kiệt Connection Pool của Database và làm tăng thời gian phản hồi API từ vài mili-giây lên hàng chục giây.',
+              'Vì TypeScript runtime sẽ tự động ngắt kết nối mạng khi phát hiện có nhiều hơn 5 câu query trong 1 hàm.',
+              'Vì cơ sở dữ liệu PostgreSQL sẽ tự động khóa bảng ở chế độ Read-Only vĩnh viễn để bảo vệ đĩa cứng.',
+              'Vì trình duyệt web của người dùng sẽ tự động gửi mã độc lên máy chủ khi thời gian chờ vượt quá 100ms.'
             ],
             correctIndex: 0,
             explanation: 'Mỗi câu query tốn chi phí mở kết nối, truyền gói tin mạng TCP và thực thi trên DB. 100 câu query lặp làm nghẽn toàn bộ Connection Pool của hệ thống.'
           },
           {
             id: 'q10-2',
-            question: 'Trong Prisma, khi chỉ cần hiển thị một số trường nhất định của bảng liên kết (vd: chỉ cần id và fullName của Bác sĩ), ta nên dùng tùy chọn nào để tiết kiệm băng thông?',
+            question: 'Trong Prisma, khi chỉ cần hiển thị một số trường nhất định của bảng liên kết, ta nên dùng tùy chọn nào để tối ưu RAM và băng thông?',
             options: [
-              'select',
-              'include',
-              'where',
-              'orderBy'
+              'Tùy chọn `select: { id: true, fullName: true }` để DB chỉ serialize và trả về đúng các cột được yêu cầu.',
+              'Tùy chọn `include: { _all: true }` để nạp toàn bộ các bảng con vào bộ nhớ đệm RAM của máy chủ Node.js.',
+              'Tùy chọn `where: { isActive: true }` kết hợp với việc xóa bớt các thuộc tính thừa bằng lệnh delete trong JS.',
+              'Tùy chọn `orderBy: { createdAt: "desc" }` để DB tự động sắp xếp và nén dữ liệu nhị phân trước khi gửi.'
             ],
             correctIndex: 0,
             explanation: 'select cho phép chỉ định chính xác các cột cần lấy từ DB, giảm dung lượng dữ liệu truyền qua mạng và RAM của server.'
           },
           {
             id: 'q10-3',
-            question: 'Kỹ thuật Batching (in: uniqueIds) giải quyết bài toán N+1 bằng cách nào?',
+            question: 'Kỹ thuật Batching (`id: { in: uniqueIds }`) giải quyết triệt để bài toán N+1 Query theo cơ chế nào?',
             options: [
-              'Gom toàn bộ N ID cần tìm và gửi đúng 1 câu query duy nhất với toán tử SQL IN',
-              'Tắt chức năng query của database',
-              'Lưu toàn bộ database vào file text',
-              'Dùng setTimeout'
+              'Thu thập toàn bộ N ID cần tìm trong mảng và gửi đúng 1 câu query duy nhất với mệnh đề SQL `WHERE id IN (...)`.',
+              'Tạo ra N tiến trình con chạy song song trên N lõi CPU để thực thi N câu lệnh truy vấn cùng một lúc.',
+              'Lưu trữ toàn bộ cơ sở dữ liệu PostgreSQL vào một file JSON tĩnh trong thư mục public của Frontend.',
+              'Sử dụng hàm setTimeout 10ms giữa mỗi câu query để Database có thời gian nghỉ ngơi giải phóng RAM.'
             ],
             correctIndex: 0,
-            explanation: 'Thay vì N câu query riêng lẻ, Batching chỉ thực hiện 1 câu query duy nhất gom tất cả ID lại.'
-          },
-          {
-            id: 'l10-q4',
-            question: 'Lệnh include trong Prisma findAll làm gì?',
-            options: [
-              'Load kèm các bảng có quan hệ (JOIN)',
-              'Xóa bảng',
-              'Lọc data',
-              'Sắp xếp'
-            ],
-            correctIndex: 0,
-            explanation: 'Tương đương Eager Loading / LEFT JOIN.'
-          },
-          {
-            id: 'l10-q5',
-            question: 'Vấn đề N+1 Query thường do đâu?',
-            options: [
-              'Máy chủ yếu',
-              'Lặp vòng lặp for và gọi truy vấn cho từng phần tử',
-              'DB quá lớn',
-              'Dùng ORM'
-            ],
-            correctIndex: 1,
-            explanation: 'Chạy N truy vấn con cho 1 danh sách N phần tử thay vì IN(id).'
-          },
-          {
-            id: 'l10-q6',
-            question: 'select trong Prisma khác gì include?',
-            options: [
-              'Giống hệt',
-              'select chỉ lấy ra đúng các cột/relation mình muốn (Tối ưu RAM)',
-              'select báo lỗi',
-              'select chậm hơn'
-            ],
-            correctIndex: 1,
-            explanation: 'Include lấy tất cả cột, select chọn lọc cột.'
-          },
-          {
-            id: 'l10-q7',
-            question: 'Prisma Batching xử lý N+1 như thế nào (DataLoader)?',
-            options: [
-              'Không xử lý',
-              'Tự gom các query trùng lặp/giống nhau gửi 1 lần (query bundling)',
-              'Gửi N query',
-              'Khóa DB'
-            ],
-            correctIndex: 1,
-            explanation: 'Prisma có Data Loader pattern tích hợp sẵn.'
-          },
-          {
-            id: 'l10-q8',
-            question: 'Upsert trong Prisma là hành động gì?',
-            options: [
-              'Update nếu tồn tại, Insert nếu không tồn tại',
-              'Xóa bảng',
-              'Sắp xếp ngược',
-              'Tạo mới'
-            ],
-            correctIndex: 0,
-            explanation: 'Lệnh cực kỳ hữu ích thay cho kiểm tra find -> if -> create/update.'
+            explanation: 'Thay vì N câu query riêng lẻ, Batching chỉ thực hiện 1 câu query duy nhất gom tất cả ID lại với độ phức tạp O(1) round-trip mạng.'
           }
         ],
         codeChallenge: {
@@ -2171,99 +1609,39 @@ async transferStock(unitId: string, fromWh: string, toWh: string, itemId: string
         quiz: [
           {
             id: 'q11-1',
-            question: 'Trong khối this.prisma.$transaction(async (tx) => { ... }), nếu câu lệnh thứ 2 ném ra một Exception thì điều gì xảy ra với câu lệnh thứ 1 đã thực thi trước đó?',
+            question: 'Trong khối `prisma.$transaction(async (tx) => { ... })`, nếu câu lệnh thứ 2 ném Exception thì điều gì xảy ra với câu lệnh thứ 1?',
             options: [
-              'Câu lệnh thứ 1 vẫn lưu vào Database, chỉ câu lệnh 2 bị hủy',
-              'Toàn bộ Transaction tự động Rollback (hủy bỏ hoàn toàn các thay đổi của câu 1), Database quay về nguyên trạng ban đầu',
-              'Database bị khóa vĩnh viễn',
-              'Server Node.js tự động tắt'
+              'Câu lệnh thứ 1 vẫn lưu vào Database, chỉ câu lệnh thứ 2 bị hủy bỏ và ghi log cảnh báo.',
+              'Toàn bộ Transaction tự động Rollback (hủy bỏ hoàn toàn các thay đổi của câu 1), Database quay về nguyên trạng ban đầu.',
+              'Cơ sở dữ liệu PostgreSQL sẽ bị khóa vĩnh viễn và yêu cầu khởi động lại máy chủ vật lý.',
+              'Tiến trình server Node.js sẽ tự động crash và xóa toàn bộ dữ liệu tạm thời trong RAM.'
             ],
             correctIndex: 1,
             explanation: 'Tính chất Atomicity (Nguyên tử) đảm bảo nguyên tắc: Tất cả các câu lệnh cùng thành công hoặc không có bất kỳ câu lệnh nào được lưu.'
           },
           {
             id: 'q11-2',
-            question: 'Với hai request xuất cùng một mặt hàng, cách nào tránh oversell tốt hơn việc đọc quantity rồi mới decrement?',
+            question: 'Để chống Race Condition khi 2 bác sĩ cùng đặt 1 lịch hẹn hoặc trừ tồn kho cùng lúc, giải pháp chuẩn trong Prisma là gì?',
             options: [
-              'Dùng conditional update `where: { quantity: { gte: qty } }`, decrement trong cùng câu lệnh, rồi kiểm tra số bản ghi được cập nhật',
-              'Đọc số lượng hai lần trước khi ghi để chắc chắn hơn',
-              'Chỉ kiểm tra `quantity < 0` sau update ngoài transaction',
-              'Tin rằng Node.js single-thread nên không cần xử lý concurrent request'
+              'Đọc dữ liệu ra RAM, kiểm tra bằng câu lệnh if/else trong JavaScript rồi mới gọi lệnh update thông thường.',
+              'Sử dụng Database Transaction kết hợp Conditional Update (updateMany có where số lượng >= cần trừ) hoặc Pessimistic Locking.',
+              'Tăng thêm dung lượng RAM của máy chủ Node.js lên gấp đôi để xử lý 2 request nhanh hơn.',
+              'Sử dụng hàm setTimeout 500ms giữa 2 request để tránh việc 2 người bấm nút cùng một giây.'
             ],
-            correctIndex: 0,
-            explanation: 'Transaction hữu ích, nhưng read-then-write vẫn có race tùy cách viết. Conditional update biến điều kiện đủ hàng và decrement thành một thao tác nguyên tử ở DB.'
+            correctIndex: 1,
+            explanation: 'Atomic Conditional Update (`UPDATE items SET quantity = quantity - X WHERE id = Y AND quantity >= X`) xử lý triệt để Race Condition ngay tại mức Engine Database mà không sợ lag giữa tầng Node.js và DB.'
           },
           {
             id: 'q11-3',
-            question: 'Mức độ cô lập giao dịch (Transaction Isolation Level) mặc định của PostgreSQL là gì?',
+            question: 'Mức độ cô lập giao dịch (Transaction Isolation Level) mặc định của PostgreSQL là gì và đảm bảo điều gì?',
             options: [
-              'Read Uncommitted',
-              'Read Committed',
-              'Repeatable Read',
-              'Serializable'
-            ],
-            correctIndex: 1,
-            explanation: 'Read Committed là mức cô lập mặc định của PostgreSQL, đảm bảo câu query chỉ đọc được dữ liệu đã được commit bởi các transaction khác.'
-          },
-          {
-            id: 'l11-q4',
-            question: 'Transaction Isolation Level ngăn ngừa lỗi gì?',
-            options: [
-              'Sai UI',
-              'Các Race Conditions như Dirty Read, Non-Repeatable Read, Phantom Read',
-              'Lỗi CPU',
-              'Lỗi CSS'
-            ],
-            correctIndex: 1,
-            explanation: 'Mức độ cách ly càng cao càng an toàn nhưng làm giảm tính đồng thời.'
-          },
-          {
-            id: 'l11-q5',
-            question: 'Pessimistic Locking (Khóa bi quan) là gì?',
-            options: [
-              'Khóa ngay từ đầu bằng FOR UPDATE',
-              'Không khóa',
-              'Khóa UI',
-              'Dùng versioning'
+              'Read Committed: Giao dịch chỉ đọc được những dữ liệu đã được Commit bởi các giao dịch khác trước đó.',
+              'Read Uncommitted: Cho phép đọc dữ liệu rác (Dirty Read) đang được chỉnh sửa dở dang bởi transaction khác.',
+              'Serializable: Khóa toàn bộ bảng dữ liệu và chỉ cho phép duy nhất một người dùng kết nối tại một thời điểm.',
+              'Repeatable Read: Tự động nhân bản bảng dữ liệu ra nhiều bản sao tạm thời trong bộ nhớ đệm RAM.'
             ],
             correctIndex: 0,
-            explanation: 'Bắt các transaction khác phải chờ cho đến khi commit.'
-          },
-          {
-            id: 'l11-q6',
-            question: 'Optimistic Locking (Khóa lạc quan) thường dùng gì?',
-            options: [
-              'Cột version hoặc updatedAt',
-              'FOR UPDATE',
-              'Wait 10s',
-              'Block User'
-            ],
-            correctIndex: 0,
-            explanation: 'Cho phép đọc tự do, khi update check version. Nếu version đổi -> Retry.'
-          },
-          {
-            id: 'l11-q7',
-            question: 'Prisma Interactive Transaction dùng method gì?',
-            options: [
-              'prisma.$transaction(async (tx) => {})',
-              'prisma.run()',
-              'prisma.tx()',
-              'prisma.begin()'
-            ],
-            correctIndex: 0,
-            explanation: 'Chạy một callback async với client tx chứa lock.'
-          },
-          {
-            id: 'l11-q8',
-            question: 'Deadlock xảy ra khi nào?',
-            options: [
-              'DB đầy',
-              'Hai transaction khóa tài nguyên chéo nhau và chờ đợi vô tận',
-              'Quá timeout',
-              'Mất mạng'
-            ],
-            correctIndex: 1,
-            explanation: 'Tx1 đợi Lock B của Tx2, Tx2 đợi Lock A của Tx1.'
+            explanation: 'Read Committed là mức cô lập mặc định của PostgreSQL, ngăn chặn Dirty Read và cân bằng giữa tính toàn vẹn dữ liệu và hiệu năng concurrency.'
           }
         ],
         codeChallenge: {
@@ -2380,99 +1758,39 @@ async update(unitId: string, id: string, dto: UpdateInventoryCategoryDto) {
         quiz: [
           {
             id: 'q12-1',
-            question: 'Khi người dùng gọi API PATCH /api/i/v1/inventory/categories/:id, tại sao Service phải kiểm tra "where: { id, unitId }"?',
+            question: 'Khi người dùng gọi API PATCH `/api/i/v1/inventory/categories/:id`, tại sao Service bắt buộc phải kiểm tra `where: { id, unitId }`?',
             options: [
-              'Để kiểm tra bản ghi có tồn tại VÀ có thuộc về phòng khám của người dùng đang đăng nhập hay không, chống lỗ hổng xem trộm/sửa trộm dữ liệu phòng khám khác (IDOR)',
-              'Để database chạy nhanh hơn',
-              'Để format lại ngày tháng',
-              'Không cần thiết nếu đã có id'
+              'Để kiểm tra bản ghi có tồn tại VÀ có thuộc về phòng khám của người dùng đang đăng nhập hay không, chống lỗ hổng xem trộm/sửa trộm dữ liệu (IDOR).',
+              'Để tăng tốc độ thực thi của cơ sở dữ liệu PostgreSQL lên gấp đôi nhờ việc bỏ qua các bảng không liên quan.',
+              'Để tự động định dạng lại ngày tháng theo múi giờ GMT+7 trước khi trả về cho ứng dụng Frontend.',
+              'Vì cú pháp của Prisma 7 bắt buộc phải truyền ít nhất 2 điều kiện lọc trong mọi câu lệnh updateMany.'
             ],
             correctIndex: 0,
             explanation: 'Nếu chỉ tìm theo { id }, người dùng ở Phòng khám A có thể đoán ID của Phòng khám B và sửa trộm dữ liệu.'
           },
           {
             id: 'q12-2',
-            question: 'Trong mô hình phân cấp Group -> Unit -> Branch của eSmiles, cấp nào là đơn vị cô lập dữ liệu nghiệp vụ chính?',
+            question: 'Trong mô hình phân cấp quản trị đa chi nhánh Group -> Unit -> Branch của eSmiles, cấp nào là đơn vị cô lập dữ liệu nghiệp vụ chính?',
             options: [
-              'Branch',
-              'Unit (Phòng khám)',
-              'Group',
-              'User'
+              'Cấp Branch (Ghế khám / Phòng ban nhỏ trong nội bộ từng phòng khám).',
+              'Cấp Unit (Phòng khám chi nhánh độc lập có kho thuốc, bệnh án và báo cáo tài chính riêng).',
+              'Cấp Group (Tập đoàn nha khoa nắm bản quyền phần mềm toàn hệ thống).',
+              'Cấp Patient (Hồ sơ khách hàng cá nhân đăng ký qua ứng dụng di động).'
             ],
             correctIndex: 1,
             explanation: 'Unit là đơn vị pháp nhân cô lập toàn bộ dữ liệu nghiệp vụ như Khách hàng, Bệnh án, Kho và Báo cáo tài chính.'
           },
           {
             id: 'q12-3',
-            question: 'Lỗ hổng bảo mật IDOR (Insecure Direct Object References) là gì?',
+            question: 'Lỗ hổng bảo mật IDOR (Insecure Direct Object References) trong hệ thống Multi-tenancy xảy ra khi nào?',
             options: [
-              'Lỗ hổng xảy ra khi ứng dụng cấp quyền truy cập trực tiếp vào đối tượng dữ liệu dựa trên ID do người dùng cung cấp mà không kiểm tra quyền sở hữu Tenant',
-              'Lỗ hổng mất mạng',
-              'Lỗ hổng máy tính bị virus',
-              'Lỗi cú pháp TypeScript'
+              'Khi ứng dụng cấp quyền truy cập trực tiếp vào bản ghi dựa trên ID do client gửi lên mà không kiểm tra quyền sở hữu Tenant Context.',
+              'Khi máy tính của nhân viên bị nhiễm mã độc trojan và tự động gửi mật khẩu đăng nhập ra ngoài Internet.',
+              'Khi cơ sở dữ liệu PostgreSQL bị mất kết nối mạng đột ngột trong lúc đang thực thi câu lệnh SQL migration.',
+              'Khi lập trình viên quên khai báo kiểu dữ liệu trả về cho hàm trong class Controller của NestJS.'
             ],
             correctIndex: 0,
             explanation: 'IDOR xảy ra khi server tin tưởng ID gửi lên từ client mà quên kiểm tra ID đó có thuộc về unitId của tài khoản đang đăng nhập hay không.'
-          },
-          {
-            id: 'l12-q4',
-            question: 'Row-Level Security (RLS) ở DB giúp ích gì?',
-            options: [
-              'Lọc Data ở tầng SQL thay vì Code',
-              'Làm đẹp DB',
-              'Tăng tốc Disk',
-              'Giao diện'
-            ],
-            correctIndex: 0,
-            explanation: 'Tránh leak data bằng policy trực tiếp trên DB.'
-          },
-          {
-            id: 'l12-q5',
-            question: 'Prisma Client Extension dùng làm gì trong Multi-tenant?',
-            options: [
-              'Thêm auto query filter { unitId } vào mọi tác vụ CRUD',
-              'Đổi màu log',
-              'Format JSON',
-              'Tự xóa DB'
-            ],
-            correctIndex: 0,
-            explanation: 'Cơ chế can thiệp Prisma để tự đính unitId chống rò rỉ tenant.'
-          },
-          {
-            id: 'l12-q6',
-            question: 'Data Leak (rò rỉ dữ liệu) Tenant xảy ra khi nào?',
-            options: [
-              'Quên WHERE unitId = X khi truy vấn',
-              'Lỗi CSS',
-              'Sai JWT',
-              'Quên mật khẩu'
-            ],
-            correctIndex: 0,
-            explanation: 'Lỗi con người quên where clause khiến trả nhầm data.'
-          },
-          {
-            id: 'l12-q7',
-            question: 'Cách thiết kế Multi-tenant 1 Database nhưng nhiều Schema có tên gọi là gì?',
-            options: [
-              'Shared DB Shared Schema',
-              'Shared DB Separate Schema',
-              'Separate DB',
-              'No DB'
-            ],
-            correctIndex: 1,
-            explanation: 'Dùng schema của PostgreSQL (Namespace).'
-          },
-          {
-            id: 'l12-q8',
-            question: 'Với eSmiles, cách triển khai tenant là gì?',
-            options: [
-              'Nhiều server',
-              'Shared DB, chung bảng, phân biệt bằng cột unitId',
-              '1 DB 1 User',
-              'File XML'
-            ],
-            correctIndex: 1,
-            explanation: 'Row-level tenancy (Shared Database, Shared Schema).'
           }
         ],
         codeChallenge: {
@@ -2612,99 +1930,39 @@ export class AllExceptionsFilter implements ExceptionFilter {
         quiz: [
           {
             id: 'q13-1',
-            question: 'Khi Prisma ném ra mã lỗi P2002 (Unique constraint failed), AllExceptionsFilter của eSmiles sẽ map thành HTTP Status Code nào?',
+            question: 'Khi Prisma ném mã lỗi `P2002` (Unique constraint failed), Exception Filter chuẩn của NestJS nên ánh xạ thành HTTP Status Code nào?',
             options: [
-              '409 Conflict',
-              '500 Internal Server Error',
-              '200 OK',
-              '400 Bad Request'
+              'HTTP 409 Conflict (Bản ghi đã tồn tại hoặc vi phạm tính duy nhất của trường dữ liệu).',
+              'HTTP 500 Internal Server Error (Lỗi hệ thống không xác định tại tầng máy chủ cơ sở dữ liệu).',
+              'HTTP 200 OK kèm theo cờ thông báo `{ success: false, error: "DUPLICATE_KEY" }` trong JSON.',
+              'HTTP 400 Bad Request kèm theo việc tự động đổi tên trường dữ liệu bị trùng lặp.'
             ],
             correctIndex: 0,
             explanation: 'Lỗi vi phạm ràng buộc duy nhất (trùng mã code/email) được chuẩn hóa thành 409 Conflict.'
           },
           {
             id: 'q13-2',
-            question: 'Lợi ích của việc xử lý lỗi tập trung bằng Exception Filter trong NestJS là gì?',
+            question: 'Mục đích chính của việc xây dựng Global Exception Filter trong NestJS là gì?',
             options: [
-              'Giữ cho code Service sạch sẽ, không bị lặp lại các khối try/catch giống hệt nhau ở hàng trăm endpoint',
-              'Đảm bảo 100% các API trả về cấu trúc lỗi đồng nhất để Frontend dễ dàng bắt và hiển thị thông báo',
-              'Cả 2 phương án trên đều đúng',
-              'Không có lợi ích gì'
+              'Tự động sửa lỗi sai trong câu lệnh SQL của lập trình viên và thực thi lại trên Database.',
+              'Bắt mọi lỗi unhandled, chuẩn hóa cấu trúc JSON trả về client (statusCode, message, timestamp, path) và ghi log an toàn.',
+              'Ẩn toàn bộ mã trạng thái lỗi và luôn trả về HTTP 200 OK cho mọi request của khách hàng.',
+              'Gửi tin nhắn SMS cảnh báo trực tiếp cho giám đốc phòng khám mỗi khi có 1 request bị lỗi 404.'
             ],
-            correctIndex: 2,
-            explanation: 'Exception Filter vừa giúp code tầng Business Logic sạch sẽ, vừa đảm bảo tính nhất quán của API contract.'
+            correctIndex: 1,
+            explanation: 'Global Exception Filter gom việc bắt lỗi về 1 nơi, chuẩn hóa response format theo chuẩn RFC 7807 và ẩn chi tiết nhạy cảm (Stack trace/DB errors) khỏi phía client trên Production.'
           },
           {
             id: 'q13-3',
-            question: 'Khi xảy ra lỗi không mong muốn ở tầng hệ thống (ví dụ: Database bị ngắt kết nối đột ngột), Filter nên trả về gì cho client?',
+            question: 'Khi xảy ra sự cố Database ngắt kết nối đột ngột trên môi trường Production, Filter nên phản hồi cho client như thế nào?',
             options: [
-              'Mã lỗi 500 kèm theo thông báo an toàn, không để lộ thông tin nhạy cảm (như mật khẩu DB hay câu query raw) ra ngoài',
-              'Trả về toàn bộ chuỗi kết nối Database chứa mật khẩu',
-              'Trả về status 200 coi như không có chuyện gì',
-              'Treo kết nối không phản hồi'
+              'Trả về HTTP 500 kèm thông điệp chung chung, che giấu toàn bộ chuỗi kết nối và chi tiết Database ra khỏi client.',
+              'Trả về toàn bộ chuỗi kết nối Database chứa thông tin username và password để người dùng tự sửa lỗi.',
+              'Trả về HTTP 200 OK và tự động sinh dữ liệu giả (Mock Data) để khách hàng không phát hiện ra lỗi.',
+              'Treo kết nối HTTP vô thời hạn cho đến khi người quản trị khởi động lại máy chủ cơ sở dữ liệu.'
             ],
             correctIndex: 0,
             explanation: 'Không bao giờ được trả về Database credentials hoặc raw SQL trong response 500 vì lý do an toàn bảo mật.'
-          },
-          {
-            id: 'l13-q4',
-            question: 'HttpException trong NestJS dùng làm gì?',
-            options: [
-              'Lỗi UI',
-              'Ném ra một Response Error chuẩn có StatusCode xác định',
-              'Báo lỗi DB',
-              'Tạo file'
-            ],
-            correctIndex: 1,
-            explanation: 'Base class cho mọi error HTTP (BadRequest, NotFound).'
-          },
-          {
-            id: 'l13-q5',
-            question: 'Trong ExceptionFilter, làm sao log lỗi 500?',
-            options: [
-              'Lưu vào DB',
-              'Dùng nest Logger, Sentry, hoặc File',
-              'Bỏ qua',
-              'Gửi email'
-            ],
-            correctIndex: 1,
-            explanation: 'Ghi log (stack trace) ra hệ thống APM (như Sentry).'
-          },
-          {
-            id: 'l13-q6',
-            question: 'Bắt lỗi ValidationPipe thuộc loại HTTP status nào?',
-            options: [
-              '500',
-              '400 Bad Request',
-              '404',
-              '200'
-            ],
-            correctIndex: 1,
-            explanation: 'Dữ liệu đầu vào sai cấu trúc.'
-          },
-          {
-            id: 'l13-q7',
-            question: 'Catch-all Exception Filter bắt những gì?',
-            options: [
-              'Chỉ lỗi 500',
-              'Mọi Exception bị ném ra mà chưa có ai catch',
-              'Lỗi mạng',
-              'Lỗi CSS'
-            ],
-            correctIndex: 1,
-            explanation: 'Bắt tất cả lỗi chưa được xử lý để tránh sập app và che giấu stack trace.'
-          },
-          {
-            id: 'l13-q8',
-            question: 'Gửi Stack Trace ra môi trường Production (Client) có sao không?',
-            options: [
-              'Tốt cho debug',
-              'Nguy hiểm, lộ cấu trúc code và bí mật hệ thống',
-              'Không ảnh hưởng',
-              'Làm app nhanh hơn'
-            ],
-            correctIndex: 1,
-            explanation: 'Chỉ gửi message chung (Internal Error), log stacktrace vào hệ thống nội bộ.'
           }
         ],
         codeChallenge: {
@@ -2822,99 +2080,39 @@ export async function verifyPassword(hash: string, plainText: string): Promise<b
         quiz: [
           {
             id: 'q14-1',
-            question: 'Tại sao Access Token chỉ nên có thời hạn sống ngắn (15-30 phút)?',
+            question: 'Tại sao Access Token nên có thời hạn ngắn (15 phút) trong khi Refresh Token có thời hạn dài (30 ngày) và lưu trong HttpOnly Cookie?',
             options: [
-              'Để nếu Access Token bị kẻ xấu đánh cắp qua mạng, token sẽ nhanh chóng hết hạn và vô hiệu hóa sau 15 phút',
-              'Vì máy chủ không đủ dung lượng lưu trữ token lâu',
-              'Để bắt người dùng phải nhập lại mật khẩu liên tục',
-              'Vì quy định của trình duyệt'
+              'Giảm thiểu thiệt hại nếu Access Token bị lộ, đồng thời Refresh Token an toàn trong HttpOnly Cookie chống XSS để cấp mới token.',
+              'Vì Access Token sử dụng nhiều băng thông mạng hơn Refresh Token khi truyền tải qua giao thức HTTP.',
+              'Vì trình duyệt web sẽ tự động xóa mọi loại token sau mỗi 15 phút nếu người dùng không di chuyển chuột.',
+              'Vì thuật toán mã hóa RSA không cho phép tạo token có thời hạn sử dụng dài hơn 15 phút.'
             ],
             correctIndex: 0,
-            explanation: 'Access Token sống ngắn giúp hạn chế tối đa cửa sổ rủi ro (Blast Radius) nếu token bị rò rỉ.'
+            explanation: 'Access Token thời hạn ngắn giảm thiểu rủi ro khi bị lộ. Refresh Token được bảo vệ trong HttpOnly Cookie (chống XSS) và lưu trong whitelist/database để có thể thu hồi (Revocation) khi cần.'
           },
           {
             id: 'q14-2',
-            question: 'Kỹ thuật Refresh Token Rotation (RTR) hoạt động như thế nào?',
+            question: 'Cơ chế Refresh Token Rotation (RTR) bảo vệ tài khoản người dùng như thế nào khi phát hiện token bị đánh cắp?',
             options: [
-              'Mỗi lần client dùng Refresh Token để xin Access Token mới, server lập tức hủy Refresh Token cũ và cấp 1 Refresh Token mới toanh',
-              'Xoay vòng token theo bảng chữ cái',
-              'Gửi token qua email',
-              'Không đổi token bao giờ'
+              'Mỗi lần Refresh Token được dùng để cấp Access Token mới, nó lập tức bị hủy và thay bằng token mới; nếu token cũ bị tái sử dụng, hủy toàn bộ phiên.',
+              'Tự động gửi email yêu cầu người dùng xác nhận mã OTP 6 số qua điện thoại mỗi khi thực hiện một HTTP request.',
+              'Tự động tăng gấp đôi thời gian sống của token mỗi khi người dùng thực hiện thao tác thanh toán trực tuyến.',
+              'Chuyển đổi thuật toán mã hóa từ HMAC-SHA256 sang MD5 để tăng tốc độ kiểm tra chữ ký số.'
             ],
             correctIndex: 0,
             explanation: 'Refresh Token Rotation đảm bảo mỗi Refresh Token chỉ được dùng đúng 1 lần. Nếu 1 token bị dùng lại lần 2, hệ thống phát hiện hacker và khóa toàn bộ phiên đăng nhập.'
           },
           {
             id: 'q14-3',
-            question: 'Cờ "SameSite: Strict" hoặc "SameSite: Lax" trên HttpOnly Cookie có tác dụng bảo vệ gì?',
+            question: 'Thuộc tính `SameSite: "Lax"` hoặc `"Strict"` trên HttpOnly Cookie có vai trò phòng chống loại tấn công nào?',
             options: [
-              'Chống tấn công CSRF (Cross-Site Request Forgery)',
-              'Tăng tốc độ mạng',
-              'Tự động format ngày tháng',
-              'Xóa lịch sử duyệt web'
+              'Chống tấn công Cross-Site Request Forgery (CSRF) bằng cách ngăn trình duyệt tự động đính kèm cookie khi click link từ trang thứ ba.',
+              'Chống tấn công DDoS bằng cách giới hạn số lượng request tối đa mà một địa chỉ IP có thể gửi trong 1 giây.',
+              'Chống tấn công SQL Injection bằng cách tự động escape các ký tự đặc biệt như dấu nháy đơn và chấm phẩy.',
+              'Chống tấn công Man-In-The-Middle bằng cách tự động cài đặt chứng chỉ bảo mật SSL/TLS lên máy tính người dùng.'
             ],
             correctIndex: 0,
             explanation: 'SameSite ngăn chặn việc trình duyệt tự động gửi cookie khi người dùng bị lừa click vào link từ trang web độc hại của bên thứ ba.'
-          },
-          {
-            id: 'l14-q4',
-            question: 'Argon2 vượt trội hơn Bcrypt ở điểm nào?',
-            options: [
-              'Tốc độ mã hóa 1ms',
-              'Bảo vệ mạnh mẽ khỏi các cuộc tấn công bằng GPU/ASIC do đòi hỏi nhiều RAM',
-              'Đọc dễ',
-              'Sinh ngẫu nhiên'
-            ],
-            correctIndex: 1,
-            explanation: 'Argon2 là chuẩn mã hóa mật khẩu hiện đại nhất (winner của PHC).'
-          },
-          {
-            id: 'l14-q5',
-            question: 'Salt (Muối) trong mã hóa mật khẩu dùng làm gì?',
-            options: [
-              'Cho mặn',
-              'Chuỗi ngẫu nhiên nối vào mật khẩu trước khi băm, giúp chặn Rainbow Table Attack',
-              'Tăng tốc',
-              'Tạo session'
-            ],
-            correctIndex: 1,
-            explanation: 'Đảm bảo cùng 1 mật khẩu băm ra kết quả khác nhau.'
-          },
-          {
-            id: 'l14-q6',
-            question: 'Refresh Token khác gì Access Token?',
-            options: [
-              'Ngắn hơn',
-              'Thời gian sống (TTL) dài hơn, dùng để lấy Access Token mới mà không cần đăng nhập lại',
-              'Được gửi mọi request',
-              'Lưu trên mây'
-            ],
-            correctIndex: 1,
-            explanation: 'Access Token sống ngắn (15m), Refresh Token sống dài (7d).'
-          },
-          {
-            id: 'l14-q7',
-            question: 'Thuộc tính Secure trong Cookie làm gì?',
-            options: [
-              'Mã hóa data',
-              'Chỉ gửi cookie nếu đường truyền là HTTPS',
-              'Chặn JS',
-              'Chặn CORS'
-            ],
-            correctIndex: 1,
-            explanation: 'Tránh gửi cookie dạng bản rõ qua HTTP.'
-          },
-          {
-            id: 'l14-q8',
-            question: 'Khi User đổi mật khẩu, hệ thống phải làm gì với Refresh Token cũ?',
-            options: [
-              'Không làm gì',
-              'Thu hồi (Revoke/Xóa) toàn bộ phiên đăng nhập cũ',
-              'Sửa lại',
-              'Mã hóa lại'
-            ],
-            correctIndex: 1,
-            explanation: 'Đảm bảo kẻ xấu bị văng ra khỏi các thiết bị.'
           }
         ],
         codeChallenge: {
@@ -3029,99 +2227,39 @@ export class PermissionGuard implements CanActivate {
         quiz: [
           {
             id: 'q15-1',
-            question: 'Tại sao hệ thống y tế đa chi nhánh như eSmiles nên dùng Permission-based Access Control (PBAC) thay vì chỉ dùng Role-based (RBAC)?',
+            question: 'Sự khác biệt cốt lõi giữa Role-Based Access Control (RBAC) và Permission-Based Access Control (PBAC) là gì?',
             options: [
-              'Vì mỗi phòng khám có thể tự tạo các chức danh tùy chỉnh (Lễ tân ca tối, Y tá trưởng, Bác sĩ học việc) với tập hợp quyền hạn linh hoạt mà không cần sửa code backend',
-              'Vì RBAC không chạy được trên Node.js',
-              'Để làm code ngắn hơn',
-              'Không có sự khác biệt'
+              'RBAC gán quyền theo chức danh cố định (Admin/Doctor); PBAC phân quyền động theo từng hành động cụ thể (patient:create, invoice:refund).',
+              'RBAC chỉ dùng được cho cơ sở dữ liệu MySQL; PBAC chỉ dùng được cho cơ sở dữ liệu PostgreSQL.',
+              'RBAC không cần xác thực mật khẩu người dùng; PBAC bắt buộc phải xác thực bằng sinh trắc học khuôn mặt.',
+              'RBAC có tốc độ xử lý chậm hơn PBAC 100 lần do phải giải mã chuỗi JWT phức tạp hơn.'
             ],
             correctIndex: 0,
-            explanation: 'PBAC cho phép phân quyền động đến từng nút bấm và từng API, trao quyền tự cấu hình cho quản lý phòng khám.'
+            explanation: 'RBAC kiểm tra cứng theo vai trò (Role), khó mở rộng khi có nhiều nghiệp vụ chéo. PBAC (Permission-based) kiểm tra theo từng quyền hạt nhân (Subject:Action), cho phép tùy biến phân quyền linh hoạt theo từng phòng khám.'
           },
           {
             id: 'q15-2',
-            question: 'Nếu tài khoản người dùng sở hữu quyền "inventory:*", họ có thể gọi API yêu cầu quyền "inventory:item:delete" không?',
+            question: 'Nếu tài khoản người dùng sở hữu quyền wildcard `"inventory:*"`, họ có được phép gọi API yêu cầu quyền `"inventory:item:delete"` không?',
             options: [
-              'Có, vì ký tự đại diện wildcard (*) cho phép toàn quyền thao tác trên toàn bộ module inventory',
-              'Không, phải đúng chính xác từng chữ',
-              'Chỉ được gọi nếu là chủ phòng khám',
-              'Bị khóa tài khoản'
+              'Có, vì ký tự đại diện wildcard (*) cho phép toàn quyền thực thi mọi hành động bên trong phạm vi module inventory.',
+              'Không, cơ chế PBAC bắt buộc chuỗi quyền trong token phải trùng khớp chính xác 100% từng ký tự chữ cái.',
+              'Chỉ được phép nếu người dùng đó đồng thời sở hữu vai trò là Chủ tịch tập đoàn hoặc Giám đốc chi nhánh.',
+              'Không, vì các thao tác xóa dữ liệu (delete) bắt buộc phải được khai báo quyền hạn độc lập bằng UUID riêng.'
             ],
             correctIndex: 0,
             explanation: 'Wildcard inventory:* khớp với mọi hành động thuộc module inventory.'
           },
           {
             id: 'q15-3',
-            question: 'Bề mặt /api/p/v1/... trong kiến trúc Multi-surface của eSmiles dành cho đối tượng nào?',
+            question: 'Bề mặt `/api/p/v1/...` trong quy hoạch kiến trúc Multi-Surface của eSmiles được thiết kế dành riêng cho đối tượng nào?',
             options: [
-              'Platform Admin (Quản trị viên hệ thống)',
-              'Internal Staff (Bác sĩ, Lễ tân)',
-              'Public / Patient (Bệnh nhân sử dụng Mobile App hoặc Cổng bệnh nhân)',
-              'Database Administrator'
+              'Quản trị viên cấp cao của toàn bộ nền tảng đám mây (Platform Super Admin).',
+              'Bác sĩ điều trị và nhân viên y tá nội bộ thao tác tại phòng khám chi nhánh.',
+              'Bệnh nhân và khách hàng công cộng truy cập thông qua Mobile App hoặc Patient Portal.',
+              'Kỹ sư quản trị cơ sở dữ liệu thực hiện các tác vụ sao lưu và phục hồi dữ liệu.'
             ],
             correctIndex: 2,
             explanation: 'Prefix /api/p/v1 phân vùng riêng cho bề mặt bệnh nhân (Patient / Public Portal).'
-          },
-          {
-            id: 'l15-q4',
-            question: 'ABAC (Attribute-Based Access Control) khác gì RBAC?',
-            options: [
-              'Chỉ phân quyền Role',
-              'Phân quyền dựa trên thuộc tính của User, Tài nguyên và Môi trường (vd: chỉ được xóa nếu là người tạo)',
-              'Cũ hơn',
-              'Không dùng database'
-            ],
-            correctIndex: 1,
-            explanation: 'CASL nổi tiếng về ABAC.'
-          },
-          {
-            id: 'l15-q5',
-            question: 'Trong CASL, "subject" là gì?',
-            options: [
-              'Tên bài học',
-              'Thực thể bị tác động (User, Invoice, Patient)',
-              'Role',
-              'Hành động'
-            ],
-            correctIndex: 1,
-            explanation: 'can("update", "Invoice").'
-          },
-          {
-            id: 'l15-q6',
-            question: 'Vì sao nên viết Policy Check ở tầng Service thay vì Controller?',
-            options: [
-              'Controller không hỗ trợ',
-              'Service có thể query thêm data từ DB để check quyền ABAC phức tạp (vd: check owner)',
-              'Controller làm chậm',
-              'Service tự động check'
-            ],
-            correctIndex: 1,
-            explanation: 'Cần logic DB (đọc object ra check) thì phải nằm ở service.'
-          },
-          {
-            id: 'l15-q7',
-            question: '@RequirePermission() decorator hoạt động như thế nào?',
-            options: [
-              'Là một Guard, chạy trước khi vào handler',
-              'Sửa DB',
-              'Khởi động app',
-              'Tạo token'
-            ],
-            correctIndex: 0,
-            explanation: 'Guard kiểm tra metadata của Route so với Token User.'
-          },
-          {
-            id: 'l15-q8',
-            question: 'Đại lý (Tenant) Admin có quyền xóa hệ thống không?',
-            options: [
-              'Có',
-              'Không, chỉ SuperAdmin của nền tảng',
-              'Tùy chọn',
-              'Luôn luôn'
-            ],
-            correctIndex: 1,
-            explanation: 'Tenant Admin chỉ có toàn quyền trong Unit/Tenant của họ.'
           }
         ],
         codeChallenge: {
@@ -3238,99 +2376,39 @@ export class CacheLookupService {
         quiz: [
           {
             id: 'q16-1',
-            question: 'Khi Bác sĩ sửa đổi giá của một dịch vụ khám răng, bước nào đối với Redis Cache là bắt buộc?',
+            question: 'Khi Bác sĩ cập nhật đơn giá của một dịch vụ trong danh mục, thao tác nào đối với Redis Cache là bắt buộc theo mô hình Cache-Aside?',
             options: [
-              'Xóa hoặc làm mới key cache tương ứng trong Redis (Cache Invalidation) để các request sau đọc được giá mới nhất',
-              'Khởi động lại toàn bộ máy chủ Redis',
-              'Tắt chức năng cache',
-              'Không cần làm gì, cache sẽ tự biết'
+              'Xóa hoặc làm mới key cache tương ứng trong Redis (Cache Invalidation) để các request kế tiếp đọc được dữ liệu mới từ Database.',
+              'Khởi động lại toàn bộ máy chủ Redis và xóa toàn bộ các phiên đăng nhập HttpOnly Cookie của người dùng.',
+              'Tắt hoàn toàn module Cache trong NestJS và chuyển sang đọc file tĩnh JSON lưu trên máy chủ lưu trữ S3.',
+              'Không cần thực hiện bất kỳ thao tác nào vì Redis có khả năng tự động đồng bộ hóa với Database qua Bluetooth.'
             ],
             correctIndex: 0,
             explanation: 'Cache Invalidation đảm bảo dữ liệu hiển thị cho người dùng luôn chính xác và nhất quán với Database.'
           },
           {
             id: 'q16-2',
-            question: 'Thông số TTL (Time-To-Live) của một key trong Redis có tác dụng gì?',
+            question: 'Thông số TTL (Time-To-Live) của một key trong Redis đóng vai trò cốt lõi nào trong kiến trúc bộ nhớ đệm?',
             options: [
-              'Thời gian tồn tại của key đó trong RAM trước khi Redis tự động xóa nó đi để giải phóng bộ nhớ',
-              'Thời gian khởi động của Redis',
-              'Tốc độ truyền dữ liệu qua cáp quang',
-              'Thời gian chờ kết nối'
+              'Quy định thời gian sống tối đa của key trong RAM trước khi Redis tự động thu hồi bộ nhớ, chống lỗi tràn RAM (OOM).',
+              'Đo lường thời gian khởi động của hệ điều hành Linux máy chủ tính từ lúc bật nút nguồn phần cứng.',
+              'Giới hạn tốc độ truyền tải gói tin mạng TCP giữa ứng dụng NestJS và máy chủ lưu trữ đám mây.',
+              'Quy định số lần tối đa mà một người dùng có thể nhập sai mật khẩu trước khi tài khoản bị khóa 24 giờ.'
             ],
             correctIndex: 0,
             explanation: 'TTL giúp cache tự động hết hạn, chống tràn RAM và làm mới dữ liệu định kỳ.'
           },
           {
             id: 'q16-3',
-            question: 'Thuật toán Rate Limiting (chặn spam request) sử dụng Redis như thế nào?',
+            question: 'Thuật toán Rate Limiting (chống tấn công Brute-force/Spam API) tận dụng Redis theo cơ chế nào?',
             options: [
-              'Tăng biến đếm (INCR) theo IP/UserId trong 1 cửa sổ thời gian (vd: 100 req/phút), nếu vượt quá thì trả về mã 429 Too Many Requests',
-              'Xóa toàn bộ database của người spam',
-              'Khóa máy tính của người dùng',
-              'Tắt mạng'
+              'Tăng biến đếm (INCR) theo IP/AccountId kèm TTL (vd: 100 req/60s); nếu vượt ngưỡng thì ném HTTP 429 Too Many Requests.',
+              'Tự động xóa toàn bộ bảng dữ liệu người dùng trong PostgreSQL nếu phát hiện có 1 request bị lỗi cú pháp JSON.',
+              'Khóa cứng màn hình máy tính của khách hàng và yêu cầu liên hệ số điện thoại hỗ trợ kỹ thuật.',
+              'Chuyển toàn bộ các request spam sang một server giả lập chạy trên trình duyệt web của quản trị viên.'
             ],
             correctIndex: 0,
             explanation: 'Redis INCR với TTL cho phép đếm số lượng request siêu nhanh ở mức vi-giây để chặn tấn công DDoS/Brute-force.'
-          },
-          {
-            id: 'l16-q4',
-            question: 'Redis là gì?',
-            options: [
-              'Relational DB',
-              'In-memory Key-Value Store siêu tốc độ',
-              'Web server',
-              'Message Queue độc quyền'
-            ],
-            correctIndex: 1,
-            explanation: 'Tốc độ ms nhờ lưu trên RAM.'
-          },
-          {
-            id: 'l16-q5',
-            question: 'Lệnh SETEX trong Redis làm gì?',
-            options: [
-              'Set rỗng',
-              'Ghi key-value kèm theo thời gian sống (TTL)',
-              'Xóa',
-              'Tìm kiếm'
-            ],
-            correctIndex: 1,
-            explanation: 'Tự động bốc hơi khỏi RAM khi hết hạn (Cache Expiration).'
-          },
-          {
-            id: 'l16-q6',
-            question: 'Cache Stampede (Thundering Herd) là hiện tượng gì?',
-            options: [
-              'Redis lỗi',
-              'Hàng nghìn request đồng loạt query DB khi 1 Cache Key vừa hết hạn',
-              'Xóa cache nhầm',
-              'Tràn RAM'
-            ],
-            correctIndex: 1,
-            explanation: 'DB có thể sập tức thì.'
-          },
-          {
-            id: 'l16-q7',
-            question: 'Rate Limiting (Token Bucket) dùng Redis để làm gì?',
-            options: [
-              'Lưu token đăng nhập',
-              'Đếm số request của 1 IP/User trong thời gian ngắn để chặn Spam/DDoS',
-              'Tăng tốc mạng',
-              'Chặn VPN'
-            ],
-            correctIndex: 1,
-            explanation: 'Tăng biến đếm trong Redis, vượt ngưỡng -> 429.'
-          },
-          {
-            id: 'l16-q8',
-            question: 'Dữ liệu nào phù hợp nhất để Cache?',
-            options: [
-              'Mật khẩu',
-              'Lịch sử giao dịch 1 lần',
-              'Danh mục, cấu hình, dữ liệu đọc nhiều ghi ít',
-              'Chat realtime'
-            ],
-            correctIndex: 2,
-            explanation: 'High read - low write ratio (VD: Master Data).'
           }
         ],
         codeChallenge: {
@@ -3425,99 +2503,39 @@ export class AppointmentReminderProducer {
         quiz: [
           {
             id: 'q17-1',
-            question: 'Ưu điểm lớn nhất của việc sử dụng Message Queue (BullMQ) cho các tác vụ nặng là gì?',
+            question: 'Ưu điểm lớn nhất của việc sử dụng Message Queue (BullMQ) cho các tác vụ nặng (gửi email hàng loạt, export Excel) là gì?',
             options: [
-              'Tách công việc khỏi request HTTP để trả sớm; worker riêng có thể retry lỗi transient theo backoff và theo dõi job thất bại',
-              'Làm cho code ngắn hơn',
-              'Để thay thế PostgreSQL',
-              'Không có lợi ích gì'
+              'Tách rời tác vụ nặng ra khỏi luồng HTTP chính, giúp API phản hồi tức thì và cho phép worker process xử lý ngầm độc lập.',
+              'Tự động sửa toàn bộ các lỗi cú pháp TypeScript trong mã nguồn mà không cần lập trình viên can thiệp.',
+              'Thay thế hoàn toàn vai trò lưu trữ lâu dài của cơ sở dữ liệu quan hệ PostgreSQL trong hệ thống.',
+              'Giảm dung lượng file ảnh chụp X-quang của bệnh nhân xuống 10 lần trước khi lưu vào đĩa cứng máy chủ.'
             ],
             correctIndex: 0,
             explanation: 'Queue giúp tách rời tác vụ khỏi chu trình HTTP. CPU work chỉ không block request server khi consumer được tách process/pod hoặc dùng worker thread phù hợp.'
           },
           {
             id: 'q17-2',
-            question: 'Cơ chế "Exponential Backoff" khi retry job có ý nghĩa gì?',
+            question: 'Cơ chế "Exponential Backoff" khi retry job trong BullMQ mang lại lợi ích gì cho hệ thống?',
             options: [
-              'Tăng thời gian chờ theo hàm mũ giữa các lần thử lại (vd: 1s, 2s, 4s, 8s) để tránh làm nghẽn thêm hệ thống bên thứ ba đang bị quá tải',
-              'Thử lại liên tục 1,000 lần trong 1 giây',
-              'Xóa job ngay lập tức',
-              'Gửi cảnh báo qua email'
+              'Tăng dần thời gian chờ theo cấp số nhân (vd: 5s, 10s, 20s) giữa các lần thử lại để bên thứ ba có thời gian phục hồi sau sự cố.',
+              'Thử lại liên tục hàng nghìn lần trong 1 giây nhằm ép buộc đối tác bên thứ ba phải phản hồi ngay lập tức.',
+              'Tự động xóa vĩnh viễn dữ liệu bệnh nhân nếu đối tác cổng thanh toán phản hồi mã lỗi 500.',
+              'Gửi tin nhắn SMS cảnh báo đến điện thoại của toàn bộ nhân viên trong phòng khám nha khoa.'
             ],
             correctIndex: 0,
             explanation: 'Exponential backoff giúp hệ thống bên ngoài có thời gian hồi phục trước khi nhận request thử lại tiếp theo.'
           },
           {
             id: 'q17-3',
-            question: 'Khi một Job đã retry hết số lần cho phép (vd: 3 lần) mà vẫn thất bại, BullMQ sẽ chuyển Job đó vào đâu để lập trình viên điều tra?',
+            question: 'Khi một Job đã thử lại vượt quá số lần cấu hình (vd: 3 lần) mà vẫn thất bại, BullMQ xử lý Job đó như thế nào?',
             options: [
-              'Failed State / Dead Letter Queue (DLQ)',
-              'Tự động xóa vĩnh viễn không để lại dấu vết',
-              'Gửi lại vào Database',
-              'Làm sập máy chủ'
+              'Chuyển Job vào trạng thái Thất bại (Failed State / Dead Letter Queue) để kỹ sư kiểm tra nguyên nhân và retry thủ công.',
+              'Tự động xóa vĩnh viễn Job ra khỏi bộ nhớ Redis mà không lưu lại bất kỳ lịch sử lỗi hay stack trace nào.',
+              'Gửi lệnh tắt máy chủ NestJS ngay lập tức để tránh làm hỏng các linh kiện phần cứng của hệ thống.',
+              'Tự động nạp tiền từ tài khoản ngân hàng của lập trình viên để thanh toán cho đối tác bên thứ ba.'
             ],
             correctIndex: 0,
             explanation: 'Dead Letter Queue lưu giữ các job thất bại hoàn toàn để admin có thể kiểm tra nguyên nhân và bấm retry thủ công khi sửa xong lỗi.'
-          },
-          {
-            id: 'l17-q4',
-            question: 'Message Queue (như BullMQ) dùng để làm gì?',
-            options: [
-              'Thay thế DB',
-              'Tách các tác vụ nặng (gửi email, tính toán) chạy nền ở worker riêng',
-              'Gửi HTTP',
-              'Cache dữ liệu'
-            ],
-            correctIndex: 1,
-            explanation: 'Offload CPU và I/O ra khỏi HTTP Event Loop.'
-          },
-          {
-            id: 'l17-q5',
-            question: 'BullMQ sử dụng DB/Store nào làm lõi lưu trữ queue?',
-            options: [
-              'Postgres',
-              'MongoDB',
-              'Redis',
-              'RabbitMQ'
-            ],
-            correctIndex: 2,
-            explanation: 'BullMQ viết trên Redis Streams.'
-          },
-          {
-            id: 'l17-q6',
-            question: 'DLQ (Dead Letter Queue) là gì?',
-            options: [
-              'Hàng đợi rỗng',
-              'Nơi chứa các Job đã retry nhiều lần vẫn thất bại để kỹ sư kiểm tra',
-              'Xóa data',
-              'Log file'
-            ],
-            correctIndex: 1,
-            explanation: 'Tránh job lỗi cứ retry mãi vòng lặp vô hạn.'
-          },
-          {
-            id: 'l17-q7',
-            question: 'Job Idempotency trong Queue quan trọng thế nào?',
-            options: [
-              'Làm chậm hệ thống',
-              'Đảm bảo nếu Worker bị tắt giữa chừng và chạy lại Job, DB không bị trừ/cộng tiền 2 lần',
-              'Không cần',
-              'Chỉ dùng cho mail'
-            ],
-            correctIndex: 1,
-            explanation: 'Xử lý At-least-once delivery của Queue.'
-          },
-          {
-            id: 'l17-q8',
-            question: 'Job Concurrency là gì?',
-            options: [
-              'Xóa job',
-              'Số lượng Job mà Worker xử lý đồng thời',
-              'Tốc độ mạng',
-              'Thời gian chờ'
-            ],
-            correctIndex: 1,
-            explanation: 'Quy định worker cắn bao nhiêu job cùng lúc.'
           }
         ],
         codeChallenge: {
@@ -3620,99 +2638,39 @@ export class FileService {
         quiz: [
           {
             id: 'q18-1',
-            question: 'Ưu điểm lớn nhất của mô hình Presigned URL khi upload file X-Quang 500MB là gì?',
+            question: 'Ưu điểm lớn nhất của mô hình Presigned Upload URL khi người dùng tải lên file X-quang/CT ConeBeam 500MB là gì?',
             options: [
-              'Trình duyệt stream trực tiếp lên Object Storage, giảm tải proxy upload cho Backend; Backend vẫn phải authorize, giới hạn upload và xác minh file sau upload',
-              'Làm cho ảnh có độ phân giải cao hơn',
-              'Không cần lưu trữ trên đĩa cứng',
-              'Để giảm chi phí mạng'
+              'Trình duyệt stream file trực tiếp lên Object Storage (S3/MinIO), giải phóng hoàn toàn băng thông và RAM của máy chủ Backend.',
+              'Tự động tăng độ phân giải của hình ảnh chụp cắt lớp lên gấp 4 lần nhờ thuật toán trí tuệ nhân tạo tích hợp.',
+              'Hoàn toàn không cần tốn dung lượng lưu trữ trên đĩa cứng của cụm máy chủ MinIO/S3 lưu trữ đám mây.',
+              'Tự động giải mã các tệp tin chứa virus trojan độc hại thành các file văn bản thuần túy trước khi ghi đĩa.'
             ],
             correctIndex: 0,
             explanation: 'Presigned URL chuyển đường dữ liệu file sang Object Storage. Nó không thay validation, scan malware, quota, checksum hay kiểm tra quyền tenant.'
           },
           {
             id: 'q18-2',
-            question: 'Thời gian hết hạn (Expiry) của một Presigned Upload URL nên đặt là bao lâu?',
+            question: 'Thời gian hết hạn (Expiry) của một Presigned Upload URL chuẩn doanh nghiệp nên được thiết lập ở mức nào?',
             options: [
-              'Khoảng 10 - 15 phút, vừa đủ để client hoàn thành upload và ngăn chặn URL bị lạm dụng nếu bị lộ',
-              'Vĩnh viễn không bao giờ hết hạn',
-              '1 giây',
-              '10 năm'
+              'Khoảng 10 - 15 phút, vừa đủ để client hoàn thành upload và ngăn chặn URL bị lạm dụng nếu rò rỉ ra bên ngoài.',
+              'Vĩnh viễn không bao giờ hết hạn để người dùng có thể chia sẻ đường dẫn công khai trên mạng xã hội.',
+              'Chính xác 1 giây để bảo mật tuyệt đối, yêu cầu client phải gửi toàn bộ file 500MB trong 1 mili-giây.',
+              '10 năm để tránh việc lập trình viên phải viết thêm mã nguồn sinh lại presigned token cho các lần sau.'
             ],
             correctIndex: 0,
             explanation: 'Thời hạn ngắn (10-15 phút) đảm bảo an toàn, kẻ xấu không thể tái sử dụng URL để upload file rác.'
           },
           {
             id: 'q18-3',
-            question: 'Để đảm bảo tính cô lập Multi-tenancy cho file lưu trữ, Object Key nên có cấu trúc như thế nào?',
+            question: 'Để đảm bảo tính cô lập Multi-tenancy trong cấu trúc thư mục lưu trữ S3/MinIO, Object Key nên được đặt theo format nào?',
             options: [
-              '{unitId}/{folder}/{timestamp}-{filename}',
-              'Chỉ lưu tên file {filename}',
-              'Lưu vào thư mục gốc /root',
-              'Không cần đặt tên'
+              '`{unitId}/{folder}/{timestamp}-{safeFilename}` để phân vùng riêng biệt thư mục cho từng phòng khám chi nhánh.',
+              '`/public/uploads/{safeFilename}` để tất cả các phòng khám trong toàn hệ thống lưu chung vào một thư mục gốc.',
+              '`{accountId}/root/{filename}` mà không cần quan tâm tài khoản đó đang thao tác tại chi nhánh phòng khám nào.',
+              '`{timestamp}.tmp` và lưu toàn bộ metadata nhị phân vào trường description của bảng cơ sở dữ liệu.'
             ],
             correctIndex: 0,
             explanation: 'Đặt prefix {unitId}/ ở đầu đường dẫn object giúp cô lập hoàn toàn vùng lưu trữ file của từng phòng khám.'
-          },
-          {
-            id: 'l18-q4',
-            question: 'Presigned URL là gì?',
-            options: [
-              'URL lỗi',
-              'URL sinh ra từ server, cho phép Client tải trực tiếp file lên S3/MinIO mà không cần stream qua Backend',
-              'URL chứa virus',
-              'URL đăng nhập'
-            ],
-            correctIndex: 1,
-            explanation: 'Giảm 100% băng thông và RAM cho Backend.'
-          },
-          {
-            id: 'l18-q5',
-            question: 'Tại sao không lưu file thẳng vào thư mục source code hoặc Database?',
-            options: [
-              'Đỡ tốn điện',
-              'Khó scale nhiều server, db phình to, load chậm',
-              'Không tạo được file',
-              'Vì dễ bị hack'
-            ],
-            correctIndex: 1,
-            explanation: 'Lưu file làm hỏng nguyên lý Stateless Server.'
-          },
-          {
-            id: 'l18-q6',
-            question: 'MinIO là phần mềm mô phỏng giao thức của dịch vụ nào?',
-            options: [
-              'Google Drive',
-              'AWS S3',
-              'Dropbox',
-              'FTP'
-            ],
-            correctIndex: 1,
-            explanation: 'MinIO chuẩn 100% S3 API.'
-          },
-          {
-            id: 'l18-q7',
-            question: 'Multipart Upload dùng khi nào?',
-            options: [
-              'File < 1MB',
-              'File siêu lớn (VD: video 5GB), chia nhỏ ra up song song',
-              'Up nhiều file',
-              'Tạo folder'
-            ],
-            correctIndex: 1,
-            explanation: 'Chia chunk upload an toàn.'
-          },
-          {
-            id: 'l18-q8',
-            question: 'Trường MIME Type (ContentType) trong upload làm gì?',
-            options: [
-              'Mã hóa file',
-              'Nói cho trình duyệt biết đây là ảnh (image/jpeg) hay pdf để hiển thị',
-              'Check dung lượng',
-              'Xóa file'
-            ],
-            correctIndex: 1,
-            explanation: 'Quan trọng để browser không bắt tải về như tệp vô danh.'
           }
         ],
         codeChallenge: {
@@ -3804,99 +2762,39 @@ export class ClinicRealtimeGateway implements OnGatewayConnection {
         quiz: [
           {
             id: 'q19-1',
-            question: 'Tại sao cần phân chia WebSocket Rooms theo "unit:{unitId}" trong hệ thống eSmiles?',
+            question: 'Tại sao trong hệ thống Multi-tenancy, kết nối WebSocket bắt buộc phải phân chia Room theo định dạng `unit:{unitId}`?',
             options: [
-              'Để đảm bảo Multi-tenancy: Chỉ các bác sĩ thuộc đúng phòng khám đó mới nhận được thông báo của phòng khám mình',
-              'Vì Socket.IO bắt buộc',
-              'Để giảm số lượng kết nối',
-              'Không có lý do'
+              'Để đảm bảo cô lập dữ liệu phòng khám: Chỉ các bác sĩ thuộc đúng chi nhánh đó mới nhận được sự kiện realtime của chi nhánh mình.',
+              'Vì thư viện Socket.IO sẽ tự động ném Exception nếu tên room không chứa dấu hai chấm và chữ số nguyên dương.',
+              'Để tăng tốc độ truyền tải sóng Wifi giữa máy tính của bác sĩ và thiết bị chụp phim X-quang trong phòng khám.',
+              'Để tự động sao lưu toàn bộ tin nhắn chat của phòng khám vào file văn bản Word trên máy tính của bệnh nhân.'
             ],
             correctIndex: 0,
             explanation: 'Phân chia rooms theo UnitId ngăn chặn rò rỉ thông báo của phòng khám này sang phòng khám khác.'
           },
           {
             id: 'q19-2',
-            question: 'Khi triển khai nhiều máy chủ Backend NestJS (Scaling out), công cụ nào giúp đồng bộ hóa các sự kiện WebSocket giữa các server?',
+            question: 'Khi triển khai ứng dụng NestJS trên cụm nhiều Pods (Horizontal Scaling), thành phần nào giúp phát tán sự kiện WebSocket xuyên suốt các Pods?',
             options: [
-              'Socket.IO Redis Adapter (Pub/Sub)',
-              'Gửi qua email',
-              'Lưu vào file text trên ổ cứng',
-              'Không thể đồng bộ'
+              'Socket.IO Redis Pub/Sub Adapter đóng vai trò Message Broker đồng bộ hóa sự kiện giữa tất cả các node máy chủ trong cụm.',
+              'Cơ chế gửi email tự động qua giao thức SMTP đến địa chỉ IP nội bộ của từng container Docker đang chạy.',
+              'Sử dụng file văn bản text chia sẻ trên ổ đĩa mạng NFS để các tiến trình Node.js đọc lặp lại bằng setInterval.',
+              'Không thể đồng bộ hóa sự kiện realtime khi hệ thống có nhiều hơn 1 máy chủ và bắt buộc chỉ được chạy 1 Node duy nhất.'
             ],
             correctIndex: 0,
             explanation: 'Redis Pub/Sub Adapter đóng vai trò Message Broker đồng bộ sự kiện giữa tất cả các node máy chủ trong cụm.'
           },
           {
             id: 'q19-3',
-            question: 'Giao thức WebSocket khác gì so với HTTP truyền thống?',
+            question: 'Sự khác biệt cốt lõi nhất giữa giao thức WebSocket và HTTP Request/Response truyền thống là gì?',
             options: [
-              'WebSocket là kết nối 2 chiều liên tục (Full-duplex) qua 1 kết nối TCP duy nhất, cho phép server chủ động đẩy dữ liệu về client tức thì',
-              'WebSocket chỉ truyền được text còn HTTP truyền được ảnh',
-              'WebSocket chậm hơn HTTP',
-              'Không có sự khác biệt'
+              'WebSocket duy trì kết nối 2 chiều liên tục (Full-duplex) trên 1 kết nối TCP duy nhất, cho phép máy chủ chủ động push dữ liệu tức thì về client.',
+              'WebSocket chỉ truyền tải được các ký tự chữ cái tiếng Anh thuần túy, trong khi HTTP có thể truyền tải được hình ảnh và video.',
+              'WebSocket có độ trễ cao hơn HTTP gấp 10 lần do phải thực hiện bắt tay mã hóa SSL liên tục sau mỗi 5 giây.',
+              'WebSocket yêu cầu người dùng phải cài đặt tiện ích mở rộng Adobe Flash Player trên trình duyệt web mới có thể hoạt động.'
             ],
             correctIndex: 0,
             explanation: 'WebSocket duy trì kết nối sống, giúp server bắn dữ liệu xuống client với độ trễ chỉ vài mili-giây mà client không cần gửi request hỏi liên tục (Polling).'
-          },
-          {
-            id: 'l19-q4',
-            question: 'Giao thức WebSocket hoạt động thế nào?',
-            options: [
-              'Gửi request nhận response rồi đóng',
-              'Duy trì kết nối TCP 2 chiều liên tục (Full-duplex)',
-              'Chỉ dùng UDP',
-              'Tương đương HTTP'
-            ],
-            correctIndex: 1,
-            explanation: 'Client và Server có thể push data cho nhau bất cứ lúc nào.'
-          },
-          {
-            id: 'l19-q5',
-            question: 'Redis Adapter trong Socket.IO giải quyết bài toán gì?',
-            options: [
-              'Ghi log',
-              'Khi có nhiều node Backend, event bắn từ Node A sẽ được chia sẻ sang Node B qua Redis pub/sub',
-              'Nén data',
-              'Cache HTTP'
-            ],
-            correctIndex: 1,
-            explanation: 'Giúp scale horizontally WebSocket Server.'
-          },
-          {
-            id: 'l19-q6',
-            question: 'Rooms trong Socket.IO là khái niệm gì?',
-            options: [
-              'Phòng chat',
-              'Nhóm các kết nối lại (ví dụ theo unitId), server chỉ phát tín hiệu vào nhóm đó',
-              'Chặn IP',
-              'Gửi toàn bộ'
-            ],
-            correctIndex: 1,
-            explanation: 'Giúp Broadcast tiết kiệm tài nguyên.'
-          },
-          {
-            id: 'l19-q7',
-            question: 'Làm sao xác thực (Authenticate) WebSocket connection?',
-            options: [
-              'Qua Body',
-              'Gửi Token ngay khi mở kết nối (Handshake Auth) và check ở Gateway',
-              'Không cần',
-              'Tự check'
-            ],
-            correctIndex: 1,
-            explanation: 'Chặn từ cửa Handshake để đỡ tốn connection.'
-          },
-          {
-            id: 'l19-q8',
-            question: 'Nhược điểm của WebSocket?',
-            options: [
-              'Chậm',
-              'Tốn nhiều TCP Connection và RAM duy trì, khó scale load balancer hơn HTTP stateless',
-              'Bảo mật kém',
-              'Không gửi JSON được'
-            ],
-            correctIndex: 1,
-            explanation: 'LB phải cấu hình sticky session hoặc Redis Adapter.'
           }
         ],
         codeChallenge: {
@@ -4009,99 +2907,39 @@ export class AuditService {
         quiz: [
           {
             id: 'q20-1',
-            question: 'Thông tin nào sau đây là bắt buộc phải có trong một bản ghi Audit Log y tế chuẩn?',
+            question: 'Những trường dữ liệu nào sau đây là bắt buộc phải có trong một bản ghi Audit Log y tế đạt chuẩn pháp lý?',
             options: [
-              'actorId, unitId, action, targetEntity, entityId, changes (diff before/after), timestamp',
-              'Màu sắc màn hình',
-              'Tên bài hát',
-              'Dung lượng RAM của máy tính client'
+              'Bộ thông tin 5W: `actorId`, `unitId`, `action`, `targetEntity`, `entityId`, `changes` (diff before/after) và `timestamp`.',
+              'Độ phân giải màn hình hiển thị và màu nền giao diện của ứng dụng Frontend đang cài đặt.',
+              'Danh sách các bài hát mà bác sĩ đang nghe trong lúc thực hiện thao tác kê đơn thuốc trên máy tính.',
+              'Dung lượng bộ nhớ RAM còn trống của thiết bị máy trạm tại thời điểm nhấn nút Lưu trên form.'
             ],
             correctIndex: 0,
             explanation: 'Bộ dữ liệu 5W (Who, What, Where, When, Why) là tiêu chuẩn bắt buộc của kiểm toán dữ liệu y tế và tài chính.'
           },
           {
             id: 'q20-2',
-            question: 'Tại sao việc tính toán "diff" (chỉ ghi lại các trường bị thay đổi) tốt hơn việc lưu toàn bộ object cũ và mới?',
+            question: 'Tại sao việc tính toán "diff" (chỉ lưu các trường bị thay đổi) tốt hơn việc lưu toàn bộ object cũ và object mới vào log?',
             options: [
-              'Tiết kiệm 90% dung lượng lưu trữ Database và giúp người xem log nhìn thấy ngay lập tức trường nào bị chỉnh sửa',
-              'Vì database không cho lưu object to',
-              'Để tăng dung lượng file build',
-              'Không có lợi ích gì'
+              'Tiết kiệm 90% dung lượng đĩa cứng lưu trữ và giúp kiểm toán viên nhìn thấy ngay lập tức giá trị trước và sau khi thay đổi.',
+              'Vì cơ sở dữ liệu PostgreSQL sẽ tự động từ chối ghi dữ liệu nếu kích thước bản ghi JSON vượt quá 100 bytes.',
+              'Để làm tăng dung lượng file build nhị phân của ứng dụng NestJS khi triển khai lên môi trường Production.',
+              'Vì các thuật toán trí tuệ nhân tạo chỉ có khả năng phân tích các đối tượng JSON có ít hơn 3 trường dữ liệu.'
             ],
             correctIndex: 0,
             explanation: 'Diffing chỉ lưu { field, oldValue, newValue }, vừa tiết kiệm dung lượng đĩa vừa giúp kiểm toán viên đọc hiểu tức thì.'
           },
           {
             id: 'q20-3',
-            question: 'Bảng Audit Log có được phép cho người dùng sửa hoặc xóa (UPDATE / DELETE) không?',
+            question: 'Bảng dữ liệu Audit Log có được phép cung cấp API chỉnh sửa hoặc xóa bỏ (UPDATE / DELETE) cho người dùng không?',
             options: [
-              'Tuyệt đối CẤM: Bảng Audit Log là Append-Only (chỉ cho phép ghi INSERT), không ai kể cả Admin được quyền chỉnh sửa lịch sử kiểm toán',
-              'Cho phép Bác sĩ tự do xóa log của mình',
-              'Tự động xóa sau 1 ngày',
-              'Được sửa tùy ý'
+              'Tuyệt đối CẤM: Bảng Audit Log phải là Append-Only (chỉ cho phép INSERT), không ai kể cả Admin được quyền xóa/sửa lịch sử kiểm toán.',
+              'Cho phép Bác sĩ trưởng khoa tự do xóa bỏ toàn bộ lịch sử chỉnh sửa bệnh án của phòng khám mình vào cuối mỗi tháng.',
+              'Tự động xóa vĩnh viễn toàn bộ các bản ghi kiểm toán sau 24 giờ kể từ thời điểm phát sinh thao tác.',
+              'Cho phép nhân viên Lễ tân tùy ý sửa đổi thông tin người thực hiện thao tác nếu bị nhập nhầm tài khoản.'
             ],
             correctIndex: 0,
             explanation: 'Tính bất biến (Immutability) của Audit Log là nguyên tắc pháp lý cốt lõi để chống gian lận và chối bỏ trách nhiệm.'
-          },
-          {
-            id: 'l20-q4',
-            question: 'Event-driven Architecture (EDA) khác Rest API như thế nào?',
-            options: [
-              'Đồng bộ hoàn toàn',
-              'Dịch vụ A phát ra Event (Event Publisher), các dịch vụ B, C tự động lắng nghe mà không cần A biết B,C là ai (Decoupling)',
-              'A gọi B chờ B xong',
-              'Chậm hơn'
-            ],
-            correctIndex: 1,
-            explanation: 'Mô hình Fire-and-Forget giảm Coupling.'
-          },
-          {
-            id: 'l20-q5',
-            question: 'Audit Log (Nhật ký kiểm toán) lưu gì?',
-            options: [
-              'Lỗi code 500',
-              'Ghi nhận Ai (User), làm Gì (Action), trên dữ liệu nào (Entity), lúc nào, kết quả ra sao',
-              'File css',
-              'Log nginx'
-            ],
-            correctIndex: 1,
-            explanation: 'Chức năng pháp lý trong y tế/tài chính.'
-          },
-          {
-            id: 'l20-q6',
-            question: 'NestJS EventEmitter2 dùng làm gì?',
-            options: [
-              'Kafka pubsub',
-              'Phát và lắng nghe sự kiện TRONG CÙNG 1 tiến trình Node.js (In-memory)',
-              'Redis',
-              'DB trigger'
-            ],
-            correctIndex: 1,
-            explanation: 'Gọn nhẹ cho monolith.'
-          },
-          {
-            id: 'l20-q7',
-            question: 'Khi ghi Audit Log tốn thời gian, ta nên làm gì?',
-            options: [
-              'Bỏ qua',
-              'Ghi bất đồng bộ (Event) không làm chậm request của User',
-              'Khóa DB',
-              'Chờ ghi xong'
-            ],
-            correctIndex: 1,
-            explanation: 'Lắng nghe event và insert Audit sau khi trả response.'
-          },
-          {
-            id: 'l20-q8',
-            question: 'Eventual Consistency (Nhất quán muộn) là rủi ro gì của Event Driven?',
-            options: [
-              'Lỗi luôn',
-              'Dữ liệu ở các hệ thống không đồng bộ tức thì, cần thời gian trễ',
-              'Mất dữ liệu',
-              'Bảo mật'
-            ],
-            correctIndex: 1,
-            explanation: 'User update X, nhưng Service Y đọc vẫn thấy cũ trong 1 giây.'
           }
         ],
         codeChallenge: {
@@ -4209,99 +3047,39 @@ body:json {
         quiz: [
           {
             id: 'q21-1',
-            question: 'Lợi ích lớn nhất của việc lưu trữ các file kiểm thử API Bruno (.bru) trực tiếp trong kho mã nguồn Git là gì?',
+            question: 'Lợi ích lớn nhất của việc lưu trữ các file kiểm thử API Bruno (`.bru`) trực tiếp trong Git Repository là gì?',
             options: [
-              'Bộ tài liệu và kiểm thử API luôn đồng bộ 100% với từng commit code và được kiểm tra tự động qua Git Pull Request',
-              'Để làm tăng dung lượng kho code Git',
-              'Để không cần viết unit test',
-              'Không có lợi ích gì'
+              'Bộ tài liệu và kiểm thử API luôn đồng bộ 100% với từng commit code và được kiểm tra tự động qua Git Pull Request.',
+              'Tự động làm tăng dung lượng lưu trữ của kho mã nguồn Git lên gấp 10 lần để backup dữ liệu.',
+              'Hoàn toàn không cần viết bất kỳ bài kiểm thử đơn vị Unit Test hay E2E Test nào trong dự án.',
+              'Cho phép máy chủ cơ sở dữ liệu PostgreSQL tự động cập nhật cấu trúc schema mà không cần migration.'
             ],
             correctIndex: 0,
             explanation: 'Tracking file .bru trực tiếp trong Git biến tài liệu API thành bộ test sống luôn đồng bộ với code của lập trình viên.'
           },
           {
             id: 'q21-2',
-            question: 'Lệnh nào trong eSmiles dùng để đối chiếu toàn bộ router của Controller với thư mục bruno/ và báo lỗi nếu có endpoint thiếu tài liệu test?',
+            question: 'Lệnh nào trong hệ thống eSmiles được thiết lập làm Quality Gate tự động đối chiếu các Controller với bộ test Bruno?',
             options: [
-              'pnpm bruno:check',
-              'pnpm test',
-              'pnpm build',
-              'pnpm start'
+              'Lệnh `pnpm bruno:check` để duyệt qua toàn bộ route và chặn merge PR nếu có endpoint chưa được viết file `.bru`.',
+              'Lệnh `pnpm test:watch` để tự động khởi chạy giao diện đồ họa Bruno trên màn hình của lập trình viên.',
+              'Lệnh `pnpm build:prod` để biên dịch toàn bộ các file `.bru` thành các file ảnh PNG lưu vào thư mục dist.',
+              'Lệnh `pnpm format:all` để tự động đổi tên toàn bộ các biến trong Controller theo bảng chữ cái La Tinh.'
             ],
             correctIndex: 0,
             explanation: 'pnpm bruno:check là Quality Gate tự động đối chiếu các route đã khai báo với collection Bruno.'
           },
           {
             id: 'q21-3',
-            question: 'File .bru có thể được mở và chỉnh sửa bằng công cụ nào?',
+            question: 'File kịch bản kiểm thử API `.bru` của Bruno có bản chất cấu trúc là gì?',
             options: [
-              'Ứng dụng mã nguồn mở Bruno Client hoặc mở bằng bất kỳ trình soạn thảo mã nguồn nào như VS Code',
-              'Chỉ mở được bằng Photoshop',
-              'Chỉ mở được trên trình duyệt Safari',
-              'Không thể mở'
+              'Định dạng văn bản thuần (Plain text DSL) có thể đọc, chỉnh sửa bằng VS Code hoặc phần mềm Bruno Client và review diff trên Git.',
+              'Tệp tin nhị phân biên dịch đặc biệt chỉ có thể giải mã được trên hệ điều hành MacOS của Apple.',
+              'File nén ZIP chứa hàng nghìn hình ảnh chụp màn hình kết quả kiểm thử giao diện của người dùng.',
+              'Một bảng cơ sở dữ liệu SQLite nhúng trực tiếp vào trong tập tin mã nguồn TypeScript của backend.'
             ],
             correctIndex: 0,
             explanation: 'File .bru là định dạng text thuần (Plain text DSL), có thể mở bằng Bruno App hoặc VS Code.'
-          },
-          {
-            id: 'l21-q4',
-            question: 'CI/CD Gate là gì?',
-            options: [
-              'Cổng mạng',
-              'Tiến trình tự động chặn code merge nếu Test, Lint hoặc Build thất bại',
-              'Cổng login',
-              'Lỗi DB'
-            ],
-            correctIndex: 1,
-            explanation: 'Giữ code base luôn xanh (Green).'
-          },
-          {
-            id: 'l21-q5',
-            question: 'Bruno là công cụ gì?',
-            options: [
-              'Thay thế Postman/Insomnia, lưu test dạng file text (Bru) dễ đưa lên Git',
-              'Web server',
-              'Database',
-              'IDE code'
-            ],
-            correctIndex: 0,
-            explanation: 'Hoạt động offline và lưu file .bru trực tiếp vào source control.'
-          },
-          {
-            id: 'l21-q6',
-            question: 'API Testing Assertions là gì?',
-            options: [
-              'Bấm gửi',
-              'Các câu lệnh kiểm tra xem Response (Status, Body) có đúng kỳ vọng không',
-              'Tạo tài liệu',
-              'Deploy'
-            ],
-            correctIndex: 1,
-            explanation: 'expect(res.status).toBe(200).'
-          },
-          {
-            id: 'l21-q7',
-            question: 'Husky pre-commit hook làm gì?',
-            options: [
-              'Push code',
-              'Tự động chạy script (Lint, Typecheck) TRƯỚC KHI git commit được tạo',
-              'Kéo code',
-              'Cài gói npm'
-            ],
-            correctIndex: 1,
-            explanation: 'Chặn dev commit code rác lên máy chủ.'
-          },
-          {
-            id: 'l21-q8',
-            question: 'Chạy npx tsc --noEmit để làm gì?',
-            options: [
-              'Tạo file js',
-              'Kiểm tra lỗi kiểu dữ liệu (Type check) của TypeScript mà không biên dịch ra file mới',
-              'Xóa file',
-              'Chạy test'
-            ],
-            correctIndex: 1,
-            explanation: 'Bắt lỗi cú pháp tĩnh nhanh chóng.'
           }
         ],
         codeChallenge: {
@@ -4401,97 +3179,37 @@ describe('InventoryCategoryService', () => {
             id: 'q22-1',
             question: 'Khi viết Unit Test cho Service trong NestJS, tại sao chúng ta nên Mock PrismaService thay vì kết nối trực tiếp vào Database thật?',
             options: [
-              'Để bài test chạy độc lập, siêu nhanh trong vài mili-giây và không làm biến đổi dữ liệu của database thật khi chạy trên môi trường CI/CD',
-              'Vì Jest không thể kết nối mạng',
-              'Vì database bị khóa',
-              'Không có lý do'
+              'Để bài test chạy độc lập, siêu nhanh trong vài mili-giây và không làm biến đổi dữ liệu của database thật khi chạy trên môi trường CI/CD.',
+              'Vì thư viện Jest không có khả năng gửi các gói tin mạng TCP ra cổng kết nối 5432 của PostgreSQL.',
+              'Vì cơ sở dữ liệu sẽ tự động xóa toàn bộ bảng dữ liệu người dùng nếu phát hiện có lệnh test chạy trong 1 giây.',
+              'Để tránh việc lập trình viên phải trả thêm tiền bản quyền phần mềm kiểm thử cho tập đoàn Microsoft.',
             ],
             correctIndex: 0,
             explanation: 'Mocking giúp unit test chạy nhanh, cô lập hoàn toàn và có thể chạy ở bất kỳ máy tính nào mà không cần cài PostgreSQL.'
           },
           {
             id: 'q22-2',
-            question: 'Công cụ nào trong NestJS được dùng để gửi request HTTP thực tế khi viết E2E Testing?',
+            question: 'Công cụ nào trong hệ sinh thái NestJS được sử dụng phổ biến nhất để gửi HTTP request ảo khi viết E2E Testing?',
             options: [
-              'Supertest',
-              'Puppeteer',
-              'Photoshop',
-              'Excel'
+              'Supertest kết hợp cùng module `@nestjs/testing` để gửi request trực tiếp vào instance HTTP Server của NestJS.',
+              'Phần mềm Photoshop để kiểm tra độ sắc nét của hình ảnh icon hiển thị trên thanh menu điều hướng.',
+              'Ứng dụng bảng tính Microsoft Excel để tự động nhập dữ liệu vào ô tính và đối chiếu công thức.',
+              'Trình duyệt web Internet Explorer phiên bản 6.0 chạy trên máy ảo Windows XP để kiểm tra khả năng tương thích.'
             ],
             correctIndex: 0,
             explanation: 'Supertest kết hợp cùng @nestjs/testing cho phép bắn request HTTP trực tiếp vào instance HTTP Server của NestJS.'
           },
           {
             id: 'q22-3',
-            question: 'Hàm expect(mockFn).toHaveBeenCalledWith(expectedArgs) trong Jest có tác dụng gì?',
+            question: 'Hàm assertion `expect(mockFn).toHaveBeenCalledWith(expectedArgs)` trong Jest đóng vai trò xác thực điều gì?',
             options: [
-              'Kiểm tra xem hàm mock có thực sự được gọi với đúng các tham số mong đợi hay không',
-              'Tự động sửa lỗi code',
-              'In kết quả ra máy in',
-              'Khởi động lại server'
+              'Kiểm tra xem hàm mock có thực sự được gọi với đúng các tham số mong đợi (ví dụ: đúng `unitId` và `categoryId`) hay không.',
+              'Tự động sửa chữa các lỗi sai cú pháp TypeScript và biên dịch lại mã nguồn của file Service.',
+              'Gửi lệnh in toàn bộ kết quả kiểm thử ra máy in văn phòng kết nối qua mạng cục bộ LAN.',
+              'Tự động khởi động lại máy chủ cơ sở dữ liệu PostgreSQL nếu phát hiện có câu lệnh truy vấn bị lỗi.'
             ],
             correctIndex: 0,
             explanation: 'toHaveBeenCalledWith là assertion cơ bản để verify xem Service có truyền đúng tham số (ví dụ đúng unitId) xuống Prisma hay không.'
-          },
-          {
-            id: 'l22-q4',
-            question: 'Khác biệt giữa Unit Test và E2E Test?',
-            options: [
-              'Không có',
-              'Unit Test giả lập DB (Mock), E2E Test gọi HTTP xuyên thẳng DB thật/test',
-              'Unit nhanh hơn',
-              'E2E là viết bằng tay'
-            ],
-            correctIndex: 1,
-            explanation: 'Unit test test hàm đơn lẻ. E2E test cả hệ thống.'
-          },
-          {
-            id: 'l22-q5',
-            question: 'Jest spyOn() dùng làm gì?',
-            options: [
-              'Tấn công DB',
-              'Theo dõi và thay thế một hàm thật bằng hàm Mock (vd: chặn không cho gửi mail thật)',
-              'Đo thời gian',
-              'Quay video'
-            ],
-            correctIndex: 1,
-            explanation: 'Đóng thế các side-effects.'
-          },
-          {
-            id: 'l22-q6',
-            question: 'Supertest là công cụ gì?',
-            options: [
-              'Framework E2E',
-              'Thư viện giả lập HTTP Request để test API mà không cần mở Port thật',
-              'Database in-mem',
-              'Check css'
-            ],
-            correctIndex: 1,
-            explanation: 'Gắn thẳng vào app NestJS và gửi request ảo.'
-          },
-          {
-            id: 'l22-q7',
-            question: 'Test Coverage là chỉ số gì?',
-            options: [
-              'Tốc độ test',
-              'Tỉ lệ % dòng code đã được chạy qua bởi Test runner',
-              'Dung lượng code',
-              'Bảo mật'
-            ],
-            correctIndex: 1,
-            explanation: 'Bao nhiêu % file được test quét qua (nhưng 100% chưa chắc không có bug).'
-          },
-          {
-            id: 'l22-q8',
-            question: 'Trong Unit Test, beforeEach() làm gì?',
-            options: [
-              'Chạy sau khi test xong',
-              'Chạy 1 block setup (reset mock, nạp data) TRƯỚC MỖI test case (it)',
-              'Báo lỗi',
-              'Xóa DB'
-            ],
-            correctIndex: 1,
-            explanation: 'Giúp các test case hoàn toàn độc lập, không bị rò rỉ state.'
           }
         ],
         codeChallenge: {

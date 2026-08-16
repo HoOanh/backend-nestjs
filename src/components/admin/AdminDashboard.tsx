@@ -64,7 +64,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setUsers(uList);
       setPlans(pList);
       setLogs(lList);
-      setStats(sData);
+      if (sData) {
+        setStats(sData);
+      }
     } catch (e: any) {
       showToast(e.message || 'Lỗi tải dữ liệu SQLite');
     } finally {
@@ -90,15 +92,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     try {
       const currentProg = await apiClient.getProgress(user.id);
+      const baseProg = currentProg || {
+        currentLessonId: 'lesson-1',
+        completedLessons: {},
+        sprintExamScores: {},
+        finalExam: null,
+        streakDays: 1,
+        lastActiveDate: new Date().toISOString().split('T')[0],
+        clearedLessons: {}
+      };
       await apiClient.saveProgress(user.id, {
-        ...currentProg,
+        ...baseProg,
         completedLessons: allCompleted,
         clearedLessons: allCleared
       });
       await apiClient.addHistory({
         userId: user.id,
         lessonTitle: 'Toàn bộ 6 Sprints',
-        action: 'admin_unlocked',
+        action: 'theory_read',
         details: 'Admin mở khóa 100% bài học'
       });
       showToast(`Đã mở khóa toàn bộ ${totalLessons} bài học cho ${user.name}!`);
@@ -112,8 +123,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const certId = 'ESM-CERT-' + Math.floor(100000 + Math.random() * 900000);
     try {
       const currentProg = await apiClient.getProgress(user.id);
+      const baseProg = currentProg || {
+        currentLessonId: 'lesson-1',
+        completedLessons: {},
+        sprintExamScores: {},
+        finalExam: null,
+        streakDays: 1,
+        lastActiveDate: new Date().toISOString().split('T')[0],
+        clearedLessons: {}
+      };
       await apiClient.saveProgress(user.id, {
-        ...currentProg,
+        ...baseProg,
         finalExam: {
           score: 100,
           passed: true,

@@ -19,7 +19,7 @@ interface FinalExamViewProps {
   onRetakeFinalExam: () => void;
 }
 
-interface FinalExamReviewData {
+export interface FinalExamReviewData {
   quizScore: number;
   avgCodeScore: number;
   finalScore: number;
@@ -34,16 +34,44 @@ interface FinalExamReviewData {
   submittedAt: string;
 }
 
+export interface FinalExamAttempt {
+  id: string;
+  attemptNumber: number;
+  submittedAt: string;
+  studentName: string;
+  quizScore: number;
+  avgCodeScore: number;
+  finalScore: number;
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  reviewData: FinalExamReviewData;
+}
+
 export const FinalExamView: React.FC<FinalExamViewProps> = ({
   exam,
   finalResult,
   onFinalExamSubmitted,
   onRetakeFinalExam
 }) => {
-  // If user already passed and wants to view their official certificate
-  if (finalResult && finalResult.passed && !finalResult.certificateId?.startsWith('preview')) {
-    return <GraduationCertificate result={finalResult} onRetake={onRetakeFinalExam} />;
-  }
+  const STORAGE_FINAL_REVIEW_KEY = 'esmiles_final_exam_review';
+  const STORAGE_FINAL_ATTEMPTS_KEY = 'esmiles_final_exam_attempts';
+
+  const loadSavedReview = (): FinalExamReviewData | null => {
+    try {
+      const saved = localStorage.getItem(STORAGE_FINAL_REVIEW_KEY);
+      if (saved) return JSON.parse(saved) as FinalExamReviewData;
+    } catch {}
+    return null;
+  };
+
+  const loadSavedAttempts = (): FinalExamAttempt[] => {
+    try {
+      const saved = localStorage.getItem(STORAGE_FINAL_ATTEMPTS_KEY);
+      if (saved) return JSON.parse(saved) as FinalExamAttempt[];
+    } catch {}
+    return [];
+  };
 
   const [studentName, setStudentName] = useState<string>(finalResult?.studentName || 'Đại Ca Kỹ Sư');
   const [activeQuestions, setActiveQuestions] = useState<RandomizedQuestion[]>([]);
@@ -52,7 +80,35 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(exam.timeLimitMinutes * 60);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [reviewData, setReviewData] = useState<FinalExamReviewData | null>(null);
-  const [activeTab, setActiveTab] = useState<'exam' | 'review'>('exam');
+  const [attempts, setAttempts] = useState<FinalExamAttempt[]>([]);
+  const [activeTab, setActiveTab] = useState<'certificate' | 'review' | 'history' | 'exam'>('exam');
+
+  // Initialize or restore session
+  useEffect(() => {
+    const savedAttempts = loadSavedAttempts();
+    const savedReview = loadSavedReview();
+    setAttempts(savedAttempts);
+
+    if (savedReview) {
+      setReviewData(savedReview);
+      setIsSubmitted(true);
+      setActiveQuestions(savedReview.questions);
+      setSelectedAnswers(savedReview.selectedAnswers);
+      setCodes(savedReview.codes);
+      setStudentName(savedReview.studentName);
+      if (savedReview.passed || finalResult?.passed) {
+        setActiveTab('certificate');
+      } else {
+        setActiveTab('review');
+      }
+    } else if (finalResult?.passed) {
+      setIsSubmitted(true);
+      setActiveTab('certificate');
+    } else {
+      setIsSubmitted(false);
+      startNewFinalExamSession();
+    }
+  }, []);
 
   const startNewFinalExamSession = () => {
     const picked = generateRandomExamQuestions(exam.questions, exam.questionCountToPick || 15);
@@ -61,16 +117,11 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
     setCodes(exam.codeChallenges.map((c) => c.starterCode));
     setTimeLeft(exam.timeLimitMinutes * 60);
     setIsSubmitted(false);
-    setReviewData(null);
     setActiveTab('exam');
   };
 
   useEffect(() => {
-    startNewFinalExamSession();
-  }, []);
-
-  useEffect(() => {
-    if (isSubmitted) return;
+    if (isSubmitted || activeTab !== 'exam') return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -83,7 +134,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [isSubmitted, activeQuestions, codes, selectedAnswers, studentName]);
+  }, [isSubmitted, activeTab, activeQuestions, codes, selectedAnswers, studentName]);
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -151,12 +202,58 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
       submittedAt: new Date().toISOString()
     };
 
+    const newAttempt: FinalExamAttempt = {
+      id: `final-attempt-${Date.now()}`,
+      attemptNumber: attempts.length + 1,
+      submittedAt: submittedReview.submittedAt,
+      studentName: submittedReview.studentName,
+      quizScore,
+      avgCodeScore,
+      finalScore,
+      passed,
+      correctCount,
+      totalQuestions: activeQuestions.length,
+      reviewData: submittedReview
+    };
+
+    const updatedAttempts = [newAttempt, ...attempts];
+
+    // Save to LocalStorage
+    try {
+      localStorage.setItem(STORAGE_FINAL_REVIEW_KEY, JSON.stringify(submittedReview));
+      localStorage.setItem(STORAGE_FINAL_ATTEMPTS_KEY, JSON.stringify(updatedAttempts));
+    } catch (e) {
+      console.error('Failed to save final exam attempt to localStorage:', e);
+    }
+
+    setAttempts(updatedAttempts);
     setReviewData(submittedReview);
     setIsSubmitted(true);
-    setActiveTab('review');
+
+    if (passed) {
+      setActiveTab('certificate');
+    } else {
+      setActiveTab('review');
+    }
 
     onFinalExamSubmitted(finalScore, passed, studentName.trim() || 'Học Viên eSmiles');
   };
+
+  const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.finalScore)) : (finalResult?.score || 0);
+  const hasPassedEver = attempts.some((a) => a.passed) || Boolean(finalResult?.passed);
+
+  // Certificate Result object
+  const certResult = finalResult && finalResult.passed
+    ? finalResult
+    : reviewData && reviewData.passed
+    ? {
+        score: reviewData.finalScore,
+        passed: true,
+        studentName: reviewData.studentName,
+        certificateId: `ESMILES-CERT-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        completedAt: reviewData.submittedAt
+      }
+    : null;
 
   return (
     <div className="exam-view-wrapper">
@@ -167,7 +264,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           <FormattedText content={exam.description} />
           <div className="exam-badges-row">
             <span className="exam-pill">
-              📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc <strong>{activeQuestions.length} câu</strong>)
+              📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc <strong>{exam.questionCountToPick || 15} câu</strong>)
             </span>
             <span className="exam-pill">
               💻 Thực hành: <strong>3 Capstone Labs</strong>
@@ -178,42 +275,187 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
             <span className="exam-pill">
               ⏱️ Thời gian: <strong>{exam.timeLimitMinutes} phút</strong>
             </span>
+            {attempts.length > 0 && (
+              <span className="exam-pill" style={{ borderColor: hasPassedEver ? '#10b981' : '#f59e0b' }}>
+                🏆 Cao nhất: <strong style={{ color: hasPassedEver ? '#10b981' : '#f59e0b' }}>{bestScore}% ({hasPassedEver ? 'TỐT NGHIỆP' : 'CHƯA ĐẠT'})</strong>
+              </span>
+            )}
           </div>
         </div>
 
-        {!isSubmitted ? (
+        {activeTab === 'exam' && !isSubmitted ? (
           <div className="exam-timer">
             <div className="timer-digits">{formatTimer(timeLeft)}</div>
             <div className="timer-label">Thời gian còn lại</div>
           </div>
         ) : (
-          <div className="exam-timer completed">
-            <div className="timer-digits">{reviewData?.finalScore}%</div>
-            <div className="timer-label">{reviewData?.passed ? '🏆 TỐT NGHIỆP' : '❌ CHƯA ĐẠT'}</div>
+          <div className={`exam-timer ${hasPassedEver ? 'completed' : ''}`}>
+            <div className="timer-digits">
+              {reviewData ? `${reviewData.finalScore}%` : (finalResult ? `${finalResult.score}%` : '--')}
+            </div>
+            <div className="timer-label">
+              {hasPassedEver ? '🏆 TỐT NGHIỆP' : (isSubmitted ? '❌ CHƯA ĐẠT' : 'CHƯA THI')}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Mode Switcher */}
-      {isSubmitted && (
+      {/* Navigation Toolbar */}
+      {(isSubmitted || attempts.length > 0 || reviewData || finalResult) && (
         <div className="exam-mode-tabs">
+          {hasPassedEver && (
+            <button
+              className={`mode-tab-btn ${activeTab === 'certificate' ? 'active' : ''}`}
+              onClick={() => setActiveTab('certificate')}
+            >
+              🎓 Chứng Chỉ Tốt Nghiệp
+            </button>
+          )}
           <button
             className={`mode-tab-btn ${activeTab === 'review' ? 'active' : ''}`}
             onClick={() => setActiveTab('review')}
           >
-            📊 Bảng Điểm & Chi Tiết Sửa Bài (Review Mode)
+            📊 Bảng Điểm & Sửa Bài (Review)
           </button>
           <button
-            className="mode-tab-btn retake-btn"
-            onClick={startNewFinalExamSession}
+            className={`mode-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
           >
-            🔄 Thi Lại Đề Mới (Random 15 Câu Mới)
+            📜 Lịch Sử Thi ({attempts.length} lần)
+          </button>
+          <button
+            className={`mode-tab-btn ${activeTab === 'exam' ? 'active' : ''}`}
+            onClick={() => {
+              if (isSubmitted) {
+                if (window.confirm('Đại ca có muốn bắt đầu một lượt thi tốt nghiệp mới? Bộ đếm thời gian sẽ reset và 15 câu hỏi ngẫu nhiên mới cùng 3 bài Capstone sẽ được nạp lại.')) {
+                  onRetakeFinalExam();
+                  startNewFinalExamSession();
+                }
+              } else {
+                setActiveTab('exam');
+              }
+            }}
+          >
+            {isSubmitted ? '🔄 Thi Lại Đề Mới (Nâng Điểm)' : '✍️ Đang Làm Bài Thi'}
           </button>
         </div>
       )}
 
-      {/* REVIEW MODE VIEW */}
-      {isSubmitted && activeTab === 'review' && reviewData && (
+      {/* TAB: CERTIFICATE VIEW */}
+      {activeTab === 'certificate' && certResult && (
+        <div style={{ marginBottom: '40px' }}>
+          <GraduationCertificate
+            result={certResult}
+            onRetake={() => {
+              if (window.confirm('Đại ca có chắc muốn thi lại bài tốt nghiệp để nâng cao điểm số không?')) {
+                onRetakeFinalExam();
+                startNewFinalExamSession();
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* TAB: ATTEMPTS HISTORY VIEW */}
+      {activeTab === 'history' && (
+        <div className="exam-attempts-wrapper">
+          <div className="attempts-stats-cards">
+            <div className="attempt-stat-card highlight">
+              <span className="stat-label">Tổng Lượt Thi</span>
+              <span className="stat-value">{attempts.length} lần</span>
+            </div>
+            <div className="attempt-stat-card success-card">
+              <span className="stat-label">Điểm Cao Nhất</span>
+              <span className="stat-value">{bestScore}%</span>
+            </div>
+            <div className="attempt-stat-card">
+              <span className="stat-label">Lần Thi Gần Nhất</span>
+              <span className="stat-value">{attempts[0]?.finalScore ?? '--'}%</span>
+            </div>
+            <div className="attempt-stat-card">
+              <span className="stat-label">Trạng Thái Tốt Nghiệp</span>
+              <span className="stat-value" style={{ color: hasPassedEver ? '#10b981' : '#f87171' }}>
+                {hasPassedEver ? '🎓 ĐÃ TỐT NGHIỆP' : '❌ CHƯA ĐẠT'}
+              </span>
+            </div>
+          </div>
+
+          <div className="attempts-table-container">
+            {attempts.length === 0 ? (
+              <div className="empty-attempts-notice">
+                <p>Đại ca chưa có lịch sử thi nào cho kỳ thi tốt nghiệp. Hãy hoàn thành bài thi để ghi nhận thành tích!</p>
+              </div>
+            ) : (
+              <table className="attempts-table">
+                <thead>
+                  <tr>
+                    <th>Lần Thi</th>
+                    <th>Thời Gian Nộp</th>
+                    <th>Học Viên</th>
+                    <th>Trắc Nghiệm</th>
+                    <th>3 Capstones</th>
+                    <th>Tổng Điểm</th>
+                    <th>Kết Quả</th>
+                    <th>Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attempts.map((att) => (
+                    <tr key={att.id}>
+                      <td>
+                        <span className="attempt-badge-num">#{att.attemptNumber}</span>
+                      </td>
+                      <td>
+                        <div>
+                          <div>{new Date(att.submittedAt).toLocaleTimeString('vi-VN')}</div>
+                          <small style={{ color: 'var(--text-muted)' }}>
+                            {new Date(att.submittedAt).toLocaleDateString('vi-VN')}
+                          </small>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>{att.studentName}</strong>
+                      </td>
+                      <td>
+                        <strong>{att.quizScore}%</strong> ({att.correctCount}/{att.totalQuestions} câu)
+                      </td>
+                      <td>
+                        <strong>{att.avgCodeScore}%</strong>
+                      </td>
+                      <td>
+                        <strong style={{ fontSize: '15px' }}>{att.finalScore}%</strong>
+                      </td>
+                      <td>
+                        <span className={`attempt-score-pill ${att.passed ? 'passed' : 'failed'}`}>
+                          {att.passed ? '🎓 TỐT NGHIỆP' : '✗ CHƯA ĐẠT'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn-view-attempt"
+                          onClick={() => {
+                            setReviewData(att.reviewData);
+                            setActiveQuestions(att.reviewData.questions);
+                            setSelectedAnswers(att.reviewData.selectedAnswers);
+                            setCodes(att.reviewData.codes);
+                            setStudentName(att.studentName);
+                            setActiveTab('review');
+                          }}
+                        >
+                          👁️ Xem Lại
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: REVIEW MODE VIEW */}
+      {activeTab === 'review' && reviewData && (
         <div className="exam-review-container">
           <div className={`scorecard-hero ${reviewData.passed ? 'passed' : 'failed'}`}>
             <div className="scorecard-main">
@@ -229,8 +471,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                 </h3>
                 <p>
                   {reviewData.passed
-                    ? `Đại ca đã hoàn thành toàn bộ khóa học với số điểm ${reviewData.finalScore}% (vượt chuẩn ${exam.passingScore}%). Chứng chỉ tốt nghiệp danh dự eSmiles đã được cấp!`
-                    : `Điểm số đạt được: ${reviewData.finalScore}% (yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết lỗi bên dưới và bấm "Thi Lại Đề Mới" nhé!`}
+                    ? `Đại ca đã hoàn thành toàn bộ khóa học với số điểm ${reviewData.finalScore}% (vượt chuẩn ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}. Chứng chỉ tốt nghiệp danh dự eSmiles đã sẵn sàng trong Tab "Chứng Chỉ"!`
+                    : `Điểm số đạt được: ${reviewData.finalScore}% (yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết lỗi bên dưới và bấm nút "Thi Lại Đề Mới" để nâng cao điểm số nhé!`}
                 </p>
                 <div className="score-breakdown-row">
                   <div className="score-item">
@@ -362,8 +604,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
         </div>
       )}
 
-      {/* EXAM TAKING MODE */}
-      {(!isSubmitted || activeTab === 'exam') && (
+      {/* TAB: EXAM TAKING MODE */}
+      {activeTab === 'exam' && (
         <div className="exam-taking-container">
           {/* Student Name Input */}
           <div className="student-name-card">

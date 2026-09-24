@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onSelectFinalExam}
           title={
             !finalExamStatus.unlocked
-              ? `🔒 Cần hoàn thành ${finalExamStatus.passedSprintsCount}/6 kỳ thi Sprint để mở khóa tốt nghiệp.`
+              ? `🔒 Cần hoàn thành ${finalExamStatus.passedSprintsCount}/${finalExamStatus.totalSprints} kỳ thi để mở khóa tốt nghiệp.`
               : '🎓 Kỳ thi tốt nghiệp toàn khóa eSmiles Academy'
           }
         >

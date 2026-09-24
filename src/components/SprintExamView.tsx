@@ -11,7 +11,7 @@ interface SprintExamViewProps {
   onExamSubmitted: (sprintId: number, score: number, passed: boolean) => void;
 }
 
-interface ExamReviewData {
+export interface ExamReviewData {
   quizScore: number;
   codeScore: number;
   finalScore: number;
@@ -25,16 +25,73 @@ interface ExamReviewData {
   submittedAt: string;
 }
 
+export interface SprintExamAttempt {
+  id: string;
+  attemptNumber: number;
+  submittedAt: string;
+  quizScore: number;
+  codeScore: number;
+  finalScore: number;
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  reviewData: ExamReviewData;
+}
+
 export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingScore, onExamSubmitted }) => {
+  const STORAGE_REVIEW_KEY = `esmiles_sprint_exam_review_${exam.sprintId}`;
+  const STORAGE_ATTEMPTS_KEY = `esmiles_sprint_exam_attempts_${exam.sprintId}`;
+
+  // Read saved data from LocalStorage
+  const loadSavedReview = (): ExamReviewData | null => {
+    try {
+      const saved = localStorage.getItem(STORAGE_REVIEW_KEY);
+      if (saved) return JSON.parse(saved) as ExamReviewData;
+    } catch {}
+    return null;
+  };
+
+  const loadSavedAttempts = (): SprintExamAttempt[] => {
+    try {
+      const saved = localStorage.getItem(STORAGE_ATTEMPTS_KEY);
+      if (saved) return JSON.parse(saved) as SprintExamAttempt[];
+    } catch {}
+    return [];
+  };
+
   const [activeQuestions, setActiveQuestions] = useState<RandomizedQuestion[]>([]);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [code, setCode] = useState<string>(exam.codeChallenge.starterCode);
   const [timeLeft, setTimeLeft] = useState<number>(exam.timeLimitMinutes * 60);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [reviewData, setReviewData] = useState<ExamReviewData | null>(null);
-  const [activeTab, setActiveTab] = useState<'exam' | 'review'>('exam');
+  const [attempts, setAttempts] = useState<SprintExamAttempt[]>([]);
+  const [activeTab, setActiveTab] = useState<'exam' | 'review' | 'history'>('exam');
 
-  // Initialize randomized exam session
+  // Initialize or restore session when sprintId changes
+  useEffect(() => {
+    const savedAttempts = loadSavedAttempts();
+    const savedReview = loadSavedReview();
+    setAttempts(savedAttempts);
+
+    if (savedReview) {
+      setReviewData(savedReview);
+      setIsSubmitted(true);
+      setActiveTab('review');
+      setActiveQuestions(savedReview.questions);
+      setSelectedAnswers(savedReview.selectedAnswers);
+      setCode(savedReview.code);
+    } else if (existingScore) {
+      // If user has existing score from backend but no local review, start fresh but mark score
+      setIsSubmitted(false);
+      startNewExamSession();
+    } else {
+      setIsSubmitted(false);
+      startNewExamSession();
+    }
+  }, [exam.sprintId]);
+
+  // Start new randomized exam session
   const startNewExamSession = () => {
     const picked = generateRandomExamQuestions(exam.questions, exam.questionCountToPick || 10);
     setActiveQuestions(picked);
@@ -42,17 +99,12 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
     setCode(exam.codeChallenge.starterCode);
     setTimeLeft(exam.timeLimitMinutes * 60);
     setIsSubmitted(false);
-    setReviewData(null);
     setActiveTab('exam');
   };
 
+  // Timer countdown (only active during 'exam' mode and not submitted)
   useEffect(() => {
-    startNewExamSession();
-  }, [exam.sprintId]);
-
-  // Timer countdown
-  useEffect(() => {
-    if (isSubmitted) return;
+    if (isSubmitted || activeTab !== 'exam') return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -66,7 +118,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [exam.sprintId, isSubmitted, activeQuestions, code, selectedAnswers]);
+  }, [exam.sprintId, isSubmitted, activeTab, activeQuestions, code, selectedAnswers]);
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -118,12 +170,40 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
       submittedAt: new Date().toISOString()
     };
 
+    const newAttempt: SprintExamAttempt = {
+      id: `attempt-${Date.now()}`,
+      attemptNumber: attempts.length + 1,
+      submittedAt: submittedData.submittedAt,
+      quizScore,
+      codeScore,
+      finalScore,
+      passed,
+      correctCount,
+      totalQuestions: activeQuestions.length,
+      reviewData: submittedData
+    };
+
+    const updatedAttempts = [newAttempt, ...attempts];
+
+    // Save to LocalStorage
+    try {
+      localStorage.setItem(STORAGE_REVIEW_KEY, JSON.stringify(submittedData));
+      localStorage.setItem(STORAGE_ATTEMPTS_KEY, JSON.stringify(updatedAttempts));
+    } catch (e) {
+      console.error('Failed to save exam attempt to localStorage:', e);
+    }
+
+    setAttempts(updatedAttempts);
     setReviewData(submittedData);
     setIsSubmitted(true);
     setActiveTab('review');
 
     onExamSubmitted(exam.sprintId, finalScore, passed);
   };
+
+  // Best score calculation
+  const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.finalScore)) : (existingScore?.score || 0);
+  const hasPassedEver = attempts.some((a) => a.passed) || Boolean(existingScore?.passed);
 
   return (
     <div className="exam-view-wrapper">
@@ -136,7 +216,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           <FormattedText content={exam.description} />
           <div className="exam-badges-row">
             <span className="exam-pill">
-              📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc ngẫu nhiên <strong>{activeQuestions.length} câu</strong>)
+              📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc ngẫu nhiên <strong>{exam.questionCountToPick || 10} câu</strong>)
             </span>
             <span className="exam-pill">
               🎯 Điểm đạt: <strong>≥ {exam.passingScore}%</strong>
@@ -144,42 +224,63 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
             <span className="exam-pill">
               ⏱️ Thời gian: <strong>{exam.timeLimitMinutes} phút</strong>
             </span>
+            {attempts.length > 0 && (
+              <span className="exam-pill" style={{ borderColor: hasPassedEver ? '#10b981' : '#f59e0b' }}>
+                🏆 Cao nhất: <strong style={{ color: hasPassedEver ? '#10b981' : '#f59e0b' }}>{bestScore}% ({hasPassedEver ? 'ĐÃ ĐẠT' : 'CHƯA ĐẠT'})</strong>
+              </span>
+            )}
           </div>
         </div>
 
-        {!isSubmitted ? (
+        {activeTab === 'exam' && !isSubmitted ? (
           <div className="exam-timer">
             <div className="timer-digits">{formatTimer(timeLeft)}</div>
             <div className="timer-label">Thời gian còn lại</div>
           </div>
         ) : (
-          <div className="exam-timer completed">
-            <div className="timer-digits">{reviewData?.finalScore}%</div>
-            <div className="timer-label">{reviewData?.passed ? '🏆 ĐÃ ĐẠT' : '❌ CHƯA ĐẠT'}</div>
+          <div className={`exam-timer ${hasPassedEver ? 'completed' : ''}`}>
+            <div className="timer-digits">{reviewData ? `${reviewData.finalScore}%` : (existingScore ? `${existingScore.score}%` : '--')}</div>
+            <div className="timer-label">
+              {reviewData ? (reviewData.passed ? '🏆 ĐÃ ĐẠT' : '❌ CHƯA ĐẠT') : (existingScore?.passed ? '🏆 ĐÃ ĐẠT' : 'CHƯA THI')}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Mode Switcher Tabs if already submitted */}
-      {isSubmitted && (
+      {/* Mode Switcher Tabs */}
+      {(isSubmitted || attempts.length > 0 || reviewData) && (
         <div className="exam-mode-tabs">
           <button
             className={`mode-tab-btn ${activeTab === 'review' ? 'active' : ''}`}
             onClick={() => setActiveTab('review')}
           >
-            📊 Bảng Điểm & Xem Lại Bài Thi (Review Mode)
+            📊 Bảng Điểm & Sửa Bài (Review)
           </button>
           <button
-            className="mode-tab-btn retake-btn"
-            onClick={startNewExamSession}
+            className={`mode-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
           >
-            🔄 Thi Lại Đề Mới (Random 10 Câu Khác)
+            📜 Lịch Sử Thi ({attempts.length} lần)
+          </button>
+          <button
+            className={`mode-tab-btn ${activeTab === 'exam' ? 'active' : ''}`}
+            onClick={() => {
+              if (isSubmitted) {
+                if (window.confirm('Đại ca có muốn bắt đầu một lượt thi mới? Bộ đếm thời gian sẽ reset và 10 câu hỏi ngẫu nhiên mới sẽ được bốc thăm.')) {
+                  startNewExamSession();
+                }
+              } else {
+                setActiveTab('exam');
+              }
+            }}
+          >
+            {isSubmitted ? '🔄 Làm Bài Lại (Đề Mới)' : '✍️ Đang Làm Bài Thi'}
           </button>
         </div>
       )}
 
-      {/* REVIEW MODE VIEW */}
-      {isSubmitted && activeTab === 'review' && reviewData && (
+      {/* TAB 1: REVIEW MODE VIEW */}
+      {activeTab === 'review' && reviewData && (
         <div className="exam-review-container">
           {/* Scorecard Hero */}
           <div className={`scorecard-hero ${reviewData.passed ? 'passed' : 'failed'}`}>
@@ -192,8 +293,8 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                 <h3>{reviewData.passed ? '🎉 CHÚC MỪNG ĐẠI CA ĐÃ ĐẠT CHỈ TIÊU!' : '⚠️ CHƯA ĐẠT CHỈ TIÊU YÊU CẦU!'}</h3>
                 <p>
                   {reviewData.passed
-                    ? `Đại ca đã hoàn thành xuất sắc Sprint ${exam.sprintId} với ${reviewData.finalScore}% (vượt mức tiêu chuẩn ${exam.passingScore}%).`
-                    : `Điểm của đại ca là ${reviewData.finalScore}% (tiêu chuẩn yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết bài làm bên dưới và thử lại đề mới nhé!`}
+                    ? `Đại ca đã hoàn thành xuất sắc Sprint ${exam.sprintId} với ${reviewData.finalScore}% (vượt mức tiêu chuẩn ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}.`
+                    : `Điểm của đại ca là ${reviewData.finalScore}% (tiêu chuẩn yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết bài làm bên dưới và bấm nút "Làm Bài Lại" để thử sức với đề mới nhé!`}
                 </p>
                 <div className="score-breakdown-row">
                   <div className="score-item">
@@ -325,8 +426,101 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
         </div>
       )}
 
-      {/* EXAM TAKING VIEW */}
-      {(!isSubmitted || activeTab === 'exam') && (
+      {/* TAB 2: ATTEMPTS HISTORY VIEW */}
+      {activeTab === 'history' && (
+        <div className="exam-attempts-wrapper">
+          <div className="attempts-stats-cards">
+            <div className="attempt-stat-card highlight">
+              <span className="stat-label">Tổng Lượt Thi</span>
+              <span className="stat-value">{attempts.length} lần</span>
+            </div>
+            <div className="attempt-stat-card success-card">
+              <span className="stat-label">Điểm Cao Nhất</span>
+              <span className="stat-value">{bestScore}%</span>
+            </div>
+            <div className="attempt-stat-card">
+              <span className="stat-label">Lần Thi Gần Nhất</span>
+              <span className="stat-value">{attempts[0]?.finalScore ?? '--'}%</span>
+            </div>
+            <div className="attempt-stat-card">
+              <span className="stat-label">Trạng Thái Chuẩn</span>
+              <span className="stat-value" style={{ color: hasPassedEver ? '#10b981' : '#f87171' }}>
+                {hasPassedEver ? '🏆 ĐÃ ĐẠT' : '❌ CHƯA ĐẠT'}
+              </span>
+            </div>
+          </div>
+
+          <div className="attempts-table-container">
+            {attempts.length === 0 ? (
+              <div className="empty-attempts-notice">
+                <p>Đại ca chưa có lịch sử làm bài nào cho Sprint này. Hãy bấm "Làm Bài Lại" để bắt đầu thử sức!</p>
+              </div>
+            ) : (
+              <table className="attempts-table">
+                <thead>
+                  <tr>
+                    <th>Lần Thi</th>
+                    <th>Thời Gian Nộp</th>
+                    <th>Trắc Nghiệm</th>
+                    <th>Thực Hành Code</th>
+                    <th>Tổng Điểm</th>
+                    <th>Kết Quả</th>
+                    <th>Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attempts.map((att) => (
+                    <tr key={att.id}>
+                      <td>
+                        <span className="attempt-badge-num">#{att.attemptNumber}</span>
+                      </td>
+                      <td>
+                        <div>
+                          <div>{new Date(att.submittedAt).toLocaleTimeString('vi-VN')}</div>
+                          <small style={{ color: 'var(--text-muted)' }}>
+                            {new Date(att.submittedAt).toLocaleDateString('vi-VN')}
+                          </small>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>{att.quizScore}%</strong> ({att.correctCount}/{att.totalQuestions} câu)
+                      </td>
+                      <td>
+                        <strong>{att.codeScore}%</strong>
+                      </td>
+                      <td>
+                        <strong style={{ fontSize: '15px' }}>{att.finalScore}%</strong>
+                      </td>
+                      <td>
+                        <span className={`attempt-score-pill ${att.passed ? 'passed' : 'failed'}`}>
+                          {att.passed ? '✓ ĐẠT CHUẨN' : '✗ CHƯA ĐẠT'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn-view-attempt"
+                          onClick={() => {
+                            setReviewData(att.reviewData);
+                            setActiveQuestions(att.reviewData.questions);
+                            setSelectedAnswers(att.reviewData.selectedAnswers);
+                            setCode(att.reviewData.code);
+                            setActiveTab('review');
+                          }}
+                        >
+                          👁️ Xem Lại
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: EXAM TAKING VIEW */}
+      {activeTab === 'exam' && (
         <div className="exam-taking-container">
           {/* SECTION 1: QUIZ */}
           <div className="quiz-container" style={{ marginBottom: '32px' }}>

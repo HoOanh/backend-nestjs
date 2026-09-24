@@ -11,383 +11,425 @@ export interface FinalExam {
 }
 
 export const FINAL_EXAM: FinalExam = {
-  title: 'Khảo Thí Tốt Nghiệp: Master NestJS 11, Prisma 7 & High-Concurrency Systems',
-  description: 'Đánh giá toàn diện năng lực Kỹ sư Backend thực chiến: Dependency Injection, Request Lifecycle, Prisma Concurrency, Multi-tenancy Scoping, Async Queues và Resilience.',
+  title: 'Khảo Thí Tốt Nghiệp: Master NestJS 11, High-Concurrency & Distributed Systems',
+  description: 'Đánh giá toàn diện năng lực Kỹ sư Backend Senior/Architect: V8 & Libuv Runtime, Network Protocols, NestJS IoC Architecture, PostgreSQL Storage & MVCC, Concurrency & Locking, Redis & BullMQ Queues, Cryptography, Distributed Systems và Production Observability.',
   timeLimitMinutes: 45,
   passingScore: 80,
   questionCountToPick: 15,
   questions: [
+    // ----------------------------------------------------
+    // CHƯƠNG 1: RUNTIME & CORE EXECUTION ENGINE
+    // ----------------------------------------------------
     {
       id: 'final-q1',
-      question: 'Một Singleton Service gán `this.activeUnitId = req.user.unitId` rồi thực hiện `await prisma.patient.findMany(...)`. Hậu quả thực tế xảy ra khi có 100 request đồng thời là gì?',
+      question: 'Trong kiến trúc Event Loop của Node.js, thứ tự ưu tiên xả các hàng đợi bất đồng bộ khi một I/O callback vừa hoàn tất là gì?',
       options: [
-        'Dữ liệu `activeUnitId` bị ghi đè chéo giữa các request, dẫn đến câu query chạy dưới `unitId` của người dùng khác gây rò rỉ dữ liệu.',
-        'TypeScript compiler sẽ tự động phát hiện và chặn quá trình khởi động server ngay tại bước bootstrap IoC Container.',
-        'Prisma Client sẽ tự động tạo một vùng nhớ RAM độc lập cho mỗi câu query nên không có nguy cơ rò rỉ dữ liệu.',
-        'Server sẽ tự động chuyển các request đó vào hàng đợi Redis để thực thi tuần tự từng người một.'
+        'process.nextTick queue được xả đầu tiên, kế đến microtask queue (Promise), rồi mới đến Check phase (setImmediate callbacks).',
+        'setImmediate callback được xả đầu tiên trong Check phase, kế đến process.nextTick queue, rồi mới đến các microtask của Promise.',
+        'Promise microtask queue được xả đầu tiên, sau đó Event Loop chuyển ngay sang Timers phase để thực thi toàn bộ setTimeout pending.',
+        'I/O poll phase sẽ giữ quyền ưu tiên xử lý toàn bộ các macro task tiếp theo trước khi cho phép bất kỳ microtask nào được kích hoạt.'
       ],
       correctIndex: 0,
-      explanation: 'Node.js đơn luồng nhưng xử lý đồng thời qua Event Loop. Khi hàm await, luồng chính chuyển sang phục vụ request khác ghi đè lên `this.activeUnitId`. Khi request đầu resume, nó sẽ dùng giá trị bị ghi đè. Scope data bắt buộc phải truyền qua function arguments.'
+      explanation: 'Trong Node.js runtime, process.nextTick sở hữu hàng đợi ưu tiên cao nhất (nextTickQueue), được drain sạch ngay sau mỗi bước chuyển giao tác vụ, tiếp theo là microtask queue (Promise.then/catch/finally), sau đó mới tới các phase của Libuv (Check phase cho setImmediate).'
     },
     {
       id: 'final-q2',
-      question: 'Khi thực hiện cập nhật danh mục vật tư chỉ thuộc quyền sở hữu của một `unitId`, câu lệnh mutation nào sau đây vừa bảo vệ Tenant Scope vừa không làm lộ sự tồn tại của ID ở chi nhánh khác?',
+      question: 'Cơ chế Garbage Collector (Orinoco / V8) phân chia bộ nhớ Heap thành Young Generation và Old Generation nhằm tối ưu hóa điều gì?',
       options: [
-        '`prisma.category.updateMany({ where: { id, unitId }, data })` và trả về mã lỗi 404 Not Found chung nếu `count === 0`.',
-        '`prisma.category.findUnique({ where: { id } })` rồi kiểm tra nếu khác `unitId` thì ném lỗi 403 Forbidden.',
-        '`prisma.category.update({ where: { id }, data })` rồi sau khi update xong mới kiểm tra `unitId` trong response.',
-        'Tin tưởng hoàn toàn vào header `x-unit-id` do client tự gửi lên trong request mà không đối chiếu token.'
+        'Giảm thời gian dừng luồng (Stop-The-World) bằng cách dùng Scavenger dọn dẹp các object ngắn hạn mà không cần duyệt toàn bộ Heap.',
+        'Cho phép ứng dụng cấp phát biến toàn cục không giới hạn dung lượng RAM mà không bao giờ gặp lỗi ngoại lệ JavaScript Heap Out Of Memory.',
+        'Tự động nén toàn bộ các chuỗi ký tự dài thành mã nhị phân trước khi lưu vào Old Generation để tiết kiệm băng thông bus dữ liệu CPU.',
+        'Bắt buộc lập trình viên phải giải phóng thủ công con trỏ bộ nhớ bằng lệnh delete trước khi object được chuyển giao sang Old Space.'
       ],
       correctIndex: 0,
-      explanation: 'Dùng updateMany với `{ id, unitId }`. Nếu count === 0, trả về 404 Not Found chung chung. Cách này ngăn chặn kẻ xấu thăm dò (ID Enumeration Attack) để biết được ID đó có tồn tại ở chi nhánh của người khác hay không.'
+      explanation: 'Theo giả thuyết Weak Generational Hypothesis, đại đa số object chết ngay sau khi sinh ra. V8 chia Young Gen (Nursery/Intermediate) dùng Scavenger (Copying GC) siêu nhanh để dọn dẹp các object ngắn ngày, chỉ những object sống sót qua 2 chu kỳ mới thăng hạng lên Old Gen (Mark-Sweep-Compact), hạn chế tối đa độ trễ Stop-The-World.'
     },
     {
       id: 'final-q3',
-      question: 'Sau khi Backend cấp Presigned Upload URL cho Frontend tải file X-Quang trực tiếp lên S3/MinIO, bước nào sau đây là bắt buộc trước khi gắn file vào Hồ Sơ Bệnh Án?',
+      question: 'Khi biến môi trường `UV_THREADPOOL_SIZE` mặc định là 4, điều gì sẽ xảy ra nếu có 8 tác vụ tính toán mã hóa `crypto.pbkdf2` gọi đồng thời?',
       options: [
-        'Backend xác thực kích thước file, định dạng MIME thực tế, áp dụng quota dung lượng chi nhánh và gán key bất biến.',
-        'Frontend gửi toàn bộ file nhị phân đó lên backend NestJS thêm một lần nữa để lưu vào thư mục /tmp.',
-        'Lưu trực tiếp đường link tạm thời vào database mà không cần kiểm tra xem file đã thực sự được tải lên hay chưa.',
-        'Tự động gửi email đính kèm file ảnh X-Quang đó tới toàn bộ các bác sĩ trong phòng khám.'
+        '8 tác vụ sẽ được phân bổ đồng đều sang 8 nhân CPU của hệ điều hành máy chủ để thực thi song song hoàn toàn trong cùng 1 tích tắc.',
+        '4 tác vụ đầu tiên chiếm giữ 4 worker threads trong pool, 4 tác vụ còn lại phải nằm chờ ở hàng đợi Libuv cho đến khi có thread rảnh.',
+        'Event Loop sẽ bị treo cứng hoàn toàn và từ chối tiếp nhận toàn bộ các request HTTP mới từ client cho đến khi cả 8 tác vụ kết thúc.',
+        'Node.js sẽ tự động chuyển đổi 4 tác vụ bị tràn sang xử lý trên card đồ họa GPU nhằm tránh làm tắc nghẽn hàng đợi của Libuv.'
       ],
-      correctIndex: 0,
-      explanation: 'Client có thể upload file giả mạo hoặc độc hại lên S3. Backend cần webhook/callback xác nhận: kiểm tra object tồn tại, verify size/magic bytes, kiểm tra quota chi nhánh rồi mới lưu metadata vào database.'
+      correctIndex: 1,
+      explanation: 'Các hàm crypto đồng bộ ngầm (như pbkdf2, scrypt) và fs được Libuv offload sang Thread Pool nội bộ (mặc định size = 4). Khi 8 tác vụ gọi đồng thời, 4 tác vụ đầu chiếm trọn 4 worker threads, 4 tác vụ sau phải xếp hàng chờ trong pending queue của Libuv cho tới khi có thread hoàn tất.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 2: GIAO THỨC MẠNG & THIẾT KẾ GIAO TIẾP
+    // ----------------------------------------------------
     {
       id: 'final-q4',
-      question: 'Để trừ tồn kho an toàn trước hàng trăm request đặt hàng đồng thời, cách viết nào thể hiện đúng tính bất biến và nguyên tử (Atomicity)?',
+      question: 'Vấn đề Head-of-Line (HoL) Blocking ở tầng truyền vận (Transport Layer) của HTTP/2 được giao thức HTTP/3 khắc phục như thế nào?',
       options: [
-        '`updateMany({ where: { id, unitId, quantity: { gte: count } }, data: { quantity: { decrement: count } } })` và kiểm tra `count === 1`.',
-        'Đọc `quantity` ra bộ nhớ bằng `findUnique`, dùng lệnh `if (quantity >= count)` của JavaScript rồi mới gọi `update`.',
-        'Thực hiện câu lệnh `update` trừ không điều kiện, nếu kết quả trả về số âm thì tiếp tục gọi câu lệnh cộng bù lại.',
-        'Lưu toàn bộ số lượng tồn kho vào biến toàn cục của Singleton Service để tăng tốc độ kiểm tra.'
+        'HTTP/3 bắt buộc client phải mở 6 kết nối TCP song song đến máy chủ cho mỗi domain nhằm chia nhỏ tải truyền nhận gói tin media.',
+        'HTTP/3 sử dụng giao thức QUIC chạy trên nền UDP, giúp các stream dữ liệu độc lập hoàn toàn và việc mất gói ở 1 stream không chặn stream khác.',
+        'HTTP/3 nén tiêu đề HTTP bằng thuật toán HPACK tĩnh thay vì QPACK nhằm loại bỏ hoàn toàn hiện tượng nghẽn hàng đợi trên mạng LAN.',
+        'HTTP/3 loại bỏ cơ chế xác thực bắt tay TLS để đẩy tốc độ truyền tải các gói tin nhị phân đạt mức tối đa trên toàn bộ hạ tầng mạng.'
       ],
-      correctIndex: 0,
-      explanation: 'Atomic Conditional Update ở cấp độ Database: Điều kiện `quantity: { gte: count }` được cơ sở dữ liệu kiểm tra và trừ ngay trong một thao tác nguyên tử duy nhất, chống 100% Race Condition (Lost Update / Overselling).'
+      correctIndex: 1,
+      explanation: 'Trong HTTP/2, nhiều stream được ghép vào 1 kết nối TCP duy nhất (multiplexing). Khi 1 packet TCP bị rớt, toàn bộ kết nối TCP phải chờ truyền lại (TCP HoL Blocking). HTTP/3 chạy trên QUIC (nền UDP), mỗi stream quản lý flow và packet riêng biệt, mất packet ở stream A hoàn toàn không ảnh hưởng đến stream B.'
     },
     {
       id: 'final-q5',
-      question: 'Trong kiến trúc Multi-Surface của eSmiles, khi một request gửi tới endpoint `/api/i/v1/patients`, hệ thống bảo mật phải xác thực các yếu tố nào?',
+      question: 'Tại sao việc thiết kế API thanh toán bắt buộc phải sử dụng cơ chế Idempotency Key thay vì chỉ dựa vào tính năng Retry của HTTP Client?',
       options: [
-        'User đã đăng nhập hợp lệ, có quyền truy cập vào Surface nội bộ, và `unitId` trong Token phải khớp với ngữ cảnh chi nhánh đang thao tác.',
-        'Chỉ cần kiểm tra xem người dùng có gửi kèm địa chỉ email có đuôi `@gmail.com` hay không.',
-        'Mặc định cấp toàn quyền nếu request được gửi từ một địa chỉ IP thuộc dải mạng văn phòng.',
-        'Chỉ kiểm tra quyền nếu request gửi lên có phương thức là DELETE hoặc PUT.'
+        'Vì Retry từ client khi gặp sự cố Network Timeout có thể khiến máy chủ xử lý trừ tiền 2 lần nếu giao dịch đầu tiên đã ghi nhận thành công.',
+        'Vì chuẩn RESTful quy định phương thức HTTP POST bắt buộc phải có tính Idempotent tự nhiên mà không cần bất kỳ khóa định danh nào.',
+        'Vì Idempotency Key giúp tăng tốc độ xử lý của câu lệnh SQL UPDATE trong cơ sở dữ liệu lên gấp hai lần nhờ cơ chế bỏ qua khóa dòng.',
+        'Vì trình duyệt web sẽ tự động từ chối gửi lại các request thanh toán nếu trong header của HTTP request không chứa trường Idempotency.'
       ],
       correctIndex: 0,
-      explanation: 'Internal Surface (`/api/i/v1`) yêu cầu: 1. Authenticated User; 2. Internal Staff/Doctor role; 3. Active Unit Scoping (phải có quyền trên chi nhánh đó). Bất kỳ sự sai lệch tenant nào đều phải bị chặn 403.'
+      explanation: 'Khi Client gọi API thanh toán nhưng bị timeout mạng (Socket Hang Up), giao dịch thực chất có thể đã commit thành công trên server. Nếu client tự tiện retry mà không kèm Idempotency-Key để server kiểm tra và deduplicate, tài khoản khách hàng sẽ bị trừ tiền lần thứ hai.'
     },
     {
       id: 'final-q6',
-      question: 'Khi xử lý một Job trong BullMQ (ví dụ: trừ tiền ví điện tử MoMo), cách thiết kế nào đảm bảo tính Idempotency khi worker bị crash và khởi động lại?',
+      question: 'Trạng thái `TIME_WAIT` trong vòng đời kết nối TCP đóng vai trò cốt lõi nào đối với sự an toàn của hệ thống mạng backend?',
       options: [
-        'Lưu trạng thái giao dịch với `idempotencyKey`; kiểm tra nếu key đã ở trạng thái `SUCCESS` thì bỏ qua việc trừ tiền lần 2.',
-        'Tăng số lần retry của job lên 100 lần để đảm bảo worker luôn có cơ hội chạy lại từ đầu.',
-        'Xóa toàn bộ các job trong hàng đợi mỗi khi phát hiện có một worker bị ngắt kết nối đột ngột.',
-        'Bắt buộc người dùng phải nhập lại mã OTP trên ứng dụng di động mỗi khi worker bị lỗi.'
+        'Duy trì kết nối mở thêm 2MSL để đảm bảo gói tin ACK cuối cùng đến được bên đối tác và các gói tin lạc của kết nối cũ không làm hỏng kết nối mới.',
+        'Tự động giải phóng ngay lập tức toàn bộ địa chỉ IP và Port của máy chủ về cho hệ điều hành tái sử dụng cho các kết nối tiếp theo.',
+        'Ngăn chặn kẻ tấn công thực hiện kỹ thuật quét cổng bí mật (Port Scanning) bằng cách khóa toàn bộ các socket đang mở trên máy chủ.',
+        'Tăng tốc độ bắt tay 3 bước (Three-way Handshake) cho các request HTTP tiếp theo bằng cách bỏ qua giai đoạn trao đổi cờ SYN và ACK.'
       ],
       correctIndex: 0,
-      explanation: 'Khi Worker crash sau khi gọi MoMo nhưng trước khi ack Redis, Redis sẽ giao job cho worker khác. Nhờ kiểm tra `idempotencyKey` trong DB, worker mới phát hiện giao dịch đã thành công và return ngay lập tức.'
+      explanation: 'Trạng thái TIME_WAIT (kéo dài 2MSL, thường 1-2 phút) thuộc về bên chủ động đóng kết nối (Active Close). Nó bảo đảm gói tin ACK cuối cùng được bên kia nhận (nếu mất thì gửi lại), đồng thời để các gói tin tồn đọng/lạc đường trên mạng tan biến hoàn toàn, tránh làm sai lệch dữ liệu của kết nối mới trùng IP/Port.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 3: KIẾN TRÚC LÕI NESTJS & REQUEST LIFECYCLE
+    // ----------------------------------------------------
     {
       id: 'final-q7',
-      question: 'Trong NestJS, decorator `@Injectable({ scope: Scope.REQUEST })` nếu bị lạm dụng ở tầng Repository/Service sâu sẽ gây ra vấn đề gì?',
+      question: 'Khi khai báo `@Injectable({ scope: Scope.REQUEST })` trên một Service trung tâm, tác động tiêu cực nguy hiểm nhất đối với ứng dụng là gì?',
       options: [
-        'Lan truyền (bubble up) Request-scope lên toàn bộ các Controller và Service phụ thuộc, làm tăng chi phí cấp phát bộ nhớ và giảm thông lượng hệ thống.',
-        'Làm cho toàn bộ các câu lệnh SQL trong Repository đó bị chuyển đổi thành các hàm đồng bộ chặn luồng.',
-        'Tự động ngắt kết nối giữa ứng dụng NestJS và cơ sở dữ liệu PostgreSQL sau mỗi 10 request.',
-        'Làm mất toàn bộ các decorator validation đã được khai báo trong các file DTO của ứng dụng.'
+        'Toàn bộ các Controller và Service phụ thuộc vào nó đều bị biến thành Request Scope, gây áp lực cấp phát RAM và hủy rác liên tục trên V8 GC.',
+        'Toàn bộ các kết nối Database Connection Pool của ứng dụng sẽ tự động bị ngắt và phải mở lại từ đầu ở mỗi lượt request gửi lên.',
+        'Trình biên dịch TypeScript Compiler sẽ lập tức báo lỗi cú pháp và từ chối tiến trình build mã nguồn của toàn bộ dự án NestJS.',
+        'Mọi decorator bảo vệ phân quyền như @UseGuards() sẽ bị vô hiệu hóa hoàn toàn do IoC container không thể nhận diện được Context.'
       ],
       correctIndex: 0,
-      explanation: 'Request Scope lan truyền ngược lên toàn bộ dependency graph. Mỗi HTTP request phải khởi tạo lại hàng chục object instance trong RAM, gây áp lực lớn cho V8 Garbage Collector và làm giảm throughput rõ rệt.'
+      explanation: 'Request Scope có tính chất lan truyền ngược (bubble up) lên toàn bộ dependency chain: nếu 1 service là Request-scoped, mọi service và controller phụ thuộc vào nó cũng bị kéo thành Request-scoped. Mỗi request phải khởi tạo lại hàng tá object instances, gây áp lực khủng khiếp lên V8 Heap và GC, làm tụt thảm hại throughput.'
     },
     {
       id: 'final-q8',
-      question: 'Trong Prisma 7, tại sao không nên bọc một lời gọi API bên thứ ba (như gửi SMS hoặc gọi Cổng Thanh Toán) bên trong một Interactive Transaction (`prisma.$transaction`)?',
+      question: 'Trật tự thực thi chuẩn xác của các thành phần trong Request Pipeline của NestJS khi một HTTP request đi vào là gì?',
       options: [
-        'Vì API bên ngoài có thể phản hồi chậm, giữ kết nối DB và khóa dòng quá lâu dẫn đến Transaction Timeout và nghẽn Connection Pool.',
-        'Vì Prisma sẽ tự động hủy bỏ lời gọi API đó nếu thời gian thực thi vượt quá 100 mili-giây.',
-        'Vì các hàm gọi API bên ngoài bắt buộc phải sử dụng thư viện Axios phiên bản mới nhất.',
-        'Vì cơ sở dữ liệu PostgreSQL không cho phép truyền dữ liệu ra mạng Internet từ bên trong transaction.'
+        'Global Middleware → Module Middleware → Guards → Interceptors (Pre-controller) → Pipes → Controller Handler → Interceptors (Post) → Exception Filters.',
+        'Pipes → Guards → Global Middleware → Controller Handler → Interceptors → Module Middleware → Exception Filters.',
+        'Guards → Pipes → Interceptors (Pre) → Global Middleware → Module Middleware → Controller Handler → Exception Filters.',
+        'Interceptors (Pre) → Pipes → Guards → Global Middleware → Controller Handler → Module Middleware → Exception Filters.'
       ],
       correctIndex: 0,
-      explanation: 'Database Transaction là tài nguyên đắt đỏ. Giữ transaction mở trong lúc chờ mạng ngoại vi (3-10s) sẽ giữ connection và lock DB, làm tê liệt các request khác. Cần gọi API ngoài trước hoặc sau transaction.'
+      explanation: 'Vòng đời NestJS: Middleware (chạy đầu tiên theo chuẩn Express/Fastify) → Guards (xác thực AuthN/AuthZ) → Interceptors (pre-controller hook) → Pipes (parse & validate payload DTO) → Route Handler → Interceptors (post-controller transform response) → Exception Filters (nếu có ngoại lệ).'
     },
     {
       id: 'final-q9',
-      question: 'Khi sử dụng `class-validator`, sự kết hợp giữa `whitelist: true` và `forbidNonWhitelisted: true` trong `ValidationPipe` mang lại giá trị bảo mật gì?',
+      question: 'Cấu hình `{ whitelist: true, forbidNonWhitelisted: true }` trong `ValidationPipe` của NestJS mang lại giá trị bảo mật then chốt nào?',
       options: [
-        'Chống tấn công Mass Assignment: từ chối các request chứa các trường lạ (như `role: "admin"` hay `isVerified: true`) không có trong DTO.',
-        'Tự động mã hóa toàn bộ dữ liệu của request body bằng thuật toán RSA trước khi lưu vào cơ sở dữ liệu.',
-        'Cho phép người dùng gửi bất kỳ trường dữ liệu nào mà không cần khai báo trong DTO.',
-        'Tự động tăng gấp đôi thời gian sống của token JWT của người gửi request.'
+        'Ngăn chặn triệt để lỗ hổng Mass Assignment bằng cách từ chối request nếu client gửi kèm các trường dữ liệu lạ không được định nghĩa trong DTO.',
+        'Tự động mã hóa toàn bộ dữ liệu nhạy cảm trong body của request bằng thuật toán AES-256 trước khi chuyển tiếp cho tầng Service xử lý.',
+        'Cho phép người dùng tự do gửi bất kỳ trường dữ liệu JSON mở rộng nào mà không cần phải khai báo trước các thuộc tính trong lớp DTO.',
+        'Tự động chuyển đổi toàn bộ chuỗi ký tự hoa thành chữ thường để chuẩn hóa dữ liệu đầu vào cho các câu lệnh truy vấn cơ sở dữ liệu.'
       ],
       correctIndex: 0,
-      explanation: 'Mass Assignment xảy ra khi kẻ tấn công cố tình gửi thêm `{ role: "admin", balance: 999999 }`. Cấu hình forbidNonWhitelisted sẽ chặn đứng request ngay tại cửa khẩu Pipe với lỗi 400 Bad Request.'
+      explanation: 'Mass Assignment xảy ra khi kẻ tấn công chèn thêm các trường nguy hiểm như `{ role: "admin", isVerified: true, balance: 999999 }`. Cấu hình `whitelist: true, forbidNonWhitelisted: true` sẽ lập tức ném lỗi 400 Bad Request ngay tại Pipe nếu phát hiện bất kỳ key lạ nào ngoài DTO.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 4: HỆ QUẢN TRỊ RDBMS & POSTGRESQL CHUYÊN SÂU
+    // ----------------------------------------------------
     {
       id: 'final-q10',
-      question: 'Trong thiết kế cơ sở dữ liệu cho phòng khám nha khoa eSmiles, trường `isLocked = true` trong bảng `treatment_options` phục vụ nguyên tắc nghiệp vụ nào?',
+      question: 'Trong kiến trúc lưu trữ của PostgreSQL, cơ chế Write-Ahead Logging (WAL) đảm bảo tính Bền Vững (Durability) theo nguyên lý nào?',
       options: [
-        'Bảo toàn tính bất biến (Immutability) của phương án điều trị đã chốt với bệnh nhân, ngăn chặn việc sửa đổi đơn giá hoặc thủ thuật sau khi đã ký duyệt.',
-        'Tự động ẩn phương án điều trị đó khỏi màn hình của bác sĩ và chỉ hiển thị cho nhân viên kế toán.',
-        'Cho phép bệnh nhân tự do chỉnh sửa lại danh mục thuốc mà không cần thông qua bác sĩ điều trị.',
-        'Tự động xóa vĩnh viễn toàn bộ hồ sơ bệnh án cũ của bệnh nhân khỏi cơ sở dữ liệu.'
+        'Mọi thay đổi dữ liệu phải được ghi tuần tự và flush xuống file log WAL trên đĩa cứng trước khi các data page bẩn trong Shared Buffers được ghi.',
+        'Cơ sở dữ liệu sẽ giữ toàn bộ dữ liệu trong bộ nhớ RAM và chỉ ghi xuống đĩa cứng vào lúc nửa đêm khi máy chủ không còn request nào.',
+        'Hệ quản trị sẽ tự động sao chép toàn bộ bảng dữ liệu sang một máy chủ dự phòng trên Cloud trước khi phản hồi kết quả cho câu lệnh INSERT.',
+        'PostgreSQL bỏ qua hoàn toàn việc ghi xuống ổ đĩa nếu dung lượng bộ nhớ đệm Shared Buffers vẫn còn hơn 50% khoảng trống khả dụng.'
       ],
       correctIndex: 0,
-      explanation: 'Phương án điều trị đã duyệt có giá trị pháp lý và tài chính. Backend phải khóa cứng (`isLocked = true`) và cấm mọi thao tác UPDATE/DELETE trực tiếp để đảm bảo tính minh bạch.'
+      explanation: 'Nguyên tắc cơ bản của WAL (Write-Ahead Logging): Trước khi một page dữ liệu bị sửa đổi (dirty buffer) được ghi xuống file dữ liệu chính, bản ghi mô tả thay đổi đó PHẢI được ghi và fsync xuống WAL log trước. Nhờ đó, nếu server sập nguồn đột ngột, quá trình Crash Recovery sẽ replay WAL để khôi phục 100% dữ liệu đã commit.'
     },
     {
       id: 'final-q11',
-      question: 'Trong NestJS Exception Handling, mục đích của việc tạo Custom Exception Filter kế thừa `BaseExceptionFilter` là gì?',
+      question: 'Khi tạo Composite Index `CREATE INDEX idx_user_status_created ON users (tenant_id, status, created_at)`, câu query nào sau đây KHÔNG THỂ tận dụng triệt để index này?',
       options: [
-        'Bắt toàn bộ các lỗi unhandled, ẩn giấu chi tiết nhạy cảm (database error, stack trace) khỏi client và format response đồng nhất.',
-        'Tự động thử lại câu lệnh bị lỗi thêm 3 lần trước khi trả về kết quả cho người dùng.',
-        'Chuyển toàn bộ các mã lỗi HTTP 500 thành mã HTTP 200 để giao diện không bị gián đoạn.',
-        'Xóa toàn bộ các bản ghi bị lỗi trong cơ sở dữ liệu PostgreSQL để tránh xung đột.'
+        '`WHERE status = \'ACTIVE\' AND created_at > \'2026-01-01\'` (thiếu cột tiền tố `tenant_id` dẫn đến vi phạm quy tắc Leftmost Prefix).',
+        '`WHERE tenant_id = \'t1\' AND status = \'ACTIVE\' AND created_at > \'2026-01-01\'` (sử dụng đầy đủ và chính xác tất cả các cột theo đúng thứ tự).',
+        '`WHERE tenant_id = \'t1\' AND status = \'ACTIVE\' ORDER BY created_at DESC` (tận dụng index cho cả điều kiện lọc và sắp xếp không cần sort bộ nhớ).',
+        '`WHERE tenant_id = \'t1\'` (tận dụng index tìm kiếm theo cột tiền tố đầu tiên với chi phí duyệt cây B-Tree cực thấp).'
       ],
       correctIndex: 0,
-      explanation: 'Custom Exception Filter chuẩn hóa cấu trúc lỗi (`{ success: false, statusCode, errorCode, message, timestamp, path }`) và che giấu các thông tin nhạy cảm của hệ thống khỏi hacker.'
+      explanation: 'Quy tắc Leftmost Prefix của cây B-Tree: Index được sắp xếp tuần tự theo cột 1, rồi đến cột 2, rồi đến cột 3. Nếu câu query bỏ qua cột tiền tố đầu tiên (`tenant_id`), database engine không thể nhảy vào cây B-Tree để tìm kiếm nhị phân được mà phải duyệt toàn bộ bảng (Seq Scan) hoặc duyệt toàn bộ index (Index Full Scan).'
     },
     {
       id: 'final-q12',
-      question: 'Khi triển khai cơ chế Rate Limiting phân tán (Distributed Rate Limiting) với Redis, thuật toán nào thường được ưu tiên để tránh hiện tượng dồn cục (Burst Traffic) ở đầu mỗi phút?',
+      question: 'Hiện tượng "Table Bloat" (Phình to bảng) trong PostgreSQL sinh ra do nguyên nhân cốt lõi nào trong cơ chế MVCC?',
       options: [
-        'Sliding Window Log hoặc Sliding Window Counter (Cửa sổ trượt) chia nhỏ khoảng thời gian theo timestamp thực tế.',
-        'Fixed Window Counter (Cửa sổ cố định) reset bộ đếm về 0 ở đầu mỗi phút theo đồng hồ hệ thống.',
-        'First-In First-Out Queue (Hàng đợi vào trước ra trước) xóa bỏ toàn bộ request cũ sau 1 giây.',
-        'Random Drop (Hủy ngẫu nhiên) tự động từ chối 50% số lượng request gửi tới server.'
+        'Các thao tác UPDATE và DELETE tạo ra các dead tuples chiếm dụng không gian đĩa cứng và cần tiến trình VACUUM thu hồi lại.',
+        'Hệ quản trị tự động nhân bản bảng thành nhiều bản sao để phục vụ các câu lệnh SELECT đồng thời từ nhiều client khác nhau.',
+        'Do lập trình viên sử dụng quá nhiều kiểu dữ liệu số nguyên INT thay vì kiểu dữ liệu BIGINT khiến bộ nhớ bị tràn phân trang.',
+        'Do hệ thống mạng bị nghẽn khiến các gói tin kết quả của câu lệnh truy vấn bị ứ đọng lại bên trong các phân vùng lưu trữ của bảng.'
       ],
       correctIndex: 0,
-      explanation: 'Fixed Window bị lỗi: gửi 100 req ở 00:59 và 100 req ở 01:01 (tổng 200 req trong 2 giây). Sliding Window tính toán số lượng request dựa trên cửa sổ thời gian trượt liên tục, loại bỏ hoàn toàn hiện tượng Spike.'
+      explanation: 'Trong mô hình MVCC của Postgres, DELETE chỉ đánh dấu xmax cho tuple (không xóa vật lý ngay), còn UPDATE là ghi 1 tuple mới và đánh dấu tuple cũ là dead. Nếu autovacuum chạy không kịp hoặc bị chặn bởi long-running transactions, các dead tuple này tích tụ làm dung lượng bảng phình to (Table Bloat), làm chậm I/O.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 5: ĐỒNG THỜI, GIAO DỊCH & KIỂM SOÁT KHÓA
+    // ----------------------------------------------------
     {
       id: 'final-q13',
-      question: 'Trong Prisma Schema, khi nào bạn nên sử dụng Composite Index `@@index([unitId, status, createdAt])` thay vì các index đơn lẻ?',
+      question: 'Để giải quyết triệt để vấn đề Lost Update khi hàng nghìn người cùng bấm nút đặt mua sản phẩm có số lượng tồn kho giới hạn, giải pháp nào tối ưu nhất?',
       options: [
-        'Khi câu query thường xuyên lọc đồng thời theo `unitId`, `status` và sắp xếp theo `createdAt` (Compound Filtering & Sorting).',
-        'Khi bảng dữ liệu có ít hơn 10 dòng và chỉ dùng để lưu trữ cấu hình hệ thống.',
-        'Khi muốn tự động xóa các bản ghi có trạng thái status là INACTIVE sau mỗi 30 ngày.',
-        'Khi cơ sở dữ liệu không hỗ trợ việc tạo khóa chính trên một cột đơn lẻ.'
+        'Sử dụng Atomic Conditional Update: `UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty` và kiểm tra affected rows.',
+        'Đọc số lượng tồn kho ra biến JavaScript trong RAM bằng hàm findUnique, dùng lệnh if kiểm tra rồi gọi hàm UPDATE ghi đè giá trị mới.',
+        'Thiết lập mức cô lập giao dịch Transaction Isolation Level về mức READ UNCOMMITTED để các transaction không phải chờ đợi khóa lẫn nhau.',
+        'Khởi tạo một biến toàn cục trong Singleton Service để lưu trữ số lượng tồn kho và đồng bộ định kỳ mỗi 5 phút một lần xuống cơ sở dữ liệu.'
       ],
       correctIndex: 0,
-      explanation: 'Composite Index tối ưu cho các câu lệnh có nhiều điều kiện kết hợp (`WHERE unitId = ? AND status = ? ORDER BY createdAt DESC`), giúp database tìm kiếm trong 1 lần duyệt B-Tree duy nhất.'
+      explanation: 'Atomic Conditional Update ở mức Engine DB (`WHERE id = :id AND stock >= :qty`) là giải pháp nguyên tử, hiệu năng cao nhất: Không cần mở transaction dài, DB tự acquire row exclusive lock trong vài micro-giây, trừ tồn kho an toàn và trả về affected rows = 1 (thành công) hoặc 0 (hết hàng), triệt tiêu 100% race condition.'
     },
     {
       id: 'final-q14',
-      question: 'Khái niệm "Graceful Degradation" (Thoái lui mềm) trong hệ thống Backend được thể hiện như thế nào khi Redis Cache gặp sự cố?',
+      question: 'Hiện tượng Deadlock (Khóa chết) giữa 2 transaction xảy ra khi nào và biện pháp phòng ngừa kiến trúc hiệu quả nhất là gì?',
       options: [
-        'Backend bắt ngoại lệ kết nối Redis, chuyển tạm sang query trực tiếp Database và ghi log cảnh báo thay vì làm sập toàn bộ API.',
-        'Tự động tắt nguồn máy chủ backend ngay lập tức để bảo vệ dữ liệu không bị hỏng.',
-        'Trả về mã lỗi HTTP 500 cho toàn bộ người dùng đang truy cập vào ứng dụng.',
-        'Tự động xóa toàn bộ dữ liệu trong Database PostgreSQL để giải phóng bộ nhớ.'
+        'T1 giữ Resource A đòi Resource B, trong khi T2 giữ Resource B đòi Resource A; phòng ngừa bằng cách chuẩn hóa thứ tự chiếm khóa (Lock Ordering).',
+        'Khi một transaction chạy quá 5 giây mà không commit; phòng ngừa bằng cách khởi động lại cơ sở dữ liệu sau mỗi 1000 lượt query.',
+        'Khi hai client cùng gửi request sử dụng cùng một địa chỉ IP; phòng ngừa bằng cách chặn địa chỉ IP đó thông qua tường lửa mạng.',
+        'Khi bảng dữ liệu có hơn 1 triệu dòng và không có index; phòng ngừa bằng cách chia nhỏ cơ sở dữ liệu thành các file Excel độc lập.'
       ],
       correctIndex: 0,
-      explanation: 'Graceful Degradation đảm bảo nếu một thành phần phụ trợ (như Cache/Recommender) bị lỗi, hệ thống vẫn duy trì các chức năng cốt lõi (Core Business) bằng cách fallback về DB an toàn.'
+      explanation: 'Deadlock kinh điển phát sinh từ sự phụ thuộc vòng tròn về tài nguyên khóa (Circular Wait). Biện pháp phòng chống triệt để nhất từ tầng ứng dụng là áp dụng Strict Lock Ordering: Mọi transaction khi cần thao tác trên nhiều bản ghi (ví dụ: chuyển tiền tài khoản A và B) đều phải sắp xếp ID tăng dần trước khi khóa (`SELECT ... FOR UPDATE ORDER BY id ASC`).'
     },
     {
       id: 'final-q15',
-      question: 'Khi triển khai cơ chế Phân quyền động (PBAC) trong eSmiles, tại sao không nên kiểm tra trực tiếp chuỗi `user.role === "admin"` trong logic của Service?',
+      question: 'Sự khác biệt căn bản giữa hai mức cô lập giao dịch `READ COMMITTED` và `REPEATABLE READ` trong PostgreSQL là gì?',
       options: [
-        'Vì kiểm tra Role làm code bị cứng nhắc (hardcoded), không thể tạo thêm vai trò mới (như "Bác Sĩ Trưởng", "Kế Toán Trưởng") mà không phải sửa code.',
-        'Vì TypeScript không hỗ trợ so sánh chuỗi ký tự trong các câu lệnh điều kiện if/else.',
-        'Vì biến role sẽ tự động bị đổi thành số nguyên sau khi nạp vào bộ nhớ RAM của máy chủ.',
-        'Vì việc kiểm tra Role sẽ làm cho tốc độ truy vấn cơ sở dữ liệu bị chậm đi 10 lần.'
+        'READ COMMITTED tạo Snapshot mới cho mỗi câu query, trong khi REPEATABLE READ tạo Snapshot một lần duy nhất tại thời điểm bắt đầu transaction.',
+        'READ COMMITTED cho phép đọc các dữ liệu chưa được commit của transaction khác, trong khi REPEATABLE READ thì hoàn toàn nghiêm cấm.',
+        'REPEATABLE READ sẽ tự động khóa toàn bộ bảng dữ liệu không cho bất kỳ ai đọc, trong khi READ COMMITTED chỉ khóa trên từng dòng dữ liệu.',
+        'READ COMMITTED bắt buộc mọi câu lệnh truy vấn phải chạy qua bộ nhớ đệm Redis, trong khi REPEATABLE READ truy vấn trực tiếp vào ổ đĩa.'
       ],
       correctIndex: 0,
-      explanation: 'Phân quyền dựa trên Permission (`can("inventory.item:update")`) cho phép người quản trị tự do tạo các vai trò mới và gán quyền linh hoạt trên UI quản trị mà không cần kỹ sư phải sửa code hay deploy lại server.'
+      explanation: 'Trong PostgreSQL: Ở mức READ COMMITTED, mỗi câu lệnh SQL bên trong transaction nhận một Snapshot mới (thấy dữ liệu commit bởi transaction khác giữa 2 lần SELECT). Ở mức REPEATABLE READ, Snapshot được cố định từ đầu transaction, đảm bảo đọc lặp lại luôn ra kết quả nhất quán (chống Non-repeatable Read).'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 6: REDIS CACHING & IN-MEMORY ARCHITECTURE
+    // ----------------------------------------------------
     {
       id: 'final-q16',
-      question: 'Tại sao việc sử dụng HTTP Status Code 200 OK cho tất cả các phản hồi (kể cả khi có lỗi) kèm body `{ error: "Not Found" }` bị coi là vi phạm chuẩn RESTful?',
+      question: 'Khi triển khai Distributed Caching, hiện tượng "Cache Stampede" (hoặc Cache Breakdown) xảy ra trong kịch bản nào?',
       options: [
-        'Vì nó phá vỡ khả năng xử lý tự động của các hạ tầng mạng (API Gateway, CDN Cache, Monitoring, Load Balancer) dựa trên mã HTTP chuẩn.',
-        'Vì trình duyệt web sẽ từ chối hiển thị nội dung nếu nhận được status code 200 cho một request bị lỗi.',
-        'Vì cơ sở dữ liệu PostgreSQL sẽ tự động rollback toàn bộ dữ liệu nếu nhận được mã HTTP 200.',
-        'Vì TypeScript compiler không cho phép trả về đối tượng có chứa trường error trong mã HTTP 200.'
+        'Một Hot Key chứa dữ liệu đắt đỏ bị hết hạn (TTL Expire), khiến hàng nghìn request đồng thời đổ dồn xuống DB cùng lúc để tính toán lại.',
+        'Dung lượng RAM của máy chủ Redis bị cạn kiệt khiến tiến trình Redis bị hệ điều hành tiêu diệt bằng tín hiệu Out-Of-Memory Killer.',
+        'Hacker liên tục gửi các request tìm kiếm các ID không hề tồn tại trong hệ thống nhằm làm tràn bộ nhớ đệm của máy chủ ứng dụng.',
+        'Hai máy chủ backend cùng ghi đè một key trên Redis với hai kiểu dữ liệu khác nhau dẫn đến lỗi xung đột phiên bản dữ liệu nhị phân.'
       ],
       correctIndex: 0,
-      explanation: 'Hạ tầng mạng (Nginx, Datadog, Cloudflare, Axios) dựa vào HTTP Status Code (4xx, 5xx) để cảnh báo lỗi, đo tỷ lệ lỗi (Error Rate) và quyết định retry/cache. Trả về 200 cho request lỗi khiến việc giám sát hệ thống bị tê liệt.'
+      explanation: 'Cache Stampede (hoặc Thundering Herd): Khi 1 hot key có hàng nghìn req/sec bất ngờ hết hạn TTL, toàn bộ các request này thấy cache miss và đồng loạt truy vấn xuống DB để tính toán lại cùng một dữ liệu đắt đỏ, dẫn đến CPU database tăng vọt 100% và làm tê liệt hệ thống. Giải pháp: Distributed Lock, Mutex hoặc XFetch probabilistic early expiration.'
     },
     {
       id: 'final-q17',
-      question: 'Trong Prisma, khi thực hiện câu lệnh `prisma.patient.findMany({ select: { id: true, name: true } })`, lợi ích về mặt hiệu năng là gì?',
+      question: 'Tại sao việc xóa khóa phân tán (Distributed Lock) trong Redis bắt buộc phải sử dụng đoạn mã Lua Script thay vì lệnh DEL thông thường?',
       options: [
-        'Chỉ yêu cầu DB đọc và truyền tải các cột cần thiết qua mạng, giảm đáng kể dung lượng bộ nhớ RAM và băng thông IO của Database.',
-        'Tự động tăng tốc độ xử lý của CPU máy tính cá nhân của người lập trình viên.',
-        'Cho phép người dùng sửa đổi trực tiếp dữ liệu của các cột không được chọn trong câu lệnh.',
-        'Tự động chuyển toàn bộ kết quả tìm kiếm sang dạng file âm thanh MP3 để lưu trữ.'
+        'Để đảm bảo tính nguyên tử: chỉ xóa khóa nếu giá trị ngẫu nhiên (UUID Token) của khóa trong Redis khớp chính xác với Token của caller hiện tại.',
+        'Vì lệnh DEL của Redis không hỗ trợ xóa các khóa có chứa thời gian sống TTL được thiết lập lớn hơn 60 giây.',
+        'Vì mã Lua Script chạy đa luồng trên toàn bộ các nhân của CPU giúp tăng tốc độ giải phóng bộ nhớ RAM cho hệ thống máy chủ.',
+        'Để ngăn không cho các lập trình viên khác có thể theo dõi được lịch sử các thao tác xóa dữ liệu trên công cụ Redis Insight.'
       ],
       correctIndex: 0,
-      explanation: 'Column Projection (`select` thay vì lấy tất cả cột): Tránh việc nạp các trường dữ liệu nặng (như JSON bệnh án, file ảnh Base64) vào RAM khi không cần dùng, tối ưu hóa triệt để băng thông giữa App Server và DB.'
+      explanation: 'Nếu lock hết hạn trước khi worker xử lý xong, một worker khác có thể acquire lock mới. Nếu worker cũ kết thúc và gọi `DEL lock_key`, nó sẽ vô tình giải phóng lock của worker mới! Dùng Lua Script giúp so sánh `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end` nguyên tử trong 1 bước.'
     },
     {
       id: 'final-q18',
-      question: 'Khi triển khai kiến trúc Multi-Tenant dạng Separate Database (Mỗi phòng khám 1 Database riêng), kỹ thuật nào được dùng để kết nối đúng DB?',
+      question: 'Chính sách đào thải dữ liệu `volatile-lru` trong Redis hoạt động dựa trên nguyên tắc nào khi bộ nhớ RAM đạt ngưỡng `maxmemory`?',
       options: [
-        'Dùng Dynamic Database Connection Pool Factory: trích xuất `tenantId` từ request để cấp phát hoặc lấy Prisma Client instance tương ứng từ Map cache.',
-        'Tạo 100 file main.ts khác nhau và chạy 100 ứng dụng NestJS trên 100 cổng mạng khác nhau.',
-        'Gộp toàn bộ các database vào làm một file duy nhất và sử dụng mật khẩu chung.',
-        'Bắt buộc người dùng phải nhập chuỗi kết nối Database URL trực tiếp vào ô đăng nhập.'
+        'Chỉ đào thải các key ít được sử dụng gần đây nhất (LRU) trong số những key CÓ thiết lập thời gian sống (TTL).',
+        'Tự động xóa ngẫu nhiên bất kỳ key nào trong toàn bộ cơ sở dữ liệu kể cả những key không được thiết lập thời gian sống.',
+        'Từ chối toàn bộ các câu lệnh ghi mới và trả về mã lỗi OOM mà không xóa bất kỳ key nào đang tồn tại trong bộ nhớ.',
+        'Chuyển toàn bộ các key cũ sang lưu tạm trên ổ cứng SSD của máy chủ để giải phóng không gian cho các key mới được ghi vào.'
       ],
       correctIndex: 0,
-      explanation: 'Dynamic Tenant Connection Manager duy trì một Map các PrismaClient instances được cache theo `tenantId`. Khi có request, middleware xác định tenant và inject đúng Client tương ứng.'
+      explanation: 'Cấu hình maxmemory-policy `volatile-lru` chỉ áp dụng thuật toán Least Recently Used trên tập hợp các key có cài đặt thời gian sống (has TTL). Các key vĩnh viễn (no expire) sẽ được giữ an toàn. Nếu muốn áp dụng LRU trên tất cả key thì dùng `allkeys-lru`.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 7: ASYNC QUEUES & BULLMQ BACKGROUND JOBS
+    // ----------------------------------------------------
     {
       id: 'final-q19',
-      question: 'Trong NestJS, mục đích của việc sử dụng `app.useLogger()` kết hợp với các dịch vụ Structured Logging (như Winston, Pino, Datadog) là gì?',
+      question: 'Trong kiến trúc BullMQ, cơ chế "Stalled Job" được kích hoạt khi nào và nhằm mục đích gì?',
       options: [
-        'Ghi log có cấu trúc chuẩn JSON (kèm traceId, userId, tenantId, executionTime) giúp tập trung hóa log và dễ dàng truy vết sự cố trên Grafana/Kibana.',
-        'Tự động xóa bỏ toàn bộ các câu lệnh console.log có trong mã nguồn của ứng dụng.',
-        'Tăng dung lượng lưu trữ của ổ đĩa cứng máy chủ lên gấp 5 lần khi hệ thống chạy quá tải.',
-        'Gửi tin nhắn thông báo cho người dùng mỗi khi một hàm trong Controller thực thi xong.'
+        'Phát hiện worker đang xử lý job bị crash đột ngột hoặc mất kết nối mạng quá lâu để đưa job trở lại hàng đợi cho worker khác xử lý.',
+        'Tự động tăng số lần retry của một job lên vô hạn nếu job đó bị lỗi do cơ sở dữ liệu PostgreSQL từ chối kết nối.',
+        'Xóa bỏ toàn bộ các job có dung lượng payload lớn hơn 1MB ra khỏi bộ nhớ Redis để tránh làm nghẽn đường truyền dữ liệu.',
+        'Chuyển đổi các job ưu tiên thấp thành các job ưu tiên cao khi phát hiện hàng đợi có số lượng job chờ lớn hơn 10.000 tác vụ.'
       ],
       correctIndex: 0,
-      explanation: 'Structured JSON Logging cho phép các công cụ phân tích log (Elasticsearch, Loki, CloudWatch) bóc tách trường tự động (filter theo `traceId` hoặc `tenantId`) để kỹ sư debug luồng đi của một request trong vài giây.'
+      explanation: 'Trong BullMQ, worker định kỳ gia hạn lock cho job đang chạy qua heartbeat (lock renewal). Nếu worker bị OOM crash, segfault hoặc đứt mạng, lock bị hết hạn. BullMQ stall checker sẽ phát hiện job bị stalled, chuyển nó về trạng thái active/wait để worker khác nhận lại, bảo đảm nguyên lý At-least-once processing.'
     },
     {
       id: 'final-q20',
-      question: 'Khi một API cần thực hiện 5 bước nghiệp vụ phức tạp và bước thứ 4 bị lỗi, cơ chế Database Transaction đảm bảo điều gì?',
+      question: 'Khi thiết kế hệ thống xử lý tác vụ nền với BullMQ, tại sao Job Processor bắt buộc phải có tính Idempotent (Bất biến)?',
       options: [
-        'Tính nguyên tử (Atomicity): Tự động Rollback toàn bộ các thay đổi của bước 1, 2, 3 để đưa dữ liệu về trạng thái sạch sẽ ban đầu như chưa có gì xảy ra.',
-        'Tiếp tục thực thi bước 5 và bỏ qua bước 4 để không làm gián đoạn trải nghiệm của người dùng.',
-        'Tự động gửi email thông báo cho toàn bộ nhân viên trong công ty biết hệ thống đang gặp sự cố.',
-        'Lưu tạm các thay đổi của bước 1, 2, 3 vào một file văn bản trên màn hình Desktop của máy chủ.'
+        'Vì BullMQ đảm bảo cam kết phân phối At-least-once (ít nhất một lần), một job có thể bị thực thi lại nếu xảy ra mạng chập chờn hoặc stall.',
+        'Vì cơ chế của Redis Streams chỉ cho phép mỗi tin nhắn được gửi đi duy nhất một lần và không bao giờ cho phép thực thi lại.',
+        'Vì việc xử lý bất biến giúp giảm thời gian chạy của các hàm mã hóa dữ liệu trong thư viện crypto của Node.js xuống một nửa.',
+        'Vì các thư viện NestJS bắt buộc mọi hàm xử lý trong service phải trả về giá trị null nếu phát hiện có sự trùng lặp tham số đầu vào.'
       ],
       correctIndex: 0,
-      explanation: 'Nguyên lý ACID (Atomicity): Giao dịch là "Tất cả hoặc không có gì" (All or Nothing). Nếu có bất kỳ lỗi nào xảy ra giữa chừng, toàn bộ các câu lệnh trước đó đều bị hoàn tác (Rollback), bảo vệ 100% tính toàn vẹn dữ liệu.'
+      explanation: 'Trong hệ thống phân tán, cơ chế giao vận tin nhắn tiêu chuẩn là "At-least-once". Khi worker xử lý xong nghiệp vụ (ví dụ trừ tiền) nhưng bị đứt mạng đúng lúc chuẩn bị gửi xác nhận ack về Redis, job sẽ bị đẩy lại cho worker khác chạy lại. Nếu processor không có tính Idempotent, lỗi double-processing sẽ xảy ra.'
     },
     {
       id: 'final-q21',
-      question: 'Trong quy trình CI/CD, bước kiểm tra tĩnh (Static Analysis & Type Checking) bằng `tsc --noEmit` nhằm mục đích gì?',
+      question: 'Mục đích của việc sử dụng Dead Letter Queue (DLQ) trong hệ thống Message Queue là gì?',
       options: [
-        'Kiểm tra toàn bộ tính toàn vẹn của hệ thống kiểu dữ liệu TypeScript mà không cần mất thời gian xuất ra các file JavaScript trung gian.',
-        'Tự động deploy ứng dụng lên môi trường production nếu không có lỗi chính tả trong comment.',
-        'Tối ưu hóa các hình ảnh có trong thư mục assets để giảm dung lượng file nén.',
-        'Xóa toàn bộ các thư mục node_modules cũ để giải phóng bộ nhớ cho máy chủ build.'
+        'Cách ly các job bị lỗi liên tục sau khi đã thử lại hết số lần retry tối đa, bảo vệ hàng đợi chính không bị tắc nghẽn và cho phép kỹ sư điều tra.',
+        'Tự động gửi email xin lỗi khách hàng mỗi khi có một tác vụ gửi thông báo đẩy bị thất bại do người dùng tắt mạng di động.',
+        'Tự động xóa vĩnh viễn toàn bộ các bản ghi nhật ký hệ thống cũ hơn 30 ngày để giải phóng không gian lưu trữ cho máy chủ database.',
+        'Tăng tốc độ xử lý của hàng đợi chính bằng cách bỏ qua toàn bộ các bước kiểm tra tính hợp lệ của dữ liệu trước khi đẩy vào hàng đợi.'
       ],
       correctIndex: 0,
-      explanation: '`tsc --noEmit` chỉ chạy trình biên dịch để phân tích lỗi kiểu dữ liệu tĩnh (Type Error) trên toàn bộ dự án với tốc độ nhanh nhất, là chốt chặn quan trọng đầu tiên trong mọi pipeline CI/CD.'
+      explanation: 'Dead Letter Queue (DLQ) là chốt chặn an toàn: Khi một job bị lỗi (Poison Message) và đã retry hết hạn ngạch (max retries), nó được chuyển sang DLQ để không làm nghẽn hàng đợi chính, đồng thời lưu giữ toàn bộ context, stack trace để kỹ sư phân tích nguyên nhân gốc (Root Cause) và replay lại khi đã fix bug.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 8: CRYPTOGRAPHY & AN NINH BACKEND
+    // ----------------------------------------------------
     {
       id: 'final-q22',
-      question: 'Khái niệm "Zero Trust Architecture" trong lập trình Backend yêu cầu điều gì đối với dữ liệu nhận từ Client?',
+      question: 'Tại sao thuật toán băm mật khẩu `Argon2id` được khuyến nghị vượt trội hơn so với `MD5` và `SHA-256` truyền thống?',
       options: [
-        'Không bao giờ tin tưởng dữ liệu đầu vào từ Client; bắt buộc phải Validate, Sanitize, và xác thực quyền hạn ở mọi tầng ứng dụng.',
-        'Từ chối toàn bộ các kết nối mạng gửi từ các thiết bị di động thông minh của người dùng.',
-        'Bắt buộc người dùng phải nhập lại mật khẩu tài khoản ở mỗi lần bấm chuột trên trang web.',
-        'Mã hóa toàn bộ cơ sở dữ liệu bằng một mật khẩu chỉ có duy nhất Giám đốc công ty biết.'
+        'Argon2id được thiết kế tốn kém bộ nhớ (Memory-Hard), chống lại hiệu quả các cuộc tấn công bẻ khóa hàng loạt bằng phần cứng chuyên dụng GPU/ASIC.',
+        'Argon2id có tốc độ thực thi nhanh gấp 100 lần SHA-256 giúp máy chủ xử lý hàng triệu request đăng nhập trong cùng 1 giây.',
+        'Argon2id cho phép người quản trị hệ thống có thể dễ dàng dịch ngược chuỗi băm để lấy lại mật khẩu gốc cho người dùng khi bị quên.',
+        'Argon2id không sử dụng chuỗi muối ngẫu nhiên (Salt) nên dung lượng chuỗi băm ngắn hơn và tiết kiệm không gian lưu trữ trong DB.'
       ],
       correctIndex: 0,
-      explanation: 'Zero Trust (Không bao giờ tin tưởng, luôn luôn xác thực): Mọi payload gửi từ client đều có thể bị chỉnh sửa bởi hacker. Backend phải tự mình kiểm tra tính hợp lệ và quyền hạn ở mọi bước.'
+      explanation: 'MD5 và SHA-256 là các hàm băm tốc độ cao được thiết kế cho checksum dữ liệu, khiến hacker có thể dùng GPU/ASIC thử hàng tỷ mật khẩu mỗi giây. Argon2id (kết hợp Argon2i chống Side-channel và Argon2d chống GPU) bắt buộc tiêu tốn cả RAM (Memory-Hard) và CPU time, vô hiệu hóa khả năng tấn công brute-force phần cứng.'
     },
     {
       id: 'final-q23',
-      question: 'Khi sử dụng Redis làm bộ nhớ đệm (Cache), cơ chế "Cache Aside" (Lazy Loading) hoạt động theo trình tự nào?',
+      question: 'Trong cơ chế Refresh Token Rotation với Reuse Detection (Phát hiện tái sử dụng), điều gì xảy ra nếu kẻ xấu cố tình dùng lại một Refresh Token cũ đã bị xoay vòng?',
       options: [
-        'Đọc từ Cache → Nếu có (Hit) thì trả về ngay; Nếu không có (Miss) thì đọc từ DB → Ghi kết quả vào Cache với TTL → Trả về dữ liệu cho Client.',
-        'Ghi dữ liệu vào Cache trước rồi định kỳ 1 tiếng sau mới đồng bộ dữ liệu vào cơ sở dữ liệu chính.',
-        'Xóa toàn bộ cơ sở dữ liệu mỗi khi bộ nhớ đệm Cache của Redis bị đầy dung lượng.',
-        'Bắt buộc client phải gửi request trực tiếp tới Redis trước khi gửi request tới NestJS Backend.'
+        'Hệ thống phát hiện token cũ đã bị thu hồi, lập tức vô hiệu hóa toàn bộ chuỗi token (Family) của phiên đăng nhập đó và bắt user đăng nhập lại.',
+        'Hệ thống tự động cấp phát một Access Token mới với thời hạn sử dụng vĩnh viễn để hỗ trợ người dùng không bị gián đoạn trải nghiệm.',
+        'Máy chủ sẽ tự động chuyển hướng toàn bộ các kết nối mạng của kẻ tấn công sang một website khác để đánh lạc hướng.',
+        'Cơ sở dữ liệu sẽ tự động xóa tài khoản của người dùng đó ra khỏi hệ thống để đảm bảo an toàn tuyệt đối cho các tài khoản khác.'
       ],
       correctIndex: 0,
-      explanation: 'Cache-Aside Pattern: 1. Check cache. 2. If Miss: Query DB, set cache with TTL, return. 3. When mutate (Update/Delete): Invalidate/evict cache key tương ứng để tránh stale data.'
+      explanation: 'Refresh Token Rotation cấp 1 token mới và invalidate token cũ ở mỗi lần cấp lại. Nếu token cũ đã invalidated bị gửi lên lần nữa, hệ thống nhận diện token đã bị lộ (bị chặn bắt hoặc rò rỉ). Cơ chế Token Family Revocation lập tức thu hồi toàn bộ token liên quan trong gia đình token đó, buộc người dùng thực sự phải đăng nhập lại.'
     },
     {
       id: 'final-q24',
-      question: 'Tại sao việc thiết lập `TTL` (Time-To-Live) cho mọi Key lưu trong Redis Cache là bắt buộc?',
+      question: 'Để bảo vệ cookie phiên làm việc (Session/Auth Cookie) chống lại hoàn toàn các cuộc tấn công XSS và Man-in-the-Middle, tổ hợp cờ nào là bắt buộc?',
       options: [
-        'Tránh việc dữ liệu rác tồn tại vĩnh viễn làm cạn kiệt bộ nhớ RAM của Redis, và đảm bảo dữ liệu tự động làm mới sau một khoảng thời gian.',
-        'Bắt buộc Redis phải khởi động lại máy chủ sau khi thời gian TTL đếm ngược kết thúc.',
-        'Tăng tốc độ mã hóa của các khóa bảo mật JWT được lưu trữ trong bộ nhớ đệm.',
-        'Ngăn không cho các lập trình viên khác đọc được nội dung của các key trong Redis.'
+        '`HttpOnly; Secure; SameSite=Strict` (hoặc Lax)',
+        '`Domain=*; Path=/; MaxAge=Infinity`',
+        '`AllowScriptAccess=true; Secure=false; SameSite=None`',
+        '`HttpOnly=false; Encrypt=AES; SameSite=CrossSite`'
       ],
       correctIndex: 0,
-      explanation: 'Nếu không có TTL, các key không bao giờ hết hạn sẽ tích tụ theo thời gian khiến RAM bị đầy (OOM Crash). TTL cũng là cơ chế cứu cánh giúp dữ liệu tự động đồng bộ lại nếu lỡ quên xóa cache khi update.'
+      explanation: 'Tổ hợp phòng thủ chiều sâu cho Cookie: `HttpOnly` ngăn chặn JavaScript đọc cookie qua `document.cookie` (chống XSS đánh cắp session), `Secure` bảo đảm cookie chỉ được truyền qua kênh mã hóa HTTPS (chống MitM eavesdropping), `SameSite=Strict/Lax` ngăn trình duyệt tự động đính kèm cookie trong các request cross-site (chống CSRF).'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 9: HỆ THỐNG PHÂN TÁN & MỞ RỘNG
+    // ----------------------------------------------------
     {
       id: 'final-q25',
-      question: 'Trong NestJS, kỹ thuật "Custom Pipe Transformation" thường được ứng dụng để làm sạch dữ liệu đầu vào như thế nào?',
+      question: 'Định lý CAP phát biểu rằng khi xảy ra Phân vùng mạng (Network Partition - P), một hệ thống phân tán bắt buộc phải lựa chọn đánh đổi giữa hai yếu tố nào?',
       options: [
-        'Tự động cắt bỏ khoảng trắng thừa (trim), chuyển email về chữ thường (lowercase) và loại bỏ các thẻ HTML độc hại (Sanitize XSS).',
-        'Tự động dịch nội dung của bài viết sang 5 thứ tiếng phổ biến nhất trên thế giới.',
-        'Tự động nén toàn bộ hình ảnh đính kèm thành định dạng WebP chất lượng cao.',
-        'Gửi tin nhắn cảnh báo tới số điện thoại của người dùng nếu phát hiện có ký tự số trong tên.'
+        'Tính Nhất Quán (Consistency - C) và Tính Sẵn Sàng (Availability - A).',
+        'Tính Hiệu Năng (Performance) và Khả Năng Mở Rộng Dung Lượng (Scalability).',
+        'Độ An Toàn Dữ Liệu (Security) và Tốc Độ Bắt Tay Mạng (Latency).',
+        'Chi Phí Thuê Máy Chủ (Cost) và Độ Bền Bỉ Của Phần Cứng Lưu Trữ (Durability).'
       ],
       correctIndex: 0,
-      explanation: 'Pipes không chỉ validate mà còn transform dữ liệu trước khi vào Controller: chuẩn hóa chuỗi (`email.trim().toLowerCase()`), loại bỏ mã độc XSS (`sanitize-html`), và ép kiểu tham số an toàn.'
+      explanation: 'Theo định lý CAP của Eric Brewer: Khi có sự cố đứt đoạn mạng giữa các nodes (Partition Tolerance - P là thực tế không thể tránh khỏi trong mạng phân tán), hệ thống buộc phải chọn: Hoặc là từ chối phục vụ một số node để bảo toàn tính nhất quán (CP - Consistency), hoặc là tiếp tục phục vụ với nguy cơ dữ liệu không đồng nhất (AP - Availability).'
     },
     {
       id: 'final-q26',
-      question: 'Khi triển khai API phân trang với lượng dữ liệu lớn (Big Data > 10 triệu dòng), tại sao "Cursor-based Pagination" lại tối ưu hơn "Offset-based Pagination"?',
+      question: 'Kỹ thuật Consistent Hashing (Băm nhất quán) giải quyết nhược điểm chí mạng nào của thuật toán băm modulo truyền thống `hash(key) % N` khi mở rộng cụm node?',
       options: [
-        'Cursor-based tận dụng chỉ mục B-Tree (ví dụ: `WHERE id > lastId LIMIT 20`) để nhảy thẳng đến vị trí cần lấy, không phải quét qua hàng triệu dòng như `OFFSET 5000000`.',
-        'Cursor-based tự động chia nhỏ cơ sở dữ liệu thành 100 bảng con chạy trên các máy chủ khác nhau.',
-        'Offset-based chỉ hỗ trợ phân trang cho các bảng dữ liệu có chứa ít hơn 100 dòng.',
-        'Cursor-based không yêu cầu cơ sở dữ liệu phải có khóa chính hay chỉ mục index.'
+        'Hạn chế tối đa số lượng key phải di chuyển (Rehash) khi thêm hoặc bớt một node trong cụm từ N sang N+1.',
+        'Tăng tốc độ mã hóa dữ liệu người dùng lên gấp 10 lần nhờ việc phân bổ các key vào cùng một phân vùng duy nhất.',
+        'Cho phép lưu trữ dữ liệu không giới hạn trên một máy chủ duy nhất mà không cần phải kết nối thêm các máy chủ phụ trợ.',
+        'Tự động đồng bộ toàn bộ dữ liệu của cơ sở dữ liệu quan hệ sang định dạng NoSQL Document mà không cần viết script chuyển đổi.'
       ],
       correctIndex: 0,
-      explanation: 'OFFSET 5.000.000 ép DB phải đọc và duyệt qua 5 triệu dòng rồi vứt bỏ trước khi lấy 20 dòng tiếp theo (rất chậm). Cursor-based dùng Index Seek nhảy thẳng vào vị trí `id > lastSeenId` với độ phức tạp O(log N).'
+      explanation: 'Với thuật toán `hash(key) % N`, khi số lượng node thay đổi từ N sang N+1, hầu như toàn bộ vị trí các key đều bị thay đổi (`k % N != k % (N+1)`), gây ra hiện tượng 100% cache miss làm sập DB. Consistent Hashing sắp xếp node và key trên một vòng tròn (Hash Ring), khi thêm/bớt 1 node chỉ có trung bình `K/N` keys phải di dời.'
     },
     {
       id: 'final-q27',
-      question: 'Trong kiến trúc Event-Driven, "Outbox Pattern" được thiết kế nhằm mục đích gì?',
+      question: 'Khi thực hiện giao dịch phân tán trên nhiều Microservices, mẫu thiết kế Saga (Orchestration/Choreography) xử lý thất bại bằng cơ chế nào?',
       options: [
-        'Đảm bảo việc cập nhật Database và xuất bản Event ra Message Queue luôn đồng nhất (Atomic), không bị mất Event kể cả khi Message Broker bị sập lúc commit DB.',
-        'Tự động gửi email thông báo cho toàn bộ khách hàng mỗi khi có sản phẩm mới ra mắt.',
-        'Tăng tốc độ tải trang của giao diện web bằng cách lưu trữ toàn bộ tin nhắn vào cookie trình duyệt.',
-        'Tự động xóa các tài khoản người dùng không hoạt động trong vòng 6 tháng khỏi hệ thống.'
+        'Thực thi chuỗi các Giao dịch bù trừ (Compensating Transactions) theo thứ tự ngược lại để hoàn tác trạng thái nghiệp vụ.',
+        'Khóa cứng toàn bộ các bảng cơ sở dữ liệu trên tất cả các microservices cho đến khi toàn bộ mạng hoạt động ổn định trở lại.',
+        'Tự động hủy bỏ việc triển khai mã nguồn của các microservices liên quan và quay trở lại phiên bản cũ trên môi trường staging.',
+        'Gửi thông báo lỗi cho người dùng và yêu cầu người dùng phải tự liên hệ với ngân hàng để lấy lại số tiền đã bị trừ trong tài khoản.'
       ],
       correctIndex: 0,
-      explanation: 'Outbox Pattern lưu event vào bảng `outbox` trong cùng DB Transaction với nghiệp vụ chính. Một tiến trình riêng sẽ đọc bảng outbox và publish sang Queue, đảm bảo không bao giờ có chuyện DB lưu nhưng Event bị mất.'
+      explanation: 'Mô hình 2PC (Two-Phase Commit) dễ gây block tài nguyên diện rộng và không phù hợp với microservices độc lập. Mẫu kiến trúc Saga phân rã giao dịch thành chuỗi các local transactions. Nếu một bước thất bại (ví dụ: kho hết hàng), Saga sẽ kích hoạt chuỗi Compensating Transactions (ví dụ: hoàn tiền vào ví khách) theo chiều ngược lại.'
     },
+
+    // ----------------------------------------------------
+    // CHƯƠNG 10: QUAN SÁT & VẬN HÀNH HỆ THỐNG SẢN XUẤT
+    // ----------------------------------------------------
     {
       id: 'final-q28',
-      question: 'Khi thiết kế hệ thống Microservices, nguyên lý "Single Responsibility Principle" ở tầng Database khuyến nghị điều gì?',
+      question: 'Trong chuẩn Distributed Tracing (OpenTelemetry / W3C TraceContext), hai header `traceparent` và `tracestate` phục vụ mục đích cốt lõi nào?',
       options: [
-        'Mỗi Microservice nên sở hữu và quản lý cơ sở dữ liệu riêng của mình (Database-per-Service), không truy cập trực tiếp vào DB của service khác.',
-        'Tất cả các Microservices trong công ty bắt buộc phải dùng chung một bảng cơ sở dữ liệu duy nhất.',
-        'Chỉ cho phép duy nhất 1 người lập trình viên được quyền viết mã nguồn cho cơ sở dữ liệu đó.',
-        'Mỗi cơ sở dữ liệu chỉ được phép chứa tối đa 1 bảng dữ liệu duy nhất.'
+        'Lan truyền ngữ cảnh vết (Trace ID và Span ID) xuyên suốt qua các tầng mạng và các microservices khác nhau để liên kết toàn bộ hành trình của 1 request.',
+        'Lưu trữ thông tin thẻ tín dụng của khách hàng để phục vụ việc thanh toán tự động cho các request tiếp theo.',
+        'Xác thực mật khẩu quản trị viên cấp cao của hệ thống hạ tầng Kubernetes cluster nhằm ngăn chặn việc thâm nhập trái phép.',
+        'Chuyển đổi toàn bộ các câu lệnh SQL trong database thành định dạng GraphQL trước khi gửi dữ liệu về cho client hiển thị.'
       ],
       correctIndex: 0,
-      explanation: 'Database-per-Service ngăn ngừa việc các service bị dính chặt vào schema của nhau (Loose Coupling). Giao tiếp liên service bắt buộc phải thông qua API hoặc Event Contracts được định nghĩa rõ ràng.'
+      explanation: 'W3C TraceContext chuẩn hóa việc truyền Trace Context qua HTTP headers: `traceparent` mang version, TraceId (định danh toàn bộ hành trình), ParentSpanId (định danh bước gọi trước) và TraceFlags (lấy mẫu hay không). Nhờ đó, công cụ APM (Jaeger, Tempo) có thể vẽ nên toàn bộ Waterfall Trace xuyên qua 20 microservices.'
     },
     {
       id: 'final-q29',
-      question: 'Trong bảo mật ứng dụng Web, kỹ thuật "Content Security Policy" (CSP) Header có tác dụng gì?',
+      question: 'Chiến lược triển khai "Blue-Green Deployment" giúp đạt được mục tiêu Zero-Downtime Deployment dựa trên nguyên lý vận hành nào?',
       options: [
-        'Quy định rõ những nguồn domain nào được phép tải script, hình ảnh, stylesheet và kết nối socket, ngăn chặn tấn công XSS và Data Injection.',
-        'Tự động tăng dung lượng bộ nhớ RAM của máy tính người dùng khi truy cập trang web.',
-        'Chuyển toàn bộ nội dung của trang web thành định dạng văn bản thô không có màu sắc.',
-        'Bắt buộc người dùng phải sử dụng trình duyệt Google Chrome thì mới được phép truy cập.'
+        'Duy trì song song hai môi trường sản xuất giống hệt nhau (Blue đang chạy, Green cập nhật mới), sau khi test pass thì chuyển router/load-balancer sang Green.',
+        'Tắt toàn bộ hệ thống vào lúc 2 giờ sáng, cập nhật mã nguồn mới trong 30 phút rồi bật lại máy chủ để người dùng truy cập.',
+        'Xóa toàn bộ cơ sở dữ liệu cũ và yêu cầu người dùng phải tạo lại tài khoản mới sau mỗi đợt phát hành phiên bản tính năng lớn.',
+        'Triển khai mã nguồn trực tiếp lên máy chủ đang chạy mà không cần khởi động lại tiến trình Node.js nhằm giảm độ trễ của mạng nội bộ.'
       ],
       correctIndex: 0,
-      explanation: 'CSP Header là lớp bảo vệ vững chắc do trình duyệt thực thi, chỉ cho phép thực thi JavaScript từ các nguồn tin cậy (trusted domains), vô hiệu hóa các đoạn script độc hại bị chèn qua XSS.'
+      explanation: 'Blue-Green Deployment chạy 2 cụm môi trường độc lập hoàn toàn. Bản Blue đang phục vụ live traffic, bản Green được deploy version mới và kiểm thử kỹ lưỡng (smoke test). Khi đã sẵn sàng, Load Balancer chỉ việc trỏ router sang cụm Green trong tích tắc. Nếu có sự cố, rollback chỉ tốn vài mili-giây bằng cách trỏ ngược lại Blue.'
     },
     {
       id: 'final-q30',
-      question: 'Hành trình trở thành một Kỹ sư Backend Master NestJS & High-Concurrency Systems đòi hỏi phẩm chất kỹ thuật cốt lõi nào?',
+      question: 'Sự khác biệt cốt lõi giữa "Liveness Probe" và "Readiness Probe" trong hạ tầng điều phối container (Kubernetes) là gì?',
       options: [
-        'Hiểu sâu bản chất hoạt động bên dưới (Event Loop, Concurrency, Database Locks, Network RFC) và luôn thiết kế hệ thống có tính bền bỉ, an toàn dữ liệu và mở rộng cao.',
-        'Chỉ cần học thuộc lòng cú pháp của các decorator mà không cần hiểu cơ chế vận hành bên dưới.',
-        'Copy code từ Internet về dự án mà không cần kiểm tra tính toàn vẹn và độ an toàn của mã nguồn.',
-        'Chỉ tập trung vào giao diện người dùng và phó mặc toàn bộ logic bảo mật cho bên thứ ba.'
+        'Liveness kiểm tra container còn sống không để khởi động lại nếu bị treo; Readiness kiểm tra ứng dụng đã sẵn sàng tiếp nhận traffic mạng hay chưa.',
+        'Readiness kiểm tra container còn sống không để khởi động lại nếu bị treo; Liveness kiểm tra ứng dụng đã sẵn sàng tiếp nhận traffic mạng hay chưa.',
+        'Liveness chỉ dùng cho các ứng dụng cơ sở dữ liệu; Readiness chỉ dùng cho các ứng dụng giao diện người dùng viết bằng React.',
+        'Cả hai probe đều thực hiện cùng một chức năng là tự động scale tăng số lượng container khi lượng truy cập mạng tăng đột biến.'
       ],
       correctIndex: 0,
-      explanation: 'Kỹ sư Backend thực thụ không chỉ viết code chạy được, mà phải hiểu sâu cơ chế chịu tải, chống rò rỉ dữ liệu đa chi nhánh, kiểm soát concurrency và thiết kế hệ thống hoạt động ổn định 24/7 dưới áp lực cao.'
+      explanation: 'Trong Kubernetes: `Liveness Probe` phát hiện deadlock/freeze: nếu fail liên tục, Kubelet sẽ tiêu diệt và restart pod. `Readiness Probe` kiểm tra ứng dụng đã hoàn tất warmup/kết nối DB chưa: nếu fail, Kubelet tạm thời rút pod khỏi danh sách Endpoint của Service để không gửi traffic đến, pod không bị restart.'
     }
   ],
   codeChallenges: [
     {
       id: 'final-capstone-1',
-      title: 'Capstone 1: Atomic Stock Transfer với Tenant Isolation Scoping',
-      description: 'Hiện thực hàm `executeStockTransfer(prismaMock, unitId, payload)`: 1. Validate `unitId`, `fromItemId`, `toItemId`, `quantity > 0` và hai kho khác nhau; 2. Trong transaction: Dùng `updateMany` conditional debit theo `unitId` và `quantity: { gte: quantity }`; nếu `count !== 1` ném lỗi `INSUFFICIENT_STOCK`; 3. Cộng kho đích; 4. Ghi audit log bằng `tx.auditLog.create`. Trả về `{ success: true, transferId: payload.idempotencyKey }`.',
+      title: 'Capstone 1: Atomic Stock Transfer Với Idempotency & Tenant Scoping',
+      description: 'Hiện thực hàm `executeStockTransfer(prismaMock, unitId, payload)`: Chuyển tồn kho giữa hai kho hàng nội bộ. Yêu cầu: 1. Validate `unitId`, `fromItemId`, `toItemId`, `quantity > 0` và hai kho phải khác nhau; 2. Trong transaction: Dùng `updateMany` trừ tồn kho có điều kiện `{ id: fromItemId, unitId, stock: { gte: quantity } }`, nếu `count !== 1` ném lỗi `INSUFFICIENT_STOCK`; 3. Cộng tồn kho kho đích bằng `updateMany`; 4. Ghi nhận nhật ký chuyển kho `tx.transferLog.create`. Trả về `{ success: true, transferId: payload.idempotencyKey }`.',
       starterCode: `async function executeStockTransfer(prismaMock, unitId, payload) {
-  // TODO: Hiện thực chuyển kho nguyên tử (Atomic Stock Transfer)
+  // TODO: Hiện thực chuyển kho nguyên tử an toàn Concurrency
   // payload: { fromItemId: string, toItemId: string, quantity: number, idempotencyKey: string }
-  // 1. Kiểm tra validation (unitId, fromItemId, toItemId, quantity > 0)
-  // 2. Chạy prismaMock.$transaction thực hiện conditional decrement và audit log
+  // 1. Kiểm tra validation (unitId, fromItemId, toItemId, quantity > 0, from !== to)
+  // 2. Chạy prismaMock.$transaction:
+  //    - Trừ kho nguồn với điều kiện stock >= quantity
+  //    - Cộng kho đích
+  //    - Tạo transferLog ghi nhận idempotencyKey
   // 3. Trả về: { success: true, transferId: payload.idempotencyKey }
 
 }`,
@@ -395,99 +437,149 @@ export const FINAL_EXAM: FinalExam = {
         {
           input: [
             {
-              $transaction: async (cb) => cb({
+              $transaction: async (cb: (tx: unknown) => Promise<unknown>) => cb({
                 inventoryItem: {
-                  updateMany: async () => ({ count: 1 }),
-                  update: async () => ({})
+                  updateMany: async (args: { where: { id: string; stock?: { gte: number } } }) => {
+                    if (args.where.stock && args.where.stock.gte > 50) {
+                      return { count: 0 }; // Không đủ hàng
+                    }
+                    return { count: 1 };
+                  }
                 },
-                auditLog: {
+                transferLog: {
+                  create: async () => ({ id: 'log-01' })
+                }
+              })
+            },
+            'tenant-hanoi-01',
+            { fromItemId: 'kho-A', toItemId: 'kho-B', quantity: 20, idempotencyKey: 'idemp-tx-1001' }
+          ],
+          expected: { success: true, transferId: 'idemp-tx-1001' },
+          description: 'Chuyển kho hợp lệ với số lượng tồn kho đáp ứng phải thành công'
+        },
+        {
+          input: [
+            {
+              $transaction: async (cb: (tx: unknown) => Promise<unknown>) => cb({
+                inventoryItem: {
+                  updateMany: async () => ({ count: 0 })
+                },
+                transferLog: {
                   create: async () => ({})
                 }
               })
             },
-            'unit-esmiles-1',
-            { fromItemId: 'kho-A', toItemId: 'kho-B', quantity: 10, idempotencyKey: 'idemp-001' }
+            'tenant-hanoi-01',
+            { fromItemId: 'kho-A', toItemId: 'kho-B', quantity: 9999, idempotencyKey: 'idemp-tx-1002' }
           ],
-          expected: { success: true, transferId: 'idemp-001' },
-          description: 'Chuyển kho hợp lệ với đủ tồn kho phải thành công và trả về transferId'
+          expected: 'INSUFFICIENT_STOCK',
+          description: 'Số lượng tồn kho không đủ phải bị từ chối với lỗi INSUFFICIENT_STOCK'
         }
       ]
     },
     {
       id: 'final-capstone-2',
-      title: 'Capstone 2: Implement Request Pipeline với Validation, Status Code & Error Handling',
-      description: 'Hiện thực hàm `handleCreatePatient(req, res, next)`: Trích xuất `name` và `age` từ `req.body`. Nếu `name` rỗng hoặc `age < 0` hoặc `age > 150`, gọi `res.status(400).json({ error: "BAD_INPUT" })`. Nếu hợp lệ, gọi `res.status(201).json({ success: true, patient: { name: name.trim(), age: Number(age) } })`. Bọc toàn bộ trong khối `try/catch` và gọi `next(error)` nếu có ngoại lệ bất ngờ.',
-      starterCode: `async function handleCreatePatient(req, res, next) {
-  // TODO: Hiện thực Pipeline xử lý tạo hồ sơ bệnh nhân
-  // 1. Lấy name, age từ req.body
-  // 2. Validate dữ liệu: name không rỗng, age hợp lệ từ 0 đến 150
-  // 3. Nếu sai: res.status(400).json({ error: 'BAD_INPUT', message: '...' })
-  // 4. Nếu đúng: res.status(201).json({ success: true, patient: { name, age } })
-  // 5. Bắt lỗi ngoại lệ và chuyển tiếp cho next(error)
+      title: 'Capstone 2: Request Pipeline Interceptor, Validation & Custom Error Sanitizer',
+      description: 'Hiện thực hàm `handleCreateOrder(req, res, next)`: 1. Trích xuất `items` (mảng) và `customerEmail` từ `req.body`; 2. Nếu `customerEmail` không hợp lệ (không chứa `@`) hoặc `items` rỗng/không phải mảng, trả về `res.status(400).json({ error: "BAD_INPUT", message: "Invalid order payload" })`; 3. Nếu hợp lệ, tính `totalItems = items.reduce((sum, i) => sum + i.quantity, 0)`, trả về `res.status(201).json({ success: true, order: { email: customerEmail.trim().toLowerCase(), totalItems } })`; 4. Bắt mọi ngoại lệ bất ngờ bằng khối try/catch và chuyển cho `next(error)`.',
+      starterCode: `async function handleCreateOrder(req, res, next) {
+  // TODO: Hiện thực Pipeline xử lý đơn hàng an toàn
+  // 1. Validate email và mảng items
+  // 2. Trả về 400 nếu dữ liệu không hợp lệ
+  // 3. Tính toán và trả về 201 cùng dữ liệu đã được làm sạch
+  // 4. Bọc try/catch và chuyển tiếp lỗi cho next(error)
 
 }`,
       testCases: [
         {
           input: [
-            { body: { name: '  Nguyễn Văn A  ', age: '25' } },
             {
-              status(code) { this.statusCode = code; return this; },
-              json(payload) { return { statusCode: this.statusCode, ...payload }; }
+              body: {
+                customerEmail: '  KHONGMINH@GMAIL.COM  ',
+                items: [{ id: 'p1', quantity: 2 }, { id: 'p2', quantity: 3 }]
+              }
+            },
+            {
+              statusCode: 200,
+              status(code: number) { this.statusCode = code; return this; },
+              json(payload: Record<string, unknown>) { return { statusCode: this.statusCode, ...payload }; }
             },
             () => {}
           ],
           expected: {
             statusCode: 201,
             success: true,
-            patient: { name: 'Nguyễn Văn A', age: 25 }
+            order: {
+              email: 'khongminh@gmail.com',
+              totalItems: 5
+            }
           },
-          description: 'Payload hợp lệ phải trả về status 201 và dữ liệu bệnh nhân đã được làm sạch'
+          description: 'Payload đơn hàng hợp lệ phải trả về status 201 và email được sanitize chuẩn'
         },
         {
           input: [
-            { body: { name: '', age: 20 } },
+            { body: { customerEmail: 'invalid-email', items: [] } },
             {
-              status(code) { this.statusCode = code; return this; },
-              json(payload) { return { statusCode: this.statusCode, ...payload }; }
+              statusCode: 200,
+              status(code: number) { this.statusCode = code; return this; },
+              json(payload: Record<string, unknown>) { return { statusCode: this.statusCode, ...payload }; }
             },
             () => {}
           ],
           expected: {
             statusCode: 400,
             error: 'BAD_INPUT',
-            message: 'Tên bệnh nhân không hợp lệ'
+            message: 'Invalid order payload'
           },
-          description: 'Tên rỗng phải lập tức trả về status 400 Bad Request'
+          description: 'Email sai định dạng hoặc mảng items rỗng phải trả về status 400'
         }
       ]
     },
     {
       id: 'final-capstone-3',
-      title: 'Capstone 3: Thiết Kế Robust Background Job Với Exponential Backoff Retry',
-      description: 'Hiện thực hàm `processJobWithRetry(job, processFn, maxRetries)`: Thực thi `processFn(job)`. Nếu gặp lỗi, tăng bộ đếm `job.attempts`. Thử lại tối đa `maxRetries` lần. Nếu vượt quá, ném lỗi cuối cùng nhận được. Trả về kết quả nếu thành công.',
-      starterCode: `async function processJobWithRetry(job, processFn, maxRetries = 3) {
-  // TODO: Hiện thực cơ chế Exponential Backoff Retry cho Job
-  // 1. Thực thi processFn(job), cập nhật job.attempts ở mỗi lần chạy
-  // 2. Nếu thành công: trả về { success: true, result: res, attempts: job.attempts }
-  // 3. Nếu thất bại sau maxRetries: ném lỗi Error('Job failed after ...')
+      title: 'Capstone 3: Resilient Job Processor Với Exponential Backoff Retry',
+      description: 'Hiện thực hàm `processJobWithBackoff(job, processFn, maxRetries = 3)`: Thực thi `processFn(job)`. Mỗi lần thử, tăng `job.attempts = (job.attempts || 0) + 1`. Nếu thành công, trả về `{ success: true, result: res, attempts: job.attempts }`. Nếu thất bại và chưa vượt quá `maxRetries`, đợi một khoảng thời gian tăng dần và thử lại. Nếu vượt quá `maxRetries`, ném lỗi hoặc trả về `{ success: false, error: err.message, attempts: job.attempts, deadLetter: true }`.',
+      starterCode: `async function processJobWithBackoff(job, processFn, maxRetries = 3) {
+  // TODO: Hiện thực Background Job Processor có cơ chế Retry & Dead Letter Queue
+  // 1. Lặp qua các lần thử từ 1 đến maxRetries
+  // 2. Cập nhật job.attempts ở mỗi vòng lặp
+  // 3. Nếu thành công: return { success: true, result: ..., attempts: job.attempts }
+  // 4. Nếu vượt quá maxRetries: return { success: false, error: ..., attempts: job.attempts, deadLetter: true }
 
 }`,
       testCases: [
         {
           input: [
-            { id: 'job-01', data: { orderId: 'ord-123' } },
-            async (job) => {
-              if (job.attempts < 2) throw new Error('Gateway Timeout');
-              return { charged: true, amount: 500000 };
+            { id: 'job-payout-01', data: { amount: 1500000 }, attempts: 0 },
+            async (job: { attempts: number }) => {
+              if (job.attempts < 2) {
+                throw new Error('Bank Gateway 504 Timeout');
+              }
+              return { transactionId: 'TX-BANK-8899', status: 'PAID' };
             },
             3
           ],
           expected: {
             success: true,
-            result: { charged: true, amount: 500000 },
+            result: { transactionId: 'TX-BANK-8899', status: 'PAID' },
             attempts: 2
           },
-          description: 'Job lỗi ở lần 1 nhưng thành công ở lần 2 phải trả về kết quả và attempts = 2'
+          description: 'Job gặp lỗi timeout ở lần 1 nhưng thành công ở lần 2 phải ghi nhận attempts = 2'
+        },
+        {
+          input: [
+            { id: 'job-payout-02', data: { amount: 500000 }, attempts: 0 },
+            async () => {
+              throw new Error('Account Frozen by Compliance');
+            },
+            3
+          ],
+          expected: {
+            success: false,
+            error: 'Account Frozen by Compliance',
+            attempts: 3,
+            deadLetter: true
+          },
+          description: 'Job thất bại liên tục vượt quá 3 lần phải bị đánh dấu chuyển vào deadLetter'
         }
       ]
     }

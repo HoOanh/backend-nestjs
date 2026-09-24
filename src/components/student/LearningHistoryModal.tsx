@@ -33,6 +33,31 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Helper to read local attempt counts
+  const getSprintAttemptCount = (sprintId: number): number => {
+    try {
+      const saved = localStorage.getItem(`esmiles_sprint_exam_attempts_${sprintId}`);
+      if (saved) {
+        const arr = JSON.parse(saved) as unknown[];
+        return Array.isArray(arr) ? arr.length : 0;
+      }
+    } catch {}
+    return 0;
+  };
+
+  const getFinalAttemptCount = (): number => {
+    try {
+      const saved = localStorage.getItem('esmiles_final_exam_attempts');
+      if (saved) {
+        const arr = JSON.parse(saved) as unknown[];
+        return Array.isArray(arr) ? arr.length : 0;
+      }
+    } catch {}
+    return 0;
+  };
+
+  const finalAttemptCount = getFinalAttemptCount();
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content student-history-modal" onClick={(e) => e.stopPropagation()}>
@@ -69,7 +94,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
               <span className="hist-lbl">Bài Học Đã Pass</span>
             </div>
             <div className="hist-stat">
-              <span className="hist-val">{Object.keys(sprintExamScores).length}/4</span>
+              <span className="hist-val">{Object.keys(sprintExamScores).length}/10</span>
               <span className="hist-lbl">Sprint Đã Thi</span>
             </div>
             <div className="hist-stat">
@@ -81,22 +106,78 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
           </div>
         </div>
 
-        {/* Sprint Exam Results */}
+        {/* Final Exam Highlight Card */}
         <div className="history-section">
-          <h4>🎯 Kết Quả Các Kỳ Thi Sprint</h4>
-          <div className="sprint-results-grid">
-            {[1, 2, 3, 4].map((spId) => {
+          <h4>🏆 Khảo Thí Tốt Nghiệp Toàn Khóa (Final Exam)</h4>
+          <div style={{
+            background: finalExam?.passed
+              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.2) 100%)'
+              : 'var(--bg-surface-elevated)',
+            border: `1px solid ${finalExam?.passed ? '#10b981' : 'var(--border-subtle)'}`,
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                {finalExam?.passed ? '🎓 ĐÃ TỐT NGHIỆP DANH DỰ' : (finalExam ? '⚠️ CHƯA ĐẠT ĐIỂM TỐT NGHIỆP' : '⚪ CHƯA THAM GIA THI')}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                {finalExam
+                  ? `Điểm đạt được: ${finalExam.score}% • Đã thi ${finalAttemptCount > 0 ? finalAttemptCount : 1} lần`
+                  : 'Hãy hoàn thành 10 kỳ thi Sprint để mở khóa bài thi tốt nghiệp'}
+              </div>
+              {finalExam?.certificateId && (
+                <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                  Mã văn bằng: <strong>{finalExam.certificateId}</strong>
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: finalExam?.passed ? '#10b981' : 'var(--text-muted)' }}>
+                {finalExam ? `${finalExam.score}%` : '--'}
+              </div>
+              {finalExam?.completedAt && (
+                <small style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                  {new Date(finalExam.completedAt).toLocaleDateString('vi-VN')}
+                </small>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint Exam Results (10 Sprints) */}
+        <div className="history-section">
+          <h4>🎯 Kết Quả 10 Kỳ Thi Sprint (Chương 1 Đến Chương 10)</h4>
+          <div className="sprint-results-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((spId) => {
               const res = sprintExamScores[spId];
+              const attCount = getSprintAttemptCount(spId);
               return (
                 <div key={spId} className={`sprint-res-card ${res ? (res.passed ? 'passed' : 'failed') : 'not-taken'}`}>
                   <div className="sprint-res-header">
-                    <strong>Sprint 0{spId}</strong>
+                    <strong>Sprint {spId < 10 ? `0${spId}` : spId}</strong>
                     <span>{res ? `${res.score}%` : 'Chưa thi'}</span>
                   </div>
                   <span className="sprint-res-status">
-                    {res ? (res.passed ? '✅ Đã Đạt Chuẩn' : '❌ Chưa Đạt') : '⚪ Chưa hoàn thành'}
+                    {res ? (res.passed ? '✅ Đạt Chuẩn' : '❌ Chưa Đạt') : '⚪ Chưa thi'}
                   </span>
-                  {res && <small className="sprint-res-date">{new Date(res.completedAt).toLocaleDateString('vi-VN')}</small>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                    {attCount > 0 && (
+                      <small style={{ color: 'var(--accent-primary)', fontSize: '11px' }}>
+                        {attCount} lần thi
+                      </small>
+                    )}
+                    {res && (
+                      <small className="sprint-res-date" style={{ marginLeft: 'auto' }}>
+                        {new Date(res.completedAt).toLocaleDateString('vi-VN')}
+                      </small>
+                    )}
+                  </div>
                 </div>
               );
             })}

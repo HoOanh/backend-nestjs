@@ -7,5 +7,5 @@ dist/
 .env
 .env.*
 !.env.example
-*.sqlite
-data/
+/data/
+!src/data/

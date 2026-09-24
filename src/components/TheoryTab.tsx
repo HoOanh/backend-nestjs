@@ -2,6 +2,7 @@ import React from 'react';
 import type { Lesson } from '../data/curriculum.ts';
 import { TutorChat } from './TutorChat.tsx';
 import { CodeViewer, renderEditorHtml, renderDiagramHtml, escapeHtml } from './CodeViewer.tsx';
+import { renderSmartMindMapHtml } from './MindMapVisualizer.tsx';
 
 interface TheoryTabProps {
   lesson: Lesson;
@@ -12,8 +13,8 @@ interface TheoryTabProps {
 
 function parseMarkdownTables(text: string): { processedText: string; tables: string[] } {
   const tables: string[] = [];
-  // Regex to match a standard markdown table with pipes and alignment rows
-  const tableRegex = /(?:^|\n)((?:\|[^\n]+\|\r?\n)\|[ \t]*(?::?[-]+:?[ \t]*\|)+[ \t]*\r?\n(?:\|[^\n]+\|\r?\n?)+)/g;
+  // Regex to match a standard markdown table with pipes and alignment rows (handles variable spaces)
+  const tableRegex = /(?:^|\n)([ \t]*\|[^\n]+\|[ \t]*\r?\n[ \t]*\|(?:\s*:?-+:?\s*\|)+\r?\n(?:[ \t]*\|[^\n]+\|[ \t]*\r?\n?)+)/g;
 
   const processedText = text.replace(tableRegex, (match, tableContent: string) => {
     const rawLines = tableContent.trim().split(/\r?\n/).filter((l) => l.trim().startsWith('|'));
@@ -91,7 +92,7 @@ function formatMarkdown(text: string): string {
 
     const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
     if (isDiagram) {
-      codeBlocks.push(renderDiagramHtml(code));
+      codeBlocks.push(renderSmartMindMapHtml(code));
     } else {
       const rawLang = lang || 'typescript';
       codeBlocks.push(renderEditorHtml(code, rawLang));

@@ -5855,21 +5855,32 @@ body {
    📐 TECHNICAL ARCHITECTURE BLUEPRINT & MATRIX TABLE STYLES (WHITEPAPER)
    ========================================================================== */
 .technical-blueprint-box {
-  background: #080c14;
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   margin: 22px 0;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+}
+
+[data-theme='light'] .technical-blueprint-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
 }
 
 .blueprint-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 18px;
-  background: rgba(15, 23, 42, 0.85);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+  padding: 11px 18px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+[data-theme='light'] .blueprint-header {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .blueprint-badge {
@@ -5885,7 +5896,7 @@ body {
 .blueprint-title {
   font-size: 12px;
   font-weight: 700;
-  color: #38bdf8;
+  color: var(--accent-primary);
   letter-spacing: 0.6px;
   text-transform: uppercase;
   font-family: var(--font-sans);
@@ -5897,27 +5908,35 @@ body {
   letter-spacing: 0.5px;
   padding: 3px 8px;
   border-radius: 4px;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  color: #7dd3fc;
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  color: var(--accent-primary);
   font-family: var(--font-mono);
 }
 
 .blueprint-body {
   padding: 20px 24px;
   overflow-x: auto;
-  background: #080c14;
+  background: var(--bg-surface-elevated);
+}
+
+[data-theme='light'] .blueprint-body {
+  background: #f8fafc;
 }
 
 .blueprint-diagram-text {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, Consolas, monospace;
   font-size: 13.5px;
   line-height: 1.48;
-  color: #e2e8f0;
+  color: var(--text-primary);
   white-space: pre;
   margin: 0;
   tab-size: 2;
   letter-spacing: 0px;
+}
+
+[data-theme='light'] .blueprint-diagram-text {
+  color: #0f172a;
 }
 
 /* 📊 Technical Comparison & Trade-off Matrix Table */
@@ -5927,7 +5946,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   overflow-x: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
 .technical-matrix-table {
@@ -5968,10 +5987,18 @@ body {
   font-weight: 700;
   color: var(--text-primary);
   border-right: 1px solid var(--border-subtle);
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--bg-surface-elevated);
+}
+
+[data-theme='light'] .technical-matrix-table td:first-child {
+  background: #f8fafc;
 }
 
 .technical-matrix-table tr:nth-child(even) td:not(:first-child) {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+[data-theme='dark'] .technical-matrix-table tr:nth-child(even) td:not(:first-child) {
   background: rgba(255, 255, 255, 0.015);
 }
 
@@ -5995,6 +6022,550 @@ body {
 .technical-matrix-table strong {
   color: var(--text-primary);
 }
+
+/* ==========================================================================
+   🧠 SMART MIND MAP & DECISION TREE VISUALIZER (WHITE-PAPER GRADE UI/UX)
+   ========================================================================== */
+.mindmap-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  margin: 28px 0;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme='light'] .mindmap-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mindmap-container:hover {
+  border-color: rgba(14, 165, 233, 0.35);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.08);
+}
+
+.mindmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 20px;
+  background: var(--bg-surface-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
+}
+
+[data-theme='light'] .mindmap-header {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mindmap-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mindmap-type-icon {
+  font-size: 16px;
+}
+
+.mindmap-main-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.mindmap-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.badge-tree {
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--accent-primary);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+}
+
+.badge-stack {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+.badge-comparison {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+.badge-blueprint {
+  background: rgba(56, 189, 248, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+}
+
+.mindmap-body {
+  padding: 24px;
+}
+
+/* 🎯 1. Engineering Decision Tree */
+.decision-root-banner {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(99, 102, 241, 0.08));
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+[data-theme='light'] .decision-root-banner {
+  background: linear-gradient(135deg, #f0f9ff, #f5f3ff);
+  border: 1px solid #bae6fd;
+}
+
+.root-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--accent-primary);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.root-question {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.decision-branches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.decision-branch-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme='light'] .decision-branch-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.decision-branch-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14, 165, 233, 0.4);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
+}
+
+.branch-condition-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.branch-arrow {
+  color: var(--accent-primary);
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.branch-label {
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.branch-outcome-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.branch-outcome-card.positive {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+[data-theme='light'] .branch-outcome-card.positive {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.branch-outcome-card.caution {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+[data-theme='light'] .branch-outcome-card.caution {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.branch-outcome-card.danger {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme='light'] .branch-outcome-card.danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.outcome-header {
+  display: flex;
+  align-items: center;
+}
+
+.outcome-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.branch-outcome-card.positive .outcome-type-pill {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.branch-outcome-card.caution .outcome-type-pill {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.branch-outcome-card.danger .outcome-type-pill {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.outcome-action-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.outcome-code-tag {
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--accent-primary);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-x: auto;
+}
+
+.sub-branches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: 12px;
+  border-left: 2px dashed var(--border-subtle);
+}
+
+.sub-branch-item {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* 🏢 2. Layered Architecture Taxonomy Stack */
+.architecture-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.architecture-layer-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: all 0.2s ease;
+}
+
+[data-theme='light'] .architecture-layer-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.architecture-layer-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+.layer-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.layer-badge-number {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+}
+
+.layer-title-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.layer-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.layer-item-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+[data-theme='light'] .layer-item-chip {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.chip-icon {
+  color: var(--accent-primary);
+  font-size: 14px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.chip-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.chip-subtitle {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.layer-connector-band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.connector-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.connector-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+[data-theme='light'] .connector-badge {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.connector-icon {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+/* ⚖️ 3. Visual Comparison & Architecture Trade-off Grid */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comparison-column {
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.col-legacy {
+  background: var(--bg-surface-elevated);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+[data-theme='light'] .col-legacy {
+  background: #f8fafc;
+  border: 1px solid #fecaca;
+}
+
+.col-modern {
+  background: var(--bg-surface-elevated);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+[data-theme='light'] .col-modern {
+  background: #f8fafc;
+  border: 1px solid #bbf7d0;
+}
+
+.comparison-col-header {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-legacy {
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+[data-theme='light'] .header-legacy {
+  background: #fef2f2;
+  border-bottom: 1px solid #fee2e2;
+}
+
+.header-modern {
+  background: rgba(16, 185, 129, 0.08);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+[data-theme='light'] .header-modern {
+  background: #f0fdf4;
+  border-bottom: 1px solid #dcfce7;
+}
+
+.col-status-icon {
+  font-size: 18px;
+}
+
+.col-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.header-legacy .col-title {
+  color: var(--accent-error);
+}
+
+.header-modern .col-title {
+  color: var(--accent-success);
+}
+
+.col-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.comparison-col-content {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comparison-point-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.point-icon {
+  font-size: 12px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.point-text {
+  flex: 1;
+}
+
+/* 📐 4. Blueprint Fallback View */
+.mindmap-blueprint-view .blueprint-body-styled {
+  background: var(--bg-surface-elevated);
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+
+[data-theme='light'] .mindmap-blueprint-view .blueprint-body-styled {
+  background: #f8fafc;
+}
+
 
 
 

@@ -11,12 +11,18 @@ export const chapter6: Sprint = {
       duration: '60 phút',
       tag: 'ACID & Isolation Levels',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CUỘC HỌP BỎ PHIẾU KÍN VS CUỘC ĐẤU THẦU ĐỒNG THỜI
+# 1. BỐI CẢNH KỸ THUẬT: ĐỒNG THỜI HÓA GIAO DỊCH, BẢO TOÀN TÍNH CÔ LẬP (ISOLATION) & CÁC HIỆN TƯỢNG ĐỌC DỊ THƯỜNG (ARCHITECTURAL CONTEXT & CONCURRENCY ANOMALIES)
 
-Khi hàng trăm người dùng cùng truy cập và chỉnh sửa cơ sở dữ liệu cùng một giây, ranh giới giữa tính đúng đắn và tốc độ trở thành bài toán sinh tử:
-* **Môi trường hoang dã không có cô lập (Chợ phiên ồn ào - Read Uncommitted):** Người bán hàng hét to: "Tôi đồng ý bán bức tranh này giá 1 tỷ!". Bạn vội vàng ghi vào sổ (Dirty Read). Nhưng ngay giây tiếp theo, người bán đổi ý nói "Tôi nói đùa đấy, tôi không bán nữa!" (Rollback). Bạn đã ghi lại một mẩu tin rác không có thật trong lịch sử thế giới!
-* **Cuộc họp bỏ phiếu kín (Repeatable Read):** Khi bạn bước vào phòng họp và mở tập tài liệu báo cáo ra xem (Snapshot), toàn bộ thế giới bên ngoài phòng họp bị đóng băng đối với bạn. Dù bên ngoài các cổ đông khác có liên tục ký thêm 100 hợp đồng mới (Committed Transactions), nội dung cuốn báo cáo trên tay bạn vẫn y nguyên như lúc bạn bước vào phòng họp.
-* **Cấp độ tối thượng (Thế giới tuần tự - Serializable):** Giống như một chiếc cầu hẹp chỉ cho phép đúng một người bước qua tại một thời điểm. Mọi hành vi đồng thời (Concurrent) đều có kết quả hoàn toàn tương đương với việc xếp hàng chạy tuần tự từng người một. Không có bất kỳ sai lệch nào, nhưng cái giá phải trả là tắc nghẽn giao thông nếu lưu lượng quá lớn!
+Trong một hệ thống Backend chịu tải cao, hàng nghìn giao dịch (Transactions) đọc và ghi dữ liệu đồng thời vào cùng một bảng hoặc cùng một hàng. Nếu cho phép các giao dịch can thiệp lẫn nhau mà không có sự kiểm soát, tính toàn vẹn của dữ liệu sẽ bị phá hủy hoàn toàn:
+* **Sự Đánh Đổi Giữa Tính Toàn Vẹn (Consistency) & Khả Năng Xử Lý Đồng Thời (Concurrency):**
+  - Mức độ cô lập càng cao, dữ liệu càng chính xác nhưng chi phí khóa (Lock Overhead) càng lớn, nguy cơ bế tắc (Deadlock) càng cao và thông lượng hệ thống (TPS) càng suy giảm.
+  - Ngược lại, mức độ cô lập càng thấp, hệ thống chạy càng nhanh nhưng nguy cơ phát sinh dữ liệu rác, thất thoát tiền bạc hoặc sai lệch báo cáo tài chính càng nghiêm trọng.
+* **Bản chất của 4 Hiện tượng Đọc Dị thường (Concurrency Read Anomalies):**
+  - **Dirty Read (Đọc rác):** Giao dịch A sửa đổi một dòng dữ liệu nhưng chưa COMMIT. Giao dịch B đọc dòng dữ liệu đó để tính toán. Ngay sau đó, Giao dịch A gặp lỗi và ROLLBACK. Dữ liệu mà Giao dịch B vừa xử lý thực chất chưa từng tồn tại hợp lệ trong cơ sở dữ liệu!
+  - **Non-Repeatable Read (Đọc không thể lặp lại):** Giao dịch A đọc dòng $X$ được giá trị $100$. Trong khi Giao dịch A vẫn đang chạy, Giao dịch B thực hiện UPDATE dòng $X$ thành $200$ và COMMIT. Giao dịch A đọc lại dòng $X$ lần thứ hai và nhận được giá trị $200$! Dữ liệu bị biến đổi ngay trong cùng một ngữ cảnh giao dịch.
+  - **Phantom Read (Bản ghi bóng ma):** Giao dịch A truy vấn một dải dữ liệu (\`SELECT COUNT(*) WHERE status = 'PENDING'\`) được $10$ dòng. Giao dịch B thực hiện INSERT thêm $1$ dòng mới thỏa mãn điều kiện đó và COMMIT. Giao dịch A chạy lại câu lệnh cũ và thấy kết quả là $11$ dòng! Dòng mới xuất hiện như một "bóng ma".
+  - **Write Skew (Lệch ghi do phụ thuộc chéo):** Hai giao dịch đồng thời đọc dữ liệu để kiểm tra một ràng buộc toàn vẹn chung (ví dụ: "Tổng số bác sĩ trực phải $\\ge 1$"). Giao dịch 1 đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ A sang nghỉ. Đồng thời, Giao dịch 2 cũng đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ B sang nghỉ. Cả hai giao dịch đều COMMIT thành công, dẫn đến kết quả: Không còn bác sĩ nào trực, vi phạm nghiêm trọng ràng buộc nghiệp vụ!
+* **Hiện thực trong PostgreSQL:** PostgreSQL loại bỏ hoàn toàn cấp độ \`Read Uncommitted\` (tự động nâng lên \`Read Committed\`), và hiện thực cấp độ \`Repeatable Read\` bằng cơ chế **Snapshot Isolation** (ngăn chặn triệt để cả Dirty Read, Non-repeatable Read và Phantom Read mà không cần khóa bảng).
 
 ---
 
@@ -294,12 +300,20 @@ export function runWithRetry<T>(action: () => T, maxRetries: number): T {
       duration: '60 phút',
       tag: 'MVCC & AutoVacuum Internals',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CUỐN SỔ BẢN THẢO VĂN BẢN VS NGƯỜI LAO CÔNG DỌN PHÒNG
+# 1. BỐI CẢNH KỸ THUẬT: KIẾN TRÚC MULTI-VERSION CONCURRENCY CONTROL (MVCC) & QUẢN TRỊ TABLE BLOAT (ARCHITECTURAL CONTEXT & STORAGE DEGRADATION)
 
-Một trong những phát minh vĩ đại nhất của công nghệ cơ sở dữ liệu hiện đại: **"Người đọc không bao giờ chặn người ghi, và người ghi không bao giờ chặn người đọc (Readers never block Writers, Writers never block Readers)"**:
-* **Tư duy cũ (Khóa bàn đọc sách):** Bạn đang ngồi đọc một cuốn sách. Có người khác muốn sửa chữa một từ trong cuốn sách đó. Họ giật cuốn sách khỏi tay bạn và đuổi bạn ra ngoài cho đến khi họ sửa xong! Hệ thống bị tắc nghẽn hoàn toàn.
-* **Cơ chế MVCC (Mỗi lần sửa là in một bản sao mới):** Khi bạn đang đọc cuốn sách phiên bản số 10 (\`xmin = 10\`), một người khác muốn cập nhật giá tiền. Họ **KHÔNG HỀ CHẠM VÀO bản sách bạn đang cầm!** Họ in một trang sách mới toanh có số hiệu phiên bản 11 (\`xmin = 11\`), đồng thời đóng một con dấu đỏ nhỏ lên trang cũ: "Bản này bị thay thế bởi phiên bản 11 (\`xmax = 11\`)". Bạn vẫn an nhiên đọc bản sách số 10 của mình mà không hề bị làm phiền!
-* **AutoVacuum (Người lao công dọn phòng lúc nửa đêm):** Sau khi bạn đọc xong và rời đi, bản sách cũ số 10 giờ đây không còn bất kỳ ai trên đời đọc tới nữa. Nó chính thức trở thành **Bản ghi chết (Dead Tuple)**. Người lao công (AutoVacuum) xuất hiện, quét dọn bản ghi chết đó đi để giải phóng chỗ trống cho các bản sách mới tiếp theo.
+Trong các hệ cơ sở dữ liệu quan hệ thế hệ cũ sử dụng cơ chế Khóa Hai Pha (Two-Phase Locking - 2PL), một câu truy vấn SELECT đọc dữ liệu sẽ áp đặt Shared Lock, chặn đứng mọi thao tác UPDATE/DELETE. Ngược lại, một lệnh UPDATE sẽ áp Exclusive Lock, đẩy mọi câu lệnh SELECT vào hàng đợi chờ đợi. Kết quả là hệ thống bị tắc nghẽn nghiêm trọng (Read/Write Contention):
+* **Nguyên lý Đột phá của MVCC: "Readers never block Writers, Writers never block Readers":**
+  - PostgreSQL loại bỏ hoàn toàn việc khóa đọc đối với các câu lệnh \`SELECT\` thông thường thông qua kiến trúc **Multi-Version Concurrency Control (MVCC)**.
+  - Thay vì ghi đè trực tiếp (in-place modification) lên khối dữ liệu cũ, mỗi khi có thao tác sửa đổi, PostgreSQL tạo ra một **phiên bản vật lý mới** của dòng dữ liệu (\`Heap Tuple\`) và lưu trữ đồng thời nhiều phiên bản khác nhau của cùng một bản ghi logic trên đĩa cứng.
+  - Các giao dịch đọc sẽ nhìn thấy một "Ảnh chụp dữ liệu nhất quán" (Consistent Snapshot) tương ứng với thời điểm giao dịch đó bắt đầu, hoàn toàn độc lập với việc các giao dịch khác đang liên tục chèn, sửa hay xóa các phiên bản mới hơn.
+* **Cái Giá Của MVCC: Vấn Nạn Table Bloat & Dead Tuples:**
+  - Vì mọi thao tác \`UPDATE\` thực chất là \`DELETE\` bản ghi cũ (đánh dấu vô hiệu hóa) kết hợp \`INSERT\` bản ghi mới, các phiên bản cũ sau khi không còn bất kỳ giao dịch nào tham chiếu tới sẽ trở thành **Bản Ghi Chết (Dead Tuples)**.
+  - Nếu một hệ thống có 1 triệu người dùng nhưng phát sinh 20 triệu lượt cập nhật mỗi ngày: Nếu không dọn dẹp, dung lượng tệp tin bảng có thể phình to từ 200MB lên **50 Gigabytes** toàn là xác bản ghi chết! Tốc độ quét bảng (Sequential Scan) sụt giảm hàng trăm lần vì đầu đọc phải quét qua hàng triệu khối đĩa chứa dữ liệu rác.
+* **Vai Trò Sống Còn của Tiến Trình AutoVacuum:**
+  - Chạy ngầm trong hệ thống để thu dọn Dead Tuples mà không khóa bảng (Zero-downtime maintenance).
+  - Cập nhật **Free Space Map (FSM)** để các lệnh INSERT/UPDATE tương lai có thể tái sử dụng các ô trống trong khối 8KB.
+  - Cập nhật **Visibility Map (VM)** giúp câu truy vấn đạt được **Index-Only Scan** (bỏ qua việc đọc Heap nếu toàn bộ trang đã được đánh dấu an toàn), đồng thời đóng băng (Freeze) Transaction ID cũ để chống thảm họa **Transaction ID Wraparound Disaster** (khi bộ đếm 32-bit $2^{31}$ bị tràn)!
 
 ---
 
@@ -576,11 +590,23 @@ export function isTupleVisible(
       duration: '60 phút',
       tag: 'Locking Strategies & Deadlocks',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: Ổ KHÓA CỬA PHÒNG THỬ ĐỒ VS PHIẾU HẸN SỐ THỨ TỰ
+# 1. BỐI CẢNH KỸ THUẬT: CHIẾN LƯỢC KIỂM SOÁT TRANH CHẤP DỮ LIỆU ĐỒNG THỜI & GIẢI QUYẾT BẾ TẮC DEADLOCK (ARCHITECTURAL CONTEXT & CONTENTION RESOLUTION)
 
-Bài toán kinh điển: Hai người dùng cùng nhìn thấy một chiếc vé máy bay duy nhất còn lại và cùng bấm nút "Đặt vé" tại cùng một mili giây:
-* **Khóa bi quan (Pessimistic Locking - Ổ khóa cài then cửa phòng thử đồ):** Bạn bước vào phòng thử đồ, bạn tin rằng thế giới bên ngoài đầy rẫy sự tranh giành ("Pessimistic - Bi quan"). Bạn lập tức gài then chốt cửa lại (\`SELECT ... FOR UPDATE\`). Bất kỳ ai khác muốn bước vào đều phải đứng ngoài cửa chờ đợi trong im lặng. Khi bạn thử đồ xong và bước ra (Commit Transaction), người tiếp theo mới được phép bước vào. An toàn tuyệt đối, nhưng nếu bạn ngủ quên trong phòng, cả hàng dài người phía sau bị tắc nghẽn!
-* **Khóa lạc quan (Optimistic Locking - Phiếu hẹn số thứ tự):** Bạn tin rằng thế giới rất hòa bình ("Optimistic - Lạc quan"). Bạn không khóa bất kỳ thứ gì cả. Bạn cầm chiếc áo và tờ phiếu ghi "Phiên bản số 5 (\`version = 5\`)". Bạn ra quầy thanh toán và nói: "Tôi mua chiếc áo phiên bản 5 và đổi phiếu thành phiên bản 6 (\`UPDATE ... WHERE version = 5\`)". Nếu người khác đã nhanh chân mua trước và đổi thành bản 6, hệ thống thông báo: "Chiếc áo này đã bị thay đổi, xin mời thử lại!". Không ai phải chờ đợi ai, tốc độ đọc tối đa, nhưng nếu tranh chấp quá gay gắt, nhiều người sẽ bị thất bại liên tục!
+Trong các kịch bản kinh doanh chịu tải đỉnh (Flash Sale, Đặt chỗ vé máy bay, Trừ số dư ví điện tử), bài toán tranh chấp ghi dữ liệu đồng thời (Write Contention) là thử thách sống còn của một Kỹ sư Backend. Khi nhiều tiến trình cùng cố gắng sửa đổi một tài nguyên hữu hạn, việc lựa chọn sai cơ chế khóa sẽ dẫn đến hoặc là mất mát tiền bạc (Double Spending), hoặc là tê liệt hệ thống vì Deadlock:
+* **Khóa Bi Quan (Pessimistic Locking - Explicit Row-level Locks):**
+  - Giả định rằng xung đột chắc chắn sẽ xảy ra (\`SELECT ... FOR UPDATE\`).
+  - Giao dịch đầu tiên đọc dòng dữ liệu sẽ chiếm giữ một **Exclusive Row Lock** trong bộ nhớ chia sẻ (\`Lock Space\`). Mọi giao dịch khác muốn đọc có khóa hoặc muốn UPDATE/DELETE dòng đó đều bị chặn (Blocked) và buộc phải xếp hàng chờ đợi cho đến khi giao dịch ban đầu gọi \`COMMIT\` hoặc \`ROLLBACK\`.
+  - **Khi nào bắt buộc dùng:** Khi dữ liệu có tính nhạy cảm tài chính tuyệt đối, tỉ lệ tranh chấp cực cao, và chi phí nếu thất bại là không thể đảo ngược (ví dụ: trừ tồn kho mặt hàng chỉ còn đúng 1 sản phẩm cuối cùng giữa hàng nghìn người mua).
+  - **Điểm yếu chí mạng:** Làm giảm thông lượng đồng thời (Throughput), kéo dài độ trễ giữ kết nối DB, và nếu logic giao dịch chứa các lệnh I/O mạng chậm bên ngoài (Third-party HTTP calls), nó sẽ giam lỏng Connection Pool làm sập toàn bộ dịch vụ!
+* **Khóa Lạc Quan (Optimistic Locking - Version-based Validation):**
+  - Giả định rằng xung đột hiếm khi xảy ra. Không hề sử dụng bất kỳ câu lệnh khóa vật lý nào của cơ sở dữ liệu!
+  - Thay vào đó, bảng dữ liệu được bổ sung một cột phiên bản (ví dụ: \`version INT DEFAULT 1\` hoặc \`updated_at TIMESTAMP\`).
+  - Khi cập nhật, ứng dụng chạy lệnh kiểm tra có điều kiện: \`UPDATE products SET stock = stock - 1, version = version + 1 WHERE id = 10 AND version = current_version;\`.
+  - Nếu số dòng bị ảnh hưởng (\`affectedRows\`) bằng $0$, ứng dụng nhận biết đã có giao dịch khác can thiệp trước, lập tức ném ngoại lệ \`OptimisticLockVersionMismatchError\` để phía Client hoặc Retry Logic tự xử lý.
+  - **Khi nào tối ưu nhất:** Hệ thống có tỉ lệ Đọc chiếm $95\\%$ (Read-heavy), mức độ tranh chấp thấp (chỉnh sửa bài viết blog, cập nhật hồ sơ người dùng), cho phép đạt thông lượng tối đa mà không gây nghẽn hàng đợi.
+* **Bản chất của Deadlock & Giải thuật Giải Phóng Chu Trình:**
+  - Deadlock xảy ra khi Giao dịch 1 đang giữ Khóa A và chờ Khóa B, trong khi Giao dịch 2 đang giữ Khóa B và chờ Khóa A (Chu trình phụ thuộc vòng tròn - Circular Wait).
+  - PostgreSQL sở hữu một tiến trình phát hiện bế tắc ngầm. Sau khi một tiến trình bị chặn quá ngưỡng **\`deadlock_timeout\`** (mặc định 1 giây), PostgreSQL sẽ quét Đồ thị Chờ Khóa (Wait-for-Graph), phát hiện chu trình, và **chủ động khai tử (Kill/Abort)** một trong hai giao dịch kèm mã lỗi \`40P01 (deadlock_detected)\` để giải phóng toàn bộ hệ thống!
 
 ---
 

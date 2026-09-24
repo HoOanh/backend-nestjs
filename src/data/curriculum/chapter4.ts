@@ -11,12 +11,12 @@ export const chapter4: Sprint = {
       duration: '60 phút',
       tag: 'NestJS Internals & DI',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: TỰ CHẾ ĐỒ CHƠI Ở NHÀ VS DÂY CHUYỀN LẮP RÁP NHÀ MÁY TỰ ĐỘNG
+# 1. BỐI CẢNH KỸ THUẬT: SỰ TIẾN HÓA TỪ TIGHT COUPLING SANG INVERSION OF CONTROL & METADATA-DRIVEN ARCHITECTURE (ARCHITECTURAL CONTEXT & CORE PROBLEM)
 
-Để hiểu sự chuyển dịch tư duy từ lập trình hướng đối tượng cơ bản sang Enterprise Architecture:
-* **Tư duy cũ (Tự chế đồ chơi tại nhà):** Một chiếc ô tô đồ chơi cần động cơ và 4 bánh xe. Khi lắp ráp, xe tự đi đúc bánh xe (\`this.wheels = new PlasticWheels()\`) và tự chế động cơ xăng (\`this.engine = new GasEngine()\`). Sự liên kết (Coupling) bị hàn chết cứng ngắc! Nếu ngày mai đại ca muốn thử nghiệm động cơ điện (\`ElectricEngine\`), đại ca buộc phải đập tan chiếc xe ra để hàn lại từ đầu. Không có cách nào kiểm thử (Unit Test) động cơ độc lập!
-* **Inversion of Control (Dây chuyền lắp ráp nhà máy tự động):** Chiếc xe không tự tạo bất kỳ linh kiện nào cả! Nó chỉ có sẵn các khe cắm chuẩn hóa: "Tôi cần một vật thể tuân thủ giao diện IEngine và một bộ IWheels". **IoC Container chính là người quản đốc nhà máy tự động:** Quản đốc nhìn vào bản thiết kế (\`@Injectable()\`), tự động đi tìm động cơ điện và 4 bánh xe cao su tốt nhất trong kho, sau đó cắm trực tiếp vào xe khi xe được đưa lên băng chuyền (\`Constructor Injection\`). Chiếc xe hoàn toàn thụ động ("Đảo ngược quyền điều khiển" - Inversion of Control)!
-* **Reflect Metadata (Mã vạch QR dán trên linh kiện):** Làm sao quản đốc biết class cần kiểu dữ liệu gì khi TypeScript biên dịch sang JavaScript thuần sẽ bị xóa sạch thông tin kiểu (Type Erasure)? Decorator của NestJS chính là máy in dán một chiếc mã QR (\`design:paramtypes\`) lên linh kiện. Khi khởi động, IoC Container quét mã QR để biết chính xác linh kiện cần nạp!
+Trong thiết kế hệ thống phần mềm doanh nghiệp (Enterprise Architecture), sự chuyển dịch từ lập trình hướng đối tượng thủ công sang Inversion of Control (IoC) giải quyết trực diện các bài toán sinh tử về khả năng mở rộng, bảo trì và kiểm thử tự động:
+* **Hiểm họa của Liên kết cứng (Tight Coupling):** Khi một Class nghiệp vụ tự khởi tạo các phụ thuộc cấp thấp của nó (\`this.paymentService = new StripePaymentService(new HttpClient())\`), Class này bị gắn chặt với hiện thực cụ thể đó. Hậu quả kỹ thuật: Không thể hoán đổi cổng thanh toán (chẳng hạn sang VNPay hay PayPal) mà không sửa mã nguồn lõi; không thể viết Unit Test cô lập (Unit Isolation Test) vì không thể đưa Mock Service vào kiểm thử; và bất kỳ sự thay đổi constructor nào ở tầng dưới cùng cũng gây hiệu ứng sụp đổ dây chuyền (Cascading Breaking Changes) lên toàn bộ các tầng phía trên.
+* **Nguyên lý Đảo ngược Quyền điều khiển (Inversion of Control - IoC):** Thay vì các module nghiệp vụ chủ động khởi tạo và quản lý vòng đời tài nguyên, quyền kiểm soát việc cấp phát, lắp ghép và giải phóng đối tượng được chuyển giao hoàn toàn cho một thực thể trung tâm: **IoC Container**. Module chỉ việc khai báo "Hợp đồng phụ thuộc" thông qua Interface/Type, IoC Container chịu trách nhiệm phân giải đồ thị phụ thuộc (Dependency Graph Resolution) và cung cấp chính xác instance đã sẵn sàng tại thời điểm thực thi.
+* **Cơ chế Metadata Reflection & Vấn nạn Type Erasure:** Do TypeScript áp dụng cơ chế xóa kiểu (Type Erasure) khi biên dịch sang JavaScript thuần chạy trên Node.js runtime, toàn bộ Interface và Type Annotations bị biến mất. NestJS giải quyết triệt để rào cản này bằng cách kết hợp Decorator (\`@Injectable()\`, \`@Inject()\`) với chuẩn **\`reflect-metadata\`**, lưu vết định danh kiểu dữ liệu vào runtime metadata (\`design:paramtypes\`), tạo nền tảng để IoC Container tự động phân giải phụ thuộc chính xác mà không đòi hỏi boilerplate code thủ công.
 
 ---
 
@@ -299,15 +299,17 @@ export class SimpleIoCContainer {
       duration: '60 phút',
       tag: 'Execution Pipeline & Filters',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: 5 TRẠM KIỂM SOÁT TẠI SÂN BAY QUỐC TẾ
+# 1. BỐI CẢNH KỸ THUẬT: THIẾT KẾ EXECUTION PIPELINE PHÂN LỚP & TRỪU TƯỢNG HÓA NGỮ CẢNH (ARCHITECTURAL CONTEXT & CONTEXT PROPAGATION)
 
-Khi một HTTP Request ập vào ứng dụng NestJS, nó giống như một hành khách quốc tế bước chân vào nhà ga sân bay:
-* **Trạm 1 - Middleware (Cổng an ninh soi chiếu hành lý tổng quát):** Nằm ở rìa ngoài cùng. Bất kỳ ai bước vào đều phải đi qua cổng này. Middleware có thể kiểm tra định dạng gói tin, ghi log thời gian đến, giải mã cookie. Middleware không biết hành khách sẽ bay chuyến bay nào (chưa biết Controller hay Route Handler nào sẽ xử lý).
-* **Trạm 2 - Guard (Cửa khẩu kiểm tra Hộ chiếu & Thị thực):** Hải quan đối chiếu danh tính. "Bạn có Visa hợp lệ để vào nước này không?" (Xác thực JWT Token & Phân quyền Role). Nếu không hợp lệ, lập tức chặn đứng và trục xuất về nước ngay tại chỗ (\`401 Unauthorized\` hoặc \`403 Forbidden\`) mà không tốn công cho hành khách bước tiếp vào sâu bên trong!
-* **Trạm 3 - Interceptor (Tiếp viên hàng không kiêm đo đếm):** Tiếp viên bấm đồng hồ đo thời gian chuyến bay (Giai đoạn Pre-controller), sau đó theo dõi cho đến khi hành khách rời máy bay để phát quà hoặc biến đổi kết quả trả về (Giai đoạn Post-controller / RxJS Map).
-* **Trạm 4 - Pipe (Máy đo hành lý & Khử trùng):** Cân hành lý xem có vượt quá số cân quy định không (Validation) và đổi tiền tệ sang đồng tiền bản địa (\`ParseIntPipe\`, ép kiểu DTO).
-* **Controller Handler (Ghế ngồi máy bay):** Hành khách ngồi vào ghế và thưởng thức hành trình (Thực thi Business Logic).
-* **Trạm 5 - Exception Filter (Đội ngũ y tế cấp cứu sân bay):** Nếu hành khách bị đột quỵ hoặc gặp sự cố ở bất kỳ chặng nào, đội ngũ y tế lập tức xuất hiện, sơ cứu và chuẩn hóa định dạng thông báo bệnh án (\`JSON Error Response\`) trước khi chuyển ra ngoài.
+Trong các framework Node.js truyền thống (như Express thuần), việc xử lý các mối bận tâm liên quan xuyên suốt (Cross-Cutting Concerns) như Logging, Authentication, Authorization, Request Validation và Exception Handling thường bị dồn chung vào một chuỗi Middleware lỏng lẻo (\`req, res, next\`). Cách tiếp cận này bộc lộ những khiếm khuyết chết người trong kiến trúc quy mô lớn:
+* **Hạn chế của Chuỗi Middleware truyền thống:** Middleware chỉ nhận được 2 đối tượng thô (\`Request\` và \`Response\`). Nó hoàn toàn không biết Request đó sắp được chuyển giao tới Controller nào hay Handler cụ thể nào. Do đó, Middleware không thể đọc các Metadata khai báo (như quyền hạn \`@Roles('ADMIN')\` hay giới hạn Rate-limit \`@Throttle()\`). Hơn nữa, Middleware không thể can thiệp hai chiều (Two-way interception): Nó không thể bao bọc việc thực thi Handler để đo đạc thời gian, chuyển đổi định dạng DTO trả về, hoặc bắt lỗi bất đồng bộ mà không phá vỡ dòng chảy chuẩn.
+* **Kiến trúc Phân tầng Pipeline của NestJS:** NestJS tái cấu trúc chu trình xử lý một Request thành một **Execution Pipeline** có tính xác định cao với 5 tầng chịu trách nhiệm độc lập:
+  - **Middleware:** Tầng giao tiếp thô với Web Server Adapter (Express/Fastify) xử lý các tác vụ tiền định tuyến (CORS, Security Headers, Tracing Headers).
+  - **Guards:** Tầng phòng thủ bảo mật danh tính và quyền hạn, sở hữu quyền truy cập vào Metadata của đích đến để ra quyết định sớm (Fail-Fast Authorization).
+  - **Interceptors:** Tầng bao bọc hàm (Aspect-Oriented Programming - AOP) dựa trên RxJS Observable, cho phép can thiệp trước khi gọi Handler và biến đổi kết quả trả về sau khi Handler hoàn thành.
+  - **Pipes:** Tầng làm sạch và kiểm định tính toàn vẹn của Payload (Transformation & Data Validation) trước khi dữ liệu chạm vào tầng Service.
+  - **Exception Filters:** Tầng hứng bắt và chuẩn hóa ngoại lệ toàn cục, bảo vệ hệ thống khỏi việc rò rỉ Stack Trace nhạy cảm ra môi trường Production.
+* **Trừu tượng hóa Đa giao thức qua ExecutionContext:** Khác với Express bị trói chặt vào HTTP protocol, NestJS cung cấp lớp trừu tượng \`ExecutionContext\`. Cho dù ứng dụng đang vận hành dưới dạng REST API (HTTP), gRPC Microservices (RPC), WebSockets hay Kafka/RabbitMQ Consumer, các Guard và Interceptor đều tái sử dụng được $100\\%$ logic phân quyền và giám sát mà không cần viết lại.
 
 ---
 
@@ -574,12 +576,15 @@ export function runPipeline(request: { token?: string; age?: number }): {
       duration: '60 phút',
       tag: 'DAG Graph & Scopes Danger',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CON GÀ QUẢ TRỨNG VS BÁC SĨ KHÁM RIÊNG TỪNG BỆNH NHÂN
+# 1. BỐI CẢNH KỸ THUẬT: ĐỒ THỊ PHỤ THUỘC TUYẾN TÍNH DAG, GIẢI QUYẾT BẾ TẮC VÒNG LẶP & ĐÁNH ĐỔI HIỆU NĂNG INJECTION SCOPES (ARCHITECTURAL CONTEXT & PERFORMANCE PITFALLS)
 
-Hai vấn đề hóc búa nhất trong kiến trúc NestJS nâng cao:
-* **Circular Dependency (Vòng lặp Con Gà & Quả Trứng):** Service A cần Service B trong constructor (\`new ServiceA(b)\`). Nhưng Service B cũng đòi Service A trong constructor (\`new ServiceB(a)\`). IoC Container đứng hình: Muốn tạo A thì phải có B, muốn tạo B thì phải có A! Nếu không can thiệp, hệ thống sập ngay lúc khởi động với lỗi \`Nest can't resolve dependencies of...\`.
-* **forwardRef() (Chiếc hộp giấy rỗng dán nhãn tương lai):** Giải pháp: Thay vì đòi đưa cả quả trứng ngay lập tức, nhà máy đưa cho con gà một chiếc hộp giấy rỗng có ghi địa chỉ: "Lát nữa quả trứng làm xong sẽ được bỏ vào đây, bây giờ hãy khởi tạo đi!". Khi cả hai hoàn thành, IoC liên kết con trỏ tham chiếu vào nhau.
-* **Scope.REQUEST (Bác sĩ riêng cho từng người dân thành phố):** Mặc định (\`Scope.DEFAULT\`), bệnh viện có 1 bác sĩ duy nhất phục vụ toàn dân (Singleton: 1 instance trong RAM, dùng chung cho mọi request). Nếu đại ca đổi sang \`Scope.REQUEST\`: **Cứ mỗi bệnh nhân bước vào cửa, bệnh viện lại sinh sản vô tính một bác sĩ mới, cấp một phòng khám mới, rồi vứt bỏ vào thùng rác ngay sau khi khám xong!** Khi có 10,000 request ập đến, RAM nổ tung và Garbage Collector tê liệt vì phải dọn dẹp hàng trăm nghìn instance rác!
+Trong quá trình khởi tạo ứng dụng (Bootstrapping phase), NestJS xây dựng một Đồ thị Phụ thuộc Có hướng Không chu trình (Directed Acyclic Graph - DAG) để xác định thứ tự nạp các Provider. Hai thách thức cấu trúc phức tạp nhất mà các Kỹ sư Hệ thống thường phải đối mặt bao gồm:
+* **Vấn nạn Phụ thuộc Vòng lặp (Circular Dependency Deadlock):** Xảy ra khi Service A yêu cầu Service B trong Constructor, đồng thời Service B lại yêu cầu ngược lại Service A. Thuật toán Sắp xếp Tô pô (Topological Sort) của IoC Container rơi vào bế tắc vô hạn (Cyclic Dependency Graph) do không thể tìm được đỉnh có bậc vào bằng 0. Hệ thống lập tức ném lỗi \`Nest can't resolve dependencies of...\` và từ chối khởi động. Cơ chế \`forwardRef()\` giải quyết tạm thời bằng kỹ thuật Trì hoãn Tham chiếu (Lazy Reference Pointer), nhưng về mặt kiến trúc dài hạn, đây là dấu hiệu cảnh báo Code Smell (vi phạm Single Responsibility) đòi hỏi phải tái cấu trúc tách Domain Event hoặc Mediator Service.
+* **Hiểm họa Hiệu năng của Scope.REQUEST & Hiệu ứng Lan truyền (Scope Bubbling):**
+  - Mặc định (\`Scope.DEFAULT\`), mọi Provider trong NestJS là **Singleton** (chỉ có 1 instance duy nhất nằm cố định trong Old Generation của V8 Heap). Chi phí cấp phát bộ nhớ bằng 0 sau khi ứng dụng khởi động thành công.
+  - Khi một kỹ sư tùy tiện chuyển một Service sang \`Scope.REQUEST\` (ví dụ để lấy \`req.headers\` trực tiếp trong service), họ vô tình kích hoạt **Scope Bubbling**: Mọi Service, Interceptor, Controller phụ thuộc vào Service đó theo chuỗi DI đều bị ép biến thành Request Scope!
+  - **Hậu quả trên Production:** Với lưu lượng 2,000 req/s, hệ thống buộc phải liên tục cấp phát và tiêu hủy hàng chục nghìn đối tượng trên Young Generation (Eden Space) mỗi giây. V8 Garbage Collector rơi vào tình trạng **GC Thrashing**, kích hoạt liên tục các đợt tạm dừng Stop-the-World, khiến CPU tăng vọt lên $100\\%$, độ trễ API P99 nhảy vọt từ 10ms lên 800ms, và Pod có nguy cơ bị Kubernetes OOMKilled.
+  - **Giải pháp Kiến trúc Đẳng cấp:** Giữ nguyên $100\\%$ Singleton Scope và sử dụng **\`AsyncLocalStorage\`** (Node.js Core API) để chia sẻ Ngữ cảnh Yêu cầu (Request Context / Correlation ID) xuyên suốt các tác vụ bất đồng bộ mà không tốn một byte cấp phát DI instance nào!
 
 ---
 

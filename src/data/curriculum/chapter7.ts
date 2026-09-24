@@ -11,12 +11,19 @@ export const chapter7: Sprint = {
       duration: '60 phút',
       tag: 'Redis Engine Internals',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: ĐẦU BẾP ĐẠI TÀI VS TỦ GIA VỊ XẾP NGĂN CHÍNH XÁC
+# 1. BỐI CẢNH KỸ THUẬT: MÔ HÌNH XỬ LÝ ĐƠN LUỒNG NGUYÊN TỬ, I/O MULTIPLEXING & CẤU TRÚC BỘ NHỚ CỦA REDIS (ARCHITECTURAL CONTEXT & IN-MEMORY ENGINE)
 
-Tại sao một máy chủ đơn luồng như Redis lại có thể đạt tốc độ hơn 100,000 phép tính mỗi giây (100k+ OPS)?
-* **Đầu bếp đại tài duy nhất (Single-threaded Execution):** Hãy tưởng tượng một nhà hàng buffet cao cấp có một đầu bếp sushi có đôi tay nhanh như chớp. Thay vì thuê 10 đầu bếp vụng về tranh giành cùng một con dao, chen chúc nhau trong gian bếp chật hẹp (Context Switching & Lock Contention), nhà hàng chỉ để đúng một đầu bếp đứng bếp. Mọi thao tác cắt cá, nắm cơm diễn ra liên tục không có một giây chờ đợi nào ($0\\%$ Locking overhead)!
-* **Hệ thống Order điện tử (I/O Multiplexing):** Người phục vụ không đứng đợi khách gọi món. Khi khách hàng nhấn chuông tại bàn (epoll event), đơn gọi món được in ra tức thì cạnh thớt của đầu bếp. Đầu bếp chỉ việc bốc đơn và làm trong vài microsecond!
-* **Tủ gia vị tối ưu cấp C (Cấu trúc dữ liệu nội tại):** Redis không dùng chuỗi văn bản thông thường của C (\`char*\`). Nó phát minh ra **SDS (Simple Dynamic String)**: Tự lưu độ dài chuỗi vào phần header để tra cứu độ dài trong $O(1)$ thay vì phải đếm ký tự $O(N)$! Khi danh sách ít phần tử, nó gói gọn vào **ZipList** để tiết kiệm từng byte RAM; khi dữ liệu phình to, nó tự động biến hóa thành **SkipList** để tìm kiếm siêu tốc độ $O(\\log N)$!
+Tại sao một tiến trình đơn luồng (Single-Threaded Process) như Redis lại có thể đạt thông lượng vượt trội hơn 100,000 phép toán mỗi giây (100k+ OPS) với độ trễ dưới 1 mili giây (Sub-millisecond Latency), vượt xa các hệ thống đa luồng phức tạp?
+* **Bản chất của Mô hình Đơn Luồng Thực Thi (Single-Threaded Execution Model):**
+  - Trong các hệ thống đa luồng (Multi-threaded), việc nhiều luồng cùng truy cập một cấu trúc dữ liệu chia sẻ đòi hỏi các cơ chế đồng bộ hóa (Mutex, Read-Write Locks, Spinlocks, Semaphores). Khi số lượng kết nối tăng cao, hiện tượng **Lock Contention** (tranh chấp khóa) và chi phí chuyển đổi ngữ cảnh (**Thread Context Switching Overhead**) sẽ tiêu tốn phần lớn năng lực xử lý của CPU.
+  - Redis loại bỏ hoàn toàn các loại khóa bằng cách chạy toàn bộ logic dữ liệu trên **1 luồng chính duy nhất**. Hậu quả tích cực: $0\\%$ chi phí Locking, $0\\%$ nguy cơ Race Condition nội tại, và mọi lệnh thao tác đơn lẻ (\`INCR\`, \`HSET\`, \`LPUSH\`, \`ZADD\`) đều có tính **Nguyên tử tuyệt đối (Atomic by default)**!
+* **Cơ chế Phân Kênh I/O Bất Đồng Bộ (Non-blocking I/O Multiplexing via epoll/kqueue):**
+  - Redis không để một luồng bị chặn khi chờ đợi dữ liệu từ socket mạng.
+  - Sử dụng các lệnh gọi hệ thống (System Calls) hiện đại của Linux Kernel như **\`epoll\`** (hoặc \`kqueue\` trên BSD/macOS), một luồng Redis có thể theo dõi đồng thời hàng chục nghìn kết nối mạng (File Descriptors).
+  - Khi một gói tin TCP truyền đến, Kernel thông báo cho Redis qua một sự kiện sẵn sàng (Read Event). Bộ điều phối sự kiện (**Event Dispatcher**) đưa sự kiện vào hàng đợi và luồng chính thực thi lệnh trong vài microsecond!
+* **Tối Ưu Hóa Cấu Trúc Dữ Liệu Ở Tầng C:**
+  - Redis không sử dụng chuỗi ký tự chuẩn của C (\`char*\` kết thúc bằng byte \`\\0\` vốn đòi hỏi $O(N)$ để đo độ dài). Nó tự phát minh ra **SDS (Simple Dynamic String)**: Lưu sẵn độ dài chuỗi (\`len\`) và dung lượng cấp phát dư (\`alloc\`) trong phần Header, giúp đo độ dài trong $O(1)$ và ngăn chặn triệt để lỗi tràn bộ đệm (Buffer Overflow).
+  - Tự động chuyển đổi biểu diễn nội tại (Internal Encoding Transformation): Khi tập hợp có ít phần tử, Redis dùng **ZipList** (mảng nén liên tục trong RAM để giảm thiểu phân mảnh bộ nhớ và tận dụng CPU Cache L1/L2); khi số lượng phần tử vượt ngưỡng, nó tự động nâng cấp thành **SkipList** (cấu trúc dữ liệu phân tầng xác suất) để duy trì tốc độ tìm kiếm và sắp xếp $O(\\log N)$!
 
 ---
 
@@ -291,12 +298,17 @@ export function simulateSdsOperations(
       duration: '60 phút',
       tag: 'Distributed Caching Strategies',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CHIẾC TỦ LẠNH GIA ĐÌNH VS CƠN ĐỘT QUỴ CỦA SIÊU THỊ
+# 1. BỐI CẢNH KỸ THUẬT: CÁC MẪU HÌNH BỘ NHỚ ĐỆM PHÂN TÁN & CƠ CHẾ PHÒNG VỆ THẢM HỌA CACHE FAILURE (ARCHITECTURAL CONTEXT & CACHE RESILIENCE)
 
-Tại sao việc dùng Cache không cẩn thận lại có thể giết chết Database nhanh hơn cả khi không dùng Cache?
-* **Chiến lược Cache-Aside (Chiếc tủ lạnh gia đình):** Bạn muốn uống nước ngọt (Dữ liệu). Bạn mở tủ lạnh ra xem trước (Check Cache). Nếu có sẵn (Cache Hit), bạn lấy uống ngay trong 2 giây. Nếu tủ lạnh rỗng (Cache Miss), bạn phải đi bộ ra siêu thị cách nhà 1km mua nước về (Query Database), sau đó cất một chai mới vào tủ lạnh để lần sau uống tiếp (Populate Cache).
-* **Thảm họa Cache Stampede (Cơn lốc siêu thị lúc nửa đêm):** Trận chung kết bóng đá thế giới diễn ra, 100,000 người cùng đang xem truyền hình trực tiếp. Chiếc tủ lạnh (Cache) chứa thông tin tỉ số trận đấu vừa hết hạn đúng giây thứ 90. Trong cùng một tích tắc, **toàn bộ 100,000 người cùng phát hiện tủ lạnh rỗng và cùng lúc tràn ra siêu thị (100k queries ập thẳng vào Database)!** Database bị nghẽn thở, sập nguồn và chết đứng tức thì!
-* **Thảm họa Cache Penetration (Kẻ trộm tìm đồ không có thực):** Hacker cố tình gửi hàng triệu request tìm kiếm các sản phẩm có ID âm hoặc ID quái dị (\`id = -99999\`). Trong Cache chắc chắn không có. Toàn bộ các request này xuyên thủng qua lớp Cache và nện thẳng vào Database, khiến máy chủ cơ sở dữ liệu bị quá tải (Denial of Service)!
+Trong kiến trúc Backend hiện đại, tầng In-Memory Cache (Redis) đóng vai trò lá chắn bảo vệ hệ cơ sở dữ liệu quan hệ (RDBMS) phía sau. Một thiết kế Cache cẩu thả không những không tăng tốc hệ thống mà còn có thể làm sập toàn bộ hạ tầng cơ sở dữ liệu khi xảy ra các thảm họa đồng thời:
+* **Các Mẫu Hình Triển Khai Cache Phổ Biến:**
+  - **Cache-Aside (Lazy Loading):** Ứng dụng đọc Cache trước. Nếu Cache Miss, ứng dụng truy vấn Database, sau đó nạp kết quả vào Cache và trả về cho Client. Đây là mô hình mặc định cho $90\\%$ hệ thống vì tính linh hoạt và khả năng phục hồi khi Cache bị sự cố (Fallback về DB).
+  - **Write-Through:** Dữ liệu mới được ghi đồng thời vào Cache và Database trước khi trả về kết quả thành công. Đảm bảo tính nhất quán tuyệt đối giữa Cache và DB nhưng làm tăng độ trễ ghi (Write Latency).
+  - **Write-Behind (Write-Back):** Ghi trực tiếp vào Cache và trả về thành công tức thì; một tiến trình nền gom nhóm các thay đổi và ghi bất đồng bộ xuống DB sau. Đạt thông lượng ghi tối đa nhưng tiềm ẩn nguy cơ mất dữ liệu nếu Redis sập nguồn trước khi xả đĩa.
+* **3 Thảm Họa Độc Hại Khi Vận Hành Cache Trên Production:**
+  - **1. Cache Stampede (Thundering Herd Problem):** Xảy ra khi một Hot Key có lưu lượng truy cập khổng lồ (ví dụ 50,000 req/s) bị hết hạn (TTL Expired) hoặc bị xóa. Trong cùng một tích tắc mili giây, 50,000 requests đồng loạt nhận kết quả Cache Miss và cùng lúc nện thẳng vào Database để tái tạo dữ liệu! Hồ bơi kết nối (Connection Pool) cạn kiệt, CPU của Database vọt lên $100\\%$ và sập nguồn tức khắc. Giải pháp: Áp dụng thuật toán **XFetch (Probabilistic Early Expiration)** hoặc sử dụng Mutex Lock / Singleflight để chỉ cho phép duy nhất 1 request đi vào DB, các request còn lại xếp hàng đợi.
+  - **2. Cache Penetration (Xuyên Thủng Cache):** Kẻ tấn công cố tình quét các khóa không hề tồn tại trong cơ sở dữ liệu (ví dụ: \`id = -1\`, \`id = 9999999999\`). Vì dữ liệu không có trong DB nên cũng không bao giờ có trong Cache, khiến mọi request đều đâm xuyên qua lớp Cache và nện thẳng vào đĩa cứng Database! Giải pháp: Sử dụng **Bloom Filter** (cấu trúc dữ liệu xác suất trong RAM để kiểm tra phần tử có chắc chắn KHÔNG tồn tại hay không) hoặc chủ động Cache giá trị \`NULL\` kèm TTL ngắn (1-2 phút).
+  - **3. Cache Avalanche (Lở Tuyết Cache):** Khi hàng triệu khóa Cache được nạp vào lúc khởi động hoặc được cấu hình cùng một thời gian hết hạn TTL (ví dụ: đúng 3600 giây). Đến đúng giây thứ 3600, toàn bộ hàng triệu khóa đồng loạt bốc hơi, dồn toàn bộ tải đọc của toàn bộ nền tảng xuống Database! Giải pháp: Bắt buộc cộng thêm một độ lệch ngẫu nhiên (**Jitter**): \`TTL = baseTTL + random(0, 300)\` để làm phẳng phân phối hết hạn của các khóa.
 
 ---
 
@@ -571,12 +583,23 @@ export function generateJitteredTtl(
       duration: '60 phút',
       tag: 'Distributed Locks & Lua',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CHIẾC VƯƠNG MIỆNG HOÀNG GIA DUY NHẤT VS MÁY CHÉM THỜI GIAN
+# 1. BỐI CẢNH KỸ THUẬT: ĐỒNG THUẬN TÀI NGUYÊN PHÂN TÁN, NGUYÊN TẮC MUTUAL EXCLUSION VỚI REDIS & NGUY CƠ SPLIT-BRAIN (ARCHITECTURAL CONTEXT & DISTRIBUTED MUTEX)
 
-Khi một hệ sinh thái Backend có 50 máy chủ Pods cùng chạy song song trong Kubernetes, các cơ chế khóa trong bộ nhớ của Node.js (\`Mutex\`, biến cờ) hoàn toàn vô dụng:
-* **Chiếc vương miện hoàng gia duy nhất (Distributed Lock):** Cả vương quốc chỉ có duy nhất một chiếc vương miện. Ai đội chiếc vương miện lên đầu (\`SET lock_key uuid NX PX 10000\`) thì người đó là vua, có toàn quyền ra lệnh (Thực thi Cron Job, Trừ kho hàng, Phân bổ mã giảm giá). Bất kỳ ai khác muốn lên ngôi đều phải đợi nhà vua thoái vị.
-* **Máy chém thời gian (TTL Lock Expiration):** Điều gì xảy ra nếu vị vua vừa đội vương miện xong thì bị đột quỵ (Server sập nguồn hoặc V8 Garbage Collector Pause)? Nếu không có cơ chế tự động thoái vị, cả vương quốc sẽ không bao giờ có vua mới (Hệ thống bị khóa chết mãi mãi)! Do đó, vương miện có gắn một quả bom hẹn giờ: Sau đúng 10 giây (TTL), chiếc vương miện tự động rụng khỏi đầu để người khác nhặt lấy.
-* **Tai họa thoái vị nhầm (Releasing Someone Else's Lock):** Vị vua A làm việc quá chậm (bị mạng lag 15 giây). Quả bom nổ, chiếc vương miện rơi xuống, Vị vua B bước lên nhặt lấy đội vào đầu. Đúng lúc này, Vị vua A tỉnh lại, tưởng mình vẫn là vua, liền rút kiếm chém đứt vương miện của Vị vua B (\`DEL lock_key\`)! Kết quả: Hai vị vua cùng lúc điều hành vương quốc, gây ra thảm họa dữ liệu phân tán!
+Khi một hệ thống Backend được mở rộng theo chiều ngang (Horizontally Scaled) với hàng chục Pods chạy đồng thời trong Kubernetes, các cơ chế đồng bộ hóa bộ nhớ nội tại của Node.js (biến cờ, thư viện \`async-mutex\`) hoàn toàn mất tác dụng vì mỗi tiến trình sở hữu một vùng nhớ Heap cô lập:
+* **Nhu cầu về Khóa Phân Tán (Distributed Locks):**
+  - Cần bảo đảm tính **Loại Trừ Lẫn Nhau (Mutual Exclusion)** trên quy mô toàn cụm máy chủ: Tại một thời điểm, chỉ duy nhất một Worker được phép thực thi một tác vụ đặc quyền (ví dụ: chạy Cron Job kết toán số dư cuối ngày, xử lý trừ kho sản phẩm duy nhất còn lại, hoặc gọi đối tác thanh toán).
+  - Vì Redis là một dịch vụ tập trung (Centralized In-Memory Datastore) có tính đơn luồng và độ trễ cực thấp, nó trở thành giải pháp tiêu chuẩn công nghiệp để hiện thực Distributed Lock.
+* **Bài toán Sinh tử về Thời hạn Khóa (Lock TTL Expiration) & Cơ chế Tự Giải Phóng:**
+  - Nếu một tiến trình chiếm được khóa nhưng sau đó bị sập nguồn đột ngột (Kernel Panic, OOM Killer) hoặc rơi vào trạng thái đóng băng kéo dài (V8 Garbage Collection Stop-The-World Pause): Nếu khóa không có thời gian tự hủy (TTL), toàn bộ hệ thống sẽ bị **Deadlock vĩnh viễn** vì không ai có thể chiếm được khóa nữa!
+  - Do đó, khóa phân tán bắt buộc phải được gắn một giá trị thời gian sống hợp lý (ví dụ: \`PX 10000\` = 10 giây).
+* **Hiểm họa Giải Phóng Khóa Nhầm Lẫn (Releasing Someone Else's Lock Disaster):**
+  - Giả sử Worker A chiếm khóa với TTL 10 giây.
+  - Do nghẽn mạng I/O hoặc GC Pause, tác vụ của Worker A kéo dài mất 15 giây.
+  - Sau 10 giây, khóa của Worker A tự động hết hạn trên Redis.
+  - Worker B nhảy vào chiếm khóa thành công và bắt đầu thực thi tác vụ.
+  - Đúng lúc này, Worker A hoàn thành công việc và ngây thơ gọi lệnh \`DEL lock_key\`!
+  - **Hậu quả thảm khốc:** Worker A đã vô tình **xóa mất khóa hợp lệ của Worker B**! Một Worker C thứ ba lập tức nhảy vào chiếm khóa, dẫn đến việc cả Worker B và Worker C cùng lúc thực thi tác vụ nhạy cảm, phá hủy hoàn toàn tính Mutual Exclusion!
+  - **Giải pháp Bắt Buộc:** Mỗi Client khi chiếm khóa phải sinh ra một chuỗi ngẫu nhiên duy nhất (**UUID v4**) làm giá trị khóa (\`lockValue\`). Khi giải phóng, Client bắt buộc phải thực thi một đoạn **Lua Script nguyên tử**: Chỉ kiểm tra nếu giá trị trên Redis khớp chính xác với UUID của mình thì mới thực hiện lệnh \`DEL\`, bảo đảm an toàn phân tán tuyệt đối!
 
 ---
 

@@ -120,6 +120,27 @@ export function renderEditorHtml(code: string, lang: string = 'typescript', file
   `;
 }
 
+export function renderDiagramHtml(diagramText: string, title: string = 'BẢN VẼ KIẾN TRÚC HỆ THỐNG (ARCHITECTURE BLUEPRINT)'): string {
+  const cleanDiagram = escapeHtml(diagramText.replace(/^\n+|\n+$/g, ''));
+  return `
+    <div class="technical-blueprint-box">
+      <div class="blueprint-header">
+        <div class="blueprint-badge">
+          <span class="blueprint-icon">📐</span>
+          <span class="blueprint-title">${escapeHtml(title)}</span>
+        </div>
+        <div class="blueprint-actions">
+          <span class="blueprint-format-tag">BOX-DRAWING ARCHITECTURE</span>
+        </div>
+      </div>
+      <div class="blueprint-body">
+        <pre class="blueprint-diagram-text">${cleanDiagram}</pre>
+      </div>
+    </div>
+  `;
+}
+
+
 export const CodeViewer: React.FC<CodeViewerProps> = ({
   code,
   language = 'typescript',

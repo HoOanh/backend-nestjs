@@ -11,12 +11,24 @@ export const chapter3: Sprint = {
       duration: '60 phút',
       tag: 'Networking & Transport Layer',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CUỘC GỌI ĐIỆN THOẠI XÁC NHẬN VS ĐOÀN TÀU CHỞ HÀNG MỘT ĐƯỜNG RAY
+# 1. BỐI CẢNH KỸ THUẬT: ĐỘ TRỄ GIAO VẬN MẠNG & NGHẼN TẮC HEAD-OF-LINE BLOCKING
 
-Khi lập trình viên frontend chỉ nhìn thấy \`fetch('/api/users')\`, ở tầng mạng bên dưới là cả một chuỗi tương tác vật lý phức tạp:
-* **TCP 3-Way Handshake (Cuộc gọi xác nhận 3 bước):** Trước khi nói chuyện, hai người phải chào hỏi: A nói "Alo, bạn nghe rõ không?" (SYN) -> B trả lời "Nghe rõ, bạn nghe tôi không?" (SYN-ACK) -> A xác nhận "Nghe rõ, chúng ta bắt đầu nói chuyện nhé!" (ACK). Quá trình này tiêu tốn tối thiểu 1.5 vòng lặp mạng (RTT - Round Trip Time) trước khi byte dữ liệu HTTP đầu tiên được gửi đi!
-* **TCP Head-of-Line (HoL) Blocking (Đoàn tàu hỏa trên đường ray đơn):** Hãy tưởng tượng một đoàn tàu chở 10 toa hàng (10 packets TCP) trên một đường ray độc đạo. Toa số 3 bị trật bánh do nhiễu sóng mạng (Packet Loss). Mặc dù các toa số 4, 5, 6, 7, 8, 9, 10 đã về ga an toàn, **nhân viên nhà ga (TCP Kernel Stack) bắt buộc phải giữ lại toàn bộ các toa phía sau trong kho, tuyệt đối không bàn giao cho khách hàng (Application Layer)** cho đến khi toa số 3 được vận chuyển lại thành công!
-* **HTTP/3 & QUIC (Đội xe tải độc lập):** Thay vì dùng đoàn tàu phụ thuộc trên ray đơn, QUIC chuyển sang dùng giao thức UDP và quản lý hàng chục luồng xe tải độc lập (Streams). Xe số 3 hỏng chỉ ảnh hưởng đến xe số 3, tất cả các xe số 4, 5, 6... vẫn phi thẳng vào kho nhận hàng ngay lập tức!
+Khi lập trình viên frontend thực hiện một lời gọi API đơn giản như \`fetch('/api/v1/orders')\`, ở tầng mạng vật lý là cả một chuỗi thủ tục bắt tay và kiểm soát luồng phức tạp:
+
+* **Chi phí Bắt tay 3 Bước TCP (3-Way Handshake Overhead):**
+  - Trước khi bất kỳ byte dữ liệu HTTP nào được phép truyền đi, máy khách (Client) và máy chủ (Server) bắt buộc phải trải qua tiến trình đồng bộ hóa trạng thái tuần tự: SYN (Sequence Number từ Client) $\rightarrow$ SYN-ACK (Server xác nhận và gửi Seq của Server) $\rightarrow$ ACK (Client xác nhận hoàn tất kết nối).
+  - Kết hợp với bước bắt tay bảo mật TLS 1.3 (Trao đổi khóa Diffie-Hellman và chứng chỉ SSL), tiến trình này tiêu tốn từ 2 đến 3 vòng lặp mạng (Round Trip Time — RTT).
+  - **Tác động vật lý:** Nếu Client ở TP. Hồ Chí Minh gọi Server đặt tại Singapore (RTT ~35ms), chỉ riêng việc mở kết nối TCP đã tốn gần 100ms trước khi request được xử lý.
+
+* **Nghịch lý Multiplexing trong HTTP/2 & Tắc nghẽn Head-of-Line (HoL) Blocking:**
+  - HTTP/2 ra đời với đột phá kỹ thuật **Ghép luồng nhị phân (Binary Multiplexing)**: Cho phép hàng trăm request/response chạy song song trên cùng một kết nối TCP duy nhất, xóa bỏ giới hạn 6 kết nối TCP của HTTP/1.1.
+  - Tuy nhiên, điểm yếu chết người của HTTP/2 nằm ở chính tầng truyền vận TCP bên dưới: TCP coi toàn bộ dữ liệu trên kết nối là một dòng byte liên tục có thứ tự nghiêm ngặt (In-order Byte Stream).
+  - **Kịch bản mất gói (Packet Loss):** Khi có một gói tin TCP bị rớt trên đường truyền (do sóng Wifi chập chờn hoặc nghẽn router), toàn bộ nhân hệ điều hành (Kernel TCP Stack) buộc phải dừng lại, giữ toàn bộ các gói tin tiếp theo trong bộ nhớ đệm (Receive Buffer) để chờ gói tin mất được truyền lại (TCP Retransmission).
+  - **Hệ quả kiến trúc:** Mặc dù 99 stream khác hoàn toàn không bị lỗi, chúng đều bị đóng băng chung trong kết nối TCP đó!
+
+* **Đột phá Giao Thức HTTP/3 trên nền tảng QUIC (UDP):**
+  - Để giải quyết dứt điểm rào cản 30 năm của TCP, giao thức HTTP/3 loại bỏ hoàn toàn TCP và chuyển sang chạy trên **QUIC (nền tảng UDP)**.
+  - QUIC quản lý các luồng độc lập ở cấp độ giao thức ứng dụng: Mỗi stream HTTP/3 sở hữu bộ điều khiển luồng (Flow Control) và kiểm soát mất gói riêng biệt. Việc rớt packet ở Stream A hoàn toàn không ảnh hưởng tới Stream B, đưa độ trễ bắt tay mạng về mức tối ưu $0\text{-RTT}$ (Zero Round Trip Time) khi tái kết nối.
 
 ---
 
@@ -313,11 +325,24 @@ export function simulateConnectionPool(
       duration: '60 phút',
       tag: 'HTTP Protocols & Idempotency',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CHIẾC NÚT BẤM THANG MÁY VS MÁY QUẸT THẺ TÍN DỤNG
+# 1. BỐI CẢNH KỸ THUẬT: NGUYÊN LÝ BẤT BIẾN (IDEMPOTENCY) TRONG HỆ THỐNG PHÂN TÁN
 
-Để hiểu bản chất của tính lũy kế (Idempotency) trong thiết kế API:
-* **Chiếc nút bấm gọi thang máy (Idempotent Action):** Đại ca bấm nút gọi thang máy tầng 5 một lần, đèn sáng lên. Nếu đại ca mất kiên nhẫn và bấm liên tục 10 lần nữa, **kết quả cuối cùng của hệ thống vẫn hoàn toàn không thay đổi**: Thang máy vẫn chỉ dừng ở tầng 5 đúng một lần. Hành động bấm nhiều lần có hiệu ứng phụ (Side-effect) y hệt bấm một lần.
-* **Máy quẹt thẻ tín dụng không có Idempotency (Non-Idempotent Disaster):** Đại ca thanh toán hóa đơn 10 triệu đồng. Mạng bị chập chờn (Network Timeout), màn hình điện thoại xoay vòng. Đại ca bấm nút "Thanh toán" thêm 3 lần nữa. Nếu hệ thống không có khóa Idempotency Key, **tài khoản ngân hàng của đại ca sẽ bị trừ tiền 4 lần (40 triệu đồng)!** Khách hàng phẫn nộ và doanh nghiệp đối mặt với thảm họa tài chính!
+Trong một kiến trúc mạng phân tán không hoàn hảo (Unreliable Distributed Network), việc một HTTP request bị thất bại hoặc mất gói giữa chừng là điều hiển nhiên xảy ra:
+
+* **Sự cố Mập Mờ Trạng Thái (The Two-Generals Network Paradox):**
+  - Khi Client gửi một request trừ tiền hoặc tạo đơn hàng và gặp lỗi \`Socket Hang Up\` hoặc \`504 Gateway Timeout\`, Client hoàn toàn không thể biết được:
+    1. Request chưa hề tới được Server (Server chưa làm gì).
+    2. Hay Server đã xử lý thành công, trừ tiền trong DB xong xuôi, nhưng gói tin HTTP Response trên đường bay về Client bị rớt mạng!
+
+* **Thảm họa Trừ Tiền Kép khi Retry (Double Billing Disaster):**
+  - Nếu Client (hoặc Retry Interceptor của Axios) tự động gửi lại request đó lần 2 mà API không được thiết kế có tính Idempotent: Server sẽ thực hiện trừ tiền một lần nữa trong tài khoản người dùng!
+  - Trong các hệ thống Fintech, Thương mại điện tử hoặc Đặt phòng, việc không đảm bảo tính Idempotency sẽ gây thất thoát tài chính và vi phạm nghiêm trọng tính toàn vẹn dữ liệu.
+
+* **Giải pháp Chuẩn Mực: Khóa Bất Biến (Idempotency Key Architecture):**
+  - Client sinh ra một mã định danh ngẫu nhiên duy nhất cấp UUIDv4 và đính kèm vào HTTP Header: \`Idempotency-Key: 7b2f4c91-...\`.
+  - Backend sử dụng cơ chế Distributed Lock (Redis) hoặc Unique Constraint (Database) để bắt giữ key này:
+    + **Lần đầu:** Thực thi logic nghiệp vụ, lưu kết quả response vào Cache với TTL tương ứng.
+    + **Các lần Retry tiếp theo (cùng key):** Hệ thống phát hiện key đã được xử lý thành công, lập tức trả về nguyên vẹn response đã lưu trong Cache mà **hoàn toàn không thực thi lại logic trừ tiền hay ghi DB lần thứ hai**.
 
 ---
 
@@ -644,13 +669,25 @@ export class IdempotencyValidator {
       duration: '60 phút',
       tag: 'Web Security & Headers',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: BẢO VỆ CỔNG TÒA NHÀ VS HỘ CHIẾU MIỄN THỊ THỰC
+# 1. BỐI CẢNH KỸ THUẬT: CƠ CHẾ BẢO VỆ CLIENT-SIDE (SOP/CORS) & PHÒNG THỦ CHIỀU SÂU VỚI COOKIE FLAGS
 
-Để xóa bỏ hoàn toàn hiểu lầm kinh điển: "CORS là bức tường lửa bảo vệ máy chủ Backend":
-* **Hiểu lầm tai hại:** "Tôi cấu hình CORS ở server để hacker không thể tấn công gửi request phá hoại database của tôi".
-* **Sự thật kỹ thuật (Cổng tòa nhà kiểm tra khách vào):** CORS là **CƠ CHẾ CỦA TRÌNH DUYỆT (BROWSER ENFORCEMENT)** để bảo vệ NGƯỜI DÙNG, chứ KHÔNG PHẢI bảo vệ server! Khi hacker dùng Postman, Curl hay script Python từ terminal, chúng có thể gửi bất kỳ request nào vào Backend mà không bị CORS chặn dù chỉ một phần triệu giây!
-* **Preflight Request (Thủ tục xin visa trước khi bay):** Khi máy bay từ nước lạ (Origin khác) muốn hạ cánh mang theo hàng hóa đặc biệt (Method PUT, DELETE hoặc Header tùy chỉnh), hãng hàng không phải gửi điện tín hỏi trước: "Tôi có được phép hạ cánh không?" (\`OPTIONS\` Request). Nếu hải quan từ chối, hành khách không bao giờ được phép lên máy bay.
-* **HttpOnly Cookie (Két sắt chống trộm):** Nếu đại ca cất tiền (JWT Token) vào túi áo (LocalStorage), bất kỳ tên trộm nào (mã độc XSS) thò tay vào cũng móc được (\`document.cookie\`). Cất chìa khóa vào két sắt ngầm có khóa điện tử (\`HttpOnly\`), mã JavaScript trong trình duyệt hoàn toàn mù mắt, không thể chạm tới!
+Trong an ninh ứng dụng web, sự hiểu lầm về vai trò của CORS (Cross-Origin Resource Sharing) là một trong những lỗ hổng nhận thức phổ biến nhất của các lập trình viên:
+
+* **Sự Thật Về CORS: Cơ chế bảo vệ User của Trình duyệt, KHÔNG PHẢI Firewall của Server:**
+  - CORS được sinh ra để nới lỏng chính sách **Same-Origin Policy (SOP)** do Trình duyệt (Browser) thực thi nhằm ngăn chặn một website độc hại (\`evil-site.com\`) đọc trộm dữ liệu nhạy cảm từ phiên làm việc của người dùng tại (\`bank.com\`).
+  - **CORS hoàn toàn không bảo vệ Server khỏi Hacker:** Hacker sử dụng công cụ dòng lệnh (cURL, Postman, Python, Go) không phải là trình duyệt web và không bị ràng buộc bởi SOP. Chúng có thể gửi bất kỳ HTTP request nào trực tiếp đến Backend mà CORS không thể ngăn chặn.
+  - CORS chỉ có tác dụng hướng dẫn trình duyệt web của người dùng hợp lệ có được phép đọc dữ liệu response trả về từ một Origin khác hay không.
+
+* **Cơ chế Thăm dò Trước (Preflight OPTIONS Protocol):**
+  - Đối với các request có khả năng gây biến đổi dữ liệu (Phương thức PUT, DELETE, PATCH hoặc có chứa Header tùy chỉnh như \`Authorization\`, \`X-Tenant-Id\`), trình duyệt bắt buộc phải gửi một request thăm dò \`OPTIONS\` (Preflight) trước khi gửi request nghiệp vụ chính.
+  - Nếu Server phản hồi header \`Access-Control-Allow-Origin\` và \`Access-Control-Allow-Methods\` không hợp lệ, trình duyệt sẽ lập tức chặn đứng request tại máy khách và không bao giờ truyền payload thực tế đi.
+
+* **Phòng Thủ Chiều Sâu với Bộ 3 Cờ Cookie (HttpOnly, Secure, SameSite):**
+  - **Lưu trữ JWT trong LocalStorage là một Anti-pattern nguy hiểm:** Bất kỳ đoạn mã JavaScript độc hại nào bị chèn qua lỗ hổng XSS (Cross-Site Scripting) đều có thể dễ dàng đọc trộm token qua lệnh \`localStorage.getItem()\` và gửi về máy chủ của hacker.
+  - **Giải pháp chuẩn Enterprise:** Lưu trữ Session/JWT trong Cookie với bộ 3 cờ bảo vệ:
+    + \`HttpOnly\`: Ngăn chặn hoàn toàn JavaScript của trình duyệt đọc cookie qua \`document.cookie\`, vô hiệu hóa 100% nguy cơ đánh cắp token từ XSS.
+    + \`Secure\`: Bắt buộc cookie chỉ được truyền tải qua kênh mã hóa HTTPS, chống nghe lén dữ liệu trên đường truyền (Man-in-the-Middle).
+    + \`SameSite=Strict/Lax\`: Ngăn trình duyệt tự động đính kèm cookie khi người dùng bấm vào các liên kết từ website khác, triệt tiêu nguy cơ tấn công Giả mạo yêu cầu (Cross-Site Request Forgery — CSRF).
 
 ---
 

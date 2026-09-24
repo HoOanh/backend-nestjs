@@ -11,12 +11,16 @@ export const chapter9: Sprint = {
       duration: '60 phút',
       tag: 'Applied Cryptography & JWT',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: ỐNG MÁY XAY THỊT MỘT CHIỀU VS CON DẤU HOÀNG GIA
+# 1. BỐI CẢNH KỸ THUẬT: MẬT MÃ HỌC ỨNG DỤNG, BẢO TOÀN DANH TÍNH VÀ CƠ CHẾ CHỮ KÝ BẤT ĐỐI XỨNG PHÂN TÁN (ARCHITECTURAL CONTEXT & IDENTITY CRYPTOGRAPHY)
 
-Mật mã học trong Backend không phải là giấu dữ liệu cho người khác không thấy, mà là bài toán bảo đảm tính bất khả nghịch và tính toàn vẹn:
-* **Hàm băm mật khẩu (Máy xay thịt một chiều - One-Way Hashing):** Bạn bỏ một miếng thịt bò (Mật khẩu "Pass123!") vào cối xay. Chiếc cối xay ra đĩa thịt xay nhuyễn ($hash$). Bất kỳ ai nhìn vào đĩa thịt xay cũng không bao giờ có thể "xay ngược" lại thành miếng thịt bò nguyên vẹn! Nếu hacker dùng card đồ họa GPU cực mạnh để thử hàng tỷ mật khẩu mỗi giây: **Argon2id chính là chiếc cối xay đổ thêm cát và xi măng (Memory-hard)**, ép card đồ họa phải tốn hàng trăm megabyte RAM cho mỗi lần xay, làm tốc độ giải mã của hacker chậm đi hàng triệu lần!
-* **JWT Khóa Đối xứng HS256 (Mật mã dùng chung giữa hai điệp viên):** Server Auth và Server Resource cùng giữ chung một mật khẩu bí mật (Shared Secret). Nếu Server Resource bị hacker xâm nhập đọc trộm file \`.env\`, hacker có thể tự đóng giả Server Auth để in tiền và ký token giả mạo cho mọi tài khoản!
-* **JWT Khóa Bất đối xứng RS256/ES256 (Con dấu sáp hoàng gia):** Hoàng đế (Auth Server) giữ chiếc nhẫn khắc dấu duy nhất trong két sắt (Private Key) để đóng dấu lên chiếu chỉ (Access Token). Hàng trăm vị tướng ngoài biên ải (Microservices) chỉ cầm bản in hình con dấu (Public Key) để soi xem chiếu chỉ có đúng do hoàng đế ký hay không. Dù tướng giặc có cướp được Public Key, chúng cũng không tài nào tự khắc được con dấu giả!
+Trong an toàn thông tin Backend cấp doanh nghiệp, mật mã học không phải là việc che giấu dữ liệu mà là bảo đảm toán học về **Tính Toàn Vẹn (Integrity)**, **Tính Bất Khả Chối Bỏ (Non-repudiation)** và **Tính Bất Khả Nghịch (One-way Irreversibility)**:
+* **Bản Chất Của Hàm Băm Mật Khẩu (One-Way Cryptographic Hashing):**
+  - Mật khẩu người dùng không bao giờ được phép lưu trữ dưới dạng thô hoặc mã hóa có thể đảo ngược (Two-way Encryption). Nó phải được băm một chiều qua các hàm toán học sao cho từ giá trị Hash không thể đảo ngược (infeasible) về mật khẩu gốc.
+  - Các hàm băm thô (MD5, SHA-256) chỉ tốn chu kỳ xung nhịp CPU, hoàn toàn bị vô hiệu hóa trước các giàn máy đào GPU và mạch tích hợp chuyên dụng ASIC với năng lực thử hàng chục tỷ phép băm mỗi giây. Thuật toán Bcrypt phổ biến trong quá khứ cũng bộc lộ điểm yếu: Giới hạn độ dài mật khẩu chỉ 72 bytes và tiêu tốn rất ít bộ nhớ RAM, khiến nó vẫn có thể bị bẻ khóa bằng card đồ họa phân tán.
+  - **Argon2id - Tiêu Chuẩn Vàng Hiện Đại:** Vô địch cuộc thi Password Hashing Competition (PHC). Argon2id kết hợp khả năng chống tấn công kênh bên (Side-channel Timing Attacks) của Argon2i và chống tấn công dò tìm phân tán GPU của Argon2d. Thuộc tính cốt tử của Argon2id là **Memory-Hardness**: Ép mỗi phép băm phải cấp phát và điền đầy hàng trăm megabyte RAM, khiến các bộ xử lý song song trên GPU bị cạn kiệt băng thông bộ nhớ và giảm tốc độ tấn công hàng triệu lần!
+* **Kiến Trúc Ký Khóa Token: Đối Xứng (HS256) vs Bất Đối Xứng (RS256 / ES256):**
+  - **Lỗ Hổng Của Khóa Đối Xứng HS256:** Cả bên ký (Auth Server) và bên thẩm định (Resource Services) đều dùng chung một chuỗi bí mật (Shared Secret). Trong hệ thống Microservices gồm hàng chục dịch vụ độc lập, nếu chỉ một dịch vụ cấp thấp bị lộ chuỗi bí mật trong tệp tin \`.env\`, kẻ tấn công có thể tự đóng giả làm Auth Server để ký giả mạo Token cho bất kỳ tài khoản quản trị nào!
+  - **Cơ Chế Khóa Bất Đối Xứng Chuẩn Mực RS256/ES256:** Auth Server nắm giữ **Khóa Bí Mật (Private Key)** được bảo vệ nghiêm ngặt trong Hardware Security Module (HSM) hoặc Vault để ký Access Token. Tất cả các dịch vụ nội bộ và bên ngoài chỉ nắm giữ **Khóa Công Khai (Public Key)** (được công bố qua endpoint JWKS: \`/.well-known/jwks.json\`) để giải mã và thẩm định chữ ký. Kẻ tấn công dù chiếm đoạt được Public Key cũng tuyệt đối không thể tự sinh ra một Token giả mạo hợp lệ!
 
 ---
 
@@ -293,12 +297,23 @@ export function validateJwtAlgorithm(
       duration: '60 phút',
       tag: 'Authorization & RBAC/ABAC',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: THẺ ĐEO PHÒNG BAN VS LUẬT PHÁP HIẾN PHÁP LINH HOẠT
+# 1. BỐI CẢNH KỸ THUẬT: SỰ TIẾN HÓA CỦA MÔ HÌNH PHÂN QUYỀN RBAC SANG ABAC & BÀI TOÁN THU HỒI TOKEN VÔ TRẠNG THÁI (ARCHITECTURAL CONTEXT & AUTHORIZATION GOVERNANCE)
 
-Khi hệ thống doanh nghiệp lớn dần, câu hỏi "Ai được quyền làm gì?" không còn đơn giản là kiểm tra xem bạn là Admin hay User:
-* **Phân quyền theo vai trò (Role-Based Access Control - RBAC - Chiếc thẻ đeo phòng ban):** Bạn đeo chiếc thẻ ghi chữ "KẾ TOÁN" (\`Role.ACCOUNTANT\`). Bạn được vào phòng kế toán, được xem sổ cái. Nhưng nếu công ty có 100 chi nhánh: Kế toán chi nhánh Cần Thơ có được sửa sổ cái của chi nhánh Hà Nội không? Kế toán viên có được tự duyệt hóa đơn do chính mình tạo ra không? **RBAC hoàn toàn bất lực!** Nếu cố dùng RBAC, bạn sẽ bị bùng nổ số lượng vai trò: \`ACCOUNTANT_HN\`, \`ACCOUNTANT_CT\`, \`ACCOUNTANT_LEAD\`... ma trận vai trò biến thành mớ bòng bong không thể quản lý!
-* **Phân quyền theo thuộc tính (Attribute-Based Access Control - ABAC / CASL - Điều luật hiến pháp):** Thay vì nhìn vào chức danh, người gác cổng đối chiếu 4 thuộc tính: **Chủ thể (Subject - Ai?)**, **Hành động (Action - Làm gì?)**, **Tài nguyên (Resource - Lên cái gì?)**, và **Ngữ cảnh (Context - Ở đâu, khi nào?)**. Ví dụ: *"Người dùng X được quyền SỬA bài viết Y NẾU X là TÁC GIẢ của Y VÀ bài viết Y ĐANG Ở TRẠNG THÁI DRAFT VÀ thời gian hiện tại nằm trong giờ hành chính"*. Cực kỳ uyển chuyển và chuẩn mực!
-* **Cơ chế thu hồi Token (Token Revocation Blocklist):** JWT là vô trạng thái (Stateless). Bạn vừa cấp Access Token sống 2 giờ cho nhân viên. 5 phút sau, nhân viên đó bị đuổi việc vì làm rò rỉ dữ liệu. Token vẫn còn hạn 1 tiếng 55 phút! Nếu không có sổ đen thu hồi (Revocation Blocklist trên Redis), cựu nhân viên vẫn có thể gọi API phá hoại công ty suốt 2 giờ đó!
+Khi quy mô nghiệp vụ của một tổ chức mở rộng, bài toán phân quyền truy cập (Authorization) vượt ra khỏi phạm vi kiểm tra vai trò đơn giản và trở thành thách thức lớn về mô hình hóa chính sách bảo mật:
+* **Sự Bùng Nổ Vai Trò (Role Explosion) Của Mô Hình RBAC Truyền Thống:**
+  - Mô hình Phân quyền Dựa trên Vai trò (Role-Based Access Control - RBAC) gán quyền hạn tĩnh vào các chức danh: \`ADMIN\`, \`MANAGER\`, \`USER\`.
+  - Khi xuất hiện các yêu cầu phân quyền theo phân vùng dữ liệu và quan hệ sở hữu (ví dụ: Kế toán chi nhánh Đà Nẵng chỉ được xem hóa đơn của Đà Nẵng; người dùng chỉ được sửa bài viết do chính mình tạo ra; hoặc quản lý chỉ được duyệt đơn hàng có giá trị dưới 100 triệu), RBAC hoàn toàn bất lực.
+  - Nếu cố chấp sử dụng RBAC, hệ thống sẽ rơi vào thảm họa **Role Explosion**: Sinh ra hàng trăm vai trò rời rạc như \`ACCOUNTANT_DN\`, \`ACCOUNTANT_HN\`, \`POST_OWNER\`, \`ORDER_APPROVER_TIER_1\`... khiến ma trận phân quyền trở nên hỗn loạn, không thể bảo trì và cực kỳ dễ phát sinh lỗ hổng bảo mật rò rỉ dữ liệu chéo (Cross-tenant Data Leak).
+* **Mô Hình Phân Quyền Theo Thuộc Tính (Attribute-Based Access Control - ABAC):**
+  - Đánh giá quyền truy cập động tại thời điểm chạy (Runtime Policy Evaluation) dựa trên 4 chiều thuộc tính:
+    1. **Thuộc tính Chủ thể (Subject Attributes):** ID người dùng, phòng ban, chi nhánh, cấp bậc bảo mật.
+    2. **Thuộc tính Hành động (Action Attributes):** Đọc (Read), Tạo mới (Create), Chỉnh sửa (Update), Xóa (Delete).
+    3. **Thuộc tính Tài nguyên (Resource Attributes):** \`authorId\`, trạng thái bài viết (\`isPublished\`, \`isLocked\`), giá trị hóa đơn.
+    4. **Thuộc tính Ngữ cảnh Môi trường (Environment Context):** Địa chỉ IP nội bộ, thời gian trong giờ hành chính, thiết bị truy cập có xác thực mTLS hay không.
+  - Sử dụng các thư viện Policy Engine như **CASL**, hệ thống định nghĩa các luật kiểm soát quyền truy cập linh hoạt, chặt chẽ và có thể kiểm thử tự động một cách độc lập.
+* **Nghịch Lý Token Vô Trạng Thái & Cơ Chế Thu Hồi (Stateless Token Revocation):**
+  - JSON Web Token (JWT) được thiết kế vô trạng thái (Stateless) để không phải truy vấn Database mỗi lần xác thực. Nhưng đây cũng là điểm yếu chết người: Khi một nhân viên bị chấm dứt hợp đồng hoặc lộ Token, chiếc Access Token đã cấp vẫn có hiệu lực cho đến khi hết hạn (ví dụ sau 1-2 giờ)!
+  - **Giải Pháp Enterprise Chuẩn Mực:** Kết hợp Access Token có thời gian sống siêu ngắn (10-15 phút) với **Token Revocation Blocklist** trên Redis (lưu danh sách các \`jti\` - JWT ID bị vô hiệu hóa hoặc mốc thời gian \`passwordChangedAt\`). Khi người dùng đăng xuất hoặc bị khóa tài khoản, Redis chỉ lưu vết trong đúng khoảng thời gian còn lại của Token, vừa bảo đảm tính tức thì vừa không làm nặng bộ nhớ đệm!
 
 ---
 
@@ -573,12 +588,21 @@ export function evaluateAbacPolicy(
       duration: '60 phút',
       tag: 'Web System Vulnerabilities',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: LÁ PHIẾU BỎ VÀO HÒM VS MÓN QUÀ CÓ CHÈN CHẤT CẤM
+# 1. BỐI CẢNH KỸ THUẬT: PHÒNG THỦ CHIỀU SÂU (DEFENSE IN DEPTH) TRƯỚC CÁC LỖ HỔNG HỆ THỐNG OWASP TOP 10 (ARCHITECTURAL CONTEXT & SECURITY HARDENING)
 
-Bảo mật Web không chỉ là viết code chạy được, mà là tư duy phản diện trước mọi dữ liệu đầu vào:
-* **SQL Injection (Đổi nghĩa câu lệnh trong hòm thư):** Thay vì điền tên "Minh Oanh", kẻ xấu điền tên: \`' OR '1'='1'; DROP TABLE users; --\`. Nếu bạn ghép chuỗi thô (\`string concatenation\`), bộ máy SQL bị lừa: Từ một người dùng hiền lành biến thành một chỉ thị phá hoại xóa sạch cơ sở dữ liệu!
-* **Mass Assignment (Món quà có giấu thêm chất cấm):** Bạn tạo một form cho phép người dùng sửa thông tin cá nhân (name, phone, address). Bạn ngây thơ lấy toàn bộ \`req.body\` ném thẳng vào Database (\`update(req.body)\`). Kẻ tấn công tinh vi chèn thêm một trường ẩn: \`{ "isAdmin": true, "balance": 999999999 }\`. Nếu không có DTO lọc trắng (Whitelist DTO), kẻ tấn công tự nâng mình thành Hoàng đế chỉ bằng một nút bấm!
-* **CSRF Attack (Bức thư giả mạo chữ ký):** Bạn đang đăng nhập vào trang ngân hàng. Bạn vô tình bấm vào một đường link xem ảnh mèo dễ thương trên một trang web lạ. Trang web lạ đó ngầm gửi một request \`POST /api/transfer\` sang ngân hàng. Vì bạn đang đăng nhập, trình duyệt tự động đính kèm Cookie ngân hàng của bạn vào request! Tiền của bạn bốc hơi trong tích tắc mà bạn không hề hay biết!
+Trong tư duy của một Kỹ sư Backend chuyên nghiệp, mọi dữ liệu nhận từ Client (HTTP Body, Query Params, Headers, Cookies) đều phải được mặc định coi là không đáng tin cậy (Untrusted Input). Lỗ hổng bảo mật không bắt nguồn từ thư viện mà bắt nguồn từ sự thiếu hiểu biết về ranh giới thực thi dữ liệu:
+* **Bản Chất Của SQL Injection (Tách Biệt Ngăn Cách Giữa Dữ Liệu Và Mã Thực Thi):**
+  - Xảy ra khi lập trình viên thực hiện ghép chuỗi thô (String Concatenation hoặc Template Strings) để xây dựng câu truy vấn SQL: \`"SELECT * FROM users WHERE email = '" + input + "'"\`.
+  - Kẻ tấn công cung cấp chuỗi chứa các ký tự đặc biệt (\`' OR '1'='1' --\`), làm thay đổi cây cú pháp trừu tượng (Abstract Syntax Tree - AST) của bộ phân tích câu lệnh SQL, biến dữ liệu người dùng thành mã điều khiển thực thi.
+  - **Phòng thủ Chuẩn mực:** Sử dụng **Parameterized Queries (Prepared Statements)**. Cơ sở dữ liệu biên dịch cấu trúc câu lệnh trước, sau đó nhận tham số dữ liệu riêng biệt qua giao thức nhị phân. Dữ liệu dù chứa ký tự gì cũng chỉ được đối xử như một giá trị chuỗi thuần túy, triệt tiêu $100\\%$ nguy cơ injection.
+* **Hiểm Họa Mass Assignment & Ô Nhiễm Thuộc Tính (Object Injection / Property Overwriting):**
+  - Xảy ra khi lập trình viên chuyển giao toàn bộ đối tượng \`req.body\` vào các phương thức cập nhật của ORM/Database: \`userRepository.update(id, req.body)\`.
+  - Kẻ tấn công có thể chèn thêm các thuộc tính nhạy cảm không nằm trên giao diện UI: \`{ "role": "SUPER_ADMIN", "isVerified": true, "balance": 10000000 }\`.
+  - Nếu tầng API không có bộ lọc danh sách trắng (Whitelist DTO), các giá trị độc hại này sẽ được ghi thẳng vào các cột nhạy cảm trong cơ sở dữ liệu. Trong NestJS, việc kích hoạt \`ValidationPipe\` với \`whitelist: true\` và \`forbidNonWhitelisted: true\` là yêu cầu bắt buộc tối thiểu để tự động tước bỏ hoặc ném lỗi ngay khi xuất hiện thuộc tính lạ.
+* **Tấn Công Giả Mạo Yêu Cầu Chéo Trang (Cross-Site Request Forgery - CSRF):**
+  - Khai thác cơ chế tự động đính kèm Cookie của trình duyệt khi thực hiện các yêu cầu chéo nguồn (Cross-Origin Requests).
+  - Khi người dùng đã xác thực tại ngân hàng (\`bank.com\`), một trang web độc hại (\`evil.com\`) có thể ngầm kích hoạt request \`POST https://bank.com/transfer\` (thông qua thẻ \`<form>\` ẩn hoặc JavaScript). Trình duyệt tự động gửi kèm Session/Cookie xác thực, khiến ngân hàng tưởng đó là hành động hợp lệ của người dùng.
+  - **Phòng vệ Đa lớp:** Sử dụng thuộc tính Cookie **\`SameSite=Lax\`** hoặc **\`SameSite=Strict\`**, kết hợp cơ chế **Anti-CSRF Token** (Double Submit Cookie Pattern hoặc Synchronizer Token Pattern) cho mọi phương thức thay đổi trạng thái (\`POST\`, \`PUT\`, \`PATCH\`, \`DELETE\`).
 
 ---
 

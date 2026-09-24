@@ -11,12 +11,21 @@ export const chapter5: Sprint = {
       duration: '60 phút',
       tag: 'Database Storage Internals',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CUỐN SỔ TAY KẾ TOÁN GHI NỢ VS TỦ HỒ SƠ 8KB
+# 1. BỐI CẢNH KỸ THUẬT: CẤU TRÚC LƯU TRỮ VẬT LÝ TRÊN ĐĨA CỦA POSTGRESQL & BẢO ĐẢM TÍNH BỀN VỮNG DURABILITY VỚI WAL (ARCHITECTURAL CONTEXT & ACID DURABILITY)
 
-Nhiều lập trình viên nghĩ cơ sở dữ liệu là một "chiếc bảng Excel thần kỳ" lưu các dòng dữ liệu vào ổ cứng:
-* **Tủ hồ sơ chia ngăn 8KB (Slotted Page Architecture):** PostgreSQL không lưu dữ liệu thành từng file lẻ tẻ. Ổ cứng được chia thành các ngăn cố định có kích thước chính xác **8 Kilobytes (8192 bytes)** gọi là **Page (hoặc Block)**. Trong mỗi ngăn 8KB: Danh sách các con trỏ (Item Pointers / Line Pointers) mọc từ đầu trang đi xuống dưới, còn dữ liệu thực sự (Tuples) lại được nhồi từ đáy trang đi ngược lên trên! Khi hai đầu chạm nhau, ngăn đó đầy.
-* **Cuốn sổ tay ghi nợ cấp tốc (Write-Ahead Logging - WAL):** Hãy tưởng tượng một tiệm vàng đông nghẹt khách. Mỗi khi có khách mua vàng, nếu chủ tiệm phải mở két sắt lớn ra, tìm đúng ngăn hồ sơ của khách, ghi chép cẩn thận rồi khóa két lại (Random Disk I/O vào Data Page), khách hàng sẽ xếp hàng dài hàng cây số vì quá chậm! Thay vào đó, chủ tiệm cầm cuốn sổ tay bỏ túi nhỏ: Khách vừa nói mua 1 lượng vàng, chủ tiệm quẹt bút ghi 1 dòng vào sổ (Append-only Sequential Write: "Khách A +1 lượng") rồi gật đầu nhận tiền. Cuốn sổ tay đó chính là **Write-Ahead Log (WAL)**!
-* **Tiến trình Checkpoint (Dọn dẹp sổ sách định kỳ):** Đến cuối ngày khi vắng khách, người kế toán mới đem cuốn sổ tay đối chiếu với két sắt lớn để đồng bộ toàn bộ dữ liệu vào ngăn tủ chính thức (Dirty Pages Flushed to Disk). Dù mất điện đột ngột giữa ngày, chỉ cần đọc lại cuốn sổ tay WAL là phục hồi nguyên vẹn $100\\%$ số vàng!
+Hiệu năng và độ tin cậy của một hệ quản trị cơ sở dữ liệu quan hệ (RDBMS) cấp doanh nghiệp phụ thuộc trực tiếp vào cách nó quản lý tầng vật lý giữa bộ nhớ RAM và ổ đĩa lưu trữ (Disk I/O Subsystem):
+* **Nút thắt cổ chai của Random Disk I/O:** Trong các bảng dữ liệu hàng chục triệu dòng, mỗi thao tác INSERT, UPDATE hay DELETE nếu thực hiện ghi trực tiếp xuống các khối tệp tin phân tán trên đĩa sẽ gây ra hàng nghìn thao tác đọc/ghi ngẫu nhiên (Random Disk I/O). Đây là tác vụ có độ trễ cực cao (tính bằng mili giây trên HDD và micro giây trên NVMe SSD), nhanh chóng làm nghẽn kênh truyền I/O của hệ thống và giới hạn thông lượng ở mức vài trăm giao dịch/giây.
+* **Kiến trúc Khối 8KB Slotted Page:** PostgreSQL không tổ chức dữ liệu thành các tệp tin văn bản tuyến tính mà phân mảnh toàn bộ bảng dữ liệu thành các khối nhị phân cố định có kích thước chuẩn **8 Kilobytes (8,192 bytes)** gọi là **Page (hoặc Block)**. Để hỗ trợ các bản ghi có chiều dài khả biến (Variable-length Records như \`VARCHAR\`, \`JSONB\`) và việc xóa/sửa bản ghi mà không để lại các lỗ hổng phân mảnh, PostgreSQL sử dụng kiến trúc **Slotted Page**:
+  - Mảng con trỏ dòng (\`Line Pointers\` / \`ItemIds\`) được cấp phát tuần tự từ đầu trang chạy xuống dưới.
+  - Dữ liệu bản ghi thực tế (\`Heap Tuples\`) được nhồi từ đáy trang chạy ngược lên trên.
+  - Vùng nhớ trống (\`Free Space\`) nằm ở giữa sẽ co hẹp dần khi có dữ liệu mới và tự động mở rộng khi dữ liệu cũ được dọn dẹp bởi tiến trình VACUUM.
+* **Cơ chế Write-Ahead Logging (WAL) & Tính Bền vững ACID:** Để đảm bảo tính bền vững (Durability) mà vẫn đạt thông lượng hàng chục nghìn giao dịch mỗi giây (TPS):
+  - Khi một giao dịch thực hiện sửa đổi, PostgreSQL **không ghi đè ngay xuống Data File trên đĩa**. Dòng dữ liệu được sửa đổi trực tiếp trên bộ nhớ RAM đệm (**\`Shared Buffers\`**) và biến trang đó thành một **"Dirty Page"** (Trang bẩn).
+  - Đồng thời, toàn bộ nhật ký thay đổi nhị phân tối giản được ghi tuần tự vào tệp nhật ký ghi trước (**\`Write-Ahead Log - WAL\`**) theo cơ chế **Append-only Sequential Write** và được gọi lệnh đồng bộ đĩa \`fsync()\`. Ghi tuần tự trên đĩa nhanh hơn hàng nghìn lần so với ghi ngẫu nhiên.
+  - Ngay sau khi WAL được ghi xuống đĩa, hệ thống thông báo COMMIT thành công cho Client!
+* **Tiến trình Checkpoint & Khả năng Phục hồi sau Sự cố (Crash Recovery):**
+  - Định kỳ (theo \`checkpoint_timeout\` hoặc khi dung lượng WAL vượt \`max_wal_size\`), tiến trình **Checkpointer** sẽ chạy ngầm quét toàn bộ \`Shared Buffers\` và xả (flush) các Dirty Pages xuống tệp tin dữ liệu chính thức.
+  - Nếu máy chủ bị sập nguồn đột ngột (Kernel Panic, mất điện): Toàn bộ Dirty Pages trong RAM bị mất. Khi khởi động lại, PostgreSQL chỉ việc mở tệp \`global/pg_control\` để tìm mốc **Checkpoint gần nhất**, sau đó đọc các bản ghi WAL phát sinh sau mốc đó để phát lại (REDO Phase / Replay changes). Hệ thống khôi phục hoàn hảo trạng thái nhất quán $100\\%$ mà không mất một byte dữ liệu đã commit nào!
 
 ---
 
@@ -306,12 +315,21 @@ export function calculateFreeSpace(
       duration: '60 phút',
       tag: 'B-Tree Index Internals',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CUỐN TỪ ĐIỂN BÁCH KHOA VS MỤC LỤC TRA CỨU NHANH
+# 1. BỐI CẢNH KỸ THUẬT: TỐI ƯU HÓA TRUY VẤN VỚI CẤU TRÚC $B^+$-TREE INDEX & ĐÁNH ĐỔI HIỆU NĂNG GHI (ARCHITECTURAL CONTEXT & DISK I/O OVERHEAD)
 
-Nhiều lập trình viên cứ thấy câu query chậm là tự động gắn \`@Index()\` bừa bãi vào mọi cột:
-* **Sequential Scan (Đọc sách từ trang 1 đến trang 1000):** Cần tìm định nghĩa từ "Zebra" trong cuốn từ điển 1,000 trang. Nếu không có mục lục, đại ca phải lật đọc từng trang từ trang 1 đến trang 1000 ($O(N)$ Disk I/O). Đọc hàng triệu dòng dữ liệu từ đĩa cứng mất hàng chục giây!
-* **B-Tree Index (Cây mục lục đa phân tự cân bằng):** Cuốn từ điển có cấu trúc phân tầng: Trang đầu chia làm 3 nhóm lớn: [A-H], [I-P], [Q-Z] (Root Node). Chọn nhánh [Q-Z], lật tiếp thấy chia thành [Q-U] và [V-Z] (Internal Node). Lật tiếp một lần nữa là đến ngay trang chứa từ "Zebra" (Leaf Node). Chỉ cần **3 lần lật trang ($O(\\log N)$)** thay vì 1,000 lần!
-* **B-Tree Page Split (Nỗi đau xé rách trang mục lục):** Hãy tưởng tượng một trang mục lục chỉ chứa được tối đa 100 từ và đã kín đặc. Đại ca muốn chèn thêm một từ mới vào giữa trang đó. Người biên tập không thể nhét thêm được nữa! Họ buộc phải: **Cắt đôi trang giấy ra làm hai trang mới (Mỗi trang chứa 50 từ), ghi từ mới vào, rồi chạy lên trang mục lục cấp trên để sửa lại con trỏ tham chiếu!** Quá trình này tiêu tốn gấp 3 lần Disk I/O và tạo ra các khoảng trống lãng phí phân mảnh bộ nhớ!
+Trong thiết kế hệ thống dữ liệu, chỉ mục (Index) là công cụ cơ bản nhất để chuyển đổi độ phức tạp tìm kiếm từ Quét Toàn Bảng (Sequential Scan - $O(N)$ Disk I/O) sang Duyệt Cây Chỉ Mục ($O(\\log N)$). Tuy nhiên, việc lạm dụng Index mà không hiểu bản chất cấu trúc lưu trữ sẽ làm tê liệt hiệu năng ghi của hệ thống:
+* **Tại sao RDBMS sử dụng $B^+$-Tree thay vì Cây Nhị Phân Cân Bằng (AVL / Red-Black Tree)?**
+  - Cây nhị phân có hệ số rẽ nhánh (Fan-out) chỉ bằng 2. Với 10 triệu bản ghi, độ sâu của cây nhị phân lên tới $\\approx 24$ tầng. Mỗi lần tìm kiếm đòi hỏi 24 lần nhảy đĩa ngẫu nhiên (Random Disk Lookups).
+  - Ngược lại, **$B^+$-Tree** là cây đa phân tự cân bằng (Multi-way Balanced Tree) được thiết kế riêng biệt để khớp hoàn hảo với kích thước khối đĩa 8KB. Mỗi Node 8KB có thể chứa hàng trăm khóa (Fan-out từ $100$ đến $300$). Nhờ đó, với 10 triệu bản ghi, độ sâu của cây $B^+$-Tree chỉ từ **3 đến 4 tầng**! Toàn bộ các tầng trên (Root & Internal Nodes) thường được nằm trọn trong RAM (\`Shared Buffers\`), giúp việc tìm kiếm chỉ tiêu tốn đúng 1 lần đọc đĩa duy nhất tại Leaf Node!
+* **Bản chất của Hiện tượng B-Tree Page Split (Vỡ trang chỉ mục):**
+  - Mỗi Leaf Node trong $B^+$-Tree là một trang 8KB cố định, lưu trữ các khóa theo thứ tự sắp xếp tăng dần.
+  - Khi chèn một khóa mới vào một trang đã kín dung lượng ($100\\%$ Full), PostgreSQL không thể mở rộng trang đó. Hệ thống bắt buộc phải thực hiện thao tác **Page Split**:
+    1. Cấp phát một trang 8KB mới trên đĩa.
+    2. Di chuyển $50\\%$ số khóa từ trang cũ sang trang mới.
+    3. Chèn khóa mới vào đúng vị trí logic.
+    4. Cập nhật con trỏ danh sách liên kết đôi (Doubly-Linked List) giữa các trang lá.
+    5. Đẩy (Promote) khóa phân chia lên Node cha (Internal Node) - nếu Node cha cũng đầy, Page Split sẽ lan truyền ngược lên trên (Cascading Split)!
+  - **Hệ quả trên Production:** Thao tác Page Split làm phát sinh thêm các lệnh ghi đĩa ngẫu nhiên, sinh thêm các bản ghi nhật ký WAL khổng lồ (Full Page Image), và để lại các trang chỉ mục bị rỗng $50\\%$ gây lãng phí bộ nhớ đệm RAM (**Hiện tượng Index Bloat**). Đây chính là lý do vì sao việc dùng UUID v4 ngẫu nhiên làm Primary Key là thảm họa đối với các hệ thống ghi thông lượng lớn!
 
 ---
 
@@ -598,12 +616,19 @@ export function insertIntoBTreeNode(
       duration: '60 phút',
       tag: 'Query Optimization & EXPLAIN',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: TƯ TƯỞNG CỦA MỘT TỔNG ĐẠI LÝ GIAO HÀNG
+# 1. BỐI CẢNH KỸ THUẬT: ĐỘNG CƠ TỐI ƯU HÓA TRUY VẤN DỰA TRÊN CHI PHÍ (COST-BASED QUERY OPTIMIZER - CBO) & CHIẾN LƯỢC QUÉT DỮ LIỆU (ARCHITECTURAL CONTEXT & ACCESS PATH SELECTION)
 
-Khi đại ca bấm chạy một câu lệnh SQL, PostgreSQL không lập tức đi tìm dữ liệu ngay. Nó đưa câu lệnh vào **Bộ Tối Ưu Hóa Truy Vấn (Cost-Based Query Optimizer)**:
-* **Người quản lý lộ trình vận tải (The Cost-based Optimizer):** Bạn cần giao 500 bưu kiện trong thành phố. Người quản lý mở bản đồ ra, tính toán chi phí (Cost) của từng phương án: Đi xe máy luồn lách qua ngõ nhỏ (Index Scan) hay thuê hẳn một chiếc xe tải lớn quét một vòng toàn bộ các trục đường chính (Sequential Scan)? Phương án nào có điểm chi phí dự toán (Total Estimated Cost) thấp nhất sẽ được chọn làm **Execution Plan**!
-* **Sequential Scan (Xe tải lớn gom hàng toàn tuyến):** Khi số lượng kiện hàng chiếm tới $30\\%$ tổng số nhà trên đường, việc đi xe máy dừng lại từng nhà tra danh bạ (Random I/O của Index) chậm hơn nhiều so với việc xe tải cứ chạy thẳng một mạch từ đầu phố đến cuối phố gom sạch (Sequential Read tốc độ cao).
-* **Bitmap Index Scan (Tấm lưới đánh dấu vị trí trước khi xuất phát):** Đi xe máy quét qua danh bạ (Index), nhưng thay vì chạy ngay đến từng nhà, nhân viên lấy bút dạ quang tô các chấm đỏ lên bản đồ đường đi (**Tạo Bitmap trong RAM**). Sau đó, xe chạy một mạch qua các chấm đỏ theo đúng thứ tự vật lý của con đường! Tránh được hoàn toàn việc chạy qua chạy lại lộn xộn.
+Khi một câu lệnh SQL được gửi tới máy chủ PostgreSQL, hệ thống không thực thi nó một cách ngây thơ. Câu lệnh được đưa qua bộ phân tích cú pháp (Parser), bộ viết lại (Rewriter), và quan trọng nhất là **Bộ Tối Ưu Hóa Dựa Trên Chi Phí (Cost-Based Query Optimizer - CBO)**:
+* **Bản chất của Mô hình Chi phí (Cost Model):**
+  - CBO không đoán mò, nó dựa vào bảng thống kê nội bộ (\`pg_statistic\` / \`pg_stats\`) ghi nhận phân phối giá trị, tỉ lệ phần tử rỗng, số lượng phần tử phân biệt (Distinct Values) và biểu đồ tần suất (Histograms).
+  - Optimizer tính toán điểm chi phí lý thuyết (\`Cost\`) cho hàng chục đường dẫn truy cập (Access Paths) khác nhau dựa trên 2 tham số vật lý then chốt:
+    1. **Chi phí đọc khối đĩa:** Đọc tuần tự (\`seq_page_cost = 1.0\`) so với Đọc ngẫu nhiên (\`random_page_cost = 4.0\` trên HDD, $\\approx 1.1 - 1.5$ trên NVMe SSD).
+    2. **Chi phí xử lý CPU:** Đánh giá biểu thức lọc điều kiện (\`cpu_tuple_cost = 0.01\`) và tính toán hàm so sánh (\`cpu_operator_cost = 0.0025\`).
+  - Kế hoạch thực thi (Execution Plan) nào có tổng chi phí ước tính (\`Total Cost\`) thấp nhất sẽ được chọn để đưa xuống Executor.
+* **Chiến lược Quét Dữ Liệu: Đánh đổi giữa Sequential Scan, Index Scan và Bitmap Scan:**
+  - **Sequential Scan ($O(N)$):** Quét tuần tự toàn bộ các khối 8KB từ đầu đến cuối bảng. Tận dụng tối đa băng thông đọc đĩa tuần tự và cơ chế đọc trước của hệ điều hành (Kernel Read-Ahead Buffer). Tối ưu vượt trội khi bảng dữ liệu nhỏ (< vài nghìn dòng) hoặc câu truy vấn cần lấy một lượng lớn dữ liệu (> $15\\% - 20\\%$ tổng số dòng).
+  - **Index Scan ($O(\\log N)$):** Duyệt cây $B^+$-Tree để lấy con trỏ \`ctid\`, sau đó ngay lập tức thực hiện một lệnh Random Disk I/O nhảy vào Heap Data Page để lấy dòng tương ứng. Cực kỳ tối ưu khi chỉ lấy từ 1 đến vài dòng cụ thể (Point Queries / High Cardinality). Nhưng nếu áp dụng cho hàng nghìn dòng, hàng nghìn lượt Random I/O sẽ bóp nghẹt Disk Controller!
+  - **Bitmap Index Scan (Kỹ thuật Lai Đẳng Cấp):** Giải quyết tình trạng khó xử khi kết quả lọc chiếm từ $1\\%$ đến $15\\%$ bảng. Optimizer duyệt B-Tree để lấy danh sách \`ctid\`, nhưng **chưa nhảy vào đọc Heap ngay**. Nó dựng một mảng Bitmap trong RAM (mỗi bit đại diện cho một 8KB Page). Sau đó, nó sắp xếp các con trỏ theo đúng thứ tự vị trí vật lý trên đĩa cứng rồi mới thực hiện đọc một vòng tuần tự (**Sequential Heap Read**) các Page có đánh dấu bit! Tránh được $100\\%$ việc đầu đọc đĩa nhảy qua nhảy lại hỗn loạn.
 
 ---
 

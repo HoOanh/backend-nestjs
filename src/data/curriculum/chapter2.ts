@@ -11,12 +11,22 @@ export const chapter2: Sprint = {
       duration: '60 phút',
       tag: 'Event Loop & Microtasks',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: NGƯỜI ĐIỀU HÀNH BĂNG CHUYỀN SÂN BAY (THE BAGGAGE CAROUSEL)
+# 1. BỐI CẢNH KỸ THUẬT: ĐIỀU PHỐI I/O BẤT ĐỒNG BỘ & THỨ BẬC ƯU TIÊN DRAIN QUEUES
 
-Nhiều lập trình viên lầm tưởng rằng Node.js là một runtime đa luồng chạy song song mọi thứ, hoặc ngược lại nghĩ rằng nó chỉ là một hàm \`while(true)\` đơn giản:
-* **The Single-Thread Illusion (Ảo tưởng đơn luồng):** Thực tế, mã JavaScript của đại ca chỉ chạy trên đúng **MỘT luồng duy nhất (V8 Main Thread)**. Nó giống như một nhân viên hải quan đứng tại cổng kiểm soát duy nhất. Nhân viên này không tự mình đi bê hàng nghìn kiện hành lý (I/O), mà chỉ đóng dấu kiểm định và giao việc cho hệ thống băng chuyền tự động phía sau.
-* **Libuv 6 Pha (Vòng xoay băng chuyền hành lý):** Hành lý sau khi được phân loại sẽ được đưa vào 6 chặng kiểm tra định kỳ liên tục theo chiều kim đồng hồ. Mỗi chặng chuyên trách một loại hành lý: Hẹn giờ (Timers), Sự kiện hệ thống (Pending Callbacks), Chờ đợi tín hiệu mạng (Poll), và Bàn giao hoàn tất (Check).
-* **Microtask Queue (Thẻ ưu tiên khẩn cấp VIP - VIP Pass):** Bất cứ khi nào nhân viên hải quan vừa xử lý xong một kiện hành lý ở bất kỳ chặng nào, nếu có khách VIP cầm thẻ ưu tiên (\`process.nextTick\` hoặc \`Promise.then\`), nhân viên **bắt buộc phải dừng mọi hành lý thông thường trên băng chuyền lại để phục vụ ngay lập tức toàn bộ hàng đợi VIP cho đến khi sạch bóng (Drain completely)** trước khi cho phép băng chuyền nhích sang chặng tiếp theo!
+Để vận hành một dịch vụ Backend Node.js đạt hàng trăm nghìn throughput mà không gặp lỗi nghẽn luồng, kỹ sư bắt buộc phải nắm vững mô hình điều phối của Libuv và sự phân tầng hàng đợi:
+
+* **Bản chất của Single-Thread Illusion (Ảo tưởng đơn luồng):**
+  - Mọi dòng mã JavaScript trong ứng dụng (bao gồm Controller, Service, Guard, Pipe) đều được thực thi tuần tự trên đúng **một luồng duy nhất (V8 Main Thread)**.
+  - Tuy nhiên, Node.js không thực hiện các tác vụ I/O trên luồng này. V8 Main Thread chỉ đóng vai trò điều phối: tiếp nhận request, đăng ký các hàm phản hồi (Event Handlers / Callbacks), ủy thác thao tác chờ đợi I/O xuống nhân hệ điều hành, rồi lập tức giải phóng Call Stack để tiếp tục phục vụ các request khác.
+
+* **Vòng điều phối 6 Pha của Libuv (The 6-Phase Event Loop):**
+  - Trái tim của Libuv là một vòng lặp sự kiện tuần tự gồm 6 pha tách biệt: Timers (xử lý setTimeout/setInterval), Pending Callbacks (xử lý lỗi I/O hệ thống), Idle/Prepare (dọn dẹp nội bộ), Poll (chờ đợi và đọc sự kiện mạng mới), Check (thực thi setImmediate), và Close Callbacks (đóng socket, dọn dẹp tài nguyên).
+  - Mỗi pha sở hữu một hàng đợi FIFO riêng, được thiết kế để không một loại tác vụ nào có thể chiếm dụng vĩnh viễn vòng lặp.
+
+* **Hiện tượng Starvation từ Microtask Queue (nextTick & Promise Drain):**
+  - Khác với 6 pha của Libuv (vốn chỉ xử lý Macrotasks), V8 duy trì hai hàng đợi ưu tiên đặc biệt: \`process.nextTickQueue\` và \`microtaskQueue\` (Promise).
+  - **Cơ chế Drain Tuyệt Đối:** Ngay sau khi một tác vụ JavaScript kết thúc ở BẤT KỲ pha nào của Event Loop, V8 bắt buộc phải xả sạch hoàn toàn (Drain completely) toàn bộ các tác vụ trong \`nextTickQueue\`, kế tiếp là \`microtaskQueue\`, trước khi cho phép Libuv chuyển sang pha tiếp theo.
+  - **Hiểm họa Starvation trong Production:** Nếu kỹ sư vô tình kích hoạt đệ quy vô hạn \`process.nextTick()\` hoặc chuỗi Promise không hồi kết, Event Loop sẽ bị giam cầm vĩnh viễn giữa hai pha. Toàn bộ pha Poll (đọc I/O mạng) và pha Timers bị tê liệt hoàn toàn, dẫn đến sập hệ thống do nghẽn I/O (Event Loop Starvation).
 
 ---
 
@@ -353,12 +363,23 @@ export async function chunkProcessor<T>(
       duration: '60 phút',
       tag: 'Kernel Syscalls & Libuv',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: TỔNG ĐÀI ĐIỆN THOẠI TRUNG TÂM (TELEPHONE OPERATOR SWITCHBOARD)
+# 1. BỐI CẢNH KỸ THUẬT: CƠ CHẾ CHUYỂN GIAO I/O CẤP KERNEL (EPOLL) & GIỚI HẠN THREADPOOL
 
-Để hình dung cách một máy chủ tiếp nhận 50,000 kết nối TCP mà không bị nổ RAM:
-* **Mô hình Polling cổ điển (Nhân viên lễ tân chạy từng phòng hỏi thăm):** Khách sạn có 10,000 phòng. Người phục vụ phải chạy bộ gõ cửa từng phòng từ phòng 1 đến 10,000 để hỏi "Quý khách có cần gọi đồ ăn không?". $99.9\\%$ số phòng đang ngủ say. Người phục vụ kiệt sức vì chạy liên tục trong vô vọng ($O(N)$ CPU overhead).
-* **Mô hình Linux epoll / macOS kqueue (Chuông báo tự động tại bàn tổng đài):** Tại bàn tổng đài, nhân viên chỉ ngồi uống cà phê thư giãn. Nhân viên gắn một hệ thống rơ-le điện tử vào tất cả 10,000 phòng. Khi phòng nào thực sự bấm chuông (gửi TCP packet đến Card mạng), bảng điều khiển tổng đài sẽ nhấp nháy đúng số phòng đó. Nhân viên lập tức nhấc máy phục vụ chính xác người đang cần ($O(1)$ Event-driven).
-* **Libuv Threadpool (Đội ngũ thợ cơ khí sửa chữa nặng):** Những việc mà tổng đài không thể tự làm trong nháy mắt (ví dụ: bốc dỡ hàng hóa nặng, giải mã ổ cứng, tính toán mã băm mật khẩu), tổng đài sẽ viết phiếu yêu cầu và chuyển cho một đội ngũ gồm 4 thợ cơ khí chuyên trách chạy ngầm trong xưởng (Libuv C++ Worker Threads).
+Khi một máy chủ Backend phải duy trì 50,000 kết nối TCP (như WebSocket Server hoặc Microservices Gateway), thách thức lớn nhất nằm ở tầng giao tiếp giữa không gian người dùng (User Space) và không gian nhân hệ điều hành (Kernel Space):
+
+* **Sự bất lực của cơ chế Polling truyền thống (\`select\` / \`poll\` System Calls):**
+  - Trong các hệ điều hành Unix sơ khai, để kiểm tra xem trong số 10,000 sockets mở có socket nào đã nhận đủ dữ liệu mạng hay chưa, ứng dụng phải truyền một mảng gồm 10,000 File Descriptors (FDs) xuống Kernel ở mỗi vòng lặp.
+  - Kernel buộc phải duyệt tuyến tính từ FD số 1 đến FD số 10,000 ($O(N)$ CPU complexity). Ngay cả khi 99.9% socket đang ở trạng thái rảnh rỗi (Idle), CPU vẫn bị thiêu đốt chỉ để quét qua hàng nghìn con trỏ không có dữ liệu.
+
+* **Đột phá kiến trúc I/O Multiplexing hiện đại (Linux \`epoll\` / macOS \`kqueue\`):**
+  - \`epoll\` thay đổi hoàn toàn cuộc chơi bằng cách chuyển danh bạ theo dõi File Descriptor vào lưu trữ trực tiếp bên trong cấu trúc cây đỏ-đen (Red-Black Tree) của Kernel (\`epoll_create\`, \`epoll_ctl\`).
+  - Khi card mạng (NIC) nhận được gói tin TCP, phần cứng kích hoạt ngắt phần cứng (Hardware Interrupt), Kernel lập tức đưa đúng FD có dữ liệu vào hàng đợi sẵn sàng (\`Ready List\`).
+  - Khi Node.js gọi \`epoll_wait()\` trong pha Poll của Libuv, nó chỉ nhận về đúng danh sách các socket thực sự có dữ liệu với độ phức tạp $O(1)$ Event-driven, hoàn toàn không tiêu tốn chu kỳ CPU vô ích.
+
+* **Ranh giới cốt lõi: Khi nào Libuv dùng Kernel và khi nào dùng Threadpool?**
+  - **Network I/O (TCP, UDP, UNIX Sockets, HTTP, DNS resolve qua c-ares):** Hoàn toàn là Non-blocking thực sự thông qua cơ chế \`epoll/kqueue\` của Kernel, không tốn bất kỳ thread nền nào của Libuv!
+  - **File System (fs), DNS lookup (getaddrinfo), và Crypto (pbkdf2, scrypt):** Nhân hệ điều hành Linux truyền thống KHÔNG hỗ trợ Asynchronous I/O hoàn hảo cho tập tin đĩa (POSIX AIO bị hạn chế). Do đó, Libuv bắt buộc phải chuyển giao (Offload) các tác vụ này sang một **Threadpool nội bộ C++** (mặc định gồm 4 Worker Threads).
+  - **Điểm nghẽn Threadpool Starvation:** Nếu 4 request gọi hàm mã hóa mật khẩu nặng đồng thời, toàn bộ 4 thread của Libuv bị chiếm dụng, khiến toàn bộ các lệnh đọc ghi file (\`fs.readFile\`) của hệ thống bị xếp hàng chờ, gây nghẽn nghiêm trọng. Kỹ sư phải chủ động cấu hình biến môi trường \`UV_THREADPOOL_SIZE\` phù hợp.
 
 ---
 
@@ -658,12 +679,27 @@ export class ConcurrentTaskPool {
       duration: '60 phút',
       tag: 'Profiling & Multi-threading',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: BÁC SĨ KHÁM BỆNH VS TRUNG TÂM PHÂN TÍCH X-QUANG
+# 1. BỐI CẢNH KỸ THUẬT: ĐÁNH ĐỔI GIỮA I/O-BOUND VÀ CPU-BOUND TRÊN KIẾN TRÚC EVENT LOOP
 
-Để hiểu vì sao Main Thread không bao giờ được phép làm toán nặng:
-* **Main Thread (Bác sĩ trưởng khoa tiếp đón bệnh nhân):** Bác sĩ đứng ở sảnh cấp cứu tiếp đón bệnh nhân. Việc của bác sĩ là: Bắt mạch nhanh, hỏi triệu chứng trong 5 giây, viết phiếu chỉ định xét nghiệm và gọi người tiếp theo. Nếu bác sĩ làm đúng vai trò, hàng nghìn bệnh nhân lướt qua cửa khám rất êm ả.
-* **Tai họa khi Bác sĩ làm toán nặng (CPU-bound Blocking):** Một bệnh nhân bước vào cần chụp X-quang và phân tích ADN. Thay vì gửi mẫu sang phòng thí nghiệm, bác sĩ đóng cửa phòng khám, ngồi cặm cụi soi kính hiển vi suốt 30 phút! Trong 30 phút đó, **toàn bộ 500 bệnh nhân đang chờ ngoài hành lang đều bị bỏ mặc, không ai được tiếp đón, phòng khám tê liệt hoàn toàn!**
-* **Worker Threads (Trung tâm phòng lab chuyên dụng):** Giải pháp chuẩn mực của kỹ sư: Bác sĩ giao mẫu xét nghiệm cho phòng lab riêng biệt (Worker Thread có CPU Core riêng). Bác sĩ lập tức quay ra khám cho bệnh nhân tiếp theo. Khi phòng lab phân tích xong, họ gửi giấy kết quả về bàn cho bác sĩ (MessagePort IPC).
+Nguyên lý nền tảng giúp Node.js đạt hiệu năng I/O vượt trội là: **Toàn bộ ứng dụng dựa trên giả định mọi tác vụ trên Main Thread đều kết thúc sau vài phần triệu giây (Microseconds)**.
+
+Khi giả định này bị phá vỡ bởi một tác vụ tính toán CPU nặng (CPU-bound Task), hệ thống sẽ đối mặt với sự sụp đổ dây chuyền:
+
+* **Sự khác biệt bản chất giữa I/O-bound và CPU-bound:**
+  - **Tác vụ I/O-bound (Truy vấn DB, đọc Redis, gọi HTTP API bên ngoài):** 99% thời gian là chờ đợi mạng. Luồng chính Node.js không bị chặn vì chỉ việc ủy thác cho Kernel rồi chuyển sang phục vụ request khác.
+  - **Tác vụ CPU-bound (Phân tích cú pháp JSON payload 50MB, nén file zip/gzip, xử lý hình ảnh sharp, tính toán thuật toán mã hóa):** CPU core bị ép thực thi tính toán liên tục 100% công suất mà không bao giờ nhường quyền thực thi cho Event Loop.
+
+* **Thảm họa Event Loop Lag trong môi trường Production:**
+  - Khi một tác vụ CPU-bound chiếm giữ Main Thread trong 3.5 giây:
+    + Toàn bộ 5,000 kết nối HTTP đồng thời khác bị đóng băng tại pha Poll của Libuv.
+    + Trình duyệt client bị timeout (\`504 Gateway Timeout\`), người dùng liên tục bấm F5 gửi thêm request mới, gây ra hiện tượng bão request (Retry Storm).
+    + Các endpoint giám sát sức khỏe (\`/healthz\` Liveness/Readiness Probe của Kubernetes) không nhận được phản hồi trong ngưỡng 3 giây.
+    + **Hệ quả chết người:** Kubernetes nhận định Container đã bị chết đứng (Deadlock/Frozen) và tiến hành tiêu diệt (Restart/Kill Pod). Hàng nghìn người dùng bị rớt kết nối đột ngột, toàn bộ dịch vụ rơi vào vòng lặp CrashLoopBackOff!
+
+* **Giải pháp Kiến trúc Chuẩn Mực: Worker Threads & Multi-Process Clustering:**
+  - Không bao giờ chạy tác vụ CPU-bound trên Main Thread.
+  - Sử dụng module \`worker_threads\` để tạo các tiến trình con độc lập chạy trên các CPU Cores riêng biệt, giao tiếp bất đồng bộ qua kênh truyền tin \`MessagePort\` (sử dụng cấu trúc sao chép bộ nhớ \`Structured Clone\` hoặc vùng nhớ chia sẻ tốc độ cao \`SharedArrayBuffer\`).
+  - Luồng chính chỉ đóng vai trò tiếp nhận, giao việc xuống Worker Thread và trả response cho client ngay khi nhận được tín hiệu hoàn tất.
 
 ---
 

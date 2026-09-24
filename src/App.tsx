@@ -456,23 +456,10 @@ export const App: React.FC = () => {
                       📖 Lý Thuyết & Code Mẫu
                     </button>
                     <button
-                      className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''} ${
-                        !state.clearedLessons?.[currentLesson.id] && !effectiveBypass ? 'locked' : ''
-                      }`}
-                      onClick={() => {
-                        if (state.clearedLessons?.[currentLesson.id] || effectiveBypass) {
-                          handleTabChange('quiz');
-                        }
-                      }}
-                      disabled={!state.clearedLessons?.[currentLesson.id] && !effectiveBypass}
-                      title={
-                        !state.clearedLessons?.[currentLesson.id] && !effectiveBypass
-                          ? 'Cần đọc lý thuyết và bấm "Đã hiểu bài" để mở trắc nghiệm'
-                          : 'Làm trắc nghiệm ôn tập'
-                      }
+                      className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
+                      onClick={() => handleTabChange('quiz')}
                     >
-                      {state.clearedLessons?.[currentLesson.id] || effectiveBypass ? '❓' : '🔒'}{' '}
-                      Trắc Nghiệm Ôn Luyện{' '}
+                      📝 Trắc Nghiệm Ôn Luyện{' '}
                       <span className="tab-badge">{currentLesson.quiz.length}</span>
                     </button>
                     <button

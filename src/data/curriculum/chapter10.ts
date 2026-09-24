@@ -11,12 +11,17 @@ export const chapter10: Sprint = {
       duration: '60 phút',
       tag: 'Distributed Systems & CAP',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: HAI CHI NHÁNH NGÂN HÀNG BỊ ĐỨT CÁP ĐIỆN THOẠI
+# 1. BỐI CẢNH KỸ THUẬT: ĐỊNH LÝ CAP, MỞ RỘNG PACELC & BẢO ĐẢM TÍNH NHẤT QUÁN CUỐI CÙNG TRONG HỆ THỐNG PHÂN TÁN (ARCHITECTURAL CONTEXT & DISTRIBUTED TRADE-OFFS)
 
-Hệ thống phân tán bắt đầu khi bạn không thể nhét toàn bộ thế giới vào một chiếc máy tính duy nhất:
-* **Chiếc cầu đứt gãy (Network Partition - Chữ 'P' trong CAP):** Ngân hàng eSmiles có 2 chi nhánh: Hà Nội và Sài Gòn. Bình thường có đường dây cáp quang nối thông hai nơi. Một ngày bão lớn làm đứt cáp quang biển giữa hai miền (Mạng bị phân vùng - Partition).
-* **Lựa chọn Nhất quán (Consistency - CP):** Một khách hàng bước vào chi nhánh Sài Gòn rút 100 triệu. Vì đứt cáp, nhân viên Sài Gòn không thể hỏi Hà Nội xem khách hàng có còn đủ tiền không. Để bảo đảm số dư không bị âm (Consistency), nhân viên Sài Gòn **từ chối phục vụ (Hy sinh Availability)**: "Xin lỗi quý khách, mạng liên tỉnh đang đứt, chúng tôi tạm ngừng giao dịch!".
-* **Lựa chọn Sẵn sàng (Availability - AP):** Nhân viên Sài Gòn vẫn vui vẻ chi tiền cho khách để khách không bực mình (Availability): "Tôi cứ cho bạn rút tiền, tôi ghi vào sổ tay tạm thời". Đến tối khi cáp quang nối lại, hai miền đối chiếu sổ sách sau (**Tính nhất quán cuối cùng - Eventual Consistency**). Nếu khách lỡ rút quá số dư, ngân hàng gọi điện đòi lại hoặc phạt sau!
+Khi một hệ thống phần mềm vượt quá giới hạn của một máy chủ vật lý đơn lẻ và mở rộng thành một cụm nút phân tán (Distributed Cluster), kỹ sư hệ thống bắt buộc phải đối mặt với thực tế nghiệt ngã của **8 Ngộ Nhận Về Điện Toán Phân Tán (The 8 Fallacies of Distributed Computing)**, trong đó ngộ nhận nguy hiểm nhất là "Mạng luôn luôn tin cậy và không có độ trễ":
+* **Tính Tất Yếu Của Phân Vùng Mạng (Network Partitions - Chữ 'P' Trong CAP):**
+  - Trong môi trường mạng thực tế (đặc biệt là Cloud Data Centers), việc đứt kết nối cáp quang, nghẽn switch, độ trễ tăng vọt hoặc sập DNS giữa các vùng khả dụng (Availability Zones) là sự kiện chắc chắn sẽ xảy ra theo thời gian.
+  - Khi một phân vùng mạng xuất hiện, cụm máy chủ bị chia cắt thành các phân vùng độc lập không thể trao đổi thông tin với nhau.
+* **Sự Lựa Chọn Bắt Buộc Giữa CP và AP:**
+  - **Hệ Thống CP (Consistency + Partition Tolerance):** Ưu tiên tính đúng đắn toán học tuyệt đối của dữ liệu. Nếu một Node bị cô lập khỏi mạng hoặc không thể đạt được sự đồng thuận Quorum (đa số phiếu bầu) từ cụm, Node đó sẽ **từ chối phục vụ (Fast-fail hoặc Timeout)** để ngăn chặn thảm họa Split-Brain và sai lệch số dư. Đại diện: PostgreSQL Clustered, ZooKeeper, etcd, Redis Sentinel/Cluster Master.
+  - **Hệ Thống AP (Availability + Partition Tolerance):** Ưu tiên tính sẵn sàng phục vụ người dùng. Dù bị chia cắt mạng, từng phân vùng vẫn tiếp tục tiếp nhận thao tác đọc và ghi, chấp nhận rằng các Node ở các vùng khác nhau có thể tạm thời chứa các trạng thái dữ liệu mâu thuẫn nhau. Dữ liệu sẽ dần dần được đồng bộ hội tụ về một trạng thái đồng nhất sau khi mạng được khôi phục thông qua cơ chế **Tính Nhất Quán Cuối Cùng (Eventual Consistency)** và các giải thuật giải quyết xung đột như Vector Clocks hoặc Last-Write-Wins (LWW). Đại diện: Apache Cassandra, Amazon DynamoDB, CouchDB.
+* **Định Lý Mở Rộng PACELC:**
+  - Định lý CAP chỉ giải thích hành vi khi có sự cố mạng ($P$). Định lý **PACELC** của Daniel Abadi mở rộng: **P** (nếu có Partition) chọn giữa **A** và **C**; **E**lse (trong điều kiện vận hành bình thường không có lỗi mạng), hệ thống buộc phải đánh đổi giữa **L**atency (Độ trễ phản hồi) và **C**onsistency (Tính nhất quán của dữ liệu đọc).
 
 ---
 
@@ -311,11 +316,20 @@ export function executeSagaSteps(
       duration: '60 phút',
       tag: 'System Resiliency & Rate Limiting',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: CẦU CHÌ ĐIỆN TỰ NGẮT VS VÁCH NGĂN CHỐNG CHÌM TÀU TITANIC
+# 1. BỐI CẢNH KỸ THUẬT: NGUYÊN LÝ THIẾT KẾ KHẢ NĂNG CHỊU LỖI (DESIGN FOR FAILURE) & CÁC MẪU HÌNH KHẢ NĂNG PHỤC HỒI (ARCHITECTURAL CONTEXT & RESILIENCE PATTERNS)
 
-Khi xây dựng hệ thống chịu tải cao, một nguyên lý kỹ thuật bất hủ là: **"Thiết kế sẵn sàng cho sự cố (Design for Failure)"**:
-* **Cầu chì tự ngắt (Circuit Breaker):** Dịch vụ cổng thanh toán đối tác bị chập cháy (Response Timeout 30 giây). Nếu 10,000 khách hàng tiếp tục bấm thanh toán, 10,000 requests sẽ cùng đứng chờ 30 giây, ngốn sạch toàn bộ Connection Pool và RAM của máy chủ bạn, khiến cả trang web bán hàng bị sập theo! Chiếc cầu chì thông minh quan sát: Thấy có 50% lỗi, nó **nhảy cầu dao ngắt mạch (Mở mạch - OPEN)**! Mọi request tiếp theo bị từ chối ngay trong 1 mili giây kèm thông báo "Cổng thanh toán đang bảo trì", bảo vệ máy chủ bạn sống sót $100\\%$!
-* **Vách ngăn khoang tàu thủy (Bulkhead Pattern):** Tàu ngầm hay tàu thủy hiện đại không làm đáy rỗng thông suốt. Họ chia thân tàu thành 10 khoang kín nước độc lập (Bulkheads). Khi một khoang bị thủng đá ngầm đâm vào, nước tràn vào khoang đó nhưng **bị chặn đứng bởi các vách ngăn, 9 khoang còn lại vẫn nguyên vẹn và con tàu tiếp tục nổi**! Trong Backend: Tách riêng Connection Pool cho thanh toán và xem sản phẩm; thanh toán có chết thì khách vẫn xem được hàng!
+Trong kiến trúc Microservices phân tán gồm hàng chục dịch vụ phụ thuộc chéo nhau, lỗi phần cứng, nghẽn mạng và suy giảm hiệu năng của các dịch vụ bên thứ ba (Third-party APIs) không phải là ngoại lệ hiếm hoi mà là quy luật hoạt động thường nhật. Một hệ thống không có cơ chế tự vệ sẽ nhanh chóng sụp đổ dây chuyền khi một mắt xích gặp sự cố:
+* **Hiểm Họa Cạn Kiệt Tài Nguyên Do Dịch Vụ Cấp Dưới Suy Thoái (Downstream Degradation & Resource Exhaustion):**
+  - Giả sử Cổng thanh toán đối tác bị chậm và mất 30 giây mới phản hồi hoặc bị timeout.
+  - Khi người dùng gửi yêu cầu, mỗi kết nối HTTP tới cổng thanh toán sẽ giam lỏng một Socket kết nối, một luồng bộ đệm và một kết nối trong Hồ bơi kết nối (Connection Pool).
+  - Với lưu lượng vài nghìn requests, toàn bộ tài nguyên CPU, bộ nhớ RAM và Connection Pool của dịch vụ phía trên (Upstream Service) bị vắt kiệt. Hậu quả: Dịch vụ chính bị tê liệt hoàn toàn, không thể phục vụ ngay cả những tính năng cơ bản không liên quan đến thanh toán!
+* **Mẫu Hình Ngắt Mạch Tự Động (Circuit Breaker Pattern):**
+  - Giám sát tỉ lệ lỗi và độ trễ phản hồi của các lệnh gọi dịch vụ bên ngoài trong một cửa sổ thời gian trượt (Sliding Time Window).
+  - Khi tỉ lệ lỗi vượt ngưỡng tới hạn (ví dụ $> 50\\%$), Circuit Breaker lập tức chuyển sang trạng thái **\`OPEN\` (Mở mạch / Ngắt cầu chì)**: Mọi yêu cầu tiếp theo bị từ chối ngay lập tức tại chỗ trong $0\\text{ ms}$ (**Fast-fail**), bảo vệ tuyệt đối Connection Pool và bộ nhớ của hệ thống.
+  - Sau một khoảng thời gian chờ hồi phục (\`sleepWindowInMilliseconds\`), Circuit Breaker chuyển sang trạng thái **\`HALF-OPEN\` (Nửa mở)**: Cho phép một lượng nhỏ request thăm dò đi qua. Nếu các request này thành công, mạch tự động đóng lại (**\`CLOSED\`**); nếu vẫn thất bại, mạch tiếp tục ngắt để bảo vệ hệ thống.
+* **Mẫu Hình Phân Vùng Cách Ly Tài Nguyên (Bulkhead Pattern):**
+  - Lấy cảm hứng từ các vách ngăn kín nước trong thân tàu thủy: Ngăn không cho nước từ một khoang bị thủng tràn sang làm chìm toàn bộ con tàu.
+  - Trong kiến trúc phần mềm, Bulkhead cô lập tài nguyên độc lập (chia nhỏ Connection Pools, Worker Pools, và CPU/RAM Limits) cho từng phân hệ nghiệp vụ khác nhau. Sự cố nghẽn mạng ở phân hệ Xuất báo cáo dung lượng lớn (Report Generation) bị giới hạn trong phân vùng tài nguyên của nó, bảo đảm $100\\%$ không ảnh hưởng đến phân hệ Đặt hàng và Đăng nhập của người dùng.
 
 ---
 
@@ -598,12 +612,19 @@ export function simulateCircuitBreaker(
       duration: '60 phút',
       tag: 'Observability & OpenTelemetry',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: TẤM BẢN ĐỒ X-QUANG ĐA CHIỀU VS TIẾNG HÉT TRONG RỪNG RẬM
+# 1. BỐI CẢNH KỸ THUẬT: BA TRỤ CỘT CỦA PRODUCTION OBSERVABILITY & TRUY VẾT PHÂN TÁN VỚI OPENTELEMETRY (ARCHITECTURAL CONTEXT & OBSERVABILITY)
 
-Khi một hệ thống phân tán phục vụ hàng triệu người dùng bị sự cố:
-* **Logging vô định hình cũ kỹ (Tiếng hét giữa rừng rậm - Plaintext Logs):** Lập trình viên viết \`console.log("Lỗi rồi anh em ơi: " + err)\`. Giữa 100 chiếc máy chủ in ra hàng triệu dòng text mỗi phút: Không ai biết lỗi đó phát sinh từ HTTP request nào, của khách hàng nào, và đã đi qua những service nào! Kỹ sư thức trắng đêm mò từng dòng log trong vô vọng.
-* **Structured Logging (Tập hồ sơ bệnh án chuẩn hóa JSON):** Mọi dòng log bắt buộc phải xuất ra định dạng JSON có cấu trúc chuẩn hóa: \`{ timestamp, level, traceId, spanId, service, userId, durationMs, error }\`. Các công cụ phân tích (Elasticsearch, Loki, Datadog) có thể lọc, đếm, vẽ biểu đồ và cảnh báo trong nháy mắt!
-* **Distributed Tracing & OpenTelemetry (Sợi chỉ đỏ xuyên suốt mê cung):** Khi khách hàng bấm nút "Thanh toán", một mã định danh duy nhất (**\`traceId: "4bf92f3577b34da6"\`**) được sinh ra ngay tại cửa ngõ. Sợi chỉ đỏ này được truyền qua mọi gói tin HTTP Header (\`traceparent\`), xuyên qua Gateway -> Order Service -> Payment Service -> Database -> Redis. Khi có sự cố hoặc API chạy chậm, kỹ sư mở OpenTelemetry/Jaeger lên: **Nhìn thấy toàn bộ dòng thời gian dạng biểu đồ Gantt chi tiết từng mili giây của từng mắt xích!**
+Khi một hệ thống phân tán bao gồm hàng chục dịch vụ chạy trên các cụm Kubernetes phục vụ hàng triệu người dùng, việc điều tra sự cố (Troubleshooting) và phân tích nguyên nhân gốc rễ (Root Cause Analysis) không thể dựa vào phương pháp ghi log văn bản tự do truyền thống (\`console.log\`):
+* **Sự Thất Bại Của Plaintext Logs Trong Môi Trường Cloud-Native:**
+  - Giữa một cụm gồm 100 Container in ra hàng triệu dòng text ngẫu nhiên mỗi phút: Khi một người dùng phản ánh "Đơn hàng bị trừ tiền nhưng không nhận được vé", kỹ sư hoàn toàn không thể biết lỗi phát sinh từ request nào, do Worker nào xử lý và đã đi qua những mắt xích nào trong mạng lưới.
+  - Plaintext logs không thể tìm kiếm, không thể lọc theo trường (Field Indexing), không thể tổng hợp chỉ số (Aggregation) và tiêu tốn dung lượng lưu trữ khổng lồ mà không mang lại giá trị chẩn đoán.
+* **Ba Trụ Cột Của Khả Năng Quan Sát Toàn Diện (The Three Pillars of Observability):**
+  - **1. Structured Logging (Ghi log có cấu trúc chuẩn hóa):** Toàn bộ nhật ký ứng dụng bắt buộc phải xuất ra định dạng JSON chuẩn: \`{ timestamp, level, traceId, spanId, service, userId, durationMs, error }\`. Cho phép các hệ thống thu thập log tập trung (Grafana Loki, Elasticsearch/ELK, Datadog) lập chỉ mục trường dữ liệu, vẽ biểu đồ cảnh báo và lọc lỗi trong nháy mắt.
+  - **2. Metrics (Chỉ số đo lường hiệu năng):** Các bộ đếm định lượng (Counters, Gauges, Histograms) phản ánh sức khỏe hệ thống: Tần suất yêu cầu (RPS), tỉ lệ lỗi ($4\\text{xx}/5\\text{xx}$ Rate), mức tiêu thụ CPU/RAM, và độ trễ phân vị (**P95/P99 Latency**) cung cấp qua endpoint Prometheus (\`/metrics\`).
+  - **3. Distributed Tracing (Truy vết phân tán theo chuẩn W3C TraceContext):** Khi một HTTP Request chạm vào API Gateway, một định danh duy nhất (**\`traceId\`**) được sinh ra. Mã định danh này được truyền tuần tự qua mọi gói tin mạng (qua HTTP Header \`traceparent\`), xuyên suốt các dịch vụ: \`Gateway -> OrderService -> PaymentService -> Database -> Redis\`. Thông qua công cụ chuẩn hóa **OpenTelemetry (OTel)** và Jaeger, kỹ sư có thể quan sát một biểu đồ Gantt chi tiết: Biết chính xác câu lệnh SQL nào ở tầng cuối cùng chiếm mất $1.2$ giây trong tổng số $1.5$ giây của toàn bộ luồng yêu cầu!
+* **Kubernetes Health Probes (Cơ Chế Phục Hồi Tự Động):**
+  - **Liveness Probe:** Giám sát xem tiến trình Node.js có bị kẹt (Deadlock, Event Loop Lag vô hạn) hay không. Nếu Liveness Probe thất bại, Kubernetes lập tức khai tử và tái sinh Container (Pod Restart).
+  - **Readiness Probe:** Giám sát xem Pod đã sẵn sàng tiếp nhận lưu lượng mạng từ người dùng hay chưa (đã kết nối xong Database, nạp xong Cache và tải xong cấu hình). Nếu Readiness Probe thất bại, Pod tạm thời bị rút khỏi Load Balancer (Service Endpoint), ngăn chặn việc người dùng nhận lỗi $502/503$ trong quá trình khởi động hoặc triển khai phiên bản mới (Zero-Downtime Rolling Deployment).
 
 ---
 

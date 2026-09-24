@@ -11,11 +11,20 @@ export const chapter1: Sprint = {
       duration: '60 phút',
       tag: 'Hardware & OS Layer',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: KHÁCH GHÉ QUÁN NƯỚC VS TÒA CAO ỐC VẬN HÀNH 24/7
+# 1. BỐI CẢNH KIẾN TRÚC: CLIENT RUNTIME (EPHEMERAL) VS BACKEND RUNTIME (LONG-RUNNING DAEMON)
 
-Để hiểu sự khác biệt bản chất giữa Frontend (Browser) và Backend (Node.js/NestJS):
-* **Browser Runtime (Vị khách ghé quán cà phê):** Người dùng mở một tab trình duyệt, uống ly nước rồi rời đi (đóng tab hoặc F5). Quán nước dọn bàn sạch bóng, toàn bộ ly tách rác rưởi đều được dọn dẹp sạch sẽ không để lại dấu vết. Nếu khách làm đổ nước (rò rỉ RAM), chỉ có đúng cái bàn của vị khách đó bị ướt, không ảnh hưởng đến ai khác trong quán.
-* **Backend Runtime (Tòa cao ốc 50 tầng vận hành liên tục 24/7):** Khi máy chủ khởi động (\`node dist/main.js\`), nó giống như một tòa nhà cao ốc mở cửa đón hàng chục nghìn cư dân cùng sinh sống. Tất cả cư dân dùng chung một bể nước ngầm và một hệ thống thang máy (**Bộ nhớ RAM và Luồng thực thi V8 Heap duy nhất**). Nếu một căn hộ xả chất độc vào bể nước ngầm (lưu state vào Singleton Service), **toàn bộ 10,000 cư dân khác đều bị ngộ độc dữ liệu!** Nếu một căn hộ làm chập điện thang máy (chạy vòng lặp CPU nghẽn Event Loop), **toàn bộ tòa nhà bị tê liệt hoàn toàn!**
+Để thiết kế hệ thống có khả năng chịu tải hàng chục nghìn kết nối đồng thời, kỹ sư Backend bắt buộc phải phân biệt sâu sắc sự đối lập về mô hình vận hành giữa Trình duyệt (Browser) và Máy chủ (Node.js/NestJS):
+
+* **Client Runtime (Vòng đời tạm thời - Ephemeral Lifecycle):**
+  - Trình duyệt hoạt động theo mô hình Sandbox cô lập trên từng Tab. Vòng đời của một trang web thường chỉ kéo dài từ vài giây đến vài phút.
+  - Khi người dùng F5 hoặc đóng Tab, toàn bộ không gian bộ nhớ (V8 Heap, DOM Tree, Event Listeners) lập tức bị hệ điều hành tiêu hủy và thu hồi hoàn toàn.
+  - Một lỗi rò rỉ bộ nhớ (Memory Leak) ở Frontend chỉ ảnh hưởng cục bộ đến duy nhất một người dùng đó mà không thể làm gián đoạn trình duyệt của người khác.
+
+* **Backend Runtime (Tiến trình trường tồn - Long-Running Process Daemon):**
+  - Khi máy chủ khởi động (\`node dist/main.js\`), nó là một tiến trình Daemon chạy liên tục hàng tháng, hàng năm để phục vụ hàng triệu request.
+  - **Không gian bộ nhớ dùng chung (Single Shared Heap):** Mọi request gửi đến hệ thống đều chia sẻ chung một không gian bộ nhớ ảo (V8 Virtual Address Space) và một luồng thực thi chính (Main Thread).
+  - **Hệ quả của ô nhiễm trạng thái (Shared State Contamination):** Nếu kỹ sư vô tình lưu dữ liệu của một request vào thuộc tính của một \`Singleton Service\` (ví dụ: \`this.activeTenantId = req.user.tenantId\`), giá trị này sẽ rò rỉ sang các request của các người dùng khác (Data Bleed / Cross-tenant Leakage) — một lỗi bảo mật nghiêm trọng cấp P0.
+  - **Hệ quả của nghẽn luồng (Thread Starvation):** Nếu một request chạy một vòng lặp nặng chiếm CPU trong 3 giây (ví dụ: tính toán mã hóa đồng bộ hoặc duyệt mảng đệ quy), luồng chính bị chiếm giữ khiến toàn bộ 10,000 request khác trên cùng máy chủ bị treo cứng (Gateway Timeout 504).
 
 ---
 
@@ -256,12 +265,26 @@ export function logMemoryTelemetry(context: string) {
       duration: '60 phút',
       tag: 'V8 Engine Internals',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: PHIÊN DỊCH VIÊN TỨC THÌ VS ĐẠI SỨ BIÊN DỊCH
+# 1. BỐI CẢNH KỸ THUẬT: ĐÁNH ĐỔI GIỮA INTERPRETATION VÀ JIT SPECULATIVE COMPILATION
 
-Hãy tưởng tượng cách V8 Engine xử lý mã JavaScript giống như việc giao tiếp giữa một vị Khách nước ngoài và một Thủ tướng:
-* **Ignition (Người Phiên Dịch Tức Thì):** Khách nói câu nào, phiên dịch viên dịch ngay câu đó sang tiếng bản địa (Bytecode) để Thủ tướng hiểu và phản hồi ngay lập tức không có độ trễ khởi động (**Low Startup Latency**). Nhưng nếu một câu phải nói đi nói lại 1 triệu lần, việc dịch từng từ thủ công sẽ trở nên chậm chạp!
-* **TurboFan (Đại Sứ Biên Dịch Tối Ưu):** Khi thấy khách lặp lại một câu nói quen thuộc cả nghìn lần ("Hot Function"), Đại sứ TurboFan bước vào. Ông ấy quan sát kiểu dữ liệu ("À, ông này luôn nói về 2 con số nguyên") và biên dịch hẳn câu nói đó thành **Mã máy tối ưu cực nhanh (Machine Assembly Code)** để CPU chạy trực tiếp.
-* **Deoptimization (Sự cố thất lễ):** Đột nhiên ở lần thứ 1,000,001, vị khách không truyền số nguyên nữa mà truyền vào một chuỗi văn bản kỳ lạ! Giả định của TurboFan bị sụp đổ hoàn toàn. V8 lập tức hủy bỏ mã máy tối ưu, "đuổi" Đại sứ TurboFan ra và gọi lại người Phiên dịch viên Ignition để dịch từng từ một (**Deoptimization Bailout**). Toàn bộ hệ thống bị giật lag CPU vì sự cố đổi kiểu này!
+Trong thiết kế trình biên dịch hiện đại, các ngôn ngữ tĩnh (C++, Rust, Go) được biên dịch trước (Ahead-Of-Time — AOT) thành mã máy Assembly tối ưu trực tiếp cho tập lệnh CPU. Ngược lại, JavaScript là ngôn ngữ kịch bản có kiểu dữ liệu động (Dynamically Typed) và tuân thủ đặc tả ECMAScript linh hoạt.
+
+Mỗi phép toán đơn giản như \`a + b\` trong JavaScript thực chất đòi hỏi hàng chục lệnh kiểm tra ngầm tại runtime: \`a\` có phải số nguyên không? \`b\` có phải chuỗi cần nối không? Đối tượng có ghi đè hàm \`valueOf()\` hay \`Symbol.toPrimitive\` không? Nếu chỉ dựa vào trình thông dịch tuần tự (Pure Interpreter), JavaScript sẽ chậm hơn C++ từ 50 đến 100 lần.
+
+V8 Engine giải quyết bài toán này bằng **Kiến trúc Pipeline Hai Tầng (Two-Tier Execution Pipeline)**:
+
+* **Tầng 1 - Bytecode Interpreter (Ignition):**
+  - Ưu tiên hàng đầu: **Độ trễ khởi động tức thì (Zero Startup Latency)** và **tiết kiệm bộ nhớ (Compact Bytecode Footprint)**.
+  - Ignition biên dịch AST thành các chỉ lệnh Bytecode nhỏ gọn và thực thi ngay lập tức. Trong quá trình thông dịch, Ignition gắn các sensor ngầm để thu thập **Vector phản hồi kiểu dữ liệu (Type Feedback Vector)** tại mỗi điểm gọi hàm (Call Site): ghi nhận các kiểu dữ liệu thực tế truyền vào qua các lần chạy.
+
+* **Tầng 2 - Optimizing JIT Compiler (TurboFan):**
+  - Khi một hàm được thực thi nhiều lần và đạt ngưỡng tần suất cao (trở thành "Hot Function"), V8 kích hoạt TurboFan để biên dịch hàm đó thành mã máy Assembly nguyên bản.
+  - **Tối ưu hóa phỏng đoán (Speculative Optimization):** Dựa vào Type Feedback của Ignition, TurboFan đưa ra giả định lạc quan: *"Hàm này đã được gọi 10,000 lần và luôn nhận vào 2 số nguyên 31-bit (Smi)"*. Nhờ giả định đó, TurboFan loại bỏ toàn bộ các bước kiểm tra kiểu runtime, sinh ra chuỗi lệnh Assembly tối ưu trực tiếp trên CPU registers với hiệu năng tương đương mã C++.
+
+* **Hiện tượng Thoát Lui Ngoại Lệ (Deoptimization Bailout):**
+  - Nếu tại lần gọi thứ 10,001, mã nguồn bất ngờ truyền vào một tham số khác kiểu (ví dụ: truyền \`String\` hoặc một Object có cấu trúc thuộc tính bị xáo trộn), giả định của TurboFan lập tức bị sụp đổ.
+  - V8 buộc phải kích hoạt cơ chế **Deoptimization (Bailout)**: tái cấu trúc lại khung ngăn xếp (On-Stack Replacement — OSR) từ mã máy tối ưu ngược trở lại khung thông dịch Bytecode của Ignition.
+  - Việc rơi vào chu kỳ tối ưu rồi lại hủy tối ưu (Deopt Loop) là nguyên nhân hàng đầu gây ra hiện tượng **CPU Spikes** và **P99 Latency Spikes** bất thường trong các hệ thống Backend Node.js tải cao.
 
 ---
 
@@ -510,11 +533,24 @@ export function runShapeBenchmark() {
       duration: '60 phút',
       tag: 'Garbage Collection & Profiling',
       theory: `
-# 1. ẨN DỤ TRỰC QUAN: ĐỘI VỆ SINH BÀN ĂN VS TỔNG DỌN DẸP KHO HÀNG
+# 1. BỐI CẢNH KỸ THUẬT: QUẢN TRỊ BỘ NHỚ TỰ ĐỘNG & ĐỘ TRỄ STOP-THE-WORLD (STW)
 
-Thuật toán thu gom rác của V8 được chia làm 2 cấp độ dựa trên **Giả thuyết Thế hệ (Generational Hypothesis)**: *Đa số các object sinh ra đều chết ngay sau vài mili-giây*:
-* **Young Generation (Đội Dọn Bàn Ăn Nhanh - Minor GC / Scavenge):** Giống như một quán ăn đông đúc chia làm 2 khu bàn: Khu A (\`From-Space\`) và Khu B (\`To-Space\`). Khách ngồi ăn ở Khu A. Khi Khu A đầy, nhân viên chạy vào: ai còn đang ăn dở thì **bế nguyên đĩa thức ăn sang Khu B xếp ngay ngắn** (sao chép object sống). Còn lại toàn bộ rác rưởi ở Khu A bị xúc bỏ sạch sẽ chỉ trong 1 thao tác dọn bàn cực nhanh (~1-2ms)! Sau đó Khu B trở thành khu ăn mới.
-* **Old Generation (Tổng Dọn Dẹp Kho Hàng Lớn - Major GC / Mark-Sweep-Compact):** Những món đồ sống sót qua 2 lần chuyển bàn sẽ được thăng cấp chuyển vào Kho Lưu Trữ Dài Hạn. Vì kho hàng này cực kỳ khổng lồ (vài GB), đội vệ sinh không thể xúc bỏ tùy tiện được mà phải làm 3 bước thận trọng: **Đánh dấu (Marking)** $\rightarrow$ **Quét rác vào danh sách trống (Sweeping)** $\rightarrow$ **Dồn các thùng hàng lại sát nhau để triệt tiêu lỗ hổng phân mảnh (Compacting)**. Nếu kho hàng bị rò rỉ đồ đạc không thể dọn, máy chủ sẽ bị sập vì **OOM (Out of Memory)**!
+Trong phát triển phần mềm Backend, việc quản lý bộ nhớ thủ công (như \`malloc()\` và \`free()\` trong C/C++) trao cho kỹ sư quyền kiểm soát tối đa nhưng đi kèm rủi ro bảo mật nghiêm trọng (Use-After-Free, Buffer Overflow, Double Free). V8 Engine sử dụng cơ chế **Thu gom rác tự động (Automated Garbage Collection — GC)** để quản lý vòng đời bộ nhớ Heap.
+
+Tuy nhiên, trong các hệ thống phân tán và ứng dụng backend hiệu năng cao, cơ chế GC tự động đặt ra một thách thức kỹ thuật lớn: **Hiện tượng Dừng Toàn Bộ Luồng Thực Thi (Stop-The-World Latency)**.
+
+* **Bản chất của Stop-The-World (STW):**
+  Khi Garbage Collector cần rà soát đồ thị con trỏ tham chiếu (Root Reference Graph) để xác định object nào còn sống và object nào đã chết, nó bắt buộc phải tạm dừng toàn bộ luồng thực thi JavaScript (V8 Main Thread). Nếu tiến trình GC kéo dài 200ms - 500ms, toàn bộ HTTP requests đến máy chủ trong khoảng thời gian đó đều bị đóng băng, làm vọt chỉ số P99 Latency và gây đứt kết nối WebSocket / gRPC.
+
+* **Giả Thuyết Thế Hệ Yếu (Weak Generational Hypothesis):**
+  Các nhà khoa học máy tính nhận thấy một quy luật thực nghiệm phổ quát trong phần mềm: **"Đại đa số các đối tượng trong bộ nhớ chết đi ngay sau khi chúng vừa được tạo ra"**.
+  - Trong một dịch vụ Backend NestJS: 95% object sinh ra (Request DTO, URL params, local scope variables, validation errors) chỉ tồn tại trong vòng đời vài mili-giây của một HTTP request và trở thành rác ngay sau khi response được trả về.
+  - Chỉ có khoảng 5% object (Database Connection Pool, Cache instances, Singleton Services, cấu hình hệ thống) là có nhu cầu tồn tại lâu dài suốt vòng đời máy chủ.
+
+* **Giải pháp Kiến trúc Phân Tầng Bộ Nhớ (Generational GC Architecture):**
+  Dựa trên quy luật trên, V8 chia vùng nhớ Heap thành hai phân vùng tách biệt:
+  - **Young Generation (Vùng Nhớ Trẻ):** Kích thước nhỏ (16MB - 64MB). Sử dụng thuật toán **Scavenger** sao chép cực nhanh chỉ trong ~1-2ms, dọn dẹp các object ngắn hạn mà không làm gián đoạn hệ thống.
+  - **Old Generation (Vùng Nhớ Già):** Chứa các object sống sót qua nhiều chu kỳ GC. Sử dụng thuật toán **Mark-Sweep-Compact** kết hợp kỹ thuật đánh dấu tăng tiến (Incremental Marking) và xử lý nền song song (Concurrent Sweeping) để triệt tiêu tối đa thời gian dừng luồng STW.
 
 ---
 

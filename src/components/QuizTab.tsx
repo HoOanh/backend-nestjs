@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Lesson } from '../data/curriculum.ts';
+import { shuffleQuestionOptions, type RandomizedQuestion } from '../utils/examRandomizer.ts';
 import { FormattedText } from './FormattedText.tsx';
 
 interface QuizTabProps {
@@ -10,6 +11,7 @@ interface QuizTabProps {
 
 interface SavedQuizResult {
   selectedAnswers: Record<string, number>;
+  questions: RandomizedQuestion[];
   isSubmitted: boolean;
   score: number;
   correctCount: number;
@@ -20,37 +22,41 @@ interface SavedQuizResult {
 export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }) => {
   const STORAGE_KEY = `esmiles_quiz_result_${lesson.id}`;
 
+  const [activeQuestions, setActiveQuestions] = useState<RandomizedQuestion[]>([]);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
-  // Restore saved quiz result for this lesson from localStorage
+  // Initialize or restore session when lesson.id changes
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as SavedQuizResult;
-        if (parsed.isSubmitted) {
+        if (parsed.isSubmitted && parsed.questions && parsed.questions.length > 0) {
+          setActiveQuestions(parsed.questions);
           setSelectedAnswers(parsed.selectedAnswers || {});
           setIsSubmitted(true);
           return;
         }
       }
     } catch {}
-    // If no saved submission, reset
+
+    // Initialize with randomized options distribution across A, B, C, D
+    const shuffled = lesson.quiz.map((q, idx) => shuffleQuestionOptions(q, idx));
+    setActiveQuestions(shuffled);
     setSelectedAnswers({});
     setIsSubmitted(false);
     setShowConfirmModal(false);
   }, [lesson.id]);
 
-  const questions = lesson.quiz;
-  const totalQuestions = questions.length;
+  const totalQuestions = activeQuestions.length;
   const answeredCount = Object.keys(selectedAnswers).length;
   const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
   // Calculate score
   let correctCount = 0;
-  questions.forEach((q) => {
+  activeQuestions.forEach((q) => {
     if (selectedAnswers[q.id] === q.correctIndex) {
       correctCount++;
     }
@@ -83,6 +89,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
     try {
       const payload: SavedQuizResult = {
         selectedAnswers,
+        questions: activeQuestions,
         isSubmitted: true,
         score: scorePercent,
         correctCount,
@@ -99,6 +106,9 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
+    // Re-shuffle options for new practice attempt
+    const shuffled = lesson.quiz.map((q, idx) => shuffleQuestionOptions(q, idx));
+    setActiveQuestions(shuffled);
     setSelectedAnswers({});
     setIsSubmitted(false);
     setShowConfirmModal(false);
@@ -115,7 +125,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
               <span className="quiz-badge-count">{totalQuestions} câu hỏi chuyên sâu</span>
             </div>
             <p className="quiz-header-desc">
-              Bộ câu hỏi được thiết kế theo chuẩn phỏng vấn & thiết kế hệ thống Senior Backend. ĐẠI CA hãy chọn đáp án chính xác nhất trước khi nộp bài.
+              Bộ câu hỏi được thiết kế theo chuẩn phỏng vấn & thiết kế hệ thống Senior Backend. ĐÁP ÁN ĐÃ ĐƯỢC XÁO TRỘN NGẪU NHIÊN trên các vị trí A, B, C, D. ĐẠI CA hãy đọc kỹ câu hỏi và tư duy bản chất trước khi nộp bài.
             </p>
           </div>
 
@@ -182,7 +192,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
 
       {/* 4. List of Questions */}
       <div className="quiz-container">
-        {questions.map((q, idx) => {
+        {activeQuestions.map((q, idx) => {
           const selectedIdx = selectedAnswers[q.id];
           const hasAnswered = selectedIdx !== undefined;
           const isCorrect = selectedIdx === q.correctIndex;

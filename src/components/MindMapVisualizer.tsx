@@ -267,194 +267,373 @@ export function renderMemoryLayout(text: string, title?: string): string {
 }
 
 /**
- * 2. Renderer: Sơ Đồ Tư Duy Chuẩn Creately / XMind (Radial 2-Way Mindmap)
+ * 2. Renderer: Kiến Trúc Phân Tầng Hệ Thống (Enterprise Layered Stack) & Sơ Đồ Tư Duy (Radial Mindmap)
  */
 export function renderLayeredStack(text: string, title?: string): string {
   const displayTitle = title || 'BẢN ĐỒ TẦNG BẬC HỆ THỐNG (SYSTEM TAXONOMY MAP)';
+  const uniqueId = 'tax_' + Math.random().toString(36).substring(2, 9);
 
-  // Trường hợp đặc thù Sơ đồ 1 của Chapter 1 (Hardware / Kernel / Libuv / V8 Engine)
+  // Trường hợp đặc thù Sơ đồ 1 của Chapter 1 (Hardware / Kernel / Libuv / V8 Engine / NestJS)
   if (text.includes('HARDWARE LAYER') || text.includes('TẦNG VẬT LÝ')) {
     return `
-      <div class="creately-mindmap-board">
-        <div class="creately-mindmap-header">
-          <div class="mindmap-title-wrap">
-            <span class="mindmap-type-icon">🧠</span>
-            <span class="mindmap-main-title">${escapeHtml(displayTitle)}</span>
+      <div class="system-architecture-board" id="${uniqueId}">
+        <!-- Header với Tab Switcher -->
+        <div class="arch-board-header">
+          <div class="arch-title-wrap">
+            <span class="arch-icon">🏗️</span>
+            <div>
+              <span class="arch-main-title">${escapeHtml(displayTitle)}</span>
+              <span class="arch-subtitle">Kiến trúc đa tầng từ Phần cứng vật lý đến NestJS Application Framework</span>
+            </div>
           </div>
-          <div class="creately-header-actions">
-            <span class="creately-badge">CREATELY RADIAL MINDMAP</span>
-            <span class="creately-hint">↔️ Kéo vuốt ngang để xem toàn cảnh các nhánh</span>
+          <div class="arch-view-switcher">
+            <button class="arch-tab-btn active" onclick="
+              const board = document.getElementById('${uniqueId}');
+              board.querySelector('.arch-stack-container').style.display = 'flex';
+              board.querySelector('.arch-radial-container').style.display = 'none';
+              board.querySelectorAll('.arch-tab-btn').forEach(b => b.classList.remove('active'));
+              this.classList.add('active');
+            ">
+              🏗️ Kiến Trúc Phân Tầng (Stack)
+            </button>
+            <button class="arch-tab-btn" onclick="
+              const board = document.getElementById('${uniqueId}');
+              board.querySelector('.arch-stack-container').style.display = 'none';
+              board.querySelector('.arch-radial-container').style.display = 'flex';
+              board.querySelectorAll('.arch-tab-btn').forEach(b => b.classList.remove('active'));
+              this.classList.add('active');
+            ">
+              🧠 Sơ Đồ Tư Duy (Mindmap)
+            </button>
           </div>
         </div>
 
-        <div class="creately-canvas-viewport">
-          <div class="creately-mindmap-layout">
-            <!-- CÁNH TRÁI (LEFT WING) -->
-            <div class="mindmap-wing wing-left">
-              <!-- NHÁNH 1 (TÍM) -->
-              <div class="branch-cluster branch-purple">
-                <div class="branch-stem-card">
-                  <span class="branch-stem-icon">⚙️</span>
-                  <div class="branch-stem-info">
-                    <div class="branch-stem-title">TẦNG VẬT LÝ & PHẦN CỨNG</div>
-                    <div class="branch-stem-sub">Hardware Cores & Memory Bus</div>
-                  </div>
-                  <div class="branch-sticker sticker-purple">David [1-10ns]</div>
+        <!-- VIEW 1: KIẾN TRÚC PHÂN TẦNG ĐA TẦNG CHUẨN XÁC (DEFAULT) -->
+        <div class="arch-stack-container" style="display: flex;">
+          <!-- TẦNG 4: NESTJS APPLICATION LAYER (TRÊN CÙNG) -->
+          <div class="arch-tier-card tier-app">
+            <div class="tier-card-header header-app">
+              <div class="tier-badge-wrap">
+                <span class="tier-number-badge badge-app">TIER 04</span>
+                <span class="tier-scope-tag">BUSINESS LOGIC & TRANSPORT</span>
+              </div>
+              <div class="tier-title">TẦNG ỨNG DỤNG DOANH NGHIỆP (NESTJS APPLICATION FRAMEWORK)</div>
+            </div>
+            <div class="tier-components-grid">
+              <div class="component-block block-app">
+                <div class="comp-head">
+                  <span class="comp-icon">🎮</span>
+                  <strong>Controllers & Routers</strong>
                 </div>
-                <div class="branch-leaves-list list-left">
-                  <div class="leaf-node leaf-purple">
-                    <span class="leaf-icon">⚡</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">CPU Cores & L1/L2/L3 Cache</div>
-                      <div class="leaf-sub">Xung nhịp GHz, độ trễ nano-giây (1-10ns)</div>
+                <p>Tiếp nhận HTTP request, ánh xạ URL, validate payload qua DTO và ValidationPipe.</p>
+              </div>
+              <div class="component-block block-app">
+                <div class="comp-head">
+                  <span class="comp-icon">⚙️</span>
+                  <strong>Services & Domain Logic</strong>
+                </div>
+                <p>Singleton Providers xử lý nghiệp vụ thuần túy, tuyệt đối không lưu trạng thái request.</p>
+              </div>
+              <div class="component-block block-app">
+                <div class="comp-head">
+                  <span class="comp-icon">🗄️</span>
+                  <strong>Repositories & Cache</strong>
+                </div>
+                <p>TypeORM / Prisma giao tiếp database (PostgreSQL), Redis Client lưu cache phân tán.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONNECTOR 3: NestJS IoC & Event Demux -->
+          <div class="arch-connector-bridge bridge-app-runtime">
+            <div class="connector-line"></div>
+            <div class="connector-pill pill-app-runtime">
+              <span class="connector-direction">▲</span>
+              <span>NestJS Inversion of Control (IoC) & V8 Main Thread Callback Dispatcher</span>
+              <span class="connector-direction">▼</span>
+            </div>
+            <div class="connector-line"></div>
+          </div>
+
+          <!-- TẦNG 3: NODE.JS RUNTIME ENGINE (LIBUV + V8) -->
+          <div class="arch-tier-card tier-runtime">
+            <div class="tier-card-header header-runtime">
+              <div class="tier-badge-wrap">
+                <span class="tier-number-badge badge-runtime">TIER 03</span>
+                <span class="tier-scope-tag">CORE ENGINE RUNTIME</span>
+              </div>
+              <div class="tier-title">TẦNG RUNTIME CẤP THẤP (NODE.JS / LIBUV & V8 JIT ENGINE)</div>
+            </div>
+            <div class="tier-runtime-split">
+              <!-- Cột 1: Libuv Internals -->
+              <div class="runtime-column col-libuv">
+                <div class="column-header">
+                  <span class="col-icon">🔄</span>
+                  <strong>Libuv Core (Asynchronous I/O Engine)</strong>
+                </div>
+                <div class="comp-sub-list">
+                  <div class="sub-item">
+                    <span class="item-bullet">⚡</span>
+                    <div>
+                      <strong>Libuv Event Loop (1 Main Thread):</strong>
+                      <span>Tuần hoàn 6 pha (Timers, Pending, Poll, Check, Close) điều phối mọi sự kiện I/O.</span>
                     </div>
                   </div>
-                  <div class="leaf-node leaf-purple">
-                    <span class="leaf-icon">🧠</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">RAM Bus Vật Lý (32GB)</div>
-                      <div class="leaf-sub">Băng thông cao, độ trễ ~50-100ns</div>
-                    </div>
-                  </div>
-                  <div class="leaf-node leaf-purple">
-                    <span class="leaf-icon">💾</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">NVMe SSD & Card Mạng (NIC)</div>
-                      <div class="leaf-sub">I/O lưu trữ đĩa và thiết bị ngoại vi</div>
+                  <div class="sub-item">
+                    <span class="item-bullet">🧵</span>
+                    <div>
+                      <strong>Libuv Worker Threadpool (4 Threads):</strong>
+                      <span>Xử lý bất đồng bộ các tác vụ blocking: crypto băm, fs đọc ghi file, dns.lookup.</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- NHÁNH 2 (XANH LÁ) -->
-              <div class="branch-cluster branch-green">
-                <div class="branch-stem-card">
-                  <span class="branch-stem-icon">🐧</span>
-                  <div class="branch-stem-info">
-                    <div class="branch-stem-title">TẦNG LINUX OS KERNEL</div>
-                    <div class="branch-stem-sub">Socket Multiplexing & Queues</div>
-                  </div>
-                  <div class="branch-sticker sticker-green">Anne [Syscalls]</div>
+              <!-- Cột 2: V8 Memory Architecture -->
+              <div class="runtime-column col-v8">
+                <div class="column-header">
+                  <span class="col-icon">🚀</span>
+                  <strong>V8 Engine & Bộ Nhớ RSS (Google V8 Internals)</strong>
                 </div>
-                <div class="branch-leaves-list list-left">
-                  <div class="leaf-node leaf-green">
-                    <span class="leaf-icon">📑</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">File Descriptor Table</div>
-                      <div class="leaf-sub">Quản lý Socket Port 3000 [FD: 12]</div>
+                <div class="comp-sub-list">
+                  <div class="sub-item">
+                    <span class="item-bullet">🥞</span>
+                    <div>
+                      <strong>V8 Stack Space (LIFO):</strong>
+                      <span>Lưu Call Frames và biến nguyên thủy, tự động pop khi hàm return (0% GC overhead).</span>
                     </div>
                   </div>
-                  <div class="leaf-node leaf-green">
-                    <span class="leaf-icon">📥</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Kernel TCP Buffers</div>
-                      <div class="leaf-sub">Hàng đợi Receive Queue / Send Queue</div>
+                  <div class="sub-item">
+                    <span class="item-bullet">🌱</span>
+                    <div>
+                      <strong>V8 Heap (Young & Old Gen):</strong>
+                      <span>Young Gen (Scavenge ~1ms) và Old Gen (Mark-Sweep-Compact giải phóng rác và chống phân mảnh).</span>
                     </div>
                   </div>
-                  <div class="leaf-node leaf-green">
-                    <span class="leaf-icon">🎯</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Epoll / Kqueue Ready List</div>
-                      <div class="leaf-sub">Theo dõi hàng chục nghìn Socket cùng lúc O(1)</div>
-                    </div>
-                  </div>
-                  <div class="leaf-node leaf-green">
-                    <span class="leaf-icon">🔌</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">System Calls Bridge</div>
-                      <div class="leaf-sub">epoll_ctl, epoll_wait, read/write syscalls</div>
+                  <div class="sub-item">
+                    <span class="item-bullet">⚙️</span>
+                    <div>
+                      <strong>C++ Non-Heap (External Memory):</strong>
+                      <span>Node.js Buffers cấp phát qua malloc(), nằm ngoài sự kiểm soát của V8 GC.</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- TÂM TRUNG TÂM (CENTRAL HUB) -->
-            <div class="mindmap-central-hub">
-              <div class="hub-ring-pulse"></div>
-              <div class="hub-inner-circle">
-                <span class="hub-icon">🧠</span>
-                <div class="hub-title">KIẾN TRÚC NODE.JS</div>
-                <div class="hub-subtitle">SYSTEM TAXONOMY</div>
-                <div class="hub-core-tag">CORE ENGINE</div>
+          <!-- CONNECTOR 2: Libuv C++ System Bindings -->
+          <div class="arch-connector-bridge bridge-runtime-kernel">
+            <div class="connector-line"></div>
+            <div class="connector-pill pill-runtime-kernel">
+              <span class="connector-direction">▲</span>
+              <span>Libuv C++ Bindings & POSIX Syscall Bridge (Event Demultiplexing)</span>
+              <span class="connector-direction">▼</span>
+            </div>
+            <div class="connector-line"></div>
+          </div>
+
+          <!-- TẦNG 2: LINUX OS KERNEL & SOCKET MULTIPLEXING -->
+          <div class="arch-tier-card tier-kernel">
+            <div class="tier-card-header header-kernel">
+              <div class="tier-badge-wrap">
+                <span class="tier-number-badge badge-kernel">TIER 02</span>
+                <span class="tier-scope-tag">OPERATING SYSTEM LAYER</span>
+              </div>
+              <div class="tier-title">TẦNG NHÂN HỆ ĐIỀU HÀNH (LINUX OS KERNEL & I/O MULTIPLEXING)</div>
+            </div>
+            <div class="tier-components-grid">
+              <div class="component-block block-kernel">
+                <div class="comp-head">
+                  <span class="comp-icon">📑</span>
+                  <strong>File Descriptor Table</strong>
+                </div>
+                <p>Quản lý Socket Port 3000 <code>[FD: 12]</code> với cờ phi chặn <code>O_NONBLOCK</code>.</p>
+              </div>
+              <div class="component-block block-kernel">
+                <div class="comp-head">
+                  <span class="comp-icon">📥</span>
+                  <strong>Kernel TCP Buffers</strong>
+                </div>
+                <p>Hàng đợi Receive Queue (RX) và Send Queue (TX) do mạng quản lý trong bộ nhớ kernel.</p>
+              </div>
+              <div class="component-block block-kernel">
+                <div class="comp-head">
+                  <span class="comp-icon">🎯</span>
+                  <strong>Epoll / Kqueue Multiplexing</strong>
+                </div>
+                <p>Giám sát 10,000+ socket đồng thời với độ phức tạp <code>O(1)</code>, đánh thức tiến trình qua Ready List.</p>
+              </div>
+              <div class="component-block block-kernel">
+                <div class="comp-head">
+                  <span class="comp-icon">🗺️</span>
+                  <strong>Virtual Memory & Page Tables</strong>
+                </div>
+                <p>Quản lý Resident Set Size (RSS), nạp trang bộ nhớ (Page Fault) và ngăn ngừa OOM Killer.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONNECTOR 1: Hardware Bus & Interrupts -->
+          <div class="arch-connector-bridge bridge-kernel-hardware">
+            <div class="connector-line"></div>
+            <div class="connector-pill pill-kernel-hardware">
+              <span class="connector-direction">▲</span>
+              <span>Hardware Interrupts (IRQ), DMA Controllers & Memory Bus Protocols</span>
+              <span class="connector-direction">▼</span>
+            </div>
+            <div class="connector-line"></div>
+          </div>
+
+          <!-- TẦNG 1: PHYSICAL HARDWARE LAYER (NỀN TẢNG DƯỚI CÙNG) -->
+          <div class="arch-tier-card tier-hardware">
+            <div class="tier-card-header header-hardware">
+              <div class="tier-badge-wrap">
+                <span class="tier-number-badge badge-hardware">TIER 01</span>
+                <span class="tier-scope-tag">PHYSICAL INFRASTRUCTURE</span>
+              </div>
+              <div class="tier-title">TẦNG VẬT LÝ & PHẦN CỨNG (CPU, RAM & I/O DEVICES)</div>
+            </div>
+            <div class="tier-components-grid">
+              <div class="component-block block-hardware">
+                <div class="comp-head">
+                  <span class="comp-icon">⚡</span>
+                  <strong>CPU Cores & L1/L2/L3 Cache</strong>
+                </div>
+                <p>Xung nhịp GHz, truy xuất Cache siêu tốc độ trễ <strong>1 - 10 nanoseconds</strong>.</p>
+              </div>
+              <div class="component-block block-hardware">
+                <div class="comp-head">
+                  <span class="comp-icon">🧠</span>
+                  <strong>RAM Bus Vật Lý (DDR4 / DDR5)</strong>
+                </div>
+                <p>Băng thông bộ nhớ chính, độ trễ vật lý <strong>~50 - 100 nanoseconds</strong>.</p>
+              </div>
+              <div class="component-block block-hardware">
+                <div class="comp-head">
+                  <span class="comp-icon">💾</span>
+                  <strong>NVMe SSD & Card Mạng (NIC)</strong>
+                </div>
+                <p>Ổ cứng đĩa và Network Interface Card 10Gbps, độ trễ <strong>10 - 100 microseconds</strong>.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: SƠ ĐỒ TƯ DUY TỎA NHÁNH (RADIAL CONCEPT MINDMAP - KHÔNG CÓ TÊN NGƯỜI) -->
+        <div class="arch-radial-container" style="display: none;">
+          <div class="clean-radial-layout">
+            <!-- CÁNH TRÁI: HARDWARE & OS LAYER -->
+            <div class="radial-wing wing-left">
+              <!-- Nhánh 1: Tầng Vật Lý -->
+              <div class="radial-branch-group branch-violet">
+                <div class="radial-branch-title">
+                  <span class="b-icon">⚙️</span>
+                  <div>
+                    <strong>TẦNG VẬT LÝ & PHẦN CỨNG</strong>
+                    <span>Latency 1 - 100ns</span>
+                  </div>
+                </div>
+                <div class="radial-leaves-column">
+                  <div class="radial-leaf">
+                    <span class="l-bullet">⚡</span>
+                    <div><strong>CPU Cores & Cache:</strong> 1-10ns clock</div>
+                  </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">🧠</span>
+                    <div><strong>RAM Bus DDR4/DDR5:</strong> ~50-100ns</div>
+                  </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">💾</span>
+                    <div><strong>NVMe SSD & NIC:</strong> 10-100μs I/O</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nhánh 2: Tầng Linux Kernel -->
+              <div class="radial-branch-group branch-emerald">
+                <div class="radial-branch-title">
+                  <span class="b-icon">🐧</span>
+                  <div>
+                    <strong>TẦNG NHÂN LINUX OS KERNEL</strong>
+                    <span>Kernel Syscalls O(1)</span>
+                  </div>
+                </div>
+                <div class="radial-leaves-column">
+                  <div class="radial-leaf">
+                    <span class="l-bullet">📑</span>
+                    <div><strong>File Descriptor Table:</strong> Socket [FD: 12]</div>
+                  </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">📥</span>
+                    <div><strong>Kernel TCP Buffers:</strong> Receive/Send Queue</div>
+                  </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">🎯</span>
+                    <div><strong>Epoll / Kqueue:</strong> Giám sát 10K+ sockets O(1)</div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <!-- CÁNH PHẢI (RIGHT WING) -->
-            <div class="mindmap-wing wing-right">
-              <!-- NHÁNH 3 (VÀNG CAM) -->
-              <div class="branch-cluster branch-amber">
-                <div class="branch-stem-card">
-                  <span class="branch-stem-icon">🔄</span>
-                  <div class="branch-stem-info">
-                    <div class="branch-stem-title">RUNTIME LIBUV INTERNALS</div>
-                    <div class="branch-stem-sub">Event Loop & Worker Threads</div>
+            <!-- TÂM TRUNG TÂM SƠ ĐỒ TƯ DUY -->
+            <div class="radial-hub-center">
+              <div class="radial-hub-circle">
+                <span class="hub-center-icon">🧠</span>
+                <div class="hub-main-text">RUNTIME TAXONOMY</div>
+                <div class="hub-sub-text">HỆ QUẢN TRỊ TOÀN CẢNH</div>
+                <div class="hub-tag">CORE ARCHITECTURE</div>
+              </div>
+            </div>
+
+            <!-- CÁNH PHẢI: RUNTIME INTERNALS & APPLICATION -->
+            <div class="radial-wing wing-right">
+              <!-- Nhánh 3: Libuv Internals -->
+              <div class="radial-branch-group branch-amber">
+                <div class="radial-branch-title">
+                  <span class="b-icon">🔄</span>
+                  <div>
+                    <strong>RUNTIME LIBUV INTERNALS</strong>
+                    <span>Non-blocking Event Loop</span>
                   </div>
-                  <div class="branch-sticker sticker-amber">Mary [Non-blocking]</div>
                 </div>
-                <div class="branch-leaves-list list-right">
-                  <div class="leaf-node leaf-amber">
-                    <span class="leaf-icon">⚡</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Libuv Event Loop</div>
-                      <div class="leaf-sub">Đọc dữ liệu Socket non-blocking trên 1 Main Thread</div>
-                    </div>
+                <div class="radial-leaves-column">
+                  <div class="radial-leaf">
+                    <span class="l-bullet">⚡</span>
+                    <div><strong>Libuv Event Loop:</strong> 1 Main Thread duy nhất</div>
                   </div>
-                  <div class="leaf-node leaf-amber">
-                    <span class="leaf-icon">🧵</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Libuv Threadpool (4 Threads)</div>
-                      <div class="leaf-sub">Chạy crypto băm, fs đĩa cứng, DNS lookup</div>
-                    </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">🧵</span>
+                    <div><strong>Worker Threadpool:</strong> 4 Threads (fs, crypto)</div>
                   </div>
-                  <div class="leaf-node leaf-amber">
-                    <span class="leaf-icon">🌉</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Libuv C-Bindings</div>
-                      <div class="leaf-sub">Cầu nối C++ System Calls vào JavaScript Engine</div>
-                    </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">🌉</span>
+                    <div><strong>Libuv C-Bindings:</strong> Cầu nối Syscalls vào JS</div>
                   </div>
                 </div>
               </div>
 
-              <!-- NHÁNH 4 (HỒNG SAN HÔ) -->
-              <div class="branch-cluster branch-rose">
-                <div class="branch-stem-card">
-                  <span class="branch-stem-icon">🚀</span>
-                  <div class="branch-stem-info">
-                    <div class="branch-stem-title">V8 ENGINE & BỘ NHỚ RSS</div>
-                    <div class="branch-stem-sub">Call Stack & Heap Management</div>
+              <!-- Nhánh 4: V8 Engine & Memory -->
+              <div class="radial-branch-group branch-crimson">
+                <div class="radial-branch-title">
+                  <span class="b-icon">🚀</span>
+                  <div>
+                    <strong>V8 ENGINE & BỘ NHỚ RSS</strong>
+                    <span>Call Stack & GC Heap</span>
                   </div>
-                  <div class="branch-sticker sticker-rose">Mark [GC Engine]</div>
                 </div>
-                <div class="branch-leaves-list list-right">
-                  <div class="leaf-node leaf-rose">
-                    <span class="leaf-icon">🥞</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">V8 Stack Space (LIFO)</div>
-                      <div class="leaf-sub">Call Frames, biến nguyên thủy (0% GC overhead)</div>
-                    </div>
+                <div class="radial-leaves-column">
+                  <div class="radial-leaf">
+                    <span class="l-bullet">🥞</span>
+                    <div><strong>V8 Stack Space:</strong> Call Frames (0% GC overhead)</div>
                   </div>
-                  <div class="leaf-node leaf-rose">
-                    <span class="leaf-icon">🌱</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Young Generation Heap</div>
-                      <div class="leaf-sub">Thuật toán Scavenge (From/To) dọn rác ~1ms</div>
-                    </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">🌱</span>
+                    <div><strong>Young & Old Gen Heap:</strong> Scavenge & Mark-Sweep</div>
                   </div>
-                  <div class="leaf-node leaf-rose">
-                    <span class="leaf-icon">🏛️</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">Old Generation Heap</div>
-                      <div class="leaf-sub">Singletons & Objects sống lâu (Mark-Sweep)</div>
-                    </div>
-                  </div>
-                  <div class="leaf-node leaf-rose">
-                    <span class="leaf-icon">⚙️</span>
-                    <div class="leaf-text">
-                      <div class="leaf-title">C++ Non-Heap Buffers</div>
-                      <div class="leaf-sub">Cấp phát qua malloc(), không chịu giới hạn V8</div>
-                    </div>
+                  <div class="radial-leaf">
+                    <span class="l-bullet">⚙️</span>
+                    <div><strong>C++ Buffers Malloc:</strong> Quản trị ngoài V8 Heap</div>
                   </div>
                 </div>
               </div>
@@ -465,7 +644,7 @@ export function renderLayeredStack(text: string, title?: string): string {
     `;
   }
 
-  // Parser tổng quát cho các Bản đồ phân tầng khác sang Creately Mindmap
+  // Parser tổng quát cho các Bản đồ phân tầng khác (Fallback Parser)
   const lines = text.split('\n');
   const layers: ParsedLayer[] = [];
   let currentLayer: ParsedLayer | null = null;
@@ -475,7 +654,7 @@ export function renderLayeredStack(text: string, title?: string): string {
     if (!rawLine || rawLine.startsWith('┌') || rawLine.startsWith('└') || rawLine.startsWith('├') || rawLine === '│') continue;
 
     const layerMatch = rawLine.match(/(?:│\s*)?(\d+)\.\s+([^│\n]+)(?:│)?/);
-    if (layerMatch && (rawLine.includes('TẦNG') || rawLine.includes('LAYER') || rawLine.includes('PILLARS') || rawLine.includes('TRỤ CỘT') || rawLine.includes('REGISTRY') || rawLine.includes('INDEX') || rawLine.includes('CẤP'))) {
+    if (layerMatch && (rawLine.includes('TẦNG') || rawLine.includes('LAYER') || rawLine.includes('PILLARS') || rawLine.includes('TRỤ CỘT') || rawLine.includes('CẤP'))) {
       if (currentLayer) {
         layers.push(currentLayer);
       }
@@ -507,90 +686,66 @@ export function renderLayeredStack(text: string, title?: string): string {
     return renderCleanBlueprint(text, displayTitle);
   }
 
-  // Chia layers thành 2 cánh Left & Right
-  const mid = Math.ceil(layers.length / 2);
-  const leftLayers = layers.slice(0, mid);
-  const rightLayers = layers.slice(mid);
-
-  const colors = ['purple', 'green', 'amber', 'rose'];
-  const stickers = ['David [Core]', 'Anne [Bridge]', 'Mary [Runtime]', 'Mark [Logic]'];
-
-  const renderWingBranches = (branchLayers: ParsedLayer[], isLeft: boolean, startIndex: number) => {
-    return branchLayers
-      .map((l, idx) => {
-        const color = colors[(startIndex + idx) % colors.length];
-        const sticker = stickers[(startIndex + idx) % stickers.length];
-        const listClass = isLeft ? 'list-left' : 'list-right';
-
-        const leavesHtml = l.items
-          .map((it) => {
-            return `
-              <div class="leaf-node leaf-${color}">
-                <span class="leaf-icon">❖</span>
-                <div class="leaf-text">
-                  <div class="leaf-title">${escapeHtml(it.title)}</div>
-                  ${it.subtitle ? `<div class="leaf-sub">${escapeHtml(it.subtitle)}</div>` : ''}
-                </div>
-              </div>
-            `;
-          })
-          .join('');
-
-        return `
-          <div class="branch-cluster branch-${color}">
-            <div class="branch-stem-card">
-              <span class="branch-stem-icon">🎯</span>
-              <div class="branch-stem-info">
-                <div class="branch-stem-title">${escapeHtml(l.layerTitle)}</div>
-                <div class="branch-stem-sub">Phân nhánh cấp ${escapeHtml(l.layerNumber)}</div>
-              </div>
-              <div class="branch-sticker sticker-${color}">${sticker}</div>
+  // Render các tầng theo thứ tự phân tầng dọc (Vertical Architecture Stack)
+  const tiersHtml = layers
+    .map((l, index) => {
+      const itemsHtml = l.items
+        .map((it) => `
+          <div class="component-block">
+            <div class="comp-head">
+              <span class="comp-icon">❖</span>
+              <strong>${escapeHtml(it.title)}</strong>
             </div>
-            <div class="branch-leaves-list ${listClass}">
-              ${leavesHtml}
-            </div>
+            ${it.subtitle ? `<p>${escapeHtml(it.subtitle)}</p>` : ''}
           </div>
-        `;
-      })
-      .join('');
-  };
+        `)
+        .join('');
+
+      const connectorHtml = index < layers.length - 1
+        ? `
+          <div class="arch-connector-bridge">
+            <div class="connector-line"></div>
+            <div class="connector-pill">
+              <span class="connector-direction">▲</span>
+              <span>Dòng Dữ Liệu & Gọi Hàm Hệ Thống</span>
+              <span class="connector-direction">▼</span>
+            </div>
+            <div class="connector-line"></div>
+          </div>
+        `
+        : '';
+
+      return `
+        <div class="arch-tier-card tier-general">
+          <div class="tier-card-header">
+            <div class="tier-badge-wrap">
+              <span class="tier-number-badge">CẤP ${escapeHtml(l.layerNumber)}</span>
+            </div>
+            <div class="tier-title">${escapeHtml(l.layerTitle)}</div>
+          </div>
+          <div class="tier-components-grid">
+            ${itemsHtml}
+          </div>
+        </div>
+        ${connectorHtml}
+      `;
+    })
+    .join('');
 
   return `
-    <div class="creately-mindmap-board">
-      <div class="creately-mindmap-header">
-        <div class="mindmap-title-wrap">
-          <span class="mindmap-type-icon">🧠</span>
-          <span class="mindmap-main-title">${escapeHtml(displayTitle)}</span>
+    <div class="system-architecture-board">
+      <div class="arch-board-header">
+        <div class="arch-title-wrap">
+          <span class="arch-icon">🏗️</span>
+          <div>
+            <span class="arch-main-title">${escapeHtml(displayTitle)}</span>
+            <span class="arch-subtitle">Mô hình phân tầng kiến trúc chuyên sâu</span>
+          </div>
         </div>
-        <div class="creately-header-actions">
-          <span class="creately-badge">CREATELY RADIAL MINDMAP</span>
-          <span class="creately-hint">↔️ Kéo vuốt ngang để xem toàn cảnh các nhánh</span>
-        </div>
+        <div class="arch-view-badge">ENTERPRISE STACK</div>
       </div>
-
-      <div class="creately-canvas-viewport">
-        <div class="creately-mindmap-layout">
-          <!-- CÁNH TRÁI -->
-          <div class="mindmap-wing wing-left">
-            ${renderWingBranches(leftLayers, true, 0)}
-          </div>
-
-          <!-- TÂM TRUNG TÂM -->
-          <div class="mindmap-central-hub">
-            <div class="hub-ring-pulse"></div>
-            <div class="hub-inner-circle">
-              <span class="hub-icon">🧠</span>
-              <div class="hub-title">${escapeHtml(displayTitle.replace(/^[^a-zA-Z0-9À-ỹ]+/, '').slice(0, 22))}</div>
-              <div class="hub-subtitle">SYSTEM MINDMAP</div>
-              <div class="hub-core-tag">CENTRAL HUB</div>
-            </div>
-          </div>
-
-          <!-- CÁNH PHẢI -->
-          <div class="mindmap-wing wing-right">
-            ${renderWingBranches(rightLayers, false, leftLayers.length)}
-          </div>
-        </div>
+      <div class="arch-stack-container">
+        ${tiersHtml}
       </div>
     </div>
   `;

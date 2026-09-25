@@ -38,7 +38,7 @@ Trong các hệ thống phân tán, do độ trễ mạng, mất kết nối, ho
 │                    │ (Có thể mất tin)   │ Gặp lỗi mạng là mất vĩnh viễn!    │
 ├────────────────────┼────────────────────┼───────────────────────────────────┤
 │ At-Least-Once      │ Ít nhất 1 lần      │ Có cơ chế Retry + Ack. Đảm bảo    │
-│ (Chuẩn Quốc Dân)   │ (KHÔNG BAO GIỜ MẤT)│ $0\\%$ mất tin, nhưng có thể bị duplicate! │
+│ (Chuẩn Quốc Dân)   │ (KHÔNG BAO GIỜ MẤT)│ 0% mất tin, nhưng có thể bị duplicate! │
 ├────────────────────┼────────────────────┼───────────────────────────────────┤
 │ Exactly-Once       │ Chính xác 1 lần    │ Cực kỳ tốn kém (2PC). Trên thực tế│
 │ (Ảo tưởng thuần túy│ (Lý tưởng toán học)│ là: At-Least-Once + Idempotency!  │
@@ -109,33 +109,48 @@ BẠN CẦN CHỌN MESSAGE BROKER CHO HỆ THỐNG?
 | Tiêu Chí So Sánh | HTTP REST Đồng Bộ | BullMQ (Redis) | RabbitMQ | Apache Kafka |
 | :--- | :--- | :--- | :--- | :--- |
 | **Độ trễ tiếp nhận** | Phụ thuộc downstream | ~1ms - 2ms | ~2ms - 5ms | ~2ms - 5ms |
-| **Độ phức tạp hạ tầng** | Không có (Gọi trực tiếp) | Rất thấp (Dùng lại Redis)| Trung bình | Rất cao (Cần ZooKeeper/KRaft) |
-| **Khả năng làm mềm tải**| $0\\%$ (Dễ quá tải DB) | Rất xuất sắc | Cực kỳ xuất sắc | Tối thượng (Hàng triệu msg/s) |
-| **Hỗ trợ Delayed Job** | Khó (Cần DB polling) | Tự nhiên ($100\\%$ mượt mà)| Cần plugin x-delayed | Không hỗ trợ tự nhiên |
+| **Độ phức tạp hạ tầng** | Không có (Gọi trực tiếp) | Rất thấp (Dùng lại Redis)| Trung bình | Rất cao (Cần KRaft) |
+| **Khả năng làm mềm tải**| 0% (Dễ quá tải DB) | Rất xuất sắc | Cực kỳ xuất sắc | Tối thượng (Hàng triệu msg/s) |
+| **Hỗ trợ Delayed Job** | Khó (Cần DB polling) | Tự nhiên (100% mượt mà) | Cần plugin x-delayed | Không hỗ trợ tự nhiên |
 `,
-      realCodeSnippet: `
-import { Injectable, Logger } from '@nestjs/common';
+      realCodeSnippet: `import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
+/**
+ * ADR: Thiết kế Hàng đợi Bất đồng bộ chuẩn Enterprise
+ * - Producer trả về phản hồi 202 Accepted tức thì, không bắt Client chờ downstream
+ * - Áp dụng Job Deduplication (jobId) chống đẩy trùng đơn hàng vào Queue
+ * - Cấu hình Exponential Backoff Retry và tự động dọn dẹp bộ nhớ (removeOnComplete)
+ */
+export interface OrderJobPayload {
+  orderId: string;
+  amount: number;
+  userId: string;
+}
+
 @Injectable()
-export class OrderProducerService {
+export class OrderProducerService implements OnModuleDestroy {
   private readonly logger = new Logger(OrderProducerService.name);
-  private readonly orderQueue: Queue;
+  private readonly orderQueue: Queue<OrderJobPayload>;
 
   constructor() {
-    // Khởi tạo hàng đợi BullMQ kết nối tới Redis
-    this.orderQueue = new Queue('order-processing-queue', {
+    this.orderQueue = new Queue<OrderJobPayload>('order-processing-queue', {
       connection: {
-        host: process.env.REDIS_HOST || 'localhost',
+        host: process.env.REDIS_HOST || '127.0.0.1',
         port: Number(process.env.REDIS_PORT) || 6379,
+        lazyConnect: true,
       },
     });
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    await this.orderQueue.close();
   }
 
   /**
    * Đẩy tác vụ xử lý đơn hàng vào hàng đợi với cấu hình At-Least-Once an toàn
    */
-  public async enqueueOrderJob(orderData: { orderId: string; amount: number }): Promise<string> {
+  public async enqueueOrderJob(orderData: OrderJobPayload): Promise<string> {
     const job = await this.orderQueue.add('process-invoice', orderData, {
       jobId: \`order_\${orderData.orderId}\`, // Chống trùng lặp tin nhắn (Deduplication)
       attempts: 5, // Thử lại tối đa 5 lần nếu thất bại
@@ -144,77 +159,124 @@ export class OrderProducerService {
         delay: 2000,
       },
       removeOnComplete: true, // Tự dọn dẹp job thành công để tiết kiệm RAM Redis
+      removeOnFail: {
+        count: 1000, // Lưu tối đa 1000 job lỗi để kỹ sư phân tích điều tra
+      },
     });
 
     this.logger.log(\`[QUEUE] Đã đẩy đơn hàng \${orderData.orderId} vào hàng đợi. Job ID: \${job.id}\`);
-    return job.id!;
+    return job.id ?? \`order_\${orderData.orderId}\`;
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c8-l1-q1',
-          question: 'Vì sao hầu hết các hệ thống hàng đợi phân tán hiện đại (RabbitMQ, BullMQ, SQS) chỉ bảo đảm cấp độ At-Least-Once thay vì Exactly-Once?',
+          question: 'Vì sao trong hệ thống phân tán, cấp độ phân phối "At-Least-Once Delivery" là tiêu chuẩn thực tế phổ biến nhất thay vì "Exactly-Once Delivery"?',
           options: [
-            'Vì độ trễ và sự cố mạng khiến việc xác nhận ack có thể bị thất lạc, buộc broker phải gửi lại tin nhắn để đảm bảo không mất mát dữ liệu.',
-            'Vì các thuật toán toán học của các viện nghiên cứu khoa học cấm sử dụng cơ chế xử lý một lần trên các máy tính đa nhân.',
-            'Vì giao thức TCP tự động nhân bản tất cả các gói tin mạng lên gấp đôi mỗi khi đường truyền bị suy hao tín hiệu cáp quang.',
-            'Vì cơ sở dữ liệu Redis chỉ hỗ trợ việc đọc ghi dữ liệu theo từng khối một kilobyte chứ không hỗ trợ đọc từng byte đơn lẻ.',
+            'Vì các viện nghiên cứu khoa học máy tính cấm việc triển khai cơ chế Exactly-Once trên nền tảng đám mây.',
+            'Do vấn đề mạng phân tán (Two Generals Problem): gói tin ACK có thể bị rớt trên đường về, buộc Broker phải gửi lại tin nhắn để bảo đảm không bao giờ mất dữ liệu.',
+            'Vì Redis và RabbitMQ chỉ hỗ trợ lưu trữ tối đa 100 tin nhắn trong bộ nhớ tại cùng một thời điểm.',
+            'Vì giao thức TCP tự động nhân bản toàn bộ các gói tin lên gấp ba lần khi xảy ra hiện tượng nghẽn mạng.',
           ],
-          correctIndex: 0,
-          explanation: 'Trong môi trường phân tán (bài toán Two Generals Problem), nếu Consumer xử lý xong tin nhắn nhưng gói tin xác nhận (ACK) gửi về Broker bị rớt mạng, Broker không thể biết Consumer đã làm xong hay chưa. Để đảm bảo không bao giờ mất dữ liệu, Broker bắt buộc phải gửi lại tin nhắn đó cho Consumer khác, dẫn tới cấp độ At-Least-Once (ít nhất 1 lần). Do đó Consumer bắt buộc phải có tính Idempotent.'
+          correctIndex: 1,
+          explanation: 'Trong môi trường mạng phân tán, nếu Consumer đã xử lý xong nhưng gói tin xác nhận ACK gửi về Broker bị rớt mạng, Broker không thể phân biệt được Consumer bị chết hay mạng lag. Để đảm bảo không bao giờ mất dữ liệu (Zero Data Loss), Broker bắt buộc phải gửi lại tin nhắn đó, dẫn đến At-Least-Once Delivery. Consumer do đó bắt buộc phải có tính Idempotent.'
         },
         {
           id: 'c8-l1-q2',
-          question: 'Hiện tượng "Traffic Peak Shaving" (Làm mềm tải) mà Message Queue mang lại cho kiến trúc hệ thống hoạt động dựa trên cơ chế nào?',
+          question: 'Cơ chế "Traffic Peak Shaving" (Làm mềm đỉnh tải) của Message Queue bảo vệ cơ sở dữ liệu quan hệ (RDBMS) như thế nào trong các đợt Flash Sale?',
           options: [
-            'API Gateway gom hàng nghìn request vào Queue trong vài mili giây, sau đó các Worker rút dần dữ liệu ra xử lý theo tốc độ an toàn của Database.',
-            'Hệ thống tự động từ chối phục vụ toàn bộ các khách hàng truy cập bằng điện thoại di động trong các khung giờ cao điểm.',
-            'Cơ sở dữ liệu tự động xóa các bảng lịch sử cũ để nhường toàn bộ không gian đĩa cứng cho việc ghi các đơn hàng mới nhất.',
-            'Tất cả các câu lệnh SQL được chuyển đổi sang thực thi đồng bộ trên một luồng duy nhất của bộ vi xử lý máy chủ.',
+            'API Gateway tiếp nhận hàng chục nghìn request/giây và đẩy nhanh vào Queue, sau đó Worker Pool chủ động kéo dần các Job ra xử lý với tốc độ ổn định an toàn cho DB.',
+            'Hệ thống tự động từ chối phục vụ toàn bộ các khách hàng mới đăng ký tài khoản trong vòng 24 giờ qua.',
+            'Database tự động tạm dừng mọi thao tác kiểm tra khóa ngoại (Foreign Keys) để tăng tốc độ ghi đĩa.',
+            'Tất cả các câu lệnh SQL INSERT được chuyển đổi sang thực thi đồng bộ trên GPU của máy chủ.',
           ],
           correctIndex: 0,
-          explanation: 'Khi có đột biến lưu lượng (Traffic Spike ví dụ 50,000 req/s), nếu đẩy thẳng vào DB thì DB sẽ chết sập. Queue đóng vai trò như một hồ chứa đệm: API Gateway đẩy nhanh các job vào Queue (tốn vài ms), sau đó các Worker đóng vai trò điều tiết, kéo từng đợt job ra xử lý với tốc độ ổn định (ví dụ 1,000 req/s) phù hợp với sức chịu đựng của Database.'
+          explanation: 'Khi có đợt bùng nổ truy cập (ví dụ 50,000 req/s), nếu nện thẳng vào DB thì DB sẽ cạn kiệt Connection Pool và sập ngay lập tức. Message Queue đóng vai trò hồ chứa đệm: API Gateway tiếp nhận cực nhanh vào Queue (tốn 1ms), sau đó Consumer chủ động rút việc theo tốc độ chịu đựng của DB (ví dụ 1,000 req/s), giúp hệ thống vượt qua bão tải êm ả.'
         },
         {
           id: 'c8-l1-q3',
-          question: 'Khi chuyển đổi một API từ mô hình đồng bộ (Synchronous HTTP) sang mô hình bất đồng bộ (Asynchronous Queue), mã trạng thái HTTP chuẩn mực trả về cho Client là gì?',
+          question: 'Khi chuyển đổi một API từ mô hình đồng bộ HTTP sang xử lý bất đồng bộ qua Queue, mã trạng thái HTTP chuẩn mực theo RFC 9110 trả về cho Client là gì?',
           options: [
-            'HTTP 202 Accepted kèm thông tin Job ID để báo hiệu yêu cầu đã được tiếp nhận và sẽ được xử lý ngầm trong hàng đợi.',
-            'HTTP 200 OK kèm toàn bộ dữ liệu kết quả hoàn chỉnh của giao dịch như thể hệ thống đã xử lý xong trong cơ sở dữ liệu.',
-            'HTTP 301 Moved Permanently để yêu cầu trình duyệt chuyển hướng người dùng sang một trang web quảng cáo của đối tác.',
-            'HTTP 504 Gateway Timeout để thông báo cho khách hàng biết hệ thống đang quá tải và cần tải lại trang web sau mười phút.',
+            'HTTP 200 OK kèm thông báo toàn bộ nghiệp vụ phức tạp đã được lưu xong trong cơ sở dữ liệu.',
+            'HTTP 301 Moved Permanently để chuyển hướng người dùng sang trang kiểm tra kết quả giao dịch.',
+            'HTTP 504 Gateway Timeout để thông báo hệ thống đang quá tải và cần thử lại sau mười phút.',
+            'HTTP 202 Accepted kèm thông tin Job ID / Status URI để báo hiệu yêu cầu đã được tiếp nhận hợp lệ và đang xếp hàng xử lý.',
           ],
-          correctIndex: 0,
-          explanation: 'Theo chuẩn RFC 9110, HTTP 202 Accepted là mã chuẩn mực biểu thị: Yêu cầu của bạn đã được máy chủ tiếp nhận hợp lệ và đưa vào hàng đợi xử lý ngầm, nhưng quá trình xử lý chưa hoàn tất. Server thường trả về kèm một job_id hoặc endpoint kiểm tra trạng thái (/tasks/:jobId) để client thăm dò kết quả sau.'
+          correctIndex: 3,
+          explanation: 'HTTP 202 Accepted là mã tiêu chuẩn quốc tế biểu thị: Yêu cầu của bạn đã được máy chủ tiếp nhận hợp lệ và đưa vào hàng đợi xử lý ngầm, nhưng quá trình xử lý chưa hoàn tất. Phản hồi thường trả kèm { jobId, statusUrl } để client có thể chủ động thăm dò (polling) hoặc chờ thông báo Webhook.'
         },
         {
           id: 'c8-l1-q4',
-          question: 'Đặc tính "Decoupling" (Tách rời liên kết) giữa Producer và Consumer mang lại lợi ích vận hành hệ thống nào sau đây?',
+          question: 'Lợi ích vận hành to lớn nhất của tính chất "Decoupling" (Tách rời liên kết) giữa Producer và Consumer là gì?',
           options: [
-            'Hệ thống tiếp nhận đơn hàng (Producer) vẫn hoạt động bình thường ngay cả khi dịch vụ xuất hóa đơn và gửi email (Consumer) bị sập hoàn toàn.',
-            'Tự động tăng tốc độ xử lý của vi xử lý CPU lên gấp năm lần mà không cần nâng cấp phần cứng của các trung tâm dữ liệu.',
-            'Cho phép các kỹ sư backend có thể viết mã nguồn mà không cần tuân thủ bất kỳ quy chuẩn cú pháp nào của ngôn ngữ TypeScript.',
-            'Loại bỏ hoàn toàn sự cần thiết của việc cấu hình các biến môi trường và tệp tin cài đặt của máy chủ ứng dụng.',
+            'Cho phép lập trình viên có thể viết mã nguồn mà không cần khai báo kiểu dữ liệu trong TypeScript.',
+            'Tự động tăng gấp đôi dung lượng bộ nhớ RAM của cụm máy chủ Redis mà không cần trả thêm chi phí.',
+            'Dịch vụ tiếp nhận đơn hàng (Producer) vẫn hoạt động và nhận đơn bình thường của khách hàng ngay cả khi dịch vụ xử lý xuất hóa đơn (Consumer) đang bảo trì hoặc bị sập.',
+            'Loại bỏ hoàn toàn sự cần thiết của việc cấu hình biến môi trường và tệp tin Dockerfile trong dự án.',
+          ],
+          correctIndex: 2,
+          explanation: 'Decoupling giúp tách rời hoàn toàn thời gian sống và trạng thái giữa Producer và Consumer. Nếu dịch vụ gửi Email hoặc In hóa đơn bị sập suốt 2 tiếng, Producer vẫn nhận đơn hàng của khách hàng trên Web và tích lũy vào Queue mà không bị lỗi. Khi dịch vụ Consumer được khởi động lại, nó xử lý sạch sẽ các tin nhắn tồn đọng mà không làm mất bất kỳ đơn nào.'
+        },
+        {
+          id: 'c8-l1-q5',
+          question: 'Trong mô hình kiến trúc điều phối thông điệp, cơ chế "Consumer Pull" (như trong BullMQ / Kafka) có ưu điểm gì vượt trội so với "Broker Push"?',
+          options: [
+            'Tự động mã hóa nội dung tin nhắn sang chuẩn RSA 2048-bit trước khi truyền qua mạng.',
+            'Consumer chủ động kiểm soát tốc độ xử lý (Backpressure Control) dựa trên năng lực thực tế của mình, không bị Broker đẩy dồn dập làm tràn bộ nhớ (Out-Of-Memory).',
+            'Loại bỏ hoàn toàn sự cần thiết của card mạng vật lý trên các máy chủ đám mây.',
+            'Giúp hệ thống không cần lưu trữ dữ liệu tin nhắn trên ổ đĩa hay bộ nhớ RAM.',
+          ],
+          correctIndex: 1,
+          explanation: 'Với mô hình Broker Push, Broker có thể bắn ồ ạt tin nhắn xuống Consumer nhanh hơn tốc độ xử lý của nó, làm tràn bộ đệm RAM của Worker và gây sập tiến trình. Với mô hình Consumer Pull, Worker chỉ chủ động kéo thêm việc khi nó đã xử lý xong tác vụ hiện tại, giải quyết hoàn hảo bài toán áp lực ngược (Backpressure).'
+        },
+        {
+          id: 'c8-l1-q6',
+          question: 'Khi nào một kiến trúc sư hệ thống nên lựa chọn Apache Kafka thay vì BullMQ hoặc RabbitMQ?',
+          options: [
+            'Khi hệ thống cần lưu trữ lượng sự kiện khổng lồ (hàng trăm triệu event/ngày), cần khả năng Replay dữ liệu lịch sử nhiều lần và phục vụ Big Data Analytics.',
+            'Khi ứng dụng chỉ chạy trên một máy tính cá nhân duy nhất và không có kết nối internet.',
+            'Khi hệ thống cần tính năng Delayed Jobs lên lịch sau 3 ngày một cách đơn giản nhất.',
+            'Khi toàn bộ hệ thống được xây dựng bằng kiến trúc Monolith và sử dụng SQLite.',
           ],
           correctIndex: 0,
-          explanation: 'Decoupling nghĩa là Producer không cần biết Consumer là ai, đang sống hay chết, chỉ cần đẩy tin nhắn vào Queue an toàn. Nếu dịch vụ gửi Email hoặc Consumer xử lý hóa đơn bị sập hoặc bảo trì trong 2 tiếng, khách hàng vẫn đặt hàng bình thường trên Web (tin nhắn tích tụ an toàn trong Queue). Khi Consumer bật lại, nó tiếp tục xử lý sạch hàng đợi mà không mất đơn nào.'
+          explanation: 'Apache Kafka được thiết kế như một Distributed Commit Log bền vững. Khác với RabbitMQ hay BullMQ (xóa tin nhắn sau khi tiêu thụ), Kafka lưu trữ sự kiện trên đĩa theo phân vùng (Partitions) trong nhiều ngày/tháng, cho phép nhiều nhóm Consumer khác nhau đọc và tua lại (Replay) dữ liệu lịch sử cho các bài toán phân tích dữ liệu lớn và Event Sourcing.'
+        },
+        {
+          id: 'c8-l1-q7',
+          question: 'Vấn đề "Thứ tự xử lý thông điệp (Message Ordering Guarantee)" trong hệ thống phân tán đa Worker thường được giải quyết như thế nào mà không làm tắc nghẽn toàn bộ hàng đợi?',
+          options: [
+            'Khóa toàn bộ hệ thống lại chỉ cho phép 1 Worker duy nhất trên toàn thế giới hoạt động.',
+            'Chuyển đổi toàn bộ cơ sở dữ liệu sang kiến trúc Blockchain phân tán.',
+            'Sử dụng phân vùng theo khóa (Partitioning by Key, ví dụ: partition theo customerId): Đảm bảo các tin nhắn của cùng một khách hàng luôn đến cùng một Worker theo đúng thứ tự, trong khi các khách hàng khác nhau vẫn xử lý song song.',
+            'Bắt buộc client phải gửi kèm dấu vân tay điện tử của người dùng vào từng tin nhắn HTTP.',
+          ],
+          correctIndex: 2,
+          explanation: 'Bảo đảm thứ tự toàn cục (Global Ordering) trên toàn bộ hệ thống sẽ phá hủy hoàn toàn khả năng mở rộng quy mô (Scale). Giải pháp chuẩn là phân vùng theo khóa (Key-based Partitioning): Mọi sự kiện của Order #123 luôn vào cùng 1 Partition/Worker để bảo đảm thứ tự tuần tự, trong khi Order #124, #125 được xử lý song song trên các Partition khác.'
+        },
+        {
+          id: 'c8-l1-q8',
+          question: 'Mẫu thiết kế "Transactional Outbox Pattern" giải quyết bài toán hóc búa nào khi kết hợp Cơ sở dữ liệu quan hệ với Message Broker?',
+          options: [
+            'Tự động tăng tốc độ nén tệp tin hình ảnh đại diện của người dùng trước khi lưu đĩa.',
+            'Giải quyết lỗi Dual-Write: Đảm bảo việc cập nhật cơ sở dữ liệu và việc xuất bản tin nhắn vào Broker diễn ra nguyên tử (hoặc cùng thành công, hoặc cùng thất bại), không bị tình trạng DB đã commit nhưng Broker sập làm mất tin.',
+            'Tự động chuyển đổi các câu lệnh SQL viết hoa thành viết thường trước khi thực thi.',
+            'Cho phép truy vấn cơ sở dữ liệu PostgreSQL trực tiếp từ giao diện dòng lệnh của Redis.',
+          ],
+          correctIndex: 1,
+          explanation: 'Bài toán Dual-Write: Nếu lưu DB thành công nhưng Broker bị sập trước khi gửi tin nhắn, sự kiện bị mất; nếu gửi Broker trước nhưng DB rollback, Broker gửi tin nhắn rác! Outbox Pattern giải quyết bằng cách lưu luôn tin nhắn vào một bảng "outbox" trong cùng DB Transaction với dữ liệu chính. Một worker riêng biệt (CDC hoặc poller) sau đó đọc bảng outbox và publish vào Broker, đảm bảo tính nguyên tử tuyệt đối.'
         }
       ],
       codeChallenge: {
         id: 'c8-l1-c1',
         title: 'Mô Phỏng Hàng Đợi FIFO Cơ Bản (FIFO Queue Simulator)',
         description: 'Hiện thực hàm \`simulateFifoQueue(operations: Array<{ op: "enqueue" | "dequeue"; val?: string }>): Array<string | null>\`. Hàm nhận vào danh sách các thao tác: với \`"enqueue"\`, thêm \`val\` vào cuối hàng đợi; với \`"dequeue"\`, lấy phần tử đầu tiên ra khỏi hàng đợi và đẩy vào mảng kết quả (nếu hàng đợi rỗng, đẩy \`null\`). Trả về mảng các giá trị đã dequeue.',
-        starterCode: `
-export function simulateFifoQueue(
+        starterCode: `export function simulateFifoQueue(
   operations: Array<{ op: 'enqueue' | 'dequeue'; val?: string }>
 ): Array<string | null> {
   // TODO: Hiện thực mô phỏng hàng đợi FIFO
   return [];
-}
-`,
-        solution: `
-export function simulateFifoQueue(
+}`,
+        solution: `export function simulateFifoQueue(
   operations: Array<{ op: 'enqueue' | 'dequeue'; val?: string }>
 ): Array<string | null> {
   const queue: string[] = [];
@@ -235,8 +297,7 @@ export function simulateFifoQueue(
   }
 
   return results;
-}
-`,
+}`,
         testCases: [
           {
             name: 'Dequeue khi hàng đợi rỗng trả về null',
@@ -253,6 +314,36 @@ export function simulateFifoQueue(
               { op: 'dequeue' }
             ]],
             expected: ['A', 'B']
+          },
+          {
+            name: 'Enqueue hàng loạt rồi dequeue cạn sạch hàng đợi',
+            input: [[
+              { op: 'enqueue', val: 'X' },
+              { op: 'enqueue', val: 'Y' },
+              { op: 'dequeue' },
+              { op: 'dequeue' }
+            ]],
+            expected: ['X', 'Y']
+          },
+          {
+            name: 'Enqueue không truyền val (bỏ qua), sau đó dequeue khi rỗng trả về null',
+            input: [[
+              { op: 'enqueue' },
+              { op: 'dequeue' }
+            ]],
+            expected: [null]
+          },
+          {
+            name: 'Xen kẽ enqueue và dequeue liên tục',
+            input: [[
+              { op: 'enqueue', val: '1' },
+              { op: 'dequeue' },
+              { op: 'enqueue', val: '2' },
+              { op: 'enqueue', val: '3' },
+              { op: 'dequeue' },
+              { op: 'dequeue' }
+            ]],
+            expected: ['1', '2', '3']
           }
         ]
       }
@@ -316,7 +407,7 @@ $$\\text{Delay}(n) = \\text{Base Delay} \\times 2^{n-1} + \\text{Jitter}$$
 * **Lần 3 (n=3):** $2000 \\times 2^2 = 8000\\text{ ms}$ (8 giây).
 * **Lần 4 (n=4):** $2000 \\times 2^3 = 16000\\text{ ms}$ (16 giây).
 
-> **Hiểm họa nếu không có Jitter:** Nếu 1,000 jobs cùng thất bại tại đúng 1 thời điểm (do mạng chập chờn), cả 1,000 jobs sẽ cùng được Retry tại đúng giây thứ 2, rồi lại cùng ập vào tại đúng giây thứ 4... gây ra **Hiện tượng Thallundering Herd (Đàn trâu dẫm đạp)**! Bắt buộc phải cộng thêm Jitter ngẫu nhiên để phân tán đều các đợt retry.
+> **Hiểm họa nếu không có Jitter:** Nếu 1,000 jobs cùng thất bại tại đúng 1 thời điểm (do mạng chập chờn), cả 1,000 jobs sẽ cùng được Retry tại đúng giây thứ 2, rồi lại cùng ập vào tại đúng giây thứ 4... gây ra **Hiện tượng Thundering Herd (Đàn trâu dẫm đạp)**! Bắt buộc phải cộng thêm Jitter ngẫu nhiên để phân tán đều các đợt retry.
 
 ---
 
@@ -371,18 +462,30 @@ JOB XỬ LÝ TRONG WORKER BỊ LỖI?
 | :--- | :--- | :--- | :--- | :--- |
 | **Fixed Delay (Cố định)** | Kém (Bắn dồn dập mỗi 2s)| Ngắn | Rất cao | Tác vụ nội bộ đọc file đĩa |
 | **Exponential Backoff** | Rất tốt (Dãn cách thời gian)| Dài hơn qua từng lần thử| Trung bình | Gọi các API bên ngoài (Stripe, Zalo) |
-| **Exponential + Jitter** | Hoàn hảo nhất | Dài hơn, phân tán mượt mà| Hoàn toàn $0\\%$ | Tiêu chuẩn bắt buộc cho Production |
-| **Không Retry (0 attempts)**| $0\\%$ | Kết thúc ngay lập tức | $0\\%$ | Tác vụ gửi thông báo quảng cáo rác |
+| **Exponential + Jitter** | Hoàn hảo nhất | Dài hơn, phân tán mượt mà| Hoàn toàn 0% | Tiêu chuẩn bắt buộc cho Production |
+| **Không Retry (0 attempts)**| 0% | Kết thúc ngay lập tức | 0% | Tác vụ gửi thông báo quảng cáo rác |
 `,
-      realCodeSnippet: `
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+      realCodeSnippet: `import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 
+/**
+ * ADR: Phân loại lỗi và điều phối Retry trong BullMQ Worker
+ * - Lỗi Tạm thời (Transient Error: Timeout, 503, 429): Ném lỗi để BullMQ kích hoạt Exponential Backoff
+ * - Lỗi Vĩnh viễn (Permanent Error: Cú pháp sai, tài khoản đóng): Hủy bỏ retry ngay lập tức
+ * - Không sử dụng 'any', áp dụng type guard an toàn cho Exception handling
+ */
 export interface EmailJobData {
   recipient: string;
   subject: string;
   templateId: string;
+}
+
+export class UnrecoverableDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnrecoverableDataError';
+  }
 }
 
 @Processor('email-notification-queue')
@@ -395,32 +498,28 @@ export class EmailNotificationConsumer extends WorkerHost {
     );
 
     try {
-      // Giả lập gọi dịch vụ bên thứ ba (ví dụ SendGrid API)
       await this.sendEmailViaProvider(job.data);
-
       this.logger.log(\`[WORKER] Gửi email thành công cho Job \${job.id}\`);
       return { sentAt: new Date().toISOString() };
-    } catch (error: any) {
-      // Phân loại lỗi: Nếu là lỗi dữ liệu sai định dạng (Permanent Error) -> Không retry!
-      if (error?.message === 'INVALID_EMAIL_SYNTAX') {
-        this.logger.error(\`[FATAL] Dữ liệu sai, hủy bỏ retry cho Job \${job.id}\`);
-        throw new Error('UNRECOVERABLE_DATA_ERROR');
+    } catch (error: unknown) {
+      if (error instanceof UnrecoverableDataError) {
+        this.logger.error(\`[FATAL] Dữ liệu sai, hủy bỏ retry cho Job \${job.id}: \${error.message}\`);
+        throw error; // Ngắt retry nếu là lỗi không thể phục hồi
       }
 
-      // Nếu là lỗi mạng tạm thời (Transient Error) -> Ném lỗi để BullMQ kích hoạt Exponential Backoff
-      this.logger.warn(\`[TRANSIENT ERROR] Lỗi mạng khi gửi mail Job \${job.id}. Đang lên lịch retry...\`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown Network Failure';
+      this.logger.warn(\`[TRANSIENT ERROR] Lỗi mạng khi gửi mail Job \${job.id}: \${errorMessage}. Đang retry...\`);
       throw error;
     }
   }
 
   private async sendEmailViaProvider(data: EmailJobData): Promise<void> {
-    if (!data.recipient.includes('@')) {
-      throw new Error('INVALID_EMAIL_SYNTAX');
+    if (!data.recipient || !data.recipient.includes('@')) {
+      throw new UnrecoverableDataError('INVALID_EMAIL_SYNTAX');
     }
-    // Logic gửi mail thực tế...
+    // Giả lập logic gửi email qua third-party SMTP/SendGrid API
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c8-l2-q1',
@@ -438,67 +537,111 @@ export class EmailNotificationConsumer extends WorkerHost {
           id: 'c8-l2-q2',
           question: 'Vì sao trong chiến lược tự động thử lại (Retry) của hàng đợi, kỹ thuật Exponential Backoff bắt buộc nên được kết hợp thêm thành phần Jitter ngẫu nhiên?',
           options: [
-            'Để phân tán thời điểm thử lại của hàng nghìn tác vụ bị lỗi đồng thời tránh gây ra hiện tượng đàn trâu dẫm đạp làm sập dịch vụ bên thứ ba.',
             'Để bảo đảm rằng các tác vụ công việc quan trọng luôn luôn được hoàn thành trước các tác vụ công việc phụ của hệ thống.',
             'Để tự động giải phóng toàn bộ các khóa phân tán trong bộ nhớ RAM của Redis trước khi tiến trình worker bị đóng lại.',
+            'Để phân tán thời điểm thử lại của hàng nghìn tác vụ bị lỗi đồng thời tránh gây ra hiện tượng đàn trâu dẫm đạp (Thundering Herd) làm sập dịch vụ bên thứ ba.',
             'Để mã hóa toàn bộ dữ liệu nội dung công việc thành các chuỗi nhị phân an toàn chống lại các cuộc tấn công mạng.',
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Nếu một sự cố mạng khiến 10,000 jobs cùng thất bại tại một giây, nếu chỉ dùng Exponential Backoff thuần túy, tất cả 10,000 jobs sẽ cùng thức giấc và cùng nện vào hệ thống đích tại đúng giây thứ 2, rồi cùng lặp lại tại giây thứ 4... (Thundering Herd Problem). Thêm Jitter ngẫu nhiên sẽ phân tán 10,000 jobs này rải rác trong khoảng thời gian, giúp hệ thống đích không bị sốc tải.'
         },
         {
           id: 'c8-l2-q3',
           question: 'Trường hợp nào sau đây là lỗi vĩnh viễn (Fatal/Unrecoverable Error) mà Worker TUYỆT ĐỐI KHÔNG NÊN tiếp tục kích hoạt cơ chế thử lại (Retry)?',
           options: [
-            'Dữ liệu payload của công việc bị sai cú pháp hoặc tài khoản người dùng đích đã bị xóa vĩnh viễn khỏi cơ sở dữ liệu.',
             'Cổng kết nối mạng của dịch vụ thanh toán bên ngoài tạm thời bị nghẽn và trả về mã lỗi 429 Too Many Requests.',
+            'Dữ liệu payload của công việc bị sai cú pháp (như email không có dấu @) hoặc tài khoản người dùng đích đã bị xóa vĩnh viễn khỏi cơ sở dữ liệu.',
             'Cơ sở dữ liệu đang thực hiện quá trình tái cấu trúc bảng định kỳ và tạm thời từ chối kết nối mới trong năm giây.',
             'Đường truyền internet quốc tế bị chập chờn do đứt cáp quang biển khiến gói tin TCP bị mất trên đường đi.',
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Retry chỉ có ý nghĩa đối với các lỗi tạm thời (Transient Errors) như nghẽn mạng, timeout, hoặc rate limit. Đối với các lỗi vĩnh viễn do dữ liệu sai bản chất (dữ liệu payload thiếu trường bắt buộc, tài khoản không tồn tại, cú pháp email sai), việc thử lại 100 lần nữa kết quả vẫn chắc chắn thất bại 100%, chỉ làm lãng phí CPU, RAM và tốn quota của hệ thống.'
         },
         {
           id: 'c8-l2-q4',
           question: 'Trong cấu hình tùy chọn của một Job trong BullMQ, cờ "removeOnComplete: true" đóng vai trò quan trọng nào đối với sự ổn định lâu dài của máy chủ Redis?',
           options: [
-            'Tự động xóa sạch dữ liệu của các tác vụ đã hoàn thành thành công khỏi Redis giúp ngăn chặn việc cạn kiệt bộ nhớ RAM theo thời gian.',
             'Tự động sao lưu toàn bộ thông tin chi tiết của tác vụ vào một tệp nén zip trên máy chủ lưu trữ đám mây của doanh nghiệp.',
             'Ngăn chặn tuyệt đối việc người dùng có thể gửi thêm các yêu cầu mới vào hàng đợi trong suốt thời gian hệ thống vận hành.',
             'Chuyển đổi toàn bộ các tác vụ đang chờ xử lý sang định dạng nhị phân siêu nhỏ để giảm bớt băng thông mạng.',
+            'Tự động xóa sạch dữ liệu của các tác vụ đã hoàn thành thành công khỏi Redis giúp ngăn chặn việc cạn kiệt bộ nhớ RAM (OOM) theo thời gian.',
+          ],
+          correctIndex: 3,
+          explanation: 'Nếu không bật removeOnComplete, mỗi job xử lý xong vẫn tiếp tục tồn tại vĩnh viễn dưới dạng một HSET trong RAM của Redis để phục vụ việc xem lại lịch sử. Khi hệ thống xử lý hàng chục triệu jobs mỗi ngày, hàng chục GB RAM của Redis sẽ bị lấp đầy bởi xác các job cũ, dẫn tới lỗi OOM (Out Of Memory) làm sập Redis.'
+        },
+        {
+          id: 'c8-l2-q5',
+          question: 'Cơ chế "Stalled Job Detection" trong BullMQ hoạt động như thế nào để phục hồi một tác vụ khi tiến trình Worker bị sập đột ngột (Kernel OOM Killer)?',
+          options: [
+            'Worker định kỳ gia hạn một khóa Lock (Lock Renewal/Heartbeat) trên Redis khi đang xử lý Job; nếu Worker chết, khóa hết hạn và BullMQ chuyển Job đó về trạng thái Wait để Worker khác xử lý lại.',
+            'Hệ điều hành Linux tự động gửi tín hiệu IPC sang tất cả các máy chủ khác trong cùng mạng LAN.',
+            'Redis tự động xóa bỏ toàn bộ hàng đợi và yêu cầu Producer gửi lại toàn bộ từ đầu.',
+            'Node.js khởi động lại toàn bộ máy chủ vật lý thông qua giao thức IPMI.',
           ],
           correctIndex: 0,
-          explanation: 'Nếu không bật removeOnComplete, mỗi job xử lý xong vẫn tiếp tục tồn tại vĩnh viễn dưới dạng một HSET trong RAM của Redis để phục vụ việc xem lại lịch sử. Khi hệ thống xử lý hàng chục triệu jobs mỗi ngày, hàng chục GB RAM của Redis sẽ bị lấp đầy bởi xác các job cũ, dẫn tới lỗi OOM (Out Of Memory) làm sập Redis.'
+          explanation: 'Khi Worker bốc Job sang trạng thái active, nó chiếm một khóa Lock trên Redis kèm hạn sử dụng (lockDuration ví dụ 30s). Trong lúc xử lý, Worker gửi heartbeat gia hạn khóa liên tục. Nếu Worker bị crash đột ngột, heartbeat dừng lại và lock hết hạn. Một tiến trình Stalled Checker sẽ phát hiện Job active nhưng không có lock hợp lệ, tự động di chuyển Job về hàng đợi Wait để Worker khác cứu nạn.'
+        },
+        {
+          id: 'c8-l2-q6',
+          question: 'Khi Worker xử lý các tác vụ tiêu tốn nặng năng lực CPU (như mã hóa video, nén ảnh, xử lý tệp PDF hàng gigabyte), giải pháp nào giúp tránh làm tắc nghẽn Event Loop của Node.js trong BullMQ?',
+          options: [
+            'Sử dụng các biến cờ toàn cục boolean trong cùng một tệp tin Controller.',
+            'Tăng giá trị thread_pool_size của cơ sở dữ liệu PostgreSQL lên 10,000.',
+            'Giảm tần số quét của màn hình máy chủ điều hành trung tâm dữ liệu.',
+            'Sử Sandboxed Processors (chạy logic xử lý trong các tiến trình con child_process hoặc worker_threads độc lập) được BullMQ hỗ trợ tự nhiên.',
+          ],
+          correctIndex: 3,
+          explanation: 'Nếu chạy tác vụ nặng CPU trực tiếp trong luồng chính của Node.js, Event Loop sẽ bị nghẽn (Block), khiến Worker không thể gửi heartbeat gia hạn lock lên Redis (dẫn đến Job bị coi là Stalled nhầm) và không thể nhận HTTP request mới. BullMQ cung cấp cơ chế Sandboxed Processor: Đưa đường dẫn file xử lý vào Worker, BullMQ tự fork tiến trình con riêng biệt để chạy tác vụ nặng mà không chạm vào Event Loop chính.'
+        },
+        {
+          id: 'c8-l2-q7',
+          question: 'Tính năng FlowProducer trong BullMQ mang lại khả năng kiến trúc nâng cao nào cho hệ thống?',
+          options: [
+            'Chuyển đổi giao diện người dùng của trang web sang chế độ tối tự động.',
+            'Xây dựng cây phụ thuộc công việc phức tạp (Job Tree / Directed Acyclic Graph - DAG), trong đó một Job cha chỉ được kích hoạt khi tất cả các Job con (Children) đã hoàn tất thành công.',
+            'Tự động tăng tốc độ đường truyền internet của người dùng lên mức gigabit.',
+            'Tự động tạo các bản sao lưu hàng ngày của toàn bộ bảng tính Excel trong doanh nghiệp.',
+          ],
+          correctIndex: 1,
+          explanation: 'FlowProducer cho phép mô hình hóa các đồ thị công việc (DAG): Ví dụ, Job "Xuất Báo Cáo Tổng Hợp" phụ thuộc vào 3 Job con: "Lấy dữ liệu Bán Hàng", "Lấy dữ liệu Kho", và "Lấy dữ liệu Nhân sự". FlowProducer đảm bảo 3 Job con chạy song song trên các Worker khác nhau, và chỉ khi cả 3 Job con hoàn tất thì Job cha mới được tự động nạp vào hàng đợi Wait để thực thi.'
+        },
+        {
+          id: 'c8-l2-q8',
+          question: 'Khi triển khai phiên bản mã nguồn mới (Rolling Deployment) trên Kubernetes, làm thế nào để đảm bảo Worker Node.js tắt một cách êm ái (Graceful Shutdown) mà không làm đứt đoạn các Job đang chạy dở?',
+          options: [
+            'Gửi tín hiệu SIGKILL lập tức để giải phóng tài nguyên CPU ngay trong 1 mili giây.',
+            'Lắng nghe tín hiệu SIGTERM/SIGINT, gọi await worker.close() để ngừng nhận thêm Job mới, kiên nhẫn chờ các Job đang active hoàn thành nốt trong thời gian ân hạn trước khi tiến trình thoát.',
+            'Xóa sạch toàn bộ khóa của Redis để các Job đang chạy tự động hủy bỏ.',
+            'Chặn tất cả các địa chỉ IP của mạng nội bộ trong tường lửa iptables.',
+          ],
+          correctIndex: 1,
+          explanation: 'Khi Kubernetes dừng một Pod, nó gửi tín hiệu SIGTERM và cho Pod một khoảng thời gian ân hạn (terminationGracePeriodSeconds, vd 30s). Worker cần hook vào SIGTERM, gọi worker.close(): Lúc này Worker dừng bốc Job mới từ hàng đợi Wait, nhưng vẫn tiếp tục chờ các Job đang active chạy nốt và gửi ACK về Redis rồi mới đóng kết nối, đảm bảo không có giao dịch nào bị đứt gánh giữa chừng.'
         }
       ],
       codeChallenge: {
         id: 'c8-l2-c1',
         title: 'Bộ Tính Toán Thời Gian Chờ Thử Lại (Exponential Backoff Delay Calculator)',
-        description: 'Hiện thực hàm \`calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number\`. Hàm tính toán thời gian chờ theo công thức lũy thừa: \`delay = baseDelayMs * Math.pow(2, attempt - 1)\`. Kết quả không bao giờ được vượt quá \`maxDelayMs\` (dùng \`Math.min\`). Nếu \`attempt < 1\` hoặc \`baseDelayMs <= 0\`, ném ra Error \`"INVALID_INPUT"\`.',
-        starterCode: `
-export function calculateBackoffDelay(
+        description: 'Hiện thực hàm \`calculateBackoffDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number\`. Hàm tính toán thời gian chờ theo công thức lũy thừa: \`delay = baseDelayMs * Math.pow(2, attempt - 1)\`. Kết quả không bao giờ được vượt quá \`maxDelayMs\` (dùng \`Math.min\`). Nếu \`attempt < 1\` hoặc \`baseDelayMs <= 0\` hoặc \`maxDelayMs <= 0\`, ném ra Error \`"INVALID_INPUT"\`.',
+        starterCode: `export function calculateBackoffDelay(
   attempt: number,
   baseDelayMs: number,
   maxDelayMs: number
 ): number {
   // TODO: Hiện thực thuật toán tính delay lũy thừa có chặn trần maxDelay
   return 0;
-}
-`,
-        solution: `
-export function calculateBackoffDelay(
+}`,
+        solution: `export function calculateBackoffDelay(
   attempt: number,
   baseDelayMs: number,
   maxDelayMs: number
 ): number {
-  if (attempt < 1 || baseDelayMs <= 0) {
+  if (attempt < 1 || baseDelayMs <= 0 || maxDelayMs <= 0) {
     throw new Error('INVALID_INPUT');
   }
 
   const rawDelay = baseDelayMs * Math.pow(2, attempt - 1);
   return Math.min(rawDelay, maxDelayMs);
-}
-`,
+}`,
         testCases: [
           {
             name: 'Tính toán lần thử 1 với base 1000ms (phải ra 1000ms)',
@@ -511,14 +654,19 @@ export function calculateBackoffDelay(
             expected: 8000
           },
           {
-            name: 'Thời gian delay bị chạm trần maxDelayMs (60000ms)',
+            name: 'Thời gian delay bị chạm trần maxDelayMs (15000ms)',
             input: [10, 1000, 15000],
             expected: 15000
           },
           {
             name: 'Ném lỗi khi attempt không hợp lệ (< 1)',
             input: [0, 1000, 10000],
-            expected: 'THREW_ERROR'
+            expected: 'ERROR_THROWN'
+          },
+          {
+            name: 'Ném lỗi khi baseDelayMs hoặc maxDelayMs không hợp lệ (<= 0)',
+            input: [2, -500, 10000],
+            expected: 'ERROR_THROWN'
           }
         ]
       }
@@ -542,7 +690,7 @@ Trong các hệ sinh thái xử lý thông điệp quy mô hàng triệu sự ki
   - Hàng đợi chính lập tức được giải phóng để tiếp tục phục vụ các đơn hàng bình thường. Tin nhắn trong DLQ được làm giàu (Enriched) với toàn bộ Stack Trace, lý do lỗi, và số lần đã thử, giúp đội ngũ kỹ sư vận hành có thể phân tích nguyên nhân gốc rễ (Root Cause Analysis), sửa lỗi mã nguồn, và nhấn nút **Replay (Phát lại)** để phục hồi dữ liệu trọn vẹn $100\\%$!
 * **Nguyên Lý Bất Biến Của Consumer (Idempotent Consumer Pattern):**
   - Trong mạng máy tính phân tán, cơ chế giao nhận tin cậy tuân theo chuẩn **At-Least-Once Delivery**: Tin nhắn không bao giờ bị mất, nhưng hoàn toàn có thể bị gửi trùng lặp (ví dụ: Worker đã xử lý xong nhưng kết nối mạng bị đứt trước khi gửi tín hiệu Acknowledgment về Broker, Broker tưởng Worker bị chết nên gửi lại tin nhắn đó cho một Worker khác).
-  - Do đó, mọi Consumer xử lý các tác vụ nhạy cảm tài chính (trừ tiền, gửi hóa đơn, tạo tài khoản) **BẮT BUỘC PHẢI CÓ TÍNH CHẤT BẤT BIẾN (IDEMPOTENT)**: Sử dụng Khóa Idempotency Key (hoặc Unique Job ID) kết hợp kiểm tra trạng thái trên Redis hoặc Database Unique Constraint để đảm bảo: **Dù một tin nhắn có bị gửi lại $100$ lần, hành động nghiệp vụ cũng chỉ được thực thi duy nhất đúng $1$ lần!**
+  - Do đó, mọi Consumer xử lý các tác vụ nhạy cảm tài chính (trừ tiền, gửi hóa đơn, tạo tài khoản) **BẮT BUỘC PHẢI CÓ TÍNH CHẤT BẤT BIẾN (IDEMPOTENT)**: Sử dụng Khóa Idempotency Key (hoặc Unique Job ID) kết hợp kiểm tra trạng thái trên Redis hoặc Database Unique Constraint để đảm bảo: **Dù một tin nhắn có bị gửi lại 100 lần, hành động nghiệp vụ cũng chỉ được thực thi duy nhất đúng 1 lần!**
 
 ---
 
@@ -663,19 +811,28 @@ LÀM THẾ NÀO ĐỂ BẢO VỆ CONSUMER KHÔNG BỊ XỬ LÝ LẶP LẠI?
 ### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược Chống Trùng | Chi Phí Bộ Nhớ | Mức Độ An Toàn Dữ Liệu | Độ Phức Tạp Kiến Trúc | Rủi Ro Vận Hành |
 | :--- | :--- | :--- | :--- | :--- |
-| **Không kiểm tra** | $0\\%$ | Cực kỳ nguy hiểm, mất tiền | $0\\%$ | Khách hàng bị trừ tiền nhiều lần |
+| **Không kiểm tra** | 0% | Cực kỳ nguy hiểm, mất tiền | 0% | Khách hàng bị trừ tiền nhiều lần |
 | **Job ID Deduplication** | Rất thấp (Redis Set) | Tốt ở tầng Ingestion | Thấp | Không bảo vệ được khi Consumer lỗi |
-| **DB processed_messages**| Tốn thêm dung lượng bảng| Tuyệt đối $100\\%$ ACID | Trung bình | Cần dọn dẹp các ID cũ định kỳ |
+| **DB processed_messages**| Tốn thêm dung lượng bảng| Tuyệt đối 100% ACID | Trung bình | Cần dọn dẹp các ID cũ định kỳ |
 | **Dead Letter Queue** | Tốn RAM/Đĩa lưu Job lỗi | Ngăn chặn mất mát dữ liệu | Cần viết script Replay | Phải theo dõi và xử lý trước khi đầy |
 `,
-      realCodeSnippet: `
-import { Injectable, Logger } from '@nestjs/common';
+      realCodeSnippet: `import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+/**
+ * ADR: Idempotent Consumer Pattern trong xử lý thanh toán tài chính
+ * - Bảo đảm tính lũy kế (Idempotent): Dù tin nhắn bị gửi lại nhiều lần do mạng chập chờn,
+ *   tài khoản người dùng cũng chỉ bị trừ tiền duy nhất 1 lần.
+ * - Kiểm tra và lưu vết message_id trong cùng một Transaction nguyên tử của PostgreSQL.
+ */
 export interface PaymentJobPayload {
   transactionId: string;
   accountId: number;
   amount: number;
+}
+
+export interface ProcessedRecord {
+  message_id: string;
 }
 
 @Injectable()
@@ -685,13 +842,12 @@ export class IdempotentPaymentConsumerService {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
-   * Xử lý tin nhắn thanh toán đảm bảo tính Lũy kế (Idempotent Consumer) tuyệt đối
-   * Dù tin nhắn có bị gửi lại 10 lần thì tài khoản cũng chỉ bị trừ tiền đúng 1 lần!
+   * Xử lý tin nhắn thanh toán đảm bảo tính Lũy kế tuyệt đối
    */
   public async processPaymentMessage(payload: PaymentJobPayload): Promise<boolean> {
     return await this.dataSource.transaction(async (manager) => {
-      // 1. Kiểm tra xem Transaction ID này đã từng được ghi nhận xử lý thành công chưa
-      const existing = await manager.query(
+      // 1. Khóa và kiểm tra xem Transaction ID này đã từng được ghi nhận xử lý thành công chưa
+      const existing: ProcessedRecord[] = await manager.query(
         \`SELECT message_id FROM processed_messages WHERE message_id = $1 FOR UPDATE\`,
         [payload.transactionId]
       );
@@ -719,19 +875,18 @@ export class IdempotentPaymentConsumerService {
       return true;
     });
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c8-l3-q1',
           question: 'Vai trò cốt lõi và giá trị vận hành then chốt của một Dead Letter Queue (DLQ) trong kiến trúc hướng sự kiện là gì?',
           options: [
-            'Cô lập các tin nhắn bị lỗi sau nhiều lần thử lại để giải phóng hàng đợi chính và bảo toàn dữ liệu phục vụ điều tra, sửa lỗi.',
             'Tự động xóa vĩnh viễn tất cả các bản ghi có kích thước lớn hơn một megabyte để tiết kiệm tài nguyên cho hệ thống cơ sở dữ liệu.',
             'Tự động tăng tốc độ xử lý của các worker lên gấp mười lần bằng cách vô hiệu hóa hoàn toàn cơ chế kiểm tra tính toàn vẹn gói tin.',
+            'Cô lập các tin nhắn bị lỗi sau nhiều lần thử lại để giải phóng hàng đợi chính, tránh Head-of-Line Blocking và bảo toàn dữ liệu phục vụ điều tra, sửa lỗi.',
             'Chuyển đổi toàn bộ các tin nhắn văn bản thuần túy sang định dạng nhị phân không thể giải mã để nâng cao tính bảo mật.',
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Dead Letter Queue (DLQ) đóng vai trò như một khu vực cách ly: Khi một tin nhắn bị lỗi lặp đi lặp lại nhiều lần (Poison Pill), nó được chuyển sang DLQ để không làm tắc nghẽn hàng đợi chính. Đồng thời, toàn bộ payload và stack trace lỗi được lưu giữ an toàn trong DLQ, cho phép các kỹ sư sửa bug và phát lại (replay) các tin nhắn đó mà không làm mất dữ liệu của khách hàng.'
         },
         {
@@ -750,41 +905,86 @@ export class IdempotentPaymentConsumerService {
           id: 'c8-l3-q3',
           question: 'Phương pháp nào sau đây là giải pháp kỹ thuật chuẩn mực nhất để biến một Consumer xử lý đơn hàng tài chính thành Idempotent Consumer?',
           options: [
-            'Sử dụng bảng processed_messages trong cùng một Transaction cơ sở dữ liệu để ghi nhận và kiểm tra tính duy nhất của message_id.',
             'Sử dụng một biến mảng toàn cục trong bộ nhớ RAM của tiến trình Node.js để lưu trữ danh sách các mã đơn hàng đã xử lý.',
+            'Sử dụng bảng processed_messages trong cùng một Transaction cơ sở dữ liệu để ghi nhận và kiểm tra tính duy nhất của message_id.',
             'Khởi động lại máy chủ cơ sở dữ liệu sau mỗi lần hoàn thành một đơn hàng để giải phóng toàn bộ các kết nối mạng.',
             'Bỏ qua việc lưu trữ lịch sử giao dịch và chỉ cập nhật số dư cuối cùng của người dùng vào lúc nửa đêm.',
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Giải pháp chuẩn mực nhất là sử dụng bảng processed_messages (hoặc cột idempotent_key có UNIQUE constraint) nằm trong cùng Database Transaction với câu lệnh trừ tiền. Khi nhận tin nhắn, Consumer kiểm tra message_id: nếu đã có thì bỏ qua; nếu chưa có thì vừa trừ tiền vừa chèn message_id trong cùng một Transaction nguyên tử, đảm bảo tuyệt đối không bao giờ bị trừ tiền 2 lần.'
         },
         {
           id: 'c8-l3-q4',
-          question: 'Một tin nhắn mang mã độc hoặc dữ liệu sai cú pháp (Poison Pill) nếu không có Dead Letter Queue và giới hạn số lần thử lại sẽ gây ra hậu quả gì?',
+          question: 'Một tin nhắn mang dữ liệu sai schema hoặc lỗi logic nghiêm trọng (Poison Pill Message) nếu không có Dead Letter Queue sẽ gây ra thảm họa nào?',
           options: [
-            'Worker sẽ liên tục xử lý lỗi, ném ngoại lệ và đẩy lại vào đầu hàng đợi, tạo thành một vòng lặp vô tận làm đóng băng toàn bộ tiến trình.',
+            'Worker sẽ liên tục xử lý lỗi, ném ngoại lệ và đẩy lại vào hàng đợi, tạo thành vòng lặp vô tận (Infinite Crash Loop) làm tắc nghẽn toàn bộ hàng trăm nghìn tin nhắn bình thường phía sau (Head-of-Line Blocking).',
             'Toàn bộ ổ đĩa cứng của cụm máy chủ cơ sở dữ liệu sẽ bị xóa sạch dữ liệu do cơ chế bảo vệ phần cứng tự động kích hoạt.',
             'Hệ thống mạng internet của trung tâm dữ liệu sẽ bị ngắt kết nối vật lý để ngăn chặn việc lan truyền mã độc sang máy chủ khác.',
             'Hệ quản trị Redis sẽ tự động chuyển đổi toàn bộ các khóa dữ liệu sang định dạng văn bản thô không thể phục hồi.',
           ],
           correctIndex: 0,
-          explanation: 'Một Poison Pill là tin nhắn mà mã nguồn của bạn chắc chắn sẽ bị crash khi đọc (do bug logic hoặc dữ liệu sai). Nếu không có giới hạn retry và DLQ, Worker sẽ thất bại -> ném lỗi -> Queue đưa tin nhắn quay lại đầu hàng đợi -> Worker lại bốc chính tin nhắn đó và lại crash... tạo thành vòng lặp vô tận (Infinite Crash Loop), làm tê liệt hoàn toàn Worker và ngăn chặn mọi tin nhắn bình thường phía sau.'
+          explanation: 'Một Poison Pill là tin nhắn mà mã nguồn của bạn chắc chắn sẽ bị crash khi đọc. Nếu không có giới hạn retry và DLQ, Worker sẽ thất bại -> ném lỗi -> Queue đưa tin nhắn quay lại đầu hàng đợi -> Worker lại bốc chính tin nhắn đó và lại crash... tạo thành vòng lặp vô tận (Infinite Crash Loop), làm tê liệt hoàn toàn Worker và ngăn chặn mọi tin nhắn bình thường phía sau.'
+        },
+        {
+          id: 'c8-l3-q5',
+          question: 'Sau khi đội ngũ kỹ sư sửa xong lỗi bug trong mã nguồn Consumer, quy trình "DLQ Replay" (Phát lại tin nhắn lỗi) thường diễn ra như thế nào?',
+          options: [
+            'Yêu cầu khách hàng nhập lại toàn bộ thông tin thanh toán từ đầu trên ứng dụng di động.',
+            'Xóa bỏ toàn bộ database và khôi phục từ bản sao lưu tuần trước.',
+            'Sử dụng script đọc tuần tự các Job đang lưu trong DLQ, làm sạch nếu cần, và đẩy ngược lại vào hàng đợi chính (Main Queue) để các Worker phiên bản mới xử lý.',
+            'Tự động tăng số tiền trong tài khoản của toàn bộ khách hàng lên 10%.',
+          ],
+          correctIndex: 2,
+          explanation: 'Mục đích tối thượng của DLQ là bảo toàn dữ liệu. Khi bug đã được vá và deploy lên production, kỹ sư chạy một tác vụ Replay: Bốc các tin nhắn từ hàng đợi DLQ đẩy ngược lại vào hàng đợi chính (Main Queue). Các Worker với phiên bản code mới đã sửa lỗi sẽ tiêu thụ bình thường, bảo đảm 100% dữ liệu không bị thất thoát.'
+        },
+        {
+          id: 'c8-l3-q6',
+          question: 'Trong cơ chế Change Data Capture (CDC) kết hợp Outbox Pattern, công cụ như Debezium theo dõi thành phần nào của Database để bắn sự kiện vào Kafka?',
+          options: [
+            'Database Transaction Log (như WAL trong PostgreSQL hoặc Binlog trong MySQL), hoàn toàn không cần can thiệp hay khóa bảng ở tầng ứng dụng.',
+            'Mỗi phút chạy câu lệnh SELECT * FROM outbox một lần.',
+            'Quét các tệp tin log trong thư mục /var/log/syslog của hệ điều hành Linux.',
+            'Theo dõi các yêu cầu HTTP gửi đến cổng mạng 80 của máy chủ web Nginx.',
+          ],
+          correctIndex: 0,
+          explanation: 'CDC engine (như Debezium) đọc trực tiếp Write-Ahead Log (WAL trong PostgreSQL hoặc Binlog trong MySQL) của database. Mọi thay đổi dữ liệu đã commit vào bảng outbox đều được stream ngay lập tức vào Kafka với độ trễ vài mili giây mà không cần polling DB bằng lệnh SELECT, triệt tiêu 100% chi phí CPU của database.'
+        },
+        {
+          id: 'c8-l3-q7',
+          question: 'Thời gian sống (TTL / Retention Policy) của bảng ghi nhận tin nhắn đã xử lý (processed_messages) nên được thiết lập như thế nào?',
+          options: [
+            'Lưu trữ đúng 5 giây rồi xóa ngay lập tức.',
+            'Lưu trữ vĩnh viễn không bao giờ xóa cho đến khi ổ cứng đầy.',
+            'Lưu trữ tối thiểu bằng thời gian lưu trữ tin nhắn tối đa của Message Broker (ví dụ: 7 đến 14 ngày) kèm tiến trình dọn dẹp nền định kỳ.',
+            'Chỉ lưu trữ trong biến bộ nhớ heap của Node.js mà không lưu xuống đĩa.',
+          ],
+          correctIndex: 2,
+          explanation: 'Nếu xóa quá sớm (ví dụ 10 phút), một tin nhắn bị gửi lại sau 15 phút sẽ bị xử lý trùng. Nếu lưu vĩnh viễn, bảng processed_messages sẽ phình to hàng trăm triệu dòng làm chậm database. Chuẩn mực là lưu bằng hoặc lớn hơn thời gian tối đa mà broker có thể retry hoặc giữ message (ví dụ 7-14 ngày), sau đó chạy cron job dọn dẹp các bản ghi cũ.'
+        },
+        {
+          id: 'c8-l3-q8',
+          question: 'Khi triển khai mô hình Saga phân tán (Distributed Saga Pattern) qua Message Queue, cơ chế nào được dùng để hủy bỏ các giao dịch đã hoàn tất nếu một bước ở giữa bị lỗi?',
+          options: [
+            'Giao dịch bù trừ (Compensating Transactions): Khi bước thanh toán hoặc giao hàng thất bại, một chuỗi sự kiện rollback được phát ra để hoàn tiền và khôi phục kho.',
+            'Gọi lệnh ROLLBACK SQL trên toàn bộ các microservices qua một kết nối JDBC duy nhất.',
+            'Tắt toàn bộ máy chủ cơ sở dữ liệu để hệ thống tự động đưa số dư về 0.',
+            'Gửi thông báo cảnh báo màu đỏ lên màn hình của lập trình viên trực ca.',
+          ],
+          correctIndex: 0,
+          explanation: 'Trong kiến trúc Microservices phân tán với các database độc lập, không thể dùng 2PC (Two-Phase Commit) vì quá chậm và khóa tài nguyên. Thay vào đó, Saga Pattern sử dụng các Giao dịch bù trừ (Compensating Transactions): Ví dụ nếu bước Ship hàng lỗi, một event OrderFailed được phát đi để kích hoạt dịch vụ Payment thực hiện hành động bù (Refund tiền cho khách).'
         }
       ],
       codeChallenge: {
         id: 'c8-l3-c1',
         title: 'Bộ Lọc Tin Nhắn Trùng Lặp Idempotent Consumer (Message Deduplicator)',
         description: 'Hiện thực hàm \`processIdempotentMessages(messages: Array<{ messageId: string; amount: number }>): Array<{ messageId: string; executed: boolean }>\` nhận vào một danh sách các tin nhắn. Với mỗi tin nhắn, nếu \`messageId\` chưa từng xuất hiện, đánh dấu \`executed: true\` và ghi nhớ \`messageId\`. Nếu \`messageId\` đã xuất hiện trước đó trong danh sách, đánh dấu \`executed: false\`. Trả về mảng kết quả tương ứng.',
-        starterCode: `
-export function processIdempotentMessages(
+        starterCode: `export function processIdempotentMessages(
   messages: Array<{ messageId: string; amount: number }>
 ): Array<{ messageId: string; executed: boolean }> {
   // TODO: Hiện thực kiểm tra tính lũy kế của tin nhắn
   return [];
-}
-`,
-        solution: `
-export function processIdempotentMessages(
+}`,
+        solution: `export function processIdempotentMessages(
   messages: Array<{ messageId: string; amount: number }>
 ): Array<{ messageId: string; executed: boolean }> {
   const seen = new Set<string>();
@@ -800,8 +1000,7 @@ export function processIdempotentMessages(
   }
 
   return results;
-}
-`,
+}`,
         testCases: [
           {
             name: 'Xử lý tin nhắn đơn lẻ thành công',
@@ -819,6 +1018,39 @@ export function processIdempotentMessages(
               { messageId: 'msg_001', executed: true },
               { messageId: 'msg_001', executed: false },
               { messageId: 'msg_002', executed: true }
+            ]
+          },
+          {
+            name: 'Xử lý mảng rỗng trả về kết quả rỗng',
+            input: [[]],
+            expected: []
+          },
+          {
+            name: 'Chặn tin nhắn bị lặp lại liên tiếp nhiều lần',
+            input: [[
+              { messageId: 'dup_key', amount: 10 },
+              { messageId: 'dup_key', amount: 20 },
+              { messageId: 'dup_key', amount: 30 },
+              { messageId: 'dup_key', amount: 40 }
+            ]],
+            expected: [
+              { messageId: 'dup_key', executed: true },
+              { messageId: 'dup_key', executed: false },
+              { messageId: 'dup_key', executed: false },
+              { messageId: 'dup_key', executed: false }
+            ]
+          },
+          {
+            name: 'Xử lý chuỗi tin nhắn với các ID hoàn toàn khác nhau',
+            input: [[
+              { messageId: 'id_1', amount: 100 },
+              { messageId: 'id_2', amount: 200 },
+              { messageId: 'id_3', amount: 300 }
+            ]],
+            expected: [
+              { messageId: 'id_1', executed: true },
+              { messageId: 'id_2', executed: true },
+              { messageId: 'id_3', executed: true }
             ]
           }
         ]

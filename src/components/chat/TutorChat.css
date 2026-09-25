@@ -274,6 +274,18 @@
 }
 
 /* 5. Tùy biến TutorCard theo từng Mode */
+.tutor-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 16px);
+  overflow: hidden;
+}
+
 .tutor-card.tutor-mode-docked,
 .tutor-card.tutor-mode-floating {
   margin: 0;
@@ -451,7 +463,18 @@
   box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
 }
 
-/* 8. TutorChat Modern Redesign & Image Upload */
+/* 8. TutorChat Modern Redesign & Core Layout */
+.tutor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
 .tutor-header-brand {
   display: flex;
   align-items: center;
@@ -462,8 +485,8 @@
 
 .tutor-logo-box {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
   background: rgba(2, 132, 199, 0.12);
   border: 1px solid rgba(2, 132, 199, 0.3);
@@ -474,27 +497,21 @@
 }
 
 .tutor-logo-img {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
-}
-
-.tutor-live-dot {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  border: 2px solid var(--bg-surface);
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
 }
 
 .tutor-brand-info {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.tutor-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tutor-main-heading {
@@ -506,6 +523,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.2px;
+}
+
+.tutor-live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+  flex-shrink: 0;
 }
 
 .tutor-sub-heading {
@@ -546,16 +573,245 @@
   border-color: var(--accent-primary);
 }
 
+.tutor-btn-icon.btn-close:hover,
 .tutor-btn-icon.tutor-btn-close:hover {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+/* Messages container */
+.tutor-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(2, 8, 23, 0.04);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
+}
+
+.tutor-messages::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.tutor-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tutor-messages::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 4px;
+}
+
+.tutor-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 165, 233, 0.5);
+}
+
+/* Individual message row */
+.tutor-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.tutor-message.user {
+  flex-direction: row-reverse;
+}
+
+/* Message Avatar */
+.tutor-avatar {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(2, 132, 199, 0.12);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tutor-message.user .tutor-avatar {
+  color: #ffffff;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
 .tutor-avatar-img {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
+}
+
+/* Bubble Wrap & Bubble */
+.tutor-bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100% - 42px);
+  align-items: flex-start;
+  min-width: 0;
+  gap: 6px;
+}
+
+.tutor-message.user .tutor-bubble-wrap {
+  align-items: flex-end;
+}
+
+.tutor-bubble {
+  max-width: 100%;
+  padding: 12px 16px;
+  white-space: normal;
+  border-radius: 14px;
+  background: var(--bg-surface-elevated, #1e293b);
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 13.5px;
+  line-height: 1.6;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  word-break: break-word;
+}
+
+.tutor-message.assistant .tutor-bubble {
+  border-top-left-radius: 4px;
+}
+
+.tutor-message.user .tutor-bubble {
+  background: rgba(14, 165, 233, 0.16);
+  color: var(--text-primary, #f8fafc);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  border-top-right-radius: 4px;
+}
+
+/* Markdown typography in chat - compact & clean spacing */
+.tutor-bubble h1,
+.tutor-bubble h2,
+.tutor-bubble h3,
+.tutor-bubble h4,
+.tutor-bubble h5 {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin: 10px 0 4px;
+  line-height: 1.35;
+}
+
+.tutor-bubble h1:first-child,
+.tutor-bubble h2:first-child,
+.tutor-bubble h3:first-child,
+.tutor-bubble h4:first-child,
+.tutor-bubble h5:first-child {
+  margin-top: 0;
+}
+
+.tutor-bubble h3 { font-size: 15.5px; }
+.tutor-bubble h4 { font-size: 14.5px; }
+.tutor-bubble h5 { font-size: 13.5px; }
+
+.tutor-bubble p {
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+
+.tutor-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.tutor-bubble strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.tutor-bubble em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.tutor-bubble code.tutor-inline-code {
+  font-family: var(--font-mono, monospace);
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
+.tutor-bubble ul,
+.tutor-bubble ol {
+  margin: 6px 0 8px 18px;
+  padding: 0;
+}
+
+.tutor-bubble li {
+  margin-bottom: 4px;
+  line-height: 1.55;
+}
+
+.tutor-bubble li:last-child {
+  margin-bottom: 0;
+}
+
+.tutor-bubble hr.tutor-hr {
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  margin: 10px 0;
+}
+
+.tutor-bubble blockquote.tutor-quote {
+  margin: 8px 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--accent-primary);
+  background: rgba(14, 165, 233, 0.08);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.tutor-bubble .vs-code-editor {
+  margin: 10px 0 12px 0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.tutor-bubble .vs-code-editor .vs-editor-body {
+  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* Typing & Error */
+.tutor-typing {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-left: 40px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tutor-typing span {
+  color: var(--accent-primary);
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+
+.tutor-error {
+  margin: 0 16px 12px;
+  padding: 10px 14px;
+  color: #fca5a5;
+  background: var(--accent-error-bg, rgba(239, 68, 68, 0.12));
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm, 8px);
+  font-size: 13px;
 }
 
 /* Image Attachment & Preview in TutorChat */
@@ -903,7 +1159,65 @@
   box-shadow: none;
 }
 
-/* Light Mode Overrides for Composer */
+/* Light Mode Overrides for TutorChat */
+[data-theme='light'] .tutor-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme='light'] .tutor-header {
+  background: #ffffff;
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme='light'] .tutor-messages {
+  background: #f8fafc;
+}
+
+[data-theme='light'] .tutor-bubble {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+[data-theme='light'] .tutor-message.assistant .tutor-bubble {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+[data-theme='light'] .tutor-message.user .tutor-bubble {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
+[data-theme='light'] .tutor-bubble h1,
+[data-theme='light'] .tutor-bubble h2,
+[data-theme='light'] .tutor-bubble h3,
+[data-theme='light'] .tutor-bubble h4,
+[data-theme='light'] .tutor-bubble h5,
+[data-theme='light'] .tutor-bubble strong {
+  color: #0f172a;
+}
+
+[data-theme='light'] .tutor-bubble hr.tutor-hr {
+  border-top-color: #e2e8f0;
+}
+
+[data-theme='light'] .tutor-bubble code.tutor-inline-code {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+[data-theme='light'] .tutor-bubble blockquote.tutor-quote {
+  background: #f0f9ff;
+  border-left-color: #0284c7;
+  color: #475569;
+}
+
 [data-theme='light'] .tutor-form {
   background: #ffffff;
   border-color: #cbd5e1;

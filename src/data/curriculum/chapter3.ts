@@ -152,130 +152,217 @@ BẠN ĐANG THIẾT KẾ GIAO TIẾP MẠNG CHO HỆ THỐNG NÀO?
 | **Nghẽn Head-of-Line** | Bị nghẽn ở tầng Application | Bị nghẽn ở tầng TCP khi mất gói | Hoàn toàn triệt tiêu HoL Blocking |
 | **Chi phí tính toán CPU** | Rất thấp (dễ parse text) | Trung bình (parse frames) | Cao hơn ở tầng User Space (UDP crypto) |
 `,
-      realCodeSnippet: `
-import { Injectable, Logger } from '@nestjs/common';
+      realCodeSnippet: `// File: src/modules/network/http2/http2-multiplex-client.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - High-Concurrency HTTP/2 Multiplexing Client
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import * as http2 from 'http2';
 
+export interface MultiplexResponse {
+  path: string;
+  statusCode: number;
+  data: string;
+  durationMs: number;
+}
+
+/**
+ * ADR: Tối ưu hóa giao tiếp Microservices bằng HTTP/2 Multiplexing:
+ * - Thay vì tạo hàng trăm kết nối TCP riêng lẻ (gây tốn RTT handshake và TIME_WAIT sockets),
+ *   dịch vụ duy trì một ClientHttp2Session duy nhất và mở các luồng nhị phân (Streams) song song.
+ * - Hỗ trợ tự động phục hồi kết nối khi session bị đứt và giám sát thời gian phản hồi từng stream.
+ */
 @Injectable()
-export class Http2ClientService {
-  private readonly logger = new Logger(Http2ClientService.name);
+export class Http2MultiplexClientService implements OnModuleDestroy {
+  private readonly logger = new Logger(Http2MultiplexClientService.name);
+  private activeSession: http2.ClientHttp2Session | null = null;
 
-  /**
-   * Minh họa gửi nhiều request đồng thời qua cơ chế Multiplexing
-   * trên một kết nối HTTP/2 duy nhất mà không tốn công tạo nhiều TCP sockets
-   */
-  public async fetchMultipleStreamsMultiplexed(
-    targetUrl: string,
-    paths: string[]
-  ): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      // Thiết lập duy nhất 1 phiên kết nối HTTP/2
-      const client = http2.connect(targetUrl);
-      const responses: string[] = [];
-      let completedStreams = 0;
+  public async fetchBatchMultiplexed(baseUrl: string, paths: string[]): Promise<MultiplexResponse[]> {
+    if (!baseUrl || !Array.isArray(paths) || paths.length === 0) {
+      throw new Error('INVALID_HTTP2_REQUEST_PARAMETERS');
+    }
 
-      client.on('error', (err) => {
-        this.logger.error('HTTP/2 Session Error', err);
-        reject(err);
-      });
+    const session = this.getOrCreateSession(baseUrl);
 
-      paths.forEach((path, index) => {
-        // Mở các stream nhị phân độc lập trên cùng 1 kết nối
-        const req = client.request({
+    const streamPromises = paths.map((path) => {
+      return new Promise<MultiplexResponse>((resolve, reject) => {
+        const startTime = Date.now();
+        const req = session.request({
           [http2.constants.HTTP2_HEADER_SCHEME]: 'https',
           [http2.constants.HTTP2_HEADER_METHOD]: 'GET',
           [http2.constants.HTTP2_HEADER_PATH]: path,
         });
 
-        let data = '';
+        let statusCode = 200;
+        let responseData = '';
+
+        req.on('response', (headers) => {
+          const rawStatus = headers[http2.constants.HTTP2_HEADER_STATUS];
+          statusCode = typeof rawStatus === 'number' ? rawStatus : 200;
+        });
+
         req.setEncoding('utf8');
         req.on('data', (chunk) => {
-          data += chunk;
+          responseData += chunk;
         });
 
         req.on('end', () => {
-          responses[index] = data;
-          completedStreams++;
-          if (completedStreams === paths.length) {
-            client.close();
-            resolve(responses);
-          }
+          resolve({
+            path,
+            statusCode,
+            data: responseData,
+            durationMs: Date.now() - startTime,
+          });
+        });
+
+        req.on('error', (err) => {
+          this.logger.error(\`Stream error on path \${path}: \${err.message}\`);
+          reject(err);
         });
 
         req.end();
       });
     });
+
+    return Promise.all(streamPromises);
   }
-}
-`,
+
+  private getOrCreateSession(baseUrl: string): http2.ClientHttp2Session {
+    if (this.activeSession && !this.activeSession.closed && !this.activeSession.destroyed) {
+      return this.activeSession;
+    }
+
+    this.activeSession = http2.connect(baseUrl);
+    this.activeSession.on('error', (err) => {
+      this.logger.error(\`HTTP/2 Session Error: \${err.message}\`);
+      this.activeSession = null;
+    });
+
+    return this.activeSession;
+  }
+
+  onModuleDestroy(): void {
+    if (this.activeSession && !this.activeSession.closed) {
+      this.activeSession.close();
+      this.activeSession = null;
+    }
+  }
+}`,
       quiz: [
         {
           id: 'c3-l1-q1',
-          question: 'Hiện tượng TCP Head-of-Line Blocking trong HTTP/2 gây ra hậu quả tiêu cực nào khi gặp môi trường mạng có tỉ lệ mất gói tin (Packet Loss)?',
+          question: 'Hiện tượng TCP Head-of-Line (HoL) Blocking trong giao thức HTTP/2 để lại hậu quả nghiêm trọng nhất nào khi đường truyền mạng xuất hiện tỷ lệ mất gói tin (Packet Loss)?',
           options: [
-            'Một gói tin của một luồng bị mất sẽ khiến hệ điều hành giữ lại tất cả các luồng khác trên cùng kết nối TCP đó.',
-            'Toàn bộ kết nối TCP sẽ bị hủy ngay lập tức và client phải thực hiện lại quá trình bắt tay ba bước từ đầu.',
-            'Máy chủ backend sẽ tự động hạ cấp giao thức xuống HTTP/1.0 để truyền tuần tự từng tệp tin văn bản thô.',
-            'Dữ liệu của các luồng khác sẽ bị ghi đè lẫn lộn vào nhau do không có bảng định danh luồng nhị phân độc lập.'
+            'Trình duyệt web sẽ tự động ngắt kết nối TLS và chuyển sang truyền dữ liệu dạng văn bản không mã hóa qua cổng 80.',
+            'Một packet của một stream duy nhất bị rớt sẽ khiến Kernel TCP Stack dừng việc bàn giao toàn bộ dòng byte tiếp theo vào Receive Buffer, làm đóng băng toàn bộ hàng chục stream độc lập khác đang chạy trên cùng kết nối TCP đó cho đến khi gói tin mất được truyền lại.',
+            'Toàn bộ bảng nén tiêu đề HPACK bị hỏng khiến máy chủ phải khởi động lại toàn bộ tiến trình ứng dụng backend.',
+            'Máy chủ sẽ gửi gói tin TCP RST và ép buộc tất cả các client phải thực hiện lại quy trình bắt tay 3 bước từ đầu.'
           ],
-          correctIndex: 0,
-          explanation: 'Dù HTTP/2 phân chia các request thành nhiều stream nhị phân ở tầng ứng dụng, nhưng ở tầng giao vận, toàn bộ các stream này đều đi qua đúng một luồng byte tuần tự của giao thức TCP. Khi một packet TCP bị mất, TCP stack của hệ điều hành bắt buộc phải hoãn bàn giao mọi dữ liệu phía sau cho đến khi packet bị mất được truyền lại thành công, làm tắc nghẽn toàn bộ các stream khác.'
+          correctIndex: 1,
+          explanation: 'Điểm yếu cốt lõi của HTTP/2 là chạy multiplexing trên 1 kết nối TCP duy nhất. Vì TCP bảo đảm thứ tự byte nghiêm ngặt ở tầng giao vận, nếu 1 packet bị mất (dù thuộc stream nào), kernel phải giữ lại toàn bộ dữ liệu tiếp theo để chờ retransmission, làm tê liệt đồng loạt mọi stream khác trên kết nối đó.'
         },
         {
           id: 'c3-l1-q2',
-          question: 'Vì sao giao thức HTTP/3 chuyển sang sử dụng giao thức UDP kết hợp với QUIC thay vì tiếp tục sử dụng TCP truyền thống?',
+          question: 'Giao thức HTTP/3 chuyển sang chạy trên nền tảng QUIC (sử dụng UDP) nhằm đạt được đột phá kiến trúc mang tính quyết định nào?',
           options: [
-            'Để triệt tiêu triệt để hiện tượng nghẽn luồng chéo giữa các stream và hỗ trợ chuyển mạng không gián đoạn kết nối.',
-            'Vì UDP có khả năng mã hóa dữ liệu mặc định ở tầng phần cứng nhanh hơn giao thức bảo mật tầng truyền tải TLS.',
-            'Vì các thiết bị định tuyến mạng trên thế giới chỉ cho phép băng thông cao nhất đối với các gói tin UDP không xác nhận.',
-            'Để loại bỏ hoàn toàn các trường thông tin Header của HTTP nhằm giúp giảm kích thước gói tin xuống mức tối thiểu.'
+            'Loại bỏ hoàn toàn sự cần thiết của chứng chỉ số SSL/TLS giúp giảm chi phí mua chứng chỉ hàng năm cho doanh nghiệp.',
+            'Cho phép máy chủ gửi dữ liệu trực tiếp vào bộ nhớ RAM của card mạng (NIC) mà không thông qua hệ điều hành.',
+            'Tự động nhân bản các gói tin mạng gửi qua nhiều đường truyền song song nhằm tăng gấp 4 lần tốc độ tải trang.',
+            'Quản lý các stream độc lập ở tầng ứng dụng (Application Layer Flow Control), cho phép mất gói ở một stream không ảnh hưởng đến các stream khác (triệt tiêu hoàn toàn HoL Blocking) và hỗ trợ Connection Migration (giữ nguyên kết nối khi đổi IP mạng).'
           ],
-          correctIndex: 0,
-          explanation: 'QUIC chạy trên UDP cho phép kiểm soát việc truyền lại lỗi độc lập trên từng Stream mà không phụ thuộc vào hàng đợi tuần tự cứng nhắc của TCP, triệt tiêu hoàn toàn Head-of-Line Blocking. Ngoài ra, QUIC dùng Connection ID thay vì bộ tứ IP/Port, cho phép người dùng chuyển từ Wifi sang 4G (Connection Migration) mà không bị đứt kết nối hay phải bắt tay lại.'
+          correctIndex: 3,
+          explanation: 'QUIC chạy trên UDP nên không bị ràng buộc bởi hàng đợi tuần tự tầng kernel của TCP. Từng stream trong HTTP/3 được kiểm soát lỗi và luồng độc lập, loại bỏ hoàn toàn TCP HoL Blocking. Hơn nữa, QUIC định danh kết nối bằng Connection ID thay vì bộ tứ IP/Port, cho phép người dùng chuyển từ Wifi sang 4G mà không đứt kết nối.'
         },
         {
           id: 'c3-l1-q3',
-          question: 'Tính năng 0-RTT Connection Resumption trong giao thức TLS 1.3 và QUIC mang lại lợi ích gì lớn nhất cho trải nghiệm người dùng?',
+          question: 'Tính năng 0-RTT Connection Resumption trong TLS 1.3 và QUIC mang lại lợi ích gì vượt trội, đồng thời tiềm ẩn rủi ro an ninh mạng nào mà kỹ sư backend phải lưu ý?',
           options: [
-            'Cho phép client gửi kèm dữ liệu HTTP ngay trong gói tin đầu tiên nếu đã từng kết nối với server trước đó.',
-            'Loại bỏ hoàn toàn sự cần thiết của chứng chỉ số SSL và giúp client kết nối thẳng tới cổng ứng dụng backend.',
-            'Tự động tăng gấp đôi băng thông đường truyền mạng bằng cách kết hợp song song cả sóng vô tuyến và cáp quang.',
-            'Miễn phí hoàn toàn tài nguyên CPU dùng cho việc giải mã các gói tin dữ liệu trên các máy chủ đám mây.'
+            'Cho phép client gửi kèm dữ liệu HTTP ngay trong gói tin đầu tiên khi kết nối lại với máy chủ đã từng bắt tay, nhưng có nguy cơ bị tấn công phát lại (Replay Attack) đối với các request không có tính Idempotent.',
+            'Tự động miễn trừ việc kiểm tra tường lửa Web Application Firewall (WAF), tiềm ẩn nguy cơ bị SQL Injection.',
+            'Cho phép bỏ qua bước giải mã dữ liệu trên máy chủ, nhưng khiến CPU máy chủ phải chạy 100% công suất liên tục.',
+            'Tăng kích thước gói tin tối đa lên 100MB, nhưng có thể làm tràn bộ nhớ đệm router mạng nội bộ.'
           ],
           correctIndex: 0,
-          explanation: 'Với 0-RTT (Zero Round Trip Time), nếu client đã bắt tay với server trước đó và còn lưu khóa phiên (Session Ticket), client có thể mã hóa và gửi dữ liệu HTTP (ví dụ GET request) ngay trong gói tin đầu tiên gửi đi, giúp giảm độ trễ phản hồi xuống đúng bằng 1 chiều truyền sóng thay vì phải đợi nhiều chu kỳ khứ hồi.'
+          explanation: 'Với 0-RTT, client dùng lại khóa phiên cũ (Pre-Shared Key / Session Ticket) để mã hóa dữ liệu gửi ngay trong gói tin đầu tiên (tiết kiệm hoàn toàn 1 RTT). Tuy nhiên, kẻ tấn công có thể nghe lén và gửi lại chính gói tin 0-RTT đó (Replay Attack). Do đó, chuẩn RFC khuyến cáo chỉ cho phép 0-RTT cho các phương thức Safe/Idempotent (như GET), tuyệt đối không áp dụng cho POST thanh toán nếu không có cơ chế Anti-replay token.'
         },
         {
           id: 'c3-l1-q4',
-          question: 'Trong kiến trúc Microservices nội bộ chịu tải cao, việc duy trì HTTP Keep-Alive Connection Pooling mang lại giá trị nào sau đây?',
+          question: 'Trong giao tiếp mạng giữa các Microservices nội bộ chịu tải cao, việc duy trì HTTP Keep-Alive Connection Pooling đem lại giá trị hiệu năng cốt lõi nào?',
           options: [
-            'Tái sử dụng các kết nối TCP đã mở sẵn giúp loại bỏ hoàn toàn chi phí bắt tay ba bước và khởi tạo khóa TLS cho từng request.',
-            'Tự động nén tất cả các bản ghi cơ sở dữ liệu thành tệp nén zip trước khi truyền qua mạng nội bộ trung tâm dữ liệu.',
-            'Bảo đảm tính toàn vẹn của dữ liệu bằng cách ép buộc máy chủ phải lưu trữ toàn bộ lịch sử các gói tin trong RAM.',
-            'Cho phép một microservice đơn lẻ có thể phục vụ vô hạn số lượng kết nối mà không bị giới hạn bởi phần cứng máy chủ.'
+            'Tự động nén tất cả các bản ghi cơ sở dữ liệu thành định dạng nhị phân Protobuf trước khi truyền đi.',
+            'Giúp ứng dụng không bao giờ bị dính lỗi thiếu bộ nhớ RAM do hệ điều hành tự giải phóng Heap.',
+            'Tái sử dụng các kết nối TCP đã bắt tay sẵn, loại bỏ độ trễ của 3-way handshake và TLS handshake cho từng request, đồng thời ngăn chặn cạn kiệt ephemeral ports và trạng thái TIME_WAIT socket trên OS.',
+            'Cho phép microservice bỏ qua bước kiểm tra xác thực JWT để tăng tốc độ phản hồi API.'
+          ],
+          correctIndex: 2,
+          explanation: 'Không dùng Connection Pooling đồng nghĩa mỗi HTTP request phải tạo một kết nối TCP mới: tốn 2-3 RTT handshake, tiêu tốn CPU mã hóa TLS, và khi đóng kết nối sẽ để lại socket ở trạng thái TIME_WAIT (thường 60 giây). Với hàng chục nghìn request/giây, server sẽ cạn kiệt ephemeral port (port exhaustion) và sập mạng.'
+        },
+        {
+          id: 'c3-l1-q5',
+          question: 'Trong chu trình TCP 3-Way Handshake, vai trò của gói tin SYN-ACK từ phía Server gửi về cho Client là gì?',
+          options: [
+            'Server xác nhận đã nhận được Sequence Number khởi tạo của Client (bằng cách gửi Ack = Client_Seq + 1) và đồng thời gửi Sequence Number khởi tạo của chính Server để Client đồng bộ.',
+            'Server gửi toàn bộ nội dung HTML của trang chủ để Client bắt đầu render ngay lập tức trước khi xác nhận.',
+            'Server thông báo đóng kết nối do Client chưa gửi thông tin chứng thực tài khoản người dùng hợp lệ.',
+            'Server yêu cầu hệ điều hành của Client phải cấp quyền Root cho tiến trình mạng của ứng dụng.'
           ],
           correctIndex: 0,
-          explanation: 'Nếu không có Keep-Alive (Connection Pooling), mỗi lần Service A gọi Service B sẽ phải tạo một kết nối TCP mới: tốn 3-way handshake + TLS handshake + chi phí cấp phát File Descriptor và TIME_WAIT socket. Keep-Alive giữ kết nối mở để tái sử dụng cho các request sau, giảm tối đa độ trễ và tải CPU của hệ thống.'
+          explanation: 'Bắt tay 3 bước là quá trình đồng bộ Sequence Number hai chiều: Bước 1: Client gửi SYN (seq=X). Bước 2: Server gửi SYN-ACK (ack=X+1 để xác nhận seq của Client, đồng thời seq=Y của Server). Bước 3: Client gửi ACK (ack=Y+1) để hoàn tất.'
+        },
+        {
+          id: 'c3-l1-q6',
+          question: 'Cơ chế Flow Control (Kiểm soát luồng) trong tầng giao vận TCP sử dụng giải thuật nào để ngăn không cho bên gửi (Sender) làm tràn ngập bộ nhớ đệm của bên nhận (Receiver)?',
+          options: [
+            'Token Bucket Algorithm kết hợp Leaky Bucket ở cấp độ phần cứng card mạng.',
+            'Quét ngẫu nhiên các gói tin và tự động loại bỏ 50% số gói tin đến chậm hơn 10ms.',
+            'Đóng băng tiến trình hệ điều hành của bên gửi mỗi khi bên nhận phát hiện CPU đạt 80%.',
+            'Cửa sổ trượt (Sliding Window / Receive Window - rwnd) được bên nhận liên tục thông báo trong trường TCP Header để bên gửi biết lượng buffer còn trống.'
+          ],
+          correctIndex: 3,
+          explanation: 'TCP Flow Control sử dụng cơ chế Sliding Window. Bên nhận thông báo giá trị Receive Window (rwnd) trong mỗi gói tin TCP ACK gửi về. Bên gửi chỉ được phép truyền tối đa số byte bằng kích thước rwnd đó. Nếu buffer bên nhận đầy (rwnd = 0), bên gửi phải tạm dừng truyền (Zero Window Probe) để tránh tràn bộ nhớ đệm.'
+        },
+        {
+          id: 'c3-l1-q7',
+          question: 'Tại sao kỹ thuật Header Compression (HPACK) trong HTTP/2 lại vượt trội hơn nhiều so với việc nén Gzip truyền thống được thử nghiệm trước đó trong SPDY?',
+          options: [
+            'Vì HPACK sử dụng trí tuệ nhân tạo để đoán trước các header mà client sắp gửi trong tương lai.',
+            'Vì HPACK giải quyết lỗ hổng bảo mật nghiêm trọng CRIME attack vốn khai thác độ dài của chuỗi nén Gzip/Deflate để giải mã cookie phiên làm việc bí mật.',
+            'Vì HPACK chỉ hỗ trợ nén các số nguyên mà không cho phép nén chuỗi ký tự text.',
+            'Vì HPACK được xử lý trực tiếp trên GPU nên tốc độ nén nhanh hơn 1000 lần so với CPU.'
+          ],
+          correctIndex: 1,
+          explanation: 'Trong giao thức SPDY cũ, việc nén HTTP Header bằng gzip/deflate dẫn đến lỗ hổng bảo mật CRIME: kẻ tấn công có thể tiêm nội dung dự đoán vào request và quan sát sự thay đổi độ dài byte của bản nén để dò từng ký tự cookie bí mật. HPACK ra đời dùng Static/Dynamic Huffman Table độc lập, triệt tiêu hoàn toàn rủi ro rò rỉ cookie qua compression oracle.'
+        },
+        {
+          id: 'c3-l1-q8',
+          question: 'Trạng thái kết nối TCP socket TIME_WAIT được hệ điều hành duy trì sau khi đóng kết nối nhằm phục vụ mục đích kỹ thuật sống còn nào?',
+          options: [
+            'Để hệ điều hành quét virus và mã độc còn sót lại trong gói tin trước khi giải phóng bộ nhớ.',
+            'Để chờ người dùng đăng nhập lại mà không cần nhập lại mật khẩu trong vòng 2 phút.',
+            'Đảm bảo các gói tin bị trễ (delayed/duplicate packets) trên mạng Internet có đủ thời gian biến mất (tối đa 2MSL), ngăn chúng bị nhận nhầm bởi một kết nối mới mở trùng IP/Port sau đó, đồng thời đảm bảo gói ACK cuối cùng tới được đối tác.',
+            'Để cho phép máy chủ ghi toàn bộ nhật ký kết nối ra tệp tin log trên đĩa cứng mà không làm nghẽn RAM.'
+          ],
+          correctIndex: 2,
+          explanation: 'Trạng thái TIME_WAIT (thường kéo dài 2 x Maximum Segment Lifetime, tức 1-2 phút) thuộc về bên chủ động đóng kết nối (Active Close). Nó bảo đảm 2 điều: (1) Nếu gói ACK cuối cùng bị rớt, bên kia gửi lại FIN thì bên này vẫn còn socket để gửi lại ACK; (2) Các gói tin cũ lạc trên mạng có đủ thời gian chết đi, không làm ô nhiễm kết nối mới được tạo cùng cặp IP/Port.'
         }
       ],
       codeChallenge: {
         id: 'c3-l1-c1',
         title: 'Xây Dựng Cơ Chế Tái Sử Dụng Kết Nối (Connection Pool Keep-Alive Simulator)',
-        description: 'Hiện thực hàm \`simulateConnectionPool(maxSize: number, ops: Array<{ op: "acquire" } | { op: "release"; connId: string }>): string[]\`. Khi gặp \`"acquire"\`: nếu có kết nối trong \`idle\`, tái sử dụng nó; nếu chưa đầy \`maxSize\`, tạo mới \`"conn_\${id}"\`; đẩy ID kết nối nhận được vào mảng kết quả. Khi gặp \`"release"\`: đưa \`connId\` trở lại hàng đợi \`idle\`. Trả về mảng các kết nối đã acquire.',
-        starterCode: `
-export function simulateConnectionPool(
+        description: 'Hiện thực hàm \`simulateConnectionPool(maxSize: number, ops: Array<{ op: "acquire" } | { op: "release"; connId: string }>): string[]\`. Khi gặp \`"acquire"\`: nếu có kết nối trong danh sách nhàn rỗi (\`idle\`), tái sử dụng nó; nếu chưa đầy \`maxSize\`, tạo mới \`"conn_\${id}"\` (bắt đầu từ id = 1); đẩy ID kết nối nhận được vào mảng kết quả. Khi gặp \`"release"\`: đưa \`connId\` trở lại hàng đợi \`idle\`. Nếu \`maxSize <= 0\` hoặc \`ops\` rỗng, trả về mảng rỗng \`[]\`.',
+        starterCode: `export function simulateConnectionPool(
   maxSize: number,
   ops: Array<{ op: 'acquire' } | { op: 'release'; connId: string }>
 ): string[] {
   // TODO: Hiện thực Connection Pool tái sử dụng
   return [];
-}
-`,
-        solution: `
-export function simulateConnectionPool(
+}`,
+        solution: `export function simulateConnectionPool(
   maxSize: number,
   ops: Array<{ op: 'acquire' } | { op: 'release'; connId: string }>
 ): string[] {
+  if (typeof maxSize !== 'number' || maxSize <= 0 || !Array.isArray(ops) || ops.length === 0) {
+    return [];
+  }
+
   const idle: string[] = [];
   let currentId = 0;
   let active = 0;
@@ -293,28 +380,57 @@ export function simulateConnectionPool(
         results.push(\`conn_\${currentId}\`);
       }
     } else if (item.op === 'release') {
-      active--;
-      idle.push(item.connId);
+      if (active > 0) {
+        active--;
+        idle.push(item.connId);
+      }
     }
   }
 
   return results;
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Cấp phát connection mới khi pool chưa đầy',
+            name: 'Case 1 (Visible): Cấp phát connection mới khi pool chưa đầy',
             input: [2, [{ op: 'acquire' }]],
-            expected: ['conn_1']
+            expected: ['conn_1'],
+            hidden: false
           },
           {
-            name: 'Tái sử dụng connection sau khi được release',
+            name: 'Case 2 (Visible): Tái sử dụng connection sau khi được release',
             input: [1, [
               { op: 'acquire' },
               { op: 'release', connId: 'conn_1' },
               { op: 'acquire' }
             ]],
-            expected: ['conn_1', 'conn_1']
+            expected: ['conn_1', 'conn_1'],
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Cấp phát tối đa đến maxSize, khi pool đầy không tạo thêm',
+            input: [2, [{ op: 'acquire' }, { op: 'acquire' }, { op: 'acquire' }]],
+            expected: ['conn_1', 'conn_2'],
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): maxSize <= 0 hoặc ops rỗng -> Trả về mảng rỗng',
+            input: [0, [{ op: 'acquire' }]],
+            expected: [],
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Chu kỳ acquire và release xen kẽ liên tục',
+            input: [2, [
+              { op: 'acquire' },
+              { op: 'acquire' },
+              { op: 'release', connId: 'conn_1' },
+              { op: 'acquire' },
+              { op: 'release', connId: 'conn_2' },
+              { op: 'release', connId: 'conn_1' },
+              { op: 'acquire' }
+            ]],
+            expected: ['conn_1', 'conn_2', 'conn_1', 'conn_1'],
+            hidden: true
           }
         ]
       }
@@ -470,7 +586,8 @@ API NÀY CÓ CẦN BẢO VỆ BẰNG IDEMPOTENCY KEY KHÔNG?
 | **Redis Distributed Key**| Trung bình (Interceptor/Guard)| Hoàn hảo cho hệ thống lớn | Cần cụm Redis lưu trữ RAM | ~1ms (In-memory lookup) |
 | **Two-Phase Commit (2PC)**| Rất cao (Distributed Tx) | An toàn tuyệt đối đa database | Khóa tài nguyên lâu, giảm throughput | ~50ms - 200ms |
 `,
-      realCodeSnippet: `
+      realCodeSnippet: `// File: src/modules/common/interceptors/idempotency.interceptor.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - Distributed Idempotency Protection
 import {
   Injectable,
   NestInterceptor,
@@ -478,187 +595,274 @@ import {
   CallHandler,
   ConflictException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import * as crypto from 'crypto';
 
-interface CachedResponse {
+export interface IdempotencyRecord {
   status: 'PROCESSING' | 'COMPLETED';
   requestHash: string;
-  statusCode?: number;
-  body?: unknown;
+  statusCode: number;
+  body: unknown;
+  createdAt: number;
 }
 
+/**
+ * ADR: Phòng chống trùng lặp giao dịch phân tán (Idempotency Key):
+ * 1. Client bắt buộc gửi Header 'x-idempotency-key' dạng UUIDv4.
+ * 2. Băm SHA-256 Request Body để phát hiện gian lận thay đổi dữ liệu (Payload Mismatch -> 422).
+ * 3. Trạng thái 'PROCESSING' ngăn chặn Race Condition (409 Conflict).
+ * 4. Trạng thái 'COMPLETED' trả về trực tiếp response trong Cache (200 OK) mà không ghi DB lại.
+ */
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
-  // Giả lập lưu trữ phân tán Redis trong bộ nhớ
-  private readonly redisStore = new Map<string, CachedResponse>();
+  private readonly logger = new Logger(IdempotencyInterceptor.name);
+  // Mô phỏng cụm Redis Cache phân tán
+  private readonly distributedStore = new Map<string, IdempotencyRecord>();
 
   async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
-    const idempotencyKey = request.headers['x-idempotency-key'];
+    const http = context.switchToHttp();
+    const req = http.getRequest<{ method: string; headers: Record<string, string | undefined>; body: unknown }>();
+    const res = http.getResponse<{ statusCode: number; status: (code: number) => void }>();
 
-    // Nếu không có header này hoặc là method GET thì bỏ qua
-    if (!idempotencyKey || request.method === 'GET') {
+    const idempotencyKey = req.headers['x-idempotency-key'];
+    // Chỉ áp dụng cho các phương thức Mutation (POST, PATCH) có truyền header
+    if (!idempotencyKey || req.method === 'GET' || req.method === 'HEAD') {
       return next.handle();
     }
 
-    const currentHash = crypto
+    const payloadHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify(request.body || {}))
+      .update(JSON.stringify(req.body ?? {}))
       .digest('hex');
 
-    const cached = this.redisStore.get(idempotencyKey);
+    const existing = this.distributedStore.get(idempotencyKey);
 
-    if (cached) {
-      if (cached.status === 'PROCESSING') {
-        throw new ConflictException(
-          'Yêu cầu giao dịch đang được xử lý. Vui lòng không gửi lại liên tục.'
-        );
+    if (existing) {
+      if (existing.status === 'PROCESSING') {
+        this.logger.warn(\`Phát hiện giao dịch đang chạy trùng key: \${idempotencyKey}\`);
+        throw new ConflictException('Giao dịch đang được xử lý. Vui lòng không bấm gửi lại liên tục.');
       }
 
-      if (cached.requestHash !== currentHash) {
-        throw new UnprocessableEntityException(
-          'Idempotency Key đã được sử dụng với payload dữ liệu khác.'
-        );
+      if (existing.requestHash !== payloadHash) {
+        this.logger.error(\`Cảnh báo gian lận Payload Mismatch trên key: \${idempotencyKey}\`);
+        throw new UnprocessableEntityException('Idempotency Key đã được sử dụng với payload dữ liệu khác.');
       }
 
-      // Trả lại nguyên vẹn kết quả cũ từ Cache
-      response.status(cached.statusCode || 200);
-      return of(cached.body);
+      res.status(existing.statusCode);
+      return of(existing.body);
     }
 
-    // Đánh dấu trạng thái đang xử lý (SETNX)
-    this.redisStore.set(idempotencyKey, {
+    // Đánh dấu khóa tạm thời (tương đương Redis SETNX key 'PROCESSING' EX 120)
+    this.distributedStore.set(idempotencyKey, {
       status: 'PROCESSING',
-      requestHash: currentHash,
+      requestHash: payloadHash,
+      statusCode: 200,
+      body: null,
+      createdAt: Date.now(),
     });
 
     return next.handle().pipe(
-      tap((body) => {
-        // Lưu trữ kết quả thành công vào Redis Cache
-        this.redisStore.set(idempotencyKey, {
-          status: 'COMPLETED',
-          requestHash: currentHash,
-          statusCode: response.statusCode || 200,
-          body,
-        });
-      })
+      tap({
+        next: (body: unknown) => {
+          this.distributedStore.set(idempotencyKey, {
+            status: 'COMPLETED',
+            requestHash: payloadHash,
+            statusCode: res.statusCode || 200,
+            body,
+            createdAt: Date.now(),
+          });
+        },
+        error: () => {
+          // Xóa lock nếu xử lý nghiệp vụ thất bại để cho phép retry
+          this.distributedStore.delete(idempotencyKey);
+        },
+      }),
     );
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c3-l2-q1',
-          question: 'Theo chuẩn kỹ thuật RFC 9110, phương thức DELETE có được coi là Idempotent không và vì sao?',
+          question: 'Theo chuẩn kỹ thuật RFC 9110 (HTTP Semantics), phương thức HTTP DELETE có được phân loại là Idempotent (Lũy kế) hay không và vì sao?',
           options: [
-            'Có, vì dù gọi một lần hay nhiều lần thì trạng thái cuối cùng của tài nguyên trong database vẫn là bị xóa.',
-            'Không, vì lần gọi đầu tiên trả về mã 200 còn các lần gọi tiếp theo trả về mã 404 nên không giống nhau.',
-            'Không, vì phương thức DELETE luôn làm thay đổi dữ liệu máy chủ nên bị coi là phương thức không an toàn.',
-            'Có, với điều kiện bắt buộc máy chủ phải trả về cùng một mã trạng thái HTTP 200 cho tất cả mọi lần gọi lại.'
+            'Có; vì tính chất Idempotent xét trên trạng thái tài nguyên của hệ thống máy chủ: sau lần xóa đầu tiên hay sau 10 lần gọi lại, tài nguyên đó vẫn ở trạng thái bị xóa khỏi hệ thống mà không sinh ra tác dụng phụ mới.',
+            'Không; vì lần gọi đầu tiên trả về HTTP 200/204 trong khi các lần gọi tiếp theo trả về HTTP 404 Not Found nên mã phản hồi không đồng nhất.',
+            'Không; vì mọi phương thức làm thay đổi cơ sở dữ liệu đều bị RFC coi là Non-idempotent.',
+            'Có; nhưng chỉ khi máy chủ được cấu hình buộc phải trả về đúng mã trạng thái HTTP 200 cho tất cả mọi lần gọi lặp lại.'
           ],
           correctIndex: 0,
-          explanation: 'Theo chuẩn RFC 9110, tính chất Idempotent (Lũy kế) xét trên trạng thái dữ liệu của hệ thống máy chủ, không phụ thuộc vào việc mã HTTP trả về giống hay khác nhau. Khi gọi DELETE /users/123 lần đầu, user bị xóa (200/204). Khi gọi tiếp, user vẫn ở trạng thái đã bị xóa (404), không có tác dụng phụ mới phát sinh.'
+          explanation: 'Theo RFC 9110, tính chất Idempotent định nghĩa rằng tác động lên trạng thái máy chủ của N yêu cầu giống hệt nhau là tương đương với 1 yêu cầu duy nhất. Việc mã phản hồi là 200 (xóa lần đầu) hay 404 (các lần sau vì không còn bản ghi) không làm thay đổi bản chất rằng dữ liệu vẫn ở trạng thái đã bị xóa.'
         },
         {
           id: 'c3-l2-q2',
-          question: 'Nếu client gửi lại một request thanh toán với cùng Idempotency-Key cũ nhưng đã sửa đổi số tiền trong Request Body, hệ thống backend chuẩn phải xử lý thế nào?',
+          question: 'Trong kịch bản Client gửi lại một request thanh toán với cùng một Idempotency-Key cũ nhưng cố tình sửa đổi số tiền trong Request Body (Payload Mismatch), hệ thống backend chuẩn mực cần phản hồi như thế nào?',
           options: [
-            'Từ chối ngay lập tức với mã lỗi 422 Unprocessable Entity vì vi phạm tính toàn vẹn payload của khóa lũy kế.',
-            'Tự động ghi đè số tiền mới và trừ thêm tiền từ tài khoản người dùng để phục vụ giao dịch mới nhất.',
-            'Trả về kết quả thành công của giao dịch cũ mà không cần kiểm tra xem dữ liệu body có bị sửa đổi hay không.',
-            'Xóa khóa cũ khỏi Redis và thực thi lại toàn bộ quy trình thanh toán từ đầu với thông tin số tiền mới.'
+            'Tự động ghi đè số tiền mới vào giao dịch cũ và trừ thêm phần tiền chênh lệch từ tài khoản người dùng.',
+            'Xóa khóa cũ trong Redis và tiến hành tạo một đơn hàng thanh toán mới độc lập.',
+            'Lập tức từ chối request với mã lỗi HTTP 422 Unprocessable Entity (hoặc 400 Bad Request) vì vi phạm tính toàn vẹn của khóa lũy kế.',
+            'Trả về kết quả thành công của giao dịch cũ mà không cần kiểm tra tính khớp nối của Request Body.'
           ],
-          correctIndex: 0,
-          explanation: 'Idempotency Key gắn liền với một giao dịch cụ thể duy nhất. Nếu client gửi cùng key nhưng đổi payload (Request Body Mismatch), đây có thể là dấu hiệu tấn công gian lận hoặc lỗi phần mềm phía client. Hệ thống phải băm hash body để so sánh và ném ra lỗi 422 Unprocessable Entity để bảo vệ an toàn.'
+          correctIndex: 2,
+          explanation: 'Mỗi Idempotency Key phải được gắn liền với một bản băm (SHA-256 hash) của Request Body tương ứng. Nếu cùng một key nhưng body khác nhau, đây là dấu hiệu của lỗi lập trình client hoặc hành vi gian lận (Tampering Attack). Server bắt buộc phải từ chối với mã 422 Unprocessable Entity để bảo toàn tính toàn vẹn giao dịch.'
         },
         {
           id: 'c3-l2-q3',
-          question: 'Hiện tượng gì xảy ra nếu hai yêu cầu thanh toán POST có cùng một Idempotency-Key ập đến hệ thống cùng một mili giây trong kiến trúc phân tán?',
+          question: 'Khi hai request thanh toán sử dụng chung một Idempotency-Key gửi đến đồng thời trong cùng một mili giây trên cụm máy chủ NestJS phân tán, kỹ thuật nào sau đây giải quyết triệt để bài toán Race Condition?',
           options: [
-            'Cần dùng lệnh nguyên tử SETNX của Redis; request đầu tiên chiếm được khóa còn request thứ hai bị từ chối 409 Conflict.',
-            'Cả hai request cùng được đưa vào hàng đợi cơ sở dữ liệu và tự động gộp số tiền thanh toán làm một giao dịch duy nhất.',
-            'Hệ điều hành Linux sẽ tự động ngắt kết nối mạng của request đến sau do phát hiện xung đột dữ liệu cổng mạng.',
-            'Hệ thống NestJS sẽ tự động dừng toàn bộ tiến trình để chờ lập trình viên vào can thiệp thủ công bằng tay.'
+            'Bọc mã nguồn Controller trong khối synchronize của JavaScript để khóa Main Thread của tiến trình.',
+            'Sử dụng lệnh nguyên tử SETNX (hoặc SET key value NX EX ttl) trên Redis; request đầu tiên chiếm khóa thành công sẽ thực thi logic, request thứ hai thấy khóa đang ở trạng thái PROCESSING sẽ lập tức bị chặn với HTTP 409 Conflict.',
+            'Cho cả 2 request cùng ghi vào database rồi định kỳ 5 phút chạy cron job để hủy bản ghi trùng lặp.',
+            'Sử dụng biến toàn cục Map trong bộ nhớ của từng instance máy chủ để ghi nhận request đã xử lý.'
           ],
-          correctIndex: 0,
-          explanation: 'Để tránh Race Condition khi 2 request đến cùng thời điểm, ta sử dụng thao tác nguyên tử (atomic) SETNX (Set if Not Exists) trên Redis. Request đầu tiên sẽ set key thành công và thực thi. Request thứ hai thấy key đã tồn tại ở trạng thái PROCESSING sẽ lập tức bị chặn với lỗi 409 Conflict.'
+          correctIndex: 1,
+          explanation: 'Lệnh SETNX (Set if Not Exists) của Redis có tính nguyên tử tuyệt đối (atomic). Request nào đến trước mili giây đó sẽ chiếm được lock và ghi trạng thái "PROCESSING". Request đến sau sẽ thất bại khi gọi SETNX, phát hiện giao dịch đang được xử lý và lập tức trả về mã HTTP 409 Conflict, triệt tiêu hoàn toàn race condition trừ tiền hai lần.'
         },
         {
           id: 'c3-l2-q4',
-          question: 'Vì sao trong giao thức HTTP, phương thức POST mặc định lại KHÔNG có tính chất Idempotent?',
+          question: 'Sự khác biệt căn bản giữa phương thức PUT và PATCH theo đặc tả chuẩn HTTP là gì?',
           options: [
-            'Vì mỗi lần gọi POST thường tạo ra một tài nguyên mới độc lập hoặc kích hoạt một chuỗi hành động có hiệu ứng phụ mới.',
-            'Vì phương thức POST không hỗ trợ truyền dữ liệu trong phần thân body theo quy chuẩn của tổ chức W3C.',
-            'Vì các máy chủ proxy và bộ nhớ đệm trình duyệt luôn tự động cache lại toàn bộ kết quả của mọi lệnh gọi POST.',
-            'Vì phương thức POST bắt buộc phải đi kèm với chứng chỉ bảo mật SSL cấp doanh nghiệp mới được phép thực thi.'
+            'PUT là phương thức gửi dữ liệu dạng nhị phân, còn PATCH chỉ hỗ trợ gửi dữ liệu văn bản thuần UTF-8.',
+            'PUT chỉ dùng cho cơ sở dữ liệu NoSQL, còn PATCH chỉ dùng cho cơ sở dữ liệu quan hệ SQL.',
+            'PUT không bao giờ lưu log máy chủ, còn PATCH bắt buộc phải ghi log kiểm toán.',
+            'PUT thay thế toàn bộ tài nguyên (Idempotent: gửi đi gửi lại toàn bộ đối tượng trạng thái cuối không đổi), trong khi PATCH sửa đổi từng phần tài nguyên (thường Non-idempotent: ví dụ tăng giá trị biến đếm nếu gửi nhiều lần sẽ làm sai lệch dữ liệu).'
+          ],
+          correctIndex: 3,
+          explanation: 'Theo RFC, PUT thay thế toàn bộ biểu diễn của tài nguyên (Full Replacement), nên gọi N lần với cùng một representation đều cho ra trạng thái giống hệt (Idempotent). PATCH là Partial Modification (chỉ cập nhật một số trường hoặc áp dụng JSON Patch delta). Nếu PATCH áp dụng các thao tác tương đối (như { op: "increment", val: 5 }), việc gọi lại nhiều lần sẽ làm thay đổi trạng thái liên tục, do đó PATCH thường không mặc nhiên là Idempotent.'
+        },
+        {
+          id: 'c3-l2-q5',
+          question: 'Khi triển khai Idempotency Interceptor trong NestJS, tại sao kết quả phản hồi (Response Body & StatusCode) của request hoàn tất đầu tiên lại cần được lưu vào Cache (Redis) cùng với Idempotency Key?',
+          options: [
+            'Để khi client thực hiện Retry với cùng key, server có thể trả về ngay lập tức nguyên vẹn kết quả response trước đó mà không phải kích hoạt lại logic nghiệp vụ nặng hoặc ghi thêm vào cơ sở dữ liệu.',
+            'Để trình duyệt của người dùng tự động xóa lịch sử duyệt web liên quan đến giao dịch đó.',
+            'Để giảm kích thước của cơ sở dữ liệu chính bằng cách chuyển các bản ghi sang lưu vĩnh viễn trên RAM của Redis.',
+            'Nhằm ngăn chặn tin tặc tấn công từ chối dịch vụ phân tán (DDoS) vào cổng mạng HTTP.'
           ],
           correctIndex: 0,
-          explanation: 'Phương thức POST được thiết kế để tạo mới tài nguyên (mỗi lần gọi sinh ra 1 ID mới trong DB) hoặc thực hiện các hành động có hiệu ứng phụ (trừ tiền, gửi email). Do đó, gọi POST N lần sẽ tạo ra N bản ghi hoặc trừ tiền N lần, nên bản chất không bao giờ có tính Idempotent trừ khi chủ động cài đặt Idempotency Key.'
+          explanation: 'Trọng tâm của cơ chế Idempotency là: Khi mạng chập chờn khiến client timeout không nhận được response, client sẽ retry. Server nhận ra key đã hoàn tất (COMPLETED), lấy ngay response đã cache (bao gồm cả StatusCode và Body cũ) trả về cho client. Client nhận được kết quả như mong đợi mà backend không hề chạy lại lệnh trừ tiền hay tạo đơn hàng lần 2.'
+        },
+        {
+          id: 'c3-l2-q6',
+          question: 'Thuật ngữ "Safe Methods" trong chuẩn RFC 9110 ám chỉ những phương thức HTTP nào và có ý nghĩa kỹ thuật gì đối với các bên trung gian (Proxies/CDNs)?',
+          options: [
+            'Các phương thức có mã hóa SSL 256-bit; giúp ngăn chặn virus máy tính lây lan qua proxy.',
+            'Các phương thức POST và PUT khi có đính kèm JWT token hợp lệ; cho phép proxy đọc nội dung payload.',
+            'Các phương thức chỉ đọc tài nguyên (như GET, HEAD, OPTIONS) mà không làm biến đổi trạng thái của hệ thống máy chủ; cho phép Proxies, Caches và CDNs tự do lưu trữ bộ đệm và tự động thử lại mà không lo ngại tác dụng phụ.',
+            'Các phương thức chỉ dành riêng cho quản trị viên hệ thống có quyền truy cập root.'
+          ],
+          correctIndex: 2,
+          explanation: 'Safe Methods (GET, HEAD, OPTIONS, TRACE) là các phương thức chỉ nhằm mục đích truy xuất thông tin mà không tạo ra bất kỳ thay đổi trạng thái nào trên server (read-only). Nhờ tính chất Safe, các bộ nhớ đệm (Browser Cache, CDN, Forward Proxies) có thể an tâm cache dữ liệu hoặc gửi lại request khi mạng chập chờn mà không sợ làm biến dạng dữ liệu người dùng.'
+        },
+        {
+          id: 'c3-l2-q7',
+          question: 'Tại sao việc đặt thời gian sống (TTL) cho Idempotency Key trong Redis là bắt buộc, và khoảng thời gian TTL bao lâu thường được coi là hợp lý trong các hệ thống thanh toán thực tế?',
+          options: [
+            'TTL bắt buộc phải là 500 mili giây để tránh làm nghẽn xung nhịp CPU của máy chủ Redis.',
+            'TTL phải là vô hạn (không bao giờ hết hạn) vì dữ liệu thanh toán bắt buộc phải lưu vĩnh viễn trên RAM theo luật pháp.',
+            'TTL chỉ cần thiết khi Redis chạy trên hệ điều hành Windows 32-bit.',
+            'TTL giúp giải phóng bộ nhớ RAM cho Redis và dọn sạch các giao dịch cũ sau khi cửa sổ Retry của client kết thúc; thông thường TTL từ 24 giờ đến 72 giờ là chuẩn mực thực tế cho các luồng thanh toán.'
+          ],
+          correctIndex: 3,
+          explanation: 'Nếu không đặt TTL, hàng triệu Idempotency Keys được tạo ra mỗi ngày sẽ nhanh chóng làm cạn kiệt RAM của Redis (Out Of Memory). Mặt khác, cửa sổ thử lại (Retry Window) của client hoặc hệ thống đối tác thanh toán (như Stripe/VNPay webhook) thường chỉ kéo dài tối đa 24-72 giờ. Đặt TTL 24-72h đảm bảo bắt được mọi đợt retry hợp lệ đồng thời tự động thu hồi RAM rác.'
+        },
+        {
+          id: 'c3-l2-q8',
+          question: 'Trong kịch bản request đầu tiên đang thực thi dang dở (chưa xong DB) mà tiến trình máy chủ NestJS bất ngờ bị Crash (OOM hoặc mất điện đột ngột), rủi ro lớn nhất với Idempotency Key trong Redis là gì nếu không có cơ chế Timeout thích hợp?',
+          options: [
+            'Toàn bộ dữ liệu trong cơ sở dữ liệu PostgreSQL sẽ tự động bị xóa sạch.',
+            'Khóa trong Redis bị kẹt vĩnh viễn ở trạng thái "PROCESSING" (Zombie Lock); khiến tất cả các lần thử lại sau đó của client đều bị từ chối với lỗi 409 Conflict mãi mãi mà giao dịch không bao giờ được hoàn tất.',
+            'Máy chủ Redis sẽ tự động khởi động lại toàn bộ cụm cluster và từ chối mọi kết nối mới.',
+            'Client sẽ tự động được cấp quyền truy cập quản trị viên vào hệ thống backend.'
+          ],
+          correctIndex: 1,
+          explanation: 'Nếu tiến trình chết khi đang xử lý mà khóa PROCESSING không có TTL ngắn (ví dụ lock timeout 60-120s), khóa đó sẽ thành "Zombie Lock" tồn tại mãi mãi trong Redis. Khi client retry, hệ thống vẫn thấy "PROCESSING" và liên tục ném lỗi 409 Conflict, khiến giao dịch bị đóng băng vĩnh viễn. Do đó, bước SETNX bắt buộc phải đi kèm expire time hợp lý.'
         }
       ],
       codeChallenge: {
         id: 'c3-l2-c1',
-        title: 'Hiện Thực Idempotent Request Validator Bằng Memory Cache',
-        description: 'Hiện thực class \`IdempotencyValidator\` với phương thức \`processRequest(key: string, payload: unknown, action: () => unknown): { status: number; data: unknown }\`. Nếu \`key\` chưa có, thực thi \`action()\`, lưu kết quả cache và trả về \`{ status: 200, data: result }\`. Nếu \`key\` đã tồn tại với cùng payload, trả về \`{ status: 200, data: cachedResult }\` mà KHÔNG gọi \`action()\`. Nếu \`key\` đã tồn tại nhưng payload bị thay đổi khác trước, ném ra Error \`"PAYLOAD_MISMATCH"\`.',
-        starterCode: `
-export class IdempotencyValidator {
-  public processRequest(
-    key: string,
-    payload: unknown,
-    action: () => unknown
-  ): { status: number; data: unknown } {
-    // TODO: Hiện thực kiểm tra khóa và chống trùng lặp payload
-    return { status: 200, data: action() };
+        title: 'Hiện Thực Cơ Chế Kiểm Tra Khóa Lũy Kế (Idempotent Request Validator)',
+        description: 'Hiện thực hàm \`validateIdempotencyRequest(store: Map<string, { payloadStr: string; result: unknown }>, key: string, payload: unknown, action: () => unknown): { status: number; data: unknown }\`. Nếu \`store\` không hợp lệ, \`key\` rỗng hoặc \`action\` không phải là hàm, ném Error("INVALID_ARGUMENTS"). Nếu \`key\` chưa có trong \`store\`, thực thi \`action()\`, lưu kết quả vào store và trả về \`{ status: 200, data: result }\`. Nếu \`key\` đã tồn tại với cùng \`payload\` (so sánh qua JSON.stringify), trả về \`{ status: 200, data: existing.result }\` mà KHÔNG kích hoạt \`action()\`. Nếu \`key\` đã tồn tại nhưng \`payload\` bị thay đổi, ném Error("PAYLOAD_MISMATCH").',
+        starterCode: `export function validateIdempotencyRequest(
+  store: Map<string, { payloadStr: string; result: unknown }>,
+  key: string,
+  payload: unknown,
+  action: () => unknown
+): { status: number; data: unknown } {
+  // TODO: Kiểm tra khóa và chống trùng lặp payload
+  return { status: 200, data: null };
+}`,
+        solution: `export function validateIdempotencyRequest(
+  store: Map<string, { payloadStr: string; result: unknown }>,
+  key: string,
+  payload: unknown,
+  action: () => unknown
+): { status: number; data: unknown } {
+  if (!store || !(store instanceof Map) || typeof key !== 'string' || key.trim() === '' || typeof action !== 'function') {
+    throw new Error('INVALID_ARGUMENTS');
   }
-}
-`,
-        solution: `
-export class IdempotencyValidator {
-  private readonly cache = new Map<string, { payloadStr: string; result: unknown }>();
 
-  public processRequest(
-    key: string,
-    payload: unknown,
-    action: () => unknown
-  ): { status: number; data: unknown } {
-    const payloadStr = JSON.stringify(payload);
-    const existing = this.cache.get(key);
+  const payloadStr = JSON.stringify(payload ?? {});
+  const existing = store.get(key);
 
-    if (existing) {
-      if (existing.payloadStr !== payloadStr) {
-        throw new Error('PAYLOAD_MISMATCH');
-      }
-      return { status: 200, data: existing.result };
+  if (existing) {
+    if (existing.payloadStr !== payloadStr) {
+      throw new Error('PAYLOAD_MISMATCH');
     }
-
-    const result = action();
-    this.cache.set(key, { payloadStr, result });
-    return { status: 200, data: result };
+    return { status: 200, data: existing.result };
   }
-}
-`,
+
+  const result = action();
+  store.set(key, { payloadStr, result });
+  return { status: 200, data: result };
+}`,
         testCases: [
           {
-            name: 'Thực thi action lần đầu thành công',
+            name: 'Case 1 (Visible): Thực thi action lần đầu thành công',
             input: [
+              new Map(),
               'key_1',
               { amount: 500 },
               () => ({ invoiceId: 'INV_001' })
             ],
-            expected: { status: 200, data: { invoiceId: 'INV_001' } }
+            expected: { status: 200, data: { invoiceId: 'INV_001' } },
+            hidden: false
           },
           {
-            name: 'Gọi lại cùng key và payload không kích hoạt lại action',
+            name: 'Case 2 (Visible): Gọi lại cùng key và payload không kích hoạt lại action',
             input: [
+              new Map([['key_cached', { payloadStr: JSON.stringify({ amount: 100 }), result: 'FIRST_RESULT' }]]),
               'key_cached',
               { amount: 100 },
               () => 'SHOULD_NOT_BE_CALLED'
             ],
-            expected: { status: 200, data: 'FIRST_RESULT' }
+            expected: { status: 200, data: 'FIRST_RESULT' },
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Cùng key nhưng payload bị sửa đổi -> Ném lỗi PAYLOAD_MISMATCH',
+            input: [
+              new Map([['key_tampered', { payloadStr: JSON.stringify({ amount: 100 }), result: 'OLD_DATA' }]]),
+              'key_tampered',
+              { amount: 999999 },
+              () => 'FAIL'
+            ],
+            expected: 'ERROR_THROWN',
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Tham số key rỗng hoặc action không phải hàm -> Ném lỗi INVALID_ARGUMENTS',
+            input: [new Map(), '', { amount: 100 }, null],
+            expected: 'ERROR_THROWN',
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): store truyền vào null -> Ném lỗi INVALID_ARGUMENTS',
+            input: [null, 'key_valid', {}, () => 123],
+            expected: 'ERROR_THROWN',
+            hidden: true
           }
         ]
       }
@@ -827,118 +1031,183 @@ BẠN CẦN LƯU TRỮ ACCESS TOKEN / REFRESH TOKEN Ở CLIENT?
 | **HttpOnly Cookie (Strict)**| Miễn nhiễm hoàn toàn với XSS | Tuyệt đối (Không gửi khi đi link) | Khó (Bị logout nếu click link ngoài) | Trung bình |
 | **In-Memory Variable** | Tốt (Mất khi F5 lại trang) | Tuyệt đối chống CSRF | Dễ dàng | Cần Refresh Token ngầm để phục hồi |
 `,
-      realCodeSnippet: `
-import { INestApplication } from '@nestjs/common';
+      realCodeSnippet: `// File: src/modules/security/configuration/security-configuration.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - Production Security Middleware & CORS Pipeline
+import { Injectable, Logger, INestApplication } from '@nestjs/common';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 
-/**
- * Cấu hình bảo mật mạng chuẩn Production cho NestJS
- */
-export function configureSecurityMiddleware(app: INestApplication): void {
-  // 1. Phân tích Cookie an toàn
-  app.use(cookieParser());
-
-  // 2. Bảo vệ các Header HTTP bằng Helmet
-  app.use(
-    helmet({
-      contentSecurityPolicy: true, // Chống injection script XSS
-      crossOriginEmbedderPolicy: true,
-      hsts: {
-        maxAge: 31536000, // Ép buộc sử dụng HTTPS trong 1 năm
-        includeSubDomains: true,
-        preload: true,
-      },
-    })
-  );
-
-  // 3. Cấu hình CORS chặt chẽ cho White-listed Domains
-  const allowedOrigins = [
-    'https://app.esmiles.vn',
-    'https://admin.esmiles.vn',
-  ];
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Cho phép request không có origin (như mobile apps, server-to-server)
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Chính sách CORS không cho phép truy cập từ Origin này.'));
-      }
-    },
-    credentials: true, // Cho phép truyền Cookie an toàn
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-idempotency-key'],
-    maxAge: 86400, // Cache kết quả Preflight OPTIONS trong 24 giờ
-  });
+export interface CorsSecurityConfig {
+  allowedOrigins: string[];
+  maxAgeSeconds: number;
 }
-`,
+
+/**
+ * ADR: Thiết lập phòng thủ chiều sâu tầng mạng (Defense In Depth):
+ * 1. Helmet: Kích hoạt HSTS (ép HTTPS 1 năm), CSP (chống XSS script injection).
+ * 2. CookieParser: Ký mã và giải mã Cookie an toàn.
+ * 3. Dynamic CORS: Kiểm tra Origin theo Whitelist động, cấm tuyệt đối '*' khi bật credentials: true.
+ * 4. Cache Preflight OPTIONS: Thiết lập Max-Age 86400s để giảm độ trễ mạng cho client.
+ */
+@Injectable()
+export class SecurityConfigurationService {
+  private readonly logger = new Logger(SecurityConfigurationService.name);
+
+  public applySecurityPolicies(app: INestApplication, config: CorsSecurityConfig): void {
+    // 1. Phân tích Cookie
+    app.use(cookieParser());
+
+    // 2. Bảo vệ các Header HTTP bằng Helmet
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:', 'https:'],
+          },
+        },
+        hsts: {
+          maxAge: 31536000, // Ép buộc sử dụng HTTPS trong 1 năm
+          includeSubDomains: true,
+          preload: true,
+        },
+      }),
+    );
+
+    // 3. Cấu hình CORS chặt chẽ theo Whitelist
+    const allowedSet = new Set(config.allowedOrigins);
+
+    app.enableCors({
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Cho phép các request không có origin (mobile native apps, server-to-server microservices)
+        if (!origin || allowedSet.has(origin)) {
+          return callback(null, true);
+        }
+
+        this.logger.warn(\`Chặn đứng request CORS từ Origin chưa được cấp phép: \${origin}\`);
+        callback(new Error('CORS_ORIGIN_NOT_ALLOWED'));
+      },
+      credentials: true, // Cho phép truyền Cookie an toàn (SameSite/HttpOnly)
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-idempotency-key'],
+      maxAge: config.maxAgeSeconds, // Cache kết quả Preflight OPTIONS
+    });
+
+    this.logger.log(\`Áp dụng chính sách bảo mật mạng thành công. Whitelist: \${config.allowedOrigins.join(', ')}\`);
+  }
+}`,
       quiz: [
         {
           id: 'c3-l3-q1',
-          question: 'Bản chất cốt lõi của cơ chế Cross-Origin Resource Sharing (CORS) là gì và cơ chế này được thực thi bởi thành phần nào?',
+          question: 'Bản chất cốt lõi của cơ chế Cross-Origin Resource Sharing (CORS) là gì và cơ chế này được thực thi bởi thành phần nào trong kiến trúc Web?',
           options: [
-            'Là cơ chế bảo mật do trình duyệt thực thi nhằm ngăn chặn trang web đọc trộm tài nguyên từ domain khác khi chưa được cho phép.',
-            'Là tường lửa phần cứng do nhà cung cấp đám mây cài đặt để ngăn chặn các cuộc tấn công từ chối dịch vụ vào máy chủ backend.',
+            'Là cơ chế kiểm duyệt do Trình duyệt (Browser) thực thi nhằm nới lỏng chính sách Same-Origin Policy (SOP), bảo vệ người dùng không bị trang web độc hại đọc trộm dữ liệu từ domain khác; CORS hoàn toàn không phải là tường lửa bảo vệ máy chủ backend khỏi hacker sử dụng cURL/Postman.',
+            'Là tường lửa phần cứng do nhà cung cấp Cloud cài đặt để ngăn chặn các cuộc tấn công từ chối dịch vụ DDoS vào máy chủ backend.',
             'Là thuật toán mã hóa đối xứng của hệ điều hành dùng để bảo vệ các cổng kết nối TCP khỏi các cuộc tấn công nghe lén dữ liệu.',
-            'Là giao thức mạng cấp thấp do tổ chức IETF định nghĩa nhằm tự động nén dung lượng gói tin HTTP trước khi truyền qua Internet.'
+            'Là giao thức mạng tầng giao vận do tổ chức IETF định nghĩa nhằm tự động nén dung lượng gói tin HTTP trước khi truyền qua Internet.'
           ],
           correctIndex: 0,
-          explanation: 'CORS hoàn toàn là một cơ chế kiểm duyệt phía trình duyệt (Browser-side mechanism). Trình duyệt áp dụng chính sách Same-Origin Policy để bảo vệ người dùng khỏi việc bị các website độc hại đọc trộm dữ liệu từ các dịch vụ khác. CORS không phải là tường lửa bảo vệ máy chủ backend khỏi hacker (hacker có thể dùng curl/postman bỏ qua CORS).'
+          explanation: 'CORS là một chính sách được Browser cưỡng chế (Browser-enforced policy). Nó không bảo vệ backend khỏi các công cụ gọi API trực tiếp (như Postman, cURL, script Python). Vai trò của CORS là bảo vệ phiên làm việc của người dùng trên trình duyệt, không cho website độc hại đọc kết quả trả về từ domain khác khi không được phép.'
         },
         {
           id: 'c3-l3-q2',
-          question: 'Vì sao hầu hết các lời gọi API từ ứng dụng frontend hiện đại (React/Vue) đều kích hoạt một Preflight Request (OPTIONS) trước khi gửi request chính?',
+          question: 'Vì sao hầu hết các lời gọi API từ ứng dụng frontend hiện đại (React/Vue/Angular) đều kích hoạt một Preflight Request (OPTIONS) trước khi gửi request chính?',
           options: [
-            'Vì request sử dụng định dạng JSON trong Content-Type hoặc có đính kèm thêm các header tùy chỉnh như Authorization.',
-            'Vì trình duyệt cần kiểm tra tốc độ đường truyền mạng xem có đủ băng thông để tải dữ liệu lớn về máy hay không.',
-            'Vì các framework frontend hiện đại bắt buộc phải gửi mã hash kiểm tra tính toàn vẹn của mã nguồn lên máy chủ backend.',
+            'Vì các framework SPA bắt buộc phải gửi mã hash mã nguồn lên máy chủ để xác thực bản quyền phần mềm.',
+            'Vì trình duyệt cần đo tốc độ ping mạng xem có đủ băng thông tải dữ liệu lớn về máy hay không.',
+            'Vì request sử dụng Content-Type: application/json hoặc có đính kèm thêm các header tùy biến (như Authorization, x-api-key), khiến nó không còn thỏa mãn tiêu chí của một "Simple Request" theo đặc tả W3C.',
             'Vì máy chủ backend NestJS mặc định từ chối tất cả các yêu cầu gửi trực tiếp mà không thông qua bước đăng ký phiên.'
           ],
-          correctIndex: 0,
-          explanation: 'Một request chỉ được coi là "Simple Request" (không cần Preflight) nếu dùng GET/HEAD/POST với các Header chuẩn hạn chế và Content-Type chỉ là text/plain, multipart/form-data hoặc application/x-www-form-urlencoded. Các API hiện đại đều dùng Content-Type: application/json hoặc có Header Authorization, khiến trình duyệt bắt buộc phải gửi OPTIONS Preflight hỏi xin phép trước.'
+          correctIndex: 2,
+          explanation: 'Theo chuẩn W3C CORS, một request chỉ là Simple Request nếu dùng GET/HEAD/POST với headers hạn chế và Content-Type chỉ là text/plain, multipart/form-data, hoặc application/x-www-form-urlencoded. 99% API hiện đại gửi JSON (Content-Type: application/json) hoặc có Authorization header, nên bắt buộc browser phải gửi OPTIONS Preflight xin phép trước.'
         },
         {
           id: 'c3-l3-q3',
-          question: 'Thiết lập cờ HttpOnly: true cho Cookie chứa JWT Refresh Token đem lại giá trị bảo mật then chốt nào?',
+          question: 'Thiết lập cờ HttpOnly: true cho Cookie chứa JWT Refresh Token đem lại giá trị bảo mật then chốt nào cho hệ thống?',
           options: [
-            'Ngăn chặn tuyệt đối mã độc JavaScript trên trang web truy cập vào cookie giúp triệt tiêu nguy cơ đánh cắp token qua lỗ hổng XSS.',
-            'Tự động mã hóa toàn bộ dữ liệu lưu trong cơ sở dữ liệu bằng thuật toán mã hóa bất đối xứng khóa công khai chuẩn quân sự.',
-            'Ép buộc người dùng phải xác thực sinh trắc học vân tay trước khi trình duyệt cho phép gửi cookie lên máy chủ backend.',
-            'Giúp cookie tự động gia hạn thời gian sống thêm ba mươi ngày mỗi khi người dùng thực hiện tải lại trang web.'
+            'Giúp cookie tự động gia hạn thời gian sống thêm 30 ngày mỗi khi người dùng tải lại trang web.',
+            'Ngăn chặn tuyệt đối mã JavaScript chạy trong trình duyệt truy cập vào cookie qua document.cookie, vô hiệu hóa nguy cơ đánh cắp token nếu website không may dính lỗ hổng Cross-Site Scripting (XSS).',
+            'Tự động mã hóa toàn bộ dữ liệu lưu trong cơ sở dữ liệu bằng thuật toán mã hóa bất đối xứng khóa công khai.',
+            'Ép buộc người dùng phải xác thực sinh trắc học vân tay trước khi trình duyệt gửi cookie lên máy chủ backend.'
           ],
-          correctIndex: 0,
-          explanation: 'Khi Cookie được gán cờ HttpOnly, trình duyệt sẽ cấm mã JavaScript truy cập (qua document.cookie). Do đó, ngay cả khi website bị dính lỗ hổng Cross-Site Scripting (XSS) và kẻ tấn công chèn được mã độc JS vào trang, kẻ tấn công cũng không thể đọc hay đánh cắp được token lưu trong HttpOnly Cookie.'
+          correctIndex: 1,
+          explanation: 'Khi cờ HttpOnly được bật, trình duyệt cấm hoàn toàn JavaScript truy cập cookie đó. Ngay cả khi hacker khai thác thành công lỗ hổng XSS và chèn được script độc hại vào trang, script đó cũng không thể đọc được document.cookie để gửi token về máy chủ của hacker.'
         },
         {
           id: 'c3-l3-q4',
-          question: 'Vì sao việc cấu hình Access-Control-Allow-Origin: * kết hợp với Access-Control-Allow-Credentials: true lại bị trình duyệt coi là vi phạm bảo mật và chặn đứng?',
+          question: 'Vì sao việc cấu hình Access-Control-Allow-Origin: * kết hợp với Access-Control-Allow-Credentials: true bị trình duyệt coi là vi phạm nghiêm trọng và lập tức chặn đứng kết nối?',
           options: [
-            'Vì cho phép mọi trang web bên thứ ba đều có thể tự động gửi kèm thông tin định danh và cookie của người dùng là quá nguy hiểm.',
-            'Vì ký tự đại diện ngôi sao không phải là một chuỗi văn bản hợp lệ theo chuẩn định dạng cú pháp của ngôn ngữ lập trình C++.',
+            'Vì ký tự dấu sao (*) không phải là chuỗi hợp lệ theo cú pháp ngôn ngữ C++ của nhân trình duyệt.',
             'Vì hệ thống máy chủ cơ sở dữ liệu không thể phân biệt được đâu là người dùng thật và đâu là bot tự động khi dùng dấu sao.',
-            'Vì giao thức HTTP/2 và HTTP/3 đã loại bỏ hoàn toàn việc hỗ trợ ký tự đại diện trong các trường header phản hồi.'
+            'Vì giao thức HTTP/2 và HTTP/3 đã loại bỏ hoàn toàn việc hỗ trợ ký tự đại diện trong các trường header phản hồi.',
+            'Vì sự kết hợp này sẽ cho phép bất kỳ website độc hại nào trên Internet đều có thể gửi request ngầm kèm theo Cookie/Credentials của người dùng đến server và đọc trộm toàn bộ dữ liệu phản hồi riêng tư.'
+          ],
+          correctIndex: 3,
+          explanation: 'Nếu cho phép * đi cùng Credentials: true, bất kỳ website nào người dùng ghé thăm đều có thể gửi request AJAX mang theo cookie đăng nhập đến ngân hàng/mạng xã hội của nạn nhân và đọc toàn bộ dữ liệu trả về. Chuẩn CORS cấm tuyệt đối điều này: nếu cho phép Credentials, Origin bắt buộc phải là một domain cụ thể tường minh.'
+        },
+        {
+          id: 'c3-l3-q5',
+          question: 'Sự khác biệt về hành vi giữa hai giá trị cờ SameSite=Lax và SameSite=Strict khi người dùng bấm vào một đường link liên kết từ trang mạng xã hội bên ngoài dẫn về website của bạn là gì?',
+          options: [
+            'SameSite=Lax không cho phép gửi cookie trong bất kỳ tình huống nào, còn Strict cho phép gửi nếu có HTTPS.',
+            'SameSite=Lax chỉ hỗ trợ phương thức POST, còn Strict chỉ hỗ trợ phương thức GET.',
+            'Với SameSite=Strict, trình duyệt KHÔNG gửi cookie trong request điều hướng từ trang ngoài vào (khiến người dùng thấy trạng thái chưa đăng nhập khi vừa click link); với SameSite=Lax, cookie vẫn được gửi theo các yêu cầu điều hướng cấp cao nhất (Top-level GET navigation).',
+            'Cả hai giá trị đều có hành vi giống hệt nhau trong mọi trường hợp trên các trình duyệt hiện đại.'
+          ],
+          correctIndex: 2,
+          explanation: 'SameSite=Strict chặn gửi cookie trong mọi request cross-site, kể cả khi người dùng click vào một link GET thông thường từ ngoài vào. SameSite=Lax an toàn chống CSRF (chặn cookie trong POST/PUT/iframe cross-site) nhưng vẫn cho phép gửi cookie khi người dùng bấm link điều hướng Top-level (GET), mang lại trải nghiệm tiện lợi khi mở link từ email/mạng xã hội mà vẫn giữ trạng thái đăng nhập.'
+        },
+        {
+          id: 'c3-l3-q6',
+          question: 'Giá trị của Header Access-Control-Max-Age trong phản hồi của Preflight OPTIONS request đóng vai trò gì trong việc tối ưu hóa hiệu năng mạng của ứng dụng frontend?',
+          options: [
+            'Quy định khoảng thời gian (tính bằng giây) mà trình duyệt được phép lưu trữ bộ đệm (cache) kết quả kiểm tra Preflight, giúp các request API tiếp theo không phải gửi thêm OPTIONS request thăm dò nữa.',
+            'Xác định thời gian tối đa mà kết nối TCP được phép duy trì trạng thái Keep-Alive trước khi bị ngắt.',
+            'Thiết lập thời gian hết hạn của Access Token trong bộ nhớ RAM của trình duyệt.',
+            'Giới hạn thời gian tối đa mà máy chủ backend được phép xử lý một truy vấn cơ sở dữ liệu.'
           ],
           correctIndex: 0,
-          explanation: 'Nếu cho phép dấu sao (*) đi cùng Credentials=true, bất kỳ trang web độc hại nào cũng có thể gửi request ngầm mang theo Cookie/Session của người dùng đến server ngân hàng/mạng xã hội và đọc được phản hồi nhạy cảm. Để bảo vệ người dùng, chuẩn Web cấm tuyệt đối sự kết hợp này; nếu dùng Credentials=true, Origin bắt buộc phải là một tên miền cụ thể xác định.'
+          explanation: 'Mỗi lần gọi API có Preflight OPTIONS sẽ tốn thêm 1 RTT mạng. Header Access-Control-Max-Age: 86400 báo cho trình duyệt cache lại quyền truy cập này trong 24 giờ. Trong khoảng thời gian đó, các request cùng method/header đến cùng endpoint sẽ được gửi thẳng mà không cần tốn thêm vòng lặp OPTIONS thăm dò.'
+        },
+        {
+          id: 'c3-l3-q7',
+          question: 'Header bảo mật Strict-Transport-Security (HSTS) do máy chủ gửi về cho trình duyệt nhằm ngăn chặn loại hình tấn công mạng nào?',
+          options: [
+            'Tấn công từ chối dịch vụ phân tán (DDoS Attack).',
+            'Tấn công tiêm mã SQL Injection vào các form nhập liệu.',
+            'Tấn công chiếm dụng bộ nhớ RAM (Memory Buffer Overflow).',
+            'Tấn công hạ cấp giao thức (SSL Stripping) và nghe lén dữ liệu trên đường truyền không an toàn (Man-in-the-Middle), bằng cách ép buộc trình duyệt chỉ được phép giao tiếp qua kết nối HTTPS mã hóa trong suốt thời gian quy định.'
+          ],
+          correctIndex: 3,
+          explanation: 'HSTS (HTTP Strict Transport Security) yêu cầu trình duyệt tự động chuyển đổi toàn bộ các liên kết http:// thành https:// trước khi gửi gói tin ra mạng, ngăn chặn kẻ tấn công trung gian (MITM) chặn gói tin bắt tay để ép trình duyệt hạ cấp giao thức xuống HTTP không mã hóa (SSL Stripping).'
+        },
+        {
+          id: 'c3-l3-q8',
+          question: 'Tại sao việc lưu trữ JWT Access Token trong localStorage lại bị coi là một rủi ro an ninh nghiêm trọng hơn nhiều so với việc lưu trong HttpOnly Cookie?',
+          options: [
+            'Vì localStorage tự động đồng bộ dữ liệu lên máy chủ của Google Drive khiến lộ token ra ngoài.',
+            'Vì dữ liệu trong localStorage có thể bị đọc bởi bất kỳ đoạn mã JavaScript nào chạy trong cùng Origin; chỉ cần ứng dụng dính một lỗ hổng XSS nhỏ (từ thư viện npm bên thứ ba hoặc input chưa sanitize), toàn bộ token sẽ bị đánh cắp tức thì.',
+            'Vì localStorage có dung lượng tối đa chỉ 512 bytes không đủ chứa chữ ký điện tử của JWT.',
+            'Vì localStorage sẽ tự động xóa sạch dữ liệu sau mỗi 5 phút khiến phiên đăng nhập liên tục bị gián đoạn.'
+          ],
+          correctIndex: 1,
+          explanation: 'localStorage hoàn toàn không có cơ chế bảo vệ khỏi JavaScript. Một đoạn script độc hại được chèn qua lỗ hổng XSS (hoặc chuỗi cung ứng npm supply chain attack) có thể gọi localStorage.getItem("token") và gửi về máy chủ từ xa trong 1 phần nghìn giây. Ngược lại, HttpOnly Cookie nằm ngoài tầm với của JavaScript, bảo vệ token an toàn trước XSS.'
         }
       ],
       codeChallenge: {
         id: 'c3-l3-c1',
         title: 'Xây Dựng CORS Origin Whitelist Checker',
-        description: 'Hiện thực hàm \`validateCorsOrigin(requestOrigin: string | undefined, whitelist: string[]): { isAllowed: boolean; allowOriginHeader: string }\`. Nếu \`requestOrigin\` nằm trong danh sách \`whitelist\`, trả về \`{ isAllowed: true, allowOriginHeader: requestOrigin }\`. Nếu không có origin (server-to-server call), trả về \`{ isAllowed: true, allowOriginHeader: "" }\`. Nếu có origin nhưng không nằm trong whitelist, trả về \`{ isAllowed: false, allowOriginHeader: "" }\`.',
-        starterCode: `
-export function validateCorsOrigin(
+        description: 'Hiện thực hàm \`validateCorsOrigin(requestOrigin: string | undefined, whitelist: string[]): { isAllowed: boolean; allowOriginHeader: string }\`. Nếu \`requestOrigin\` nằm trong danh sách \`whitelist\`, trả về \`{ isAllowed: true, allowOriginHeader: requestOrigin }\`. Nếu không có origin (server-to-server call), trả về \`{ isAllowed: true, allowOriginHeader: "" }\`. Nếu có origin nhưng không nằm trong whitelist hoặc whitelist không phải là mảng, trả về \`{ isAllowed: false, allowOriginHeader: "" }\`.',
+        starterCode: `export function validateCorsOrigin(
   requestOrigin: string | undefined,
   whitelist: string[]
 ): { isAllowed: boolean; allowOriginHeader: string } {
   // TODO: Hiện thực kiểm tra whitelist an toàn CORS
   return { isAllowed: false, allowOriginHeader: '' };
-}
-`,
-        solution: `
-export function validateCorsOrigin(
+}`,
+        solution: `export function validateCorsOrigin(
   requestOrigin: string | undefined,
   whitelist: string[]
 ): { isAllowed: boolean; allowOriginHeader: string } {
@@ -946,28 +1215,42 @@ export function validateCorsOrigin(
     return { isAllowed: true, allowOriginHeader: '' };
   }
 
-  if (whitelist.includes(requestOrigin)) {
+  if (Array.isArray(whitelist) && whitelist.includes(requestOrigin)) {
     return { isAllowed: true, allowOriginHeader: requestOrigin };
   }
 
   return { isAllowed: false, allowOriginHeader: '' };
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Cho phép origin nằm trong whitelist',
+            name: 'Case 1 (Visible): Cho phép origin nằm trong whitelist',
             input: ['https://app.esmiles.vn', ['https://app.esmiles.vn', 'https://admin.esmiles.vn']],
-            expected: { isAllowed: true, allowOriginHeader: 'https://app.esmiles.vn' }
+            expected: { isAllowed: true, allowOriginHeader: 'https://app.esmiles.vn' },
+            hidden: false
           },
           {
-            name: 'Chặn origin lạ không nằm trong whitelist',
+            name: 'Case 2 (Visible): Chặn origin lạ không nằm trong whitelist',
             input: ['https://evil-hacker.com', ['https://app.esmiles.vn']],
-            expected: { isAllowed: false, allowOriginHeader: '' }
+            expected: { isAllowed: false, allowOriginHeader: '' },
+            hidden: false
           },
           {
-            name: 'Cho phép request không có origin header (gọi nội bộ)',
+            name: 'Case 3 (Visible): Cho phép request không có origin header (gọi server-to-server nội bộ)',
             input: [undefined, ['https://app.esmiles.vn']],
-            expected: { isAllowed: true, allowOriginHeader: '' }
+            expected: { isAllowed: true, allowOriginHeader: '' },
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): whitelist rỗng -> Chặn tất cả các request có origin',
+            input: ['https://app.esmiles.vn', []],
+            expected: { isAllowed: false, allowOriginHeader: '' },
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Khớp chính xác origin của admin',
+            input: ['https://admin.esmiles.vn', ['https://app.esmiles.vn', 'https://admin.esmiles.vn']],
+            expected: { isAllowed: true, allowOriginHeader: 'https://admin.esmiles.vn' },
+            hidden: true
           }
         ]
       }

@@ -156,30 +156,49 @@ HỆ THỐNG GẶP NGHẼN I/O GHI DỮ LIỆU POSTGRESQL?
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+export interface CacheHitRecord {
+  cache_hit_ratio: string;
+}
+
+export interface TableStorageRecord {
+  table_name: string;
+  table_size: string;
+  total_size_with_indexes: string;
+  total_8kb_pages: number;
+}
+
+export interface BgWriterRecord {
+  checkpoints_timed: number;
+  checkpoints_req: number;
+  checkpoint_write_time: number;
+  checkpoint_sync_time: number;
+}
+
+/**
+ * ADR: PostgreSQL Storage Diagnostics & Health Indicator
+ * - Giám sát chỉ số Cache Hit Ratio của Shared Buffers (tiêu chuẩn Production > 99%).
+ * - Đếm số lượng 8KB Pages vật lý thực tế của các bảng để phát hiện Bloat.
+ * - Kiểm tra tỷ lệ Checkpoint cưỡng bức (checkpoints_req) vs định kỳ (checkpoints_timed)
+ *   để tinh chỉnh tham số max_wal_size và checkpoint_timeout tránh nghẽn I/O đĩa.
+ */
 @Injectable()
 export class PostgresStorageMetricsService {
   private readonly logger = new Logger(PostgresStorageMetricsService.name);
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Truy vấn thông số vật lý của Page 8KB và tỉ lệ Cache Hit của Shared Buffers
-   */
   public async getEngineDiagnostics(): Promise<{
     cacheHitRatio: number;
-    walActivity: unknown;
-    topTableSizes: unknown[];
+    walActivity: BgWriterRecord | undefined;
+    topTableSizes: TableStorageRecord[];
   }> {
-    // 1. Kiểm tra tỉ lệ Cache Hit (Tỉ lệ đọc từ RAM so với đọc từ đĩa cứng)
-    // Tỉ lệ này trên Production bắt buộc phải > 99%
-    const cacheResult = await this.dataSource.query(\`
+    const cacheResult = await this.dataSource.query<CacheHitRecord[]>(\`
       SELECT 
         sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read) + 0.0001) * 100 AS cache_hit_ratio
       FROM pg_statio_user_tables;
     \`);
 
-    // 2. Kiểm tra dung lượng vật lý thực tế của bảng và các Page 8KB
-    const tableSizes = await this.dataSource.query(\`
+    const tableSizes = await this.dataSource.query<TableStorageRecord[]>(\`
       SELECT 
         relname AS table_name,
         pg_size_pretty(pg_relation_size(relid)) AS table_size,
@@ -190,8 +209,7 @@ export class PostgresStorageMetricsService {
       LIMIT 5;
     \`);
 
-    // 3. Kiểm tra hoạt động của tiến trình Checkpointer và ghi WAL
-    const walStats = await this.dataSource.query(\`
+    const walStats = await this.dataSource.query<BgWriterRecord[]>(\`
       SELECT checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time
       FROM pg_stat_bgwriter;
     \`);
@@ -215,7 +233,7 @@ export class PostgresStorageMetricsService {
           id: 'c5-l1-q1',
           question: 'Vì sao trong kiến trúc PostgreSQL 8KB Page, Line Pointers lại được bố trí mọc từ đầu trang xuống trong khi Heap Tuples mọc từ đáy trang lên?',
           options: [
-            'Để tận dụng tối đa vùng nhớ trống ở giữa và cho phép kích thước của các dòng bản ghi có độ dài co giãn linh hoạt.',
+            'Để tận dụng tối đa vùng nhớ trống ở giữa và cho phép kích thước của các dòng bản ghi có độ dài co giãn linh hoạt mà không gây phân mảnh bộ nhớ tĩnh.',
             'Vì phần cứng vi xử lý hiện đại chỉ cho phép đọc dữ liệu nhị phân từ hai đầu đối nghịch nhau cùng một thời điểm.',
             'Để hỗ trợ việc mã hóa hai lớp độc lập giúp ngăn chặn các cuộc tấn công đọc trộm dữ liệu trực tiếp từ đĩa cứng.',
             'Vì các con trỏ dòng bắt buộc phải có kích thước bằng đúng một nửa kích thước của dữ liệu bản ghi thực tế.'
@@ -227,64 +245,115 @@ export class PostgresStorageMetricsService {
           id: 'c5-l1-q2',
           question: 'Cơ chế Write-Ahead Logging (WAL) mang lại ưu thế vượt trội nào cho tốc độ ghi dữ liệu của hệ thống cơ sở dữ liệu quan hệ?',
           options: [
-            'Chuyển các thao tác ghi ngẫu nhiên vào các data pages thành các thao tác ghi tuần tự liên tục vào tệp log nhật ký.',
             'Tự động nén tất cả các hình ảnh và tệp tin đa phương tiện xuống dung lượng bằng không trước khi lưu trữ.',
             'Cho phép cơ sở dữ liệu bỏ qua việc kiểm tra các ràng buộc khóa ngoại và tính toàn vẹn của dữ liệu quan hệ.',
+            'Chuyển các thao tác ghi ngẫu nhiên (Random I/O) trên các Data Pages thành các thao tác ghi tuần tự liên tục (Append-only Sequential Write) vào tệp log nhật ký, cho phép xác nhận COMMIT ngay khi WAL fsync thành công.',
             'Tự động sao lưu toàn bộ cơ sở dữ liệu lên các máy chủ điện toán đám mây từ xa theo thời gian thực.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Ghi ngẫu nhiên (Random I/O) vào các tệp dữ liệu phân tán trên đĩa rất chậm. WAL giải quyết bài toán này bằng cách chỉ ghi tuần tự (Sequential Append-only) vào tệp tin nhật ký. Khi tệp nhật ký được ghi xuống đĩa thành công, transaction được coi là đã hoàn tất (commit), còn việc cập nhật các Data Page phức tạp được hoãn lại cho tiến trình Checkpoint.'
         },
         {
           id: 'c5-l1-q3',
           question: 'Con trỏ vật lý ctid mang giá trị (105, 12) trong một bảng dữ liệu PostgreSQL biểu thị ý nghĩa kỹ thuật chính xác là gì?',
           options: [
-            'Bản ghi nằm ở Page thứ 105 của tệp dữ liệu trên đĩa và được định vị bởi Line Pointer thứ 12 của Page đó.',
             'Bản ghi có khóa chính ID bằng 105 và đã trải qua mười hai lần cập nhật trạng thái giao dịch trong ngày.',
+            'Bản ghi nằm ở Page thứ 105 của tệp dữ liệu trên đĩa và được định vị bởi Line Pointer thứ 12 bên trong Header của Page đó.',
             'Bản ghi đang được chiếm giữ bởi tiến trình máy chủ số 105 và có tổng cộng mười hai cột dữ liệu khác rỗng.',
             'Bản ghi thuộc về người dùng thứ 105 và được phân vùng trên ổ đĩa cứng thể rắn thứ mười hai của cụm máy chủ.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'ctid (Current Tuple ID) là con trỏ địa chỉ vật lý nội bộ của PostgreSQL có dạng (block_number, tuple_index). Giá trị (105, 12) chỉ ra rằng dòng bản ghi này nằm ở Page thứ 105 của bảng trên ổ đĩa và tương ứng với chỉ mục con trỏ số 12 bên trong Page đó.'
         },
         {
           id: 'c5-l1-q4',
           question: 'Nếu cấu hình max_wal_size quá nhỏ trên một cơ sở dữ liệu có cường độ ghi cao (Heavy Write Traffic), điều gì sẽ xảy ra?',
           options: [
-            'Tiến trình Checkpoint sẽ bị kích hoạt liên tục làm quá tải I/O đĩa cứng và khiến tốc độ phản hồi của hệ thống bị sụt giảm.',
             'Cơ sở dữ liệu sẽ tự động từ chối tất cả các câu lệnh SELECT đọc dữ liệu để ưu tiên tài nguyên cho việc giải phóng ổ đĩa.',
             'Toàn bộ các tệp tin nhật ký giao dịch cũ sẽ bị xóa bỏ vĩnh viễn và không thể khôi phục lại khi gặp sự cố sập nguồn.',
-            'PostgreSQL sẽ tự động chuyển đổi sang mô hình cơ sở dữ liệu NoSQL dạng tài liệu để tránh ghi nhật ký đĩa cứng.'
+            'PostgreSQL sẽ tự động chuyển đổi sang mô hình cơ sở dữ liệu NoSQL dạng tài liệu để tránh ghi nhật ký đĩa cứng.',
+            'Tiến trình Checkpoint sẽ bị kích hoạt dồn dập liên tục (checkpoints occurring too frequently), ép máy chủ phải xả Dirty Pages ra đĩa không ngừng nghỉ, gây nghẽn băng thông I/O (Disk I/O Spikes) làm sụt giảm nghiêm trọng hiệu năng toàn hệ thống.'
+          ],
+          correctIndex: 3,
+          explanation: 'Khi lượng dữ liệu WAL phát sinh vượt quá ngưỡng max_wal_size, PostgreSQL buộc phải kích hoạt Checkpoint sớm hơn dự kiến. Nếu tham số này quá nhỏ, Checkpoint sẽ diễn ra dồn dập liên tục, buộc server phải xả Dirty Pages ra đĩa không ngừng nghỉ, gây nghẽn băng thông I/O (Disk I/O Spikes) làm chậm toàn bộ hệ thống.'
+        },
+        {
+          id: 'c5-l1-q5',
+          question: 'Trong kịch bản hệ thống xử lý Log hoặc Dữ liệu cảm biến IoT với lưu lượng cực lớn, việc thiết lập tham số synchronous_commit = off mang lại đánh đổi kỹ thuật nào?',
+          options: [
+            'Tăng tính bảo mật chống tấn công SQL Injection nhưng làm giảm 50% thông lượng CPU.',
+            'Tăng vọt thông lượng ghi giao dịch lên gấp 10 lần (>30,000 TPS) do không phải chờ lệnh fsync() đĩa ở mỗi commit, nhưng chấp nhận rủi ro có thể mất vài trăm mili-giây dữ liệu đã commit gần nhất nếu máy chủ sập nguồn đột ngột.',
+            'Làm cho cơ sở dữ liệu tự động chuyển dữ liệu sang bảng nháp RAM và không bao giờ ghi xuống đĩa.',
+            'Ngăn chặn mọi tiến trình khác đọc dữ liệu trong suốt thời gian giao dịch đang diễn ra.'
+          ],
+          correctIndex: 1,
+          explanation: 'Khi synchronous_commit = off, PostgreSQL báo thành công cho client ngay khi WAL được ghi vào WAL Buffer trong RAM mà không cần đợi lệnh fsync() xuống đĩa cứng hoàn tất. Điều này tăng vọt TPS nhưng chấp nhận cửa sổ rủi ro mất mát dữ liệu nhỏ (bằng wal_writer_delay, thường là 200ms) nếu hệ thống mất điện bất ngờ.'
+        },
+        {
+          id: 'c5-l1-q6',
+          question: 'Hai tệp tin phụ trợ Free Space Map (FSM) và Visibility Map (VM) đi kèm mỗi bảng dữ liệu trong PostgreSQL đảm nhiệm vai trò gì?',
+          options: [
+            'FSM theo dõi dung lượng trống còn lại của từng 8KB Page để backend worker nhanh chóng tìm trang còn chỗ chèn tuple mới; còn VM ghi nhận các Page hoàn toàn không chứa tuple đã chết (dead tuples) giúp tối ưu hóa tiến trình VACUUM và hỗ trợ Index-Only Scan.',
+            'FSM dùng để mã hóa mật khẩu người dùng, còn VM dùng để hiển thị biểu đồ đồ thị trên trang quản trị pgAdmin.',
+            'FSM dùng để lưu trữ các câu lệnh SQL đã biên dịch, còn VM dùng để quản lý phân quyền người dùng.',
+            'Cả hai tệp tin này chỉ là bản sao lưu tạm thời và bị xóa bỏ hoàn toàn sau khi khởi động lại cơ sở dữ liệu.'
           ],
           correctIndex: 0,
-          explanation: 'Khi lượng dữ liệu WAL phát sinh vượt quá ngưỡng max_wal_size, PostgreSQL buộc phải kích hoạt Checkpoint sớm hơn dự kiến. Nếu tham số này quá nhỏ, Checkpoint sẽ diễn ra dồn dập liên tục, buộc server phải xả Dirty Pages ra đĩa không ngừng nghỉ, gây nghẽn băng thông I/O (Disk I/O Spikes) làm chậm toàn bộ hệ thống.'
+          explanation: 'FSM (Free Space Map, đuôi _fsm) là cây nhị phân lưu trữ dung lượng còn trống của từng page giúp thao tác INSERT tìm chỗ nhanh mà không phải quét toàn bộ bảng. VM (Visibility Map, đuôi _vm) đánh dấu các page chỉ chứa dữ liệu nhìn thấy bởi mọi transaction, giúp Index-Only Scan không cần kiểm tra Heap Page để xác minh tính hiển thị.'
+        },
+        {
+          id: 'c5-l1-q7',
+          question: 'Quá trình Khôi phục sự cố (Crash Recovery / REDO Phase) của PostgreSQL diễn ra như thế nào khi máy chủ khởi động lại sau một sự cố sập nguồn đột ngột?',
+          options: [
+            'Hệ thống tự động xóa toàn bộ bảng dữ liệu và khôi phục từ bản sao lưu Dump của ngày hôm trước.',
+            'PostgreSQL yêu cầu người quản trị nhập mật khẩu root để cấp quyền phục hồi dữ liệu từ bộ nhớ RAM ảo.',
+            'Hệ thống mở tệp pg_control để xác định vị trí mốc Checkpoint gần nhất, sau đó đọc tuần tự toàn bộ các bản ghi nhật ký WAL phát sinh từ mốc Checkpoint đó đến thời điểm sập nguồn và áp dụng lại (replay) các thay đổi lên các Data Pages để tái thiết trạng thái nhất quán hoàn hảo.',
+            'Hệ thống gửi thông báo lỗi 500 đến toàn bộ các ứng dụng kết nối và tự động chuyển sang chế độ Read-Only vĩnh viễn.'
+          ],
+          correctIndex: 2,
+          explanation: 'Khi phục hồi sau crash, PostgreSQL dựa vào vị trí REDO LSN được ghi trong file global/pg_control tại mốc checkpoint gần nhất. Nó quét các bản ghi WAL từ điểm đó trở đi và phát lại (replay) toàn bộ thay đổi lên các Data Page, bảo đảm tính bền vững (Durability) của các giao dịch đã commit.'
+        },
+        {
+          id: 'c5-l1-q8',
+          question: 'Một Heap Tuple Header trong PostgreSQL chiếm dung lượng cố định 23 bytes nhằm mục đích kỹ thuật trọng yếu nào?',
+          options: [
+            'Lưu trữ khóa công khai RSA của bảng để mã hóa dữ liệu hàng.',
+            'Chứa tên đăng nhập của lập trình viên đã tạo ra dòng bản ghi đó.',
+            'Ghi nhận địa chỉ IP của client đã gửi câu lệnh INSERT đến cơ sở dữ liệu.',
+            'Lưu trữ các trường metadata phục vụ cơ chế kiểm soát đồng thời đa phiên bản MVCC bao gồm xmin (Transaction ID tạo dòng), xmax (Transaction ID xóa/sửa dòng), t_ctid (con trỏ trỏ tới phiên bản kế tiếp) và infomask cờ trạng thái.'
+          ],
+          correctIndex: 3,
+          explanation: 'Tuple Header (HeapTupleHeaderData) chiếm 23 bytes (hoặc 24 bytes do căn lề), chứa xmin, xmax, t_cid, t_ctid, và t_infomask. Đây là nền tảng cốt lõi của PostgreSQL MVCC: xmin xác định transaction nào chèn bản ghi, xmax xác định transaction nào xóa/update bản ghi, giúp các transaction đọc dữ liệu nhất quán không bị xung đột khóa.'
         }
       ],
       codeChallenge: {
         id: 'c5-l1-c1',
         title: 'Mô Phỏng Slotted Page Free Space Calculator',
-        description: 'Hiện thực hàm \`calculateFreeSpace(pageSize: number, linePointerCount: number, tupleSizes: number[]): number\`. Cấu trúc Page gồm: Page Header cố định 24 bytes; mỗi Line Pointer chiếm 4 bytes; mỗi Tuple chiếm dung lượng tương ứng trong mảng \`tupleSizes\`. Trả về số byte trống còn lại trong Page. Nếu tổng kích thước vượt quá \`pageSize\`, trả về \`0\` (đã đầy).',
-        starterCode: `
-export function calculateFreeSpace(
+        description: 'Hiện thực hàm \`calculateFreeSpace(pageSize: number, linePointerCount: number, tupleSizes: number[]): number\`. Cấu trúc Page chuẩn PostgreSQL gồm: Page Header cố định 24 bytes; mỗi Line Pointer chiếm 4 bytes; mỗi Tuple chiếm dung lượng tương ứng trong mảng \`tupleSizes\`. Trả về số byte trống còn lại trong Page. Nếu tổng kích thước vượt quá \`pageSize\` hoặc \`pageSize <= 0\`, trả về \`0\` (đã đầy hoặc không hợp lệ).',
+        starterCode: `export function calculateFreeSpace(
   pageSize: number,
   linePointerCount: number,
   tupleSizes: number[]
 ): number {
   // TODO: Tính toán dung lượng Free Space còn lại trong một Page 8KB
   return 0;
-}
-`,
-        solution: `
-export function calculateFreeSpace(
+}`,
+        solution: `export function calculateFreeSpace(
   pageSize: number,
   linePointerCount: number,
   tupleSizes: number[]
 ): number {
+  if (pageSize <= 0 || linePointerCount < 0) {
+    return 0;
+  }
+
   const HEADER_SIZE = 24;
   const LINE_POINTER_SIZE = 4;
 
   const totalLinePointersSize = linePointerCount * LINE_POINTER_SIZE;
-  const totalTuplesSize = tupleSizes.reduce((acc, curr) => acc + curr, 0);
+  const totalTuplesSize = Array.isArray(tupleSizes)
+    ? tupleSizes.reduce((acc, curr) => acc + (curr > 0 ? curr : 0), 0)
+    : 0;
 
   const usedSpace = HEADER_SIZE + totalLinePointersSize + totalTuplesSize;
 
@@ -293,18 +362,37 @@ export function calculateFreeSpace(
   }
 
   return pageSize - usedSpace;
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Tính toán Page 8192 bytes với 2 line pointers và 2 tuples (100b, 200b)',
+            name: 'Case 1 (Visible): Tính toán Page 8192 bytes với 2 line pointers và 2 tuples (100b, 200b)',
             input: [8192, 2, [100, 200]],
-            expected: 8192 - (24 + 8 + 300) // 7860
+            expected: 8192 - (24 + 8 + 300), // 7860
+            hidden: false
           },
           {
-            name: 'Page bị tràn dung lượng',
+            name: 'Case 2 (Visible): Page bị tràn dung lượng',
             input: [500, 10, [300, 200]],
-            expected: 0
+            expected: 0,
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Page rỗng chưa có tuple hay pointer nào',
+            input: [8192, 0, []],
+            expected: 8192 - 24, // 8168
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Page dung lượng vừa khớp tổng kích thước header + pointer + tuple',
+            input: [128, 1, [100]],
+            expected: 0, // 128 - (24 + 4 + 100) = 0
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Mảng tuple rỗng nhưng có 5 line pointers',
+            input: [8192, 5, []],
+            expected: 8192 - (24 + 20), // 8148
+            hidden: true
           }
         ]
       }
@@ -461,18 +549,26 @@ BẢNG DỮ LIỆU CÓ CẦN THÊM INDEX KHÔNG?
       realCodeSnippet: `
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
+/**
+ * ADR: Zero-Downtime High-Throughput Indexing Migration
+ * 1. Partial Index (idx_orders_unprocessed):
+ *    - Chỉ index các đơn hàng có status là PENDING hoặc PROCESSING (chiếm ~1% bảng).
+ *    - Tiết kiệm 99% dung lượng bộ nhớ Index trong RAM, không làm chậm thao tác ghi đơn COMPLETED.
+ * 2. Covering Index (idx_users_lookup_covering):
+ *    - Index trên cặp khóa phân vùng (tenant_id, email).
+ *    - INCLUDE các trường payload (first_name, last_name, is_active) ở Leaf Nodes.
+ *    - Kích hoạt trạng thái Index-Only Scan (0 Heap Lookups), tăng tốc độ xác thực auth lên 10x.
+ * 3. CREATE INDEX CONCURRENTLY:
+ *    - Bắt buộc trên Production để tránh SHARE lock làm tê liệt thao tác ghi dữ liệu.
+ */
 export class OptimizeHighThroughputIndexing1700000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // 1. Partial Index: Chỉ lập chỉ mục cho các đơn hàng chưa xử lý
-    // Tránh phình to Index với hàng triệu đơn đã hoàn thành
     await queryRunner.query(\`
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_unprocessed
       ON orders (created_at ASC)
       WHERE status IN ('PENDING', 'PROCESSING');
     \`);
 
-    // 2. Covering Index: Đính kèm thông tin hiển thị trực tiếp vào Leaf Node
-    // Giúp câu query thông tin khách hàng đạt cảnh giới Index Only Scan 100%
     await queryRunner.query(\`
       CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_lookup_covering
       ON users (tenant_id, email)
@@ -491,19 +587,19 @@ export class OptimizeHighThroughputIndexing1700000000000 implements MigrationInt
           id: 'c5-l2-q1',
           question: 'Hiện tượng "B-Tree Page Split" xảy ra khi nào và gây ảnh hưởng tiêu cực gì đến hiệu năng ghi dữ liệu của hệ thống cơ sở dữ liệu?',
           options: [
-            'Khi một trang lá B-Tree bị đầy và cần chèn thêm khóa mới buộc phải tách đôi trang làm tăng số thao tác ghi đĩa và phân mảnh cây.',
             'Khi hai tiến trình cùng cố gắng đọc một trang dữ liệu khiến cho hệ điều hành phải chia sẻ xung nhịp xử lý của CPU.',
-            'Khi cơ sở dữ liệu tự động xóa các bản ghi hết hạn làm cho kích thước của tệp tin bị co hẹp đột ngột trên hệ điều hành.',
-            'Khi người dùng thực hiện câu lệnh xóa chỉ mục khiến cho bảng dữ liệu phải phân chia lại các cột khóa ngoại.'
+            'Khi người dùng thực hiện câu lệnh xóa chỉ mục khiến cho bảng dữ liệu phải phân chia lại các cột khóa ngoại.',
+            'Khi một trang lá B-Tree 8KB bị đầy (100% Full) và cần chèn thêm khóa mới, hệ thống buộc phải cấp phát một trang mới, di chuyển 50% số khóa sang trang mới, cập nhật con trỏ danh sách liên kết đôi và đẩy khóa phân chia lên Node cha; thao tác này gây ra hàng loạt các đợt Random Disk I/O, phình to dung lượng WAL và gây phân mảnh index (Index Bloat).',
+            'Khi cơ sở dữ liệu tự động xóa các bản ghi hết hạn làm cho kích thước của tệp tin bị co hẹp đột ngột trên hệ điều hành.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'B-Tree Page Split xảy ra khi một Node/Page trong cây chỉ mục không còn đủ khoảng trống để chứa thêm một phần tử mới. Hệ thống bắt buộc phải cấp phát một Page mới, chuyển 50% dữ liệu sang đó, chèn bản ghi mới và cập nhật lại con trỏ ở Node cha. Quá trình này tiêu tốn nhiều Disk I/O ngẫu nhiên và làm tăng độ phân mảnh của Index.'
         },
         {
           id: 'c5-l2-q2',
           question: 'Tính năng "Covering Index" với mệnh đề INCLUDE trong PostgreSQL mang lại lợi thế vượt trội nào so với một Composite Index thông thường?',
           options: [
-            'Cho phép thực thi Index Only Scan mà không làm tăng kích cỡ của cây tìm kiếm do các cột trong INCLUDE không nằm ở các tầng trên.',
+            'Cho phép thực thi Index-Only Scan (0 Heap Lookups) mà không làm phình to các tầng Root và Internal Nodes của cây B-Tree, bởi các cột trong mệnh đề INCLUDE chỉ được lưu ở Leaf Pages và không tham gia vào cấu trúc sắp xếp của cây.',
             'Tự động sao lưu toàn bộ các cột trong bảng sang một máy chủ dự phòng mà không tốn băng thông đường truyền mạng.',
             'Bắt buộc cơ sở dữ liệu phải lưu trữ toàn bộ các cột được chỉ định trong bộ nhớ đệm CPU L1 để truy xuất tức thì.',
             'Cho phép sử dụng các hàm toán học phức tạp như căn bậc hai hoặc lượng giác ngay bên trong cấu trúc của khóa chính.'
@@ -513,35 +609,82 @@ export class OptimizeHighThroughputIndexing1700000000000 implements MigrationInt
         },
         {
           id: 'c5-l2-q3',
-          question: 'Trong trường hợp nào sau đây việc tạo một Partial Index (Chỉ mục bộ phận) là giải pháp tối ưu vượt bậc về cả dung lượng đĩa lẫn tốc độ ghi?',
+          question: 'Trong trường hợp nào sau đây việc tạo một Partial Index (Chỉ mục bộ phận với mệnh đề WHERE) là giải pháp tối ưu vượt bậc về cả dung lượng đĩa lẫn tốc độ ghi?',
           options: [
-            'Khi đại ca chỉ cần truy vấn thường xuyên một tập con dữ liệu chiếm tỉ lệ rất nhỏ trong bảng ví dụ như các đơn hàng bị lỗi.',
-            'Khi bảng dữ liệu có số lượng dòng rất ít dưới một trăm bản ghi và thường xuyên được đọc toàn bộ vào bộ nhớ ram.',
-            'Khi đại ca muốn tạo một chỉ mục bao quát toàn bộ các cột của bảng để phục vụ cho mọi câu lệnh tìm kiếm có thể có.',
-            'Khi cơ sở dữ liệu đang chạy trên hệ thống tệp tin mạng và không hỗ trợ các tính năng khóa hàng của giao dịch.'
+            'Khi bảng dữ liệu có số lượng dòng rất ít dưới một trăm bản ghi và thường xuyên được đọc toàn bộ vào bộ nhớ RAM.',
+            'Khi muốn tạo một chỉ mục bao quát toàn bộ các cột của bảng để phục vụ cho mọi câu lệnh tìm kiếm có thể có.',
+            'Khi cơ sở dữ liệu đang chạy trên hệ thống tệp tin mạng và không hỗ trợ các tính năng khóa hàng của giao dịch.',
+            'Khi hệ thống thường xuyên truy vấn một tập con dữ liệu chiếm tỉ lệ rất nhỏ và có tính chọn lọc cao trong bảng (ví dụ: các đơn hàng lỗi WHERE status = "FAILED" chỉ chiếm 1% trong 10 triệu dòng); giúp Index siêu nhỏ gọn nằm trọn trong RAM và không làm chậm thao tác chèn các đơn hàng thành công thông thường.'
           ],
-          correctIndex: 0,
+          correctIndex: 3,
           explanation: 'Partial Index sử dụng mệnh đề WHERE khi tạo index (ví dụ: WHERE status = "FAILED"). Nếu trong 10 triệu đơn hàng chỉ có 10,000 đơn bị lỗi, Partial Index chỉ lưu 10,000 mục này, giúp kích thước index siêu nhỏ, nằm gọn trong RAM, và các thao tác INSERT đơn hàng thành công thông thường không hề bị chậm vì không phải cập nhật index này.'
         },
         {
           id: 'c5-l2-q4',
-          question: 'Vì sao việc sử dụng UUID v4 ngẫu nhiên làm Khóa chính (Primary Key Clustered/B-Tree) lại là một nguyên nhân hàng đầu gây sụt giảm hiệu năng ghi dữ liệu?',
+          question: 'Vì sao việc sử dụng UUID v4 ngẫu nhiên làm Khóa chính (Primary Key Clustered/B-Tree) lại là một nguyên nhân hàng đầu gây sụt giảm nghiêm trọng hiệu năng ghi dữ liệu ở quy mô lớn?',
           options: [
-            'Vì tính chất ngẫu nhiên của UUID v4 phân tán vị trí chèn khắp các trang khác nhau liên tục kích hoạt hiện tượng B-Tree Page Splits.',
             'Vì chuỗi ký tự UUID v4 không thể chuyển đổi thành các con số nhị phân để lưu trữ trên đĩa cứng thể rắn hiện đại.',
+            'Vì tính chất ngẫu nhiên phân tán của UUID v4 khiến mỗi bản ghi mới được chèn rải rác vào giữa các trang bất kỳ trên toàn bộ cây B-Tree, liên tục kích hoạt hiện tượng Page Splits, gây phân mảnh ổ đĩa và phá vỡ cơ chế đệm cache của Buffer Pool; trái ngược với BIGINT tự tăng hoặc UUID v7 chèn tuần tự vào cuối trang lá ngoài cùng.',
             'Vì các thuật toán băm của cơ sở dữ liệu từ chối tiếp nhận các giá trị có chứa dấu gạch ngang phân cách theo quy chuẩn RFC.',
             'Vì hệ quản trị cơ sở dữ liệu PostgreSQL chỉ cho phép tối đa một nghìn giá trị UUID ngẫu nhiên tồn tại trong một bảng.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'B-Tree sắp xếp các khóa theo thứ tự liên tục. Khi dùng BigInt tự tăng hoặc UUID v7 (Time-based), các bản ghi mới luôn được chèn tuần tự vào cuối trang lá cuối cùng (Right-most leaf). Ngược lại, UUID v4 hoàn toàn ngẫu nhiên sẽ chèn rải rác vào giữa bất kỳ trang nào trong hàng triệu trang của cây, liên tục gây vỡ trang (Page Splits) và xới tung bộ nhớ đệm Buffer Pool.'
+        },
+        {
+          id: 'c5-l2-q5',
+          question: 'Vì sao các hệ quản trị cơ sở dữ liệu quan hệ (RDBMS) lại ưu tiên sử dụng cấu trúc cây B+ Tree thay vì Cây nhị phân cân bằng (như AVL Tree hay Red-Black Tree) để tổ chức chỉ mục lưu trữ trên đĩa?',
+          options: [
+            'Vì Cây nhị phân có hệ số rẽ nhánh (Fan-out) chỉ bằng 2 khiến độ sâu của cây lên tới 20-30 tầng cho 10 triệu bản ghi, đòi hỏi hàng chục lần đọc đĩa ngẫu nhiên; trong khi B+ Tree có Fan-out lớn (100-300) khớp với kích thước 8KB Block, chỉ cần độ sâu 3-4 tầng là quản lý được hàng triệu bản ghi, giảm thiểu tối đa số lần Disk I/O.',
+            'Vì Cây nhị phân chỉ lưu trữ được số nguyên mà không hỗ trợ các chuỗi ký tự UTF-8.',
+            'Vì thuật toán cây nhị phân đã bị hết hạn bản quyền phần mềm mã nguồn mở từ năm 1995.',
+            'Vì các hệ điều hành 64-bit hiện đại không hỗ trợ con trỏ nhị phân trên bộ nhớ RAM.'
+          ],
+          correctIndex: 0,
+          explanation: 'Mỗi lần nhảy node trong cây là một lần đọc đĩa tiềm tàng nếu node đó không có trong cache. Cây nhị phân có độ sâu quá lớn (O(log2 N)), trong khi B+ Tree với Fan-out lớn (O(log_B N) với B=100-300) chỉ có độ sâu 3-4 tầng, giúp việc tìm kiếm chỉ tốn tối đa 1 lần đọc đĩa ở tầng lá (vì Root và Internal nodes luôn được cache trong RAM).'
+        },
+        {
+          id: 'c5-l2-q6',
+          question: 'Cấu trúc Danh sách liên kết đôi (Doubly-Linked List) kết nối giữa các Leaf Nodes ở đáy cây B+ Tree mang lại ưu thế đột phá nào cho các câu truy vấn cơ sở dữ liệu?',
+          options: [
+            'Cho phép xóa toàn bộ bảng dữ liệu trong thời gian O(1) mà không ghi nhật ký WAL.',
+            'Tự động sao lưu dữ liệu sang máy chủ đám mây mỗi khi có một Node bị hỏng.',
+            'Tối ưu hóa các câu truy vấn khoảng giá trị (Range Queries như BETWEEN, >, <): sau khi tìm kiếm nhị phân đến Leaf Page chứa giá trị cận dưới, cơ sở dữ liệu chỉ việc duyệt ngang tuần tự qua các con trỏ trang kế tiếp mà không bao giờ phải leo ngược lên các tầng trên của cây.',
+            'Ngăn chặn tuyệt đối các cuộc tấn công DDoS vào cổng kết nối PostgreSQL.'
+          ],
+          correctIndex: 2,
+          explanation: 'Nhờ các con trỏ liên kết đôi trỏ giữa các Leaf Page liền kề, một câu query tìm khoảng giá trị (ví dụ: WHERE amount BETWEEN 100 AND 500) chỉ cần tìm kiếm từ gốc xuống giá trị 100 một lần duy nhất, sau đó đi bộ ngang qua danh sách liên kết cho tới giá trị 500 với tốc độ quét tuần tự cực nhanh.'
+        },
+        {
+          id: 'c5-l2-q7',
+          question: 'Điều kiện tiên quyết nào phải được thỏa mãn để PostgreSQL có thể kích hoạt thành công chế độ quét Index-Only Scan thay vì phải quay về Index Scan thông thường?',
+          options: [
+            'Toàn bộ bảng dữ liệu phải có dung lượng nhỏ hơn 100 Megabytes.',
+            'Mọi cột dữ liệu được câu lệnh truy vấn yêu cầu (SELECT, WHERE, ORDER BY) đều phải nằm trọn vẹn trong cấu trúc của Index, VÀ các 8KB Data Pages tương ứng phải được đánh dấu là "All-Visible" trong Visibility Map (chứng minh không có dead tuples chưa được dọn dẹp bởi VACUUM).',
+            'Bảng dữ liệu bắt buộc phải không có bất kỳ khóa ngoại (Foreign Key) nào.',
+            'Người thực thi câu truy vấn phải sở hữu quyền quản trị tối cao SUPERUSER trên database cluster.'
+          ],
+          correctIndex: 1,
+          explanation: 'Để đạt được Index-Only Scan thực thụ (0 lần truy cập Heap), ngoài việc Index phải chứa đủ tất cả các cột được SELECT, PostgreSQL còn phải kiểm tra Visibility Map. Nếu một page được đánh dấu là All-Visible (nghĩa là mọi tuple trên page đều nhìn thấy bởi mọi transaction hiện tại), Postgres mới có thể bỏ qua việc đọc Heap Page để kiểm tra tính hiển thị của MVCC.'
+        },
+        {
+          id: 'c5-l2-q8',
+          question: 'Tại sao trên môi trường Production đang hoạt động với lưu lượng truy cập cao, các kỹ sư Backend bắt buộc phải sử dụng câu lệnh CREATE INDEX CONCURRENTLY thay vì lệnh CREATE INDEX thông thường?',
+          options: [
+            'Vì CREATE INDEX thông thường sẽ tự động xóa sạch dữ liệu của các cột không liên quan.',
+            'Vì câu lệnh CREATE INDEX CONCURRENTLY sẽ ép buộc cơ sở dữ liệu nén dữ liệu bằng thuật toán gzip.',
+            'Vì lệnh CREATE INDEX thông thường sẽ kích hoạt sự kiện crash hệ thống nếu có hơn 10 kết nối cùng lúc.',
+            'Vì lệnh CREATE INDEX tiêu chuẩn sẽ chiếm giữ khóa độc quyền SHARE LOCK trên bảng, chặn đứng toàn bộ các thao tác ghi (INSERT, UPDATE, DELETE) của người dùng cho tới khi index tạo xong (có thể mất nhiều giờ); trong khi CONCURRENTLY tạo index qua 2 lượt quét ngầm mà không khóa bảng ghi, đảm bảo Zero Downtime.'
+          ],
+          correctIndex: 3,
+          explanation: 'CREATE INDEX thông thường chiếm giữ SHARE lock, cho phép SELECT nhưng chặn đứng mọi thao tác INSERT, UPDATE, DELETE cho đến khi hoàn thành. Nếu bảng có hàng chục triệu dòng, việc tạo index có thể kéo dài hàng chục phút đến vài giờ, gây tê liệt toàn bộ ứng dụng. CONCURRENTLY tránh điều này bằng cách thực hiện 2 lượt quét không khóa ghi.'
         }
       ],
       codeChallenge: {
         id: 'c5-l2-c1',
         title: 'Mô Phỏng B-Tree Node Insertion & Page Split Detection',
-        description: 'Hiện thực hàm \`insertIntoBTreeNode(currentKeys: number[], newKey: number, maxCapacity: number): { splitOccurred: boolean; leftKeys: number[]; rightKeys: number[]; promotedKey: number | null }\`. Hàm nhận vào danh sách các khóa hiện có đã được sắp xếp tăng dần và chèn \`newKey\` vào đúng vị trí. Nếu số lượng sau khi chèn vượt quá \`maxCapacity\`, kích hoạt \`splitOccurred: true\`, tìm phần tử ở giữa (median index = Math.floor(len / 2)) làm \`promotedKey\`, phần còn lại chia thành \`leftKeys\` và \`rightKeys\`. Nếu không vượt ngưỡng, \`splitOccurred: false\`.',
-        starterCode: `
-export function insertIntoBTreeNode(
+        description: 'Hiện thực hàm \`insertIntoBTreeNode(currentKeys: number[], newKey: number, maxCapacity: number): { splitOccurred: boolean; leftKeys: number[]; rightKeys: number[]; promotedKey: number | null }\`. Hàm nhận vào danh sách các khóa hiện có đã được sắp xếp tăng dần và chèn \`newKey\` vào đúng vị trí logic. Nếu số lượng sau khi chèn vượt quá \`maxCapacity\`, kích hoạt \`splitOccurred: true\`, tìm phần tử ở giữa (median index = Math.floor(len / 2)) làm \`promotedKey\`, phần còn lại chia thành \`leftKeys\` và \`rightKeys\`. Nếu không vượt ngưỡng, \`splitOccurred: false\`.',
+        starterCode: `export function insertIntoBTreeNode(
   currentKeys: number[],
   newKey: number,
   maxCapacity: number
@@ -553,10 +696,8 @@ export function insertIntoBTreeNode(
 } {
   // TODO: Chèn phần tử có sắp xếp và tách node khi vượt ngưỡng dung lượng
   return { splitOccurred: false, leftKeys: [], rightKeys: [], promotedKey: null };
-}
-`,
-        solution: `
-export function insertIntoBTreeNode(
+}`,
+        solution: `export function insertIntoBTreeNode(
   currentKeys: number[],
   newKey: number,
   maxCapacity: number
@@ -566,7 +707,8 @@ export function insertIntoBTreeNode(
   rightKeys: number[];
   promotedKey: number | null;
 } {
-  const combined = [...currentKeys, newKey].sort((a, b) => a - b);
+  const combined = Array.isArray(currentKeys) ? [...currentKeys, newKey] : [newKey];
+  combined.sort((a, b) => a - b);
 
   if (combined.length <= maxCapacity) {
     return {
@@ -577,7 +719,7 @@ export function insertIntoBTreeNode(
     };
   }
 
-  // Vượt ngưỡng -> Thực hiện Page Split
+  // Vượt ngưỡng dung lượng -> Thực hiện Page Split
   const midIndex = Math.floor(combined.length / 2);
   const promotedKey = combined[midIndex];
   const leftKeys = combined.slice(0, midIndex);
@@ -589,23 +731,52 @@ export function insertIntoBTreeNode(
     rightKeys,
     promotedKey,
   };
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Chèn không vượt quá dung lượng (maxCapacity = 3)',
+            name: 'Case 1 (Visible): Chèn không vượt quá dung lượng (maxCapacity = 3)',
             input: [[10, 30], 20, 3],
-            expected: { splitOccurred: false, leftKeys: [10, 20, 30], rightKeys: [], promotedKey: null }
+            expected: { splitOccurred: false, leftKeys: [10, 20, 30], rightKeys: [], promotedKey: null },
+            hidden: false
           },
           {
-            name: 'Chèn gây ra Page Split khi vượt ngưỡng 3 phần tử',
+            name: 'Case 2 (Visible): Chèn gây ra Page Split khi vượt ngưỡng 3 phần tử',
             input: [[10, 20, 40], 30, 3],
             expected: {
               splitOccurred: true,
               leftKeys: [10, 20],
               rightKeys: [40],
               promotedKey: 30
-            }
+            },
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Chèn vào node rỗng ban đầu',
+            input: [[], 50, 2],
+            expected: { splitOccurred: false, leftKeys: [50], rightKeys: [], promotedKey: null },
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Chèn số âm và số 0 vào node gây split với maxCapacity = 4',
+            input: [[-20, -10, 10, 20], 0, 4],
+            expected: {
+              splitOccurred: true,
+              leftKeys: [-20, -10],
+              rightKeys: [10, 20],
+              promotedKey: 0
+            },
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Chèn phần tử trùng lặp gây Page Split',
+            input: [[5, 10], 10, 2],
+            expected: {
+              splitOccurred: true,
+              leftKeys: [5],
+              rightKeys: [10],
+              promotedKey: 10
+            },
+            hidden: true
           }
         ]
       }
@@ -766,28 +937,52 @@ export interface QueryPlanAnalysis {
   scanType: 'Seq Scan' | 'Index Scan' | 'Index Only Scan' | 'Bitmap Scan' | 'Other';
   sharedHitBlocks: number;
   sharedReadBlocks: number;
+  actualRows: number;
   rawPlan: string;
 }
 
+interface ExplainPlanNode {
+  'Node Type': string;
+  'Actual Rows'?: number;
+  'Shared Hit Blocks'?: number;
+  'Shared Read Blocks'?: number;
+  [key: string]: unknown;
+}
+
+interface ExplainResult {
+  'QUERY PLAN': Array<{
+    Plan: ExplainPlanNode;
+    'Planning Time': number;
+    'Execution Time': number;
+  }>;
+}
+
+/**
+ * ADR: Automated Query Plan Profiler & EXPLAIN Inspector
+ * - Bóc tách kế hoạch thực thi EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) tại runtime.
+ * - Phát hiện sớm các câu query bị thoái lui về Sequential Scan trên tập dữ liệu > 1,000 rows.
+ * - Giám sát tỷ lệ Shared Hit Blocks vs Shared Read Blocks để đánh giá hiệu quả cache RAM.
+ */
 @Injectable()
 export class DatabaseQueryProfilerService {
   private readonly logger = new Logger(DatabaseQueryProfilerService.name);
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Phân tích tự động kế hoạch thực thi của câu lệnh và phát hiện các bẫy hiệu năng
-   */
   public async profileQuery(sqlQuery: string, params: unknown[] = []): Promise<QueryPlanAnalysis> {
     const explainQuery = \`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) \${sqlQuery}\`;
-    const result = await this.dataSource.query(explainQuery, params);
+    const result = await this.dataSource.query<ExplainResult[]>(explainQuery, params);
 
-    const planData = result[0]['QUERY PLAN'][0];
-    const planNode = planData['Plan'];
+    const planData = result[0]?.['QUERY PLAN']?.[0];
+    if (!planData) {
+      throw new Error('FAILED_TO_PARSE_EXPLAIN_PLAN');
+    }
 
+    const planNode = planData.Plan;
     const executionTimeMs = planData['Execution Time'];
     const planningTimeMs = planData['Planning Time'];
-    const nodeType = planNode['Node Type'];
+    const nodeType = planNode['Node Type'] || '';
+    const actualRows = planNode['Actual Rows'] || 0;
     const sharedHit = planNode['Shared Hit Blocks'] || 0;
     const sharedRead = planNode['Shared Read Blocks'] || 0;
 
@@ -797,8 +992,8 @@ export class DatabaseQueryProfilerService {
     else if (nodeType.includes('Index Scan')) detectedScan = 'Index Scan';
     else if (nodeType.includes('Bitmap')) detectedScan = 'Bitmap Scan';
 
-    if (detectedScan === 'Seq Scan' && planNode['Actual Rows'] > 1000) {
-      this.logger.warn(\`[QUERY PERF ALERT] Phát hiện Seq Scan trên tập dữ liệu lớn: \${planNode['Actual Rows']} dòng!\`);
+    if (detectedScan === 'Seq Scan' && actualRows > 1000) {
+      this.logger.warn(\`[QUERY PERF ALERT] Phát hiện Seq Scan trên tập dữ liệu lớn: \${actualRows} dòng!\`);
     }
 
     return {
@@ -807,6 +1002,7 @@ export class DatabaseQueryProfilerService {
       scanType: detectedScan,
       sharedHitBlocks: sharedHit,
       sharedReadBlocks: sharedRead,
+      actualRows,
       rawPlan: JSON.stringify(planData, null, 2),
     };
   }
@@ -817,7 +1013,7 @@ export class DatabaseQueryProfilerService {
           id: 'c5-l3-q1',
           question: 'Trong kết quả của lệnh EXPLAIN (ANALYZE, BUFFERS), thông số "Buffers: shared hit=120 read=5" cung cấp thông tin kỹ thuật gì?',
           options: [
-            'Hệ thống đã đọc một trăm hai mươi block từ trong RAM và chỉ phải đọc năm block từ ổ đĩa cứng vật lý.',
+            'Hệ thống đã đọc 120 blocks (mỗi block 8KB, tương đương 960KB) trực tiếp từ bộ nhớ RAM đệm (Shared Buffers), và chỉ phải đọc 5 blocks (40KB) từ ổ đĩa cứng vật lý.',
             'Hệ thống đã tìm thấy một trăm hai mươi bản ghi trùng khớp và loại bỏ năm bản ghi bị lỗi định dạng dữ liệu.',
             'Hệ thống đã sử dụng một trăm hai mươi luồng worker song song và gửi năm gói tin phản hồi về cho client.',
             'Hệ thống đã thực hiện khóa một trăm hai mươi hàng trong bảng và giải phóng năm kết nối nhàn rỗi trong pool.'
@@ -827,61 +1023,110 @@ export class DatabaseQueryProfilerService {
         },
         {
           id: 'c5-l3-q2',
-          question: 'Vì sao một câu lệnh truy vấn có mệnh đề WHERE trên cột đã được đánh Index B-Tree nhưng Query Optimizer vẫn quyết định chọn Sequential Scan?',
+          question: 'Vì sao một câu lệnh truy vấn có mệnh đề WHERE trên cột đã được đánh Index B-Tree nhưng Query Optimizer của PostgreSQL vẫn quyết định chọn Sequential Scan?',
           options: [
-            'Vì tập dữ liệu thỏa mãn điều kiện lọc chiếm tỉ lệ phần trăm lớn trong bảng khiến việc đọc tuần tự nhanh hơn đọc ngẫu nhiên.',
             'Vì PostgreSQL không cho phép sử dụng chỉ mục đối với các bảng dữ liệu có chứa các trường kiểu văn bản text.',
             'Vì các chỉ mục B-Tree chỉ hoạt động khi câu lệnh SQL có đính kèm thêm mệnh đề sắp xếp bắt buộc ORDER BY.',
+            'Vì tập dữ liệu thỏa mãn điều kiện lọc chiếm tỉ lệ phần trăm đáng kể trong bảng (thường > 15-20% tổng số bản ghi), khiến việc dùng Index Scan làm phát sinh hàng nghìn lượt Random Disk I/O nhảy vào Heap Table, chậm hơn rất nhiều so với việc quét tuần tự liên tục (Sequential Read) toàn bộ bảng.',
             'Vì hệ điều hành Linux tự động vô hiệu hóa việc tra cứu chỉ mục nếu dung lượng pin của máy chủ giảm xuống dưới một nửa.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Nếu một câu query lấy ra lượng dòng lớn (thường > 15-20% tổng số bản ghi của bảng), việc dùng Index Scan sẽ buộc đầu đọc ổ đĩa phải nhảy ngẫu nhiên (Random I/O) hàng nghìn lần sang Heap Pages. Trong trường hợp này, quét tuần tự toàn bộ bảng (Sequential Read) tận dụng tốc độ đọc liên tục của ổ cứng lại nhanh hơn rất nhiều.'
         },
         {
           id: 'c5-l3-q3',
           question: 'Cơ chế hoạt động của Bitmap Index Scan trong PostgreSQL giải quyết nhược điểm nào của phương thức Index Scan truyền thống?',
           options: [
-            'Nó xây dựng một bản đồ bit các con trỏ trang trong RAM để sắp xếp lại thứ tự đọc đĩa theo tuần tự vật lý tránh nhảy lộn xộn.',
             'Nó tự động mã hóa toàn bộ hình ảnh đại diện của người dùng thành các tệp nhị phân siêu nhỏ trước khi gửi qua mạng.',
+            'Nó duyệt qua Index để thu thập danh sách ctid, xây dựng một bản đồ Bitmap các con trỏ trang trong RAM, sắp xếp các vị trí này theo đúng thứ tự vật lý của các 8KB Page trên ổ đĩa, rồi mới tiến hành đọc Heap Table tuần tự, loại bỏ hiện tượng đầu đọc đĩa nhảy ngẫu nhiên lộn xộn.',
             'Nó loại bỏ hoàn toàn nhu cầu sử dụng bộ nhớ chia sẻ Shared Buffers giúp giải phóng tài nguyên cho hệ điều hành.',
             'Nó cho phép thực thi câu lệnh SQL mà không cần thiết lập kết nối TCP đến cơ sở dữ liệu quan hệ trung tâm.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Index Scan thông thường lấy từng ctid rồi lập tức truy cập ngay vào Heap Table (Random I/O). Bitmap Index Scan tối ưu hơn: Nó duyệt qua Index trước, đánh dấu các vị trí cần đọc vào một mảng Bitmap trong RAM, sắp xếp các vị trí này theo đúng thứ tự vật lý của các Page trên ổ đĩa, rồi mới tiến hành đọc Heap Table tuần tự, giảm thiểu tối đa hiện tượng nhảy đầu đọc ngẫu nhiên.'
         },
         {
           id: 'c5-l3-q4',
           question: 'Khi quan sát thấy dòng chữ "Sort Method: external merge Disk" trong kết quả EXPLAIN ANALYZE, giải pháp tối ưu hệ thống chuẩn nhất là gì?',
           options: [
-            'Tăng giá trị tham số cấu hình work_mem để thuật toán sắp xếp có đủ dung lượng RAM thực thi mà không phải ghi tệp tạm ra đĩa.',
             'Xóa bỏ toàn bộ các bản ghi lịch sử trong bảng để giảm bớt số lượng dòng cần xử lý trong tương lai của cơ sở dữ liệu.',
             'Thay thế câu lệnh sắp xếp ORDER BY bằng một vòng lặp đồng bộ bên trong mã nguồn JavaScript của máy chủ NestJS.',
-            'Chuyển toàn bộ cơ sở dữ liệu sang định dạng tệp tin văn bản thuần túy để hệ điều hành tự động sắp xếp nhanh hơn.'
+            'Chuyển toàn bộ cơ sở dữ liệu sang định dạng tệp tin văn bản thuần túy để hệ điều hành tự động sắp xếp nhanh hơn.',
+            'Tăng giá trị tham số cấu hình work_mem (ví dụ từ 4MB lên 32MB-64MB) để thuật toán sắp xếp QuickSort có đủ dung lượng bộ nhớ RAM thực thi mà không bị tràn tệp tạm ra đĩa cứng (Disk Spill).'
+          ],
+          correctIndex: 3,
+          explanation: '"Sort Method: external merge Disk" là dấu hiệu cho thấy dung lượng bộ nhớ được cấp phát cho phép toán sắp xếp (tham số work_mem) nhỏ hơn kích thước dữ liệu cần sort. Do đó, PostgreSQL buộc phải tạo các tệp tạm trên ổ cứng (Disk Spill) để chia nhỏ và merge sort, làm tốc độ chậm đi hàng chục lần. Tăng work_mem sẽ giúp sort hoàn toàn trong RAM.'
+        },
+        {
+          id: 'c5-l3-q5',
+          question: 'Điểm khác biệt cốt tử giữa câu lệnh "EXPLAIN" và câu lệnh "EXPLAIN ANALYZE" trong PostgreSQL là gì?',
+          options: [
+            'EXPLAIN chỉ hỗ trợ ngôn ngữ Python, còn EXPLAIN ANALYZE chỉ hỗ trợ ngôn ngữ TypeScript.',
+            'EXPLAIN chỉ dựa vào số liệu thống kê nội bộ pg_statistic để ước tính chi phí (Estimated Cost) và số dòng (Estimated Rows) mà HOÀN TOÀN KHÔNG thực thi câu query; trong khi EXPLAIN ANALYZE THỰC SỰ CHẠY câu query trên cơ sở dữ liệu để đo đạc thời gian thực thi chính xác (Actual Time) và số dòng trả về thực tế.',
+            'EXPLAIN sẽ tự động tối ưu hóa câu query thành công, còn EXPLAIN ANALYZE chỉ in ra lỗi cú pháp.',
+            'EXPLAIN ANALYZE sẽ tự động rollback dữ liệu nhưng EXPLAIN sẽ tự động commit vĩnh viễn.'
+          ],
+          correctIndex: 1,
+          explanation: 'Lệnh EXPLAIN thuần túy chỉ kích hoạt Planner/Optimizer đưa ra phán đoán lý thuyết mà không chạy truy vấn, do đó có thể dùng an toàn cho các câu lệnh DELETE/UPDATE lớn. Lệnh EXPLAIN ANALYZE sẽ thực sự cho chạy câu query trong engine để lấy số liệu thực tế đo bằng microsecond.'
+        },
+        {
+          id: 'c5-l3-q6',
+          question: 'Trong chuỗi kế hoạch "(cost=10.50..450.80 rows=100 width=32)", hai con số 10.50 và 450.80 thể hiện điều gì theo mô hình chi phí của PostgreSQL CBO?',
+          options: [
+            '10.50 là Startup Cost (chi phí ước tính để tạo ra dòng kết quả đầu tiên); 450.80 là Total Cost (tổng chi phí ước tính để đọc toàn bộ tập kết quả), tính theo đơn vị chuẩn hóa dựa trên seq_page_cost = 1.0.',
+            '10.50 là số mili-giây tối thiểu và 450.80 là số mili-giây tối đa để hoàn thành câu truy vấn.',
+            '10.50 là số lượng Megabytes RAM tiêu thụ và 450.80 là số lượng Kilobytes log ghi vào WAL.',
+            '10.50 là số lượng index hits và 450.80 là số lượng disk reads.'
           ],
           correctIndex: 0,
-          explanation: '"Sort Method: external merge Disk" là dấu hiệu cho thấy dung lượng bộ nhớ được cấp phát cho phép toán sắp xếp (tham số work_mem) nhỏ hơn kích thước dữ liệu cần sort. Do đó, PostgreSQL buộc phải tạo các tệp tạm trên ổ cứng (Disk Spill) để chia nhỏ và merge sort, làm tốc độ chậm đi hàng chục lần. Tăng work_mem sẽ giúp sort hoàn toàn trong RAM.'
+          explanation: 'Chỉ số cost trong PostgreSQL không phải là đơn vị thời gian (giây hay mili-giây) mà là đơn vị chi phí tùy biến quy đổi theo seq_page_cost = 1.0. Số trước dấu .. là Startup Cost (chi phí khởi động trước khi dòng đầu tiên được trả về), số sau dấu .. là Total Cost (tổng chi phí để hoàn tất node).'
+        },
+        {
+          id: 'c5-l3-q7',
+          question: 'Khi nào PostgreSQL Optimizer ưu tiên lựa chọn thuật toán Hash Join thay vì Nested Loop Join khi thực hiện ghép nối 2 bảng dữ liệu?',
+          options: [
+            'Khi câu lệnh SQL không chứa mệnh đề ON chỉ định điều kiện ghép nối.',
+            'Khi cả hai bảng dữ liệu đều có số lượng dòng dưới 10 bản ghi.',
+            'Khi ghép nối 2 tập dữ liệu có kích thước trung bình đến lớn mà bảng trong (inner table) không có chỉ mục phù hợp trên cột join; Optimizer sẽ tạo một bảng băm (Hash Table) trong RAM từ bảng nhỏ hơn rồi quét bảng lớn để đối chiếu tìm kiếm trong thời gian O(1) trung bình.',
+            'Khi cơ sở dữ liệu đang chạy trên ổ đĩa quang CD-ROM.'
+          ],
+          correctIndex: 2,
+          explanation: 'Nested Loop Join cực nhanh nếu bảng ngoài nhỏ và bảng trong có Index. Nhưng nếu cả 2 bảng đều lớn hoặc thiếu index, Nested Loop sẽ có độ phức tạp O(M * N) cực chậm. Optimizer sẽ chuyển sang Hash Join: dựng một bảng băm trong bộ nhớ (work_mem) từ bảng nhỏ hơn, sau đó quét bảng lớn để tra cứu hash, đạt độ phức tạp xấp xỉ O(M + N).'
+        },
+        {
+          id: 'c5-l3-q8',
+          question: 'Hiện tượng nào sau đây giải thích vì sao một bảng vừa được nhập thêm 5 triệu bản ghi mới (Bulk Insert) lại đột ngột khiến các câu truy vấn SELECT trở nên chậm chạp bất thường, và giải pháp kỹ thuật là gì?',
+          options: [
+            'Do cơ sở dữ liệu bị hết dung lượng RAM và phải tự động giảm xung nhịp CPU.',
+            'Do các bản ghi mới chưa được gán ID nên hệ thống phải tìm kiếm bằng cách so sánh từng chuỗi nhị phân.',
+            'Do các ổ đĩa NVMe SSD bị giảm tốc độ đọc sau khi ghi dữ liệu liên tục.',
+            'Do bảng thống kê nội bộ pg_statistic chưa kịp cập nhật phân phối dữ liệu mới (Outdated Statistics), khiến Cost Optimizer phán đoán sai lệch nghiêm trọng và chọn nhầm kế hoạch thực thi tồi tệ (như dùng nhầm Index Scan thay vì Seq Scan hoặc ngược lại); giải pháp là chủ động chạy ngay lệnh "ANALYZE <table_name>;" để tái tính toán thống kê.'
+          ],
+          correctIndex: 3,
+          explanation: 'Optimizer hoạt động dựa trên các thông số thống kê trong pg_statistic (được thu thập bởi ANALYZE). Sau khi bulk insert lượng lớn dữ liệu, nếu autovacuum chưa kịp chạy ANALYZE, bảng thống kê vẫn coi bảng là nhỏ hoặc có phân phối cũ, dẫn đến việc chọn các Access Path hoàn toàn lệch lạc. Chạy ANALYZE ngay lập tức sẽ giải quyết triệt để.'
         }
       ],
       codeChallenge: {
         id: 'c5-l3-c1',
         title: 'Phân Tích Báo Cáo Chi Phí Query (Query Plan Cost Analyzer)',
-        description: 'Hiện thực hàm \`analyzePlanCosts(planString: string): { startupCost: number; totalCost: number; isHighCost: boolean }\`. Chuỗi đầu vào có dạng \`"-> Seq Scan on orders (cost=10.50..450.80 rows=100 width=32)"\`. Trích xuất \`startupCost\` (số trước hai dấu chấm), \`totalCost\` (số sau hai dấu chấm). Trả về \`isHighCost: true\` nếu \`totalCost > 100\`, ngược lại trả về \`false\`.',
-        starterCode: `
-export function analyzePlanCosts(planString: string): {
+        description: 'Hiện thực hàm \`analyzePlanCosts(planString: string): { startupCost: number; totalCost: number; isHighCost: boolean }\`. Chuỗi đầu vào có dạng \`"-> Seq Scan on orders (cost=10.50..450.80 rows=100 width=32)"\`. Trích xuất \`startupCost\` (số trước hai dấu chấm), \`totalCost\` (số sau hai dấu chấm). Trả về \`isHighCost: true\` nếu \`totalCost > 100\`, ngược lại trả về \`false\`. Xử lý an toàn nếu chuỗi không hợp lệ bằng cách trả về \`{ startupCost: 0, totalCost: 0, isHighCost: false }\`.',
+        starterCode: `export function analyzePlanCosts(planString: string): {
   startupCost: number;
   totalCost: number;
   isHighCost: boolean;
 } {
   // TODO: Trích xuất chỉ số chi phí từ chuỗi kết quả EXPLAIN
   return { startupCost: 0, totalCost: 0, isHighCost: false };
-}
-`,
-        solution: `
-export function analyzePlanCosts(planString: string): {
+}`,
+        solution: `export function analyzePlanCosts(planString: string): {
   startupCost: number;
   totalCost: number;
   isHighCost: boolean;
 } {
+  if (typeof planString !== 'string') {
+    return { startupCost: 0, totalCost: 0, isHighCost: false };
+  }
+
   const match = planString.match(/cost=([0-9.]+)\.\.([0-9.]+)/);
   if (!match) {
     return { startupCost: 0, totalCost: 0, isHighCost: false };
@@ -892,22 +1137,41 @@ export function analyzePlanCosts(planString: string): {
   const isHighCost = totalCost > 100;
 
   return {
-    startupCost,
-    totalCost,
+    startupCost: isNaN(startupCost) ? 0 : startupCost,
+    totalCost: isNaN(totalCost) ? 0 : totalCost,
     isHighCost,
   };
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Phân tích câu query có chi phí thấp',
+            name: 'Case 1 (Visible): Phân tích câu query có chi phí thấp',
             input: ['-> Index Scan on users (cost=0.28..8.30 rows=1 width=64)'],
-            expected: { startupCost: 0.28, totalCost: 8.30, isHighCost: false }
+            expected: { startupCost: 0.28, totalCost: 8.30, isHighCost: false },
+            hidden: false
           },
           {
-            name: 'Phân tích câu query có chi phí cao vượt ngưỡng 100',
+            name: 'Case 2 (Visible): Phân tích câu query có chi phí cao vượt ngưỡng 100',
             input: ['-> Seq Scan on large_table (cost=10.50..580.40 rows=5000 width=128)'],
-            expected: { startupCost: 10.50, totalCost: 580.40, isHighCost: true }
+            expected: { startupCost: 10.50, totalCost: 580.40, isHighCost: true },
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Chuỗi không hợp lệ không chứa cost',
+            input: ['Invalid plan string without cost metadata'],
+            expected: { startupCost: 0, totalCost: 0, isHighCost: false },
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Đúng bằng biên 100.00 (không vượt quá 100)',
+            input: ['-> Bitmap Heap Scan (cost=0.00..100.00 rows=50 width=16)'],
+            expected: { startupCost: 0, totalCost: 100, isHighCost: false },
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Chi phí lớn với số thực phức tạp',
+            input: ['-> Hash Join (cost=1250.75..99876.50 rows=200000 width=256)'],
+            expected: { startupCost: 1250.75, totalCost: 99876.50, isHighCost: true },
+            hidden: true
           }
         ]
       }

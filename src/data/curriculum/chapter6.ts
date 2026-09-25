@@ -141,15 +141,27 @@ BẠN ĐANG XÂY DỰNG NGHIỆP VỤ NÀO CHO HỆ THỐNG?
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
+interface DatabaseErrorWithCode {
+  code?: string;
+  message?: string;
+}
+
+function isDatabaseErrorWithCode(err: unknown): err is DatabaseErrorWithCode {
+  return typeof err === 'object' && err !== null && 'code' in err;
+}
+
+/**
+ * ADR: Serializable Transaction Execution with Jitter Backoff
+ * - Chạy giao dịch tài chính ở cấp độ SERIALIZABLE để triệt tiêu 100% mọi dị thường (Dirty Read, Non-repeatable, Phantom Read, Write Skew).
+ * - Tự động bắt mã lỗi PostgreSQL '40001' (serialization_failure) phát sinh từ SSI.
+ * - Áp dụng Random Jitter Backoff để tránh hiện tượng Thundering Herd khi nhiều giao dịch xung đột cùng retry tại một thời điểm.
+ */
 @Injectable()
 export class FinancialTransactionService {
   private readonly logger = new Logger(FinancialTransactionService.name);
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Thực thi giao dịch ở mức SERIALIZABLE có bọc cơ chế tự động Retry chuẩn Enterprise
-   */
   public async executeSerializableWithRetry<T>(
     operation: (manager: EntityManager) => Promise<T>,
     maxRetries: number = 3
@@ -166,20 +178,24 @@ export class FinancialTransactionService {
         const result = await operation(queryRunner.manager);
         await queryRunner.commitTransaction();
         return result;
-      } catch (error: any) {
+      } catch (err: unknown) {
         await queryRunner.rollbackTransaction();
 
         // 40001 là mã chuẩn SQL State cho lỗi Serialization Failure trong PostgreSQL
-        if (error.code === '40001' && attempts < maxRetries) {
+        if (
+          isDatabaseErrorWithCode(err) &&
+          err.code === '40001' &&
+          attempts < maxRetries
+        ) {
           const backoffMs = Math.floor(Math.random() * 50) + 10;
           this.logger.warn(
             \`[SERIALIZATION FAILURE] Lần \${attempts} thất bại. Đang thử lại sau \${backoffMs}ms...\`
           );
-          await new Promise((r) => setTimeout(r, backoffMs));
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
           continue;
         }
 
-        throw error;
+        throw err;
       } finally {
         await queryRunner.release();
       }
@@ -194,7 +210,7 @@ export class FinancialTransactionService {
           id: 'c6-l1-q1',
           question: 'Hiện tượng "Dirty Read" xảy ra khi nào và tại sao cơ sở dữ liệu PostgreSQL lại không bao giờ cho phép hiện tượng này xuất hiện?',
           options: [
-            'Khi một giao dịch đọc dữ liệu chưa được commit của giao dịch khác; PostgreSQL không cho phép vì kiến trúc MVCC luôn yêu cầu snapshot hợp lệ.',
+            'Khi một giao dịch đọc dữ liệu chưa được commit của giao dịch khác; PostgreSQL không cho phép vì kiến trúc MVCC luôn yêu cầu snapshot hợp lệ dựa trên kiểm tra tính khả kiến xmin đã commit.',
             'Khi một bảng dữ liệu bị xóa nhầm bởi người quản trị; PostgreSQL ngăn chặn bằng cách bắt buộc phải nhập mật khẩu hai lớp.',
             'Khi câu lệnh SQL chứa các ký tự đặc biệt nguy hiểm; PostgreSQL tự động lọc bỏ các ký tự này thông qua bộ tiền xử lý.',
             'Khi bộ nhớ đệm CPU L2 bị tràn dữ liệu; PostgreSQL tự động chuyển toàn bộ các giao dịch sang lưu trữ tạm thời ngoài đĩa cứng.'
@@ -206,60 +222,107 @@ export class FinancialTransactionService {
           id: 'c6-l1-q2',
           question: 'Hiện tượng "Non-repeatable Read" khác biệt cơ bản với hiện tượng "Phantom Read" ở điểm mấu chốt nào sau đây?',
           options: [
-            'Non-repeatable Read liên quan đến việc một dòng có sẵn bị sửa đổi giá trị, còn Phantom Read liên quan đến việc xuất hiện các dòng mới được thêm vào.',
             'Phantom Read chỉ xảy ra trên các khóa chính số nguyên, trong khi Non-repeatable Read chỉ xảy ra trên các cột dữ liệu dạng chuỗi ký tự.',
             'Non-repeatable Read làm sập toàn bộ máy chủ cơ sở dữ liệu ngay lập tức, còn Phantom Read chỉ làm chậm tốc độ của mạng nội bộ.',
+            'Non-repeatable Read xảy ra khi cùng một dòng có sẵn (cùng ID) bị sửa đổi (UPDATE) hoặc xóa (DELETE) khiến 2 lần đọc ra 2 giá trị khác nhau; còn Phantom Read xảy ra khi có các dòng mới hoàn toàn (INSERT) được chèn vào tập kết quả của một câu truy vấn theo dải điều kiện.',
             'Cả hai hiện tượng này thực chất là một và được đặt tên khác nhau tùy theo quy chuẩn của từng nhà sản xuất phần mềm thương mại.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Điểm khác biệt cốt lõi: Non-repeatable Read xảy ra khi cùng 1 dòng dữ liệu (cùng ID) bị sửa đổi (UPDATE) hoặc xóa (DELETE) bởi transaction khác, khiến 2 lần đọc ra 2 giá trị khác nhau. Trong khi đó, Phantom Read xảy ra khi một tập hợp điều kiện (như WHERE age > 18) xuất hiện thêm các dòng hoàn toàn mới (INSERT) do transaction khác chèn vào.'
         },
         {
           id: 'c6-l1-q3',
-          question: 'Hiện tượng dị thường "Write Skew" (Lệch ghi) là gì và cấp độ cô lập nào là cấp độ tối thiểu bắt buộc để ngăn chặn được nó?',
+          question: 'Hiện tượng dị thường "Write Skew" (Lệch ghi do phụ thuộc chéo) là gì và cấp độ cô lập nào là cấp độ tối thiểu bắt buộc để ngăn chặn được nó?',
           options: [
-            'Xảy ra khi hai giao dịch đọc cùng một tập dữ liệu rồi ghi đè lên hai dòng khác nhau vi phạm ràng buộc chung; chỉ có Serializable mới chặn được.',
             'Xảy ra khi đĩa cứng bị mất điện đột ngột trong lúc đang ghi tệp tin; chỉ có cấp độ Read Committed mới có thể khắc phục được sự cố.',
+            'Xảy ra khi hai giao dịch đồng thời đọc cùng một trạng thái dữ liệu rồi ghi đè lên hai dòng hoàn toàn khác nhau khiến cả hai đều commit thành công nhưng phá vỡ ràng buộc toàn vẹn chung của nghiệp vụ; chỉ có cấp độ Serializable (hoặc khóa bi quan SELECT FOR UPDATE) mới ngăn chặn được.',
             'Xảy ra khi lập trình viên quên không gọi lệnh commit transaction; chỉ có cấp độ Repeatable Read mới tự động ghi đè dữ liệu.',
             'Xảy ra khi hai tiến trình cùng cố gắng tạo ra hai bảng có tên giống hệt nhau trong cùng một schema cơ sở dữ liệu quan hệ.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Write Skew xảy ra khi 2 transaction đồng thời đọc cùng một trạng thái (ví dụ kiểm tra số bác sĩ đang trực >= 2), sau đó Transaction 1 cập nhật dòng A, Transaction 2 cập nhật dòng B. Cả 2 cập nhật đều hợp lệ khi đứng riêng lẻ, nhưng kết hợp lại thì vi phạm quy tắc toàn vẹn của hệ thống. Repeatable Read không chặn được Write Skew, bắt buộc phải dùng Serializable (hoặc khóa bi quan SELECT FOR UPDATE).'
         },
         {
           id: 'c6-l1-q4',
           question: 'Khi triển khai cấp độ cô lập SERIALIZABLE trong NestJS, tại sao mã nguồn bắt buộc phải cài đặt thêm cơ chế tự động thử lại (Retry Loop)?',
           options: [
-            'Vì PostgreSQL áp dụng cơ chế lạc quan và sẽ chủ động hủy giao dịch với mã lỗi 40001 nếu phát hiện có xung đột phụ thuộc giữa các giao dịch.',
             'Vì chuẩn SERIALIZABLE chỉ cho phép một giao dịch thành công trong mỗi chu kỳ một giờ đồng hồ theo giờ máy chủ.',
             'Vì các trình điều khiển kết nối TypeORM tự động ngắt kết nối mạng sau mỗi lần thực thi câu lệnh SQL ở mức cao.',
-            'Vì giao thức TCP bắt buộc phải thiết lập lại quá trình bắt tay ba bước mỗi khi người dùng gọi lệnh commit dữ liệu.'
+            'Vì giao thức TCP bắt buộc phải thiết lập lại quá trình bắt tay ba bước mỗi khi người dùng gọi lệnh commit dữ liệu.',
+            'Vì PostgreSQL áp dụng mô hình Serializable Snapshot Isolation (SSI) theo dõi đồ thị phụ thuộc SIREAD locks; nếu phát hiện nguy cơ xảy ra chu trình xung đột tuần tự, engine sẽ chủ động abort giao dịch với mã lỗi chuẩn 40001 (serialization_failure), đòi hỏi tầng ứng dụng phải retry lại.'
+          ],
+          correctIndex: 3,
+          explanation: 'PostgreSQL sử dụng Serializable Snapshot Isolation (SSI). Thay vì khóa cứng toàn bộ bảng, nó cho phép các transaction chạy song song và duy trì một đồ thị phụ thuộc (SIREAD locks). Nếu phát hiện chu trình phụ thuộc có nguy cơ gây dị thường, PostgreSQL sẽ chủ động ném lỗi "40001 serialization_failure" để hủy giao dịch có rủi ro, buộc tầng ứng dụng phải Retry lại.'
+        },
+        {
+          id: 'c6-l1-q5',
+          question: 'Cơ chế Snapshot Isolation được PostgreSQL sử dụng trong cấp độ Repeatable Read vận hành như thế nào?',
+          options: [
+            'Transaction lấy một Snapshot trạng thái dữ liệu duy nhất tại thời điểm câu lệnh đầu tiên trong transaction bắt đầu thực thi và giữ nguyên vẹn snapshot đó cho tới khi kết thúc, giúp mọi câu SELECT sau đó đều nhìn thấy dữ liệu đồng nhất, ngăn chặn triệt để cả Dirty Read, Non-repeatable Read và Phantom Read.',
+            'Tự động chụp ảnh màn hình của hệ điều hành và lưu vào thư mục /tmp/snapshots.',
+            'Tự động khóa toàn bộ các bảng trong cơ sở dữ liệu ở chế độ độc quyền cho tới khi transaction hoàn tất.',
+            'Chuyển đổi toàn bộ các câu lệnh SELECT thành câu lệnh ghi nhật ký vào tệp tin văn bản.'
           ],
           correctIndex: 0,
-          explanation: 'PostgreSQL sử dụng Serializable Snapshot Isolation (SSI). Thay vì khóa cứng toàn bộ bảng, nó cho phép các transaction chạy song song và duy trì một đồ thị phụ thuộc (SIREAD locks). Nếu phát hiện chu trình phụ thuộc có nguy cơ gây dị thường, PostgreSQL sẽ chủ động ném lỗi "40001 serialization_failure" để hủy giao dịch có rủi ro, buộc tầng ứng dụng phải Retry lại.'
+          explanation: 'Ở cấp độ Repeatable Read, PostgreSQL thiết lập snapshot ở đầu câu lệnh đầu tiên và tái sử dụng snapshot này cho toàn bộ các truy vấn trong transaction. Do đó, dù các transaction khác có INSERT/UPDATE và COMMIT thành công, transaction này vẫn nhìn thấy trạng thái cũ, triệt tiêu cả Non-repeatable Read và Phantom Read.'
+        },
+        {
+          id: 'c6-l1-q6',
+          question: 'Theo chuẩn ANSI SQL-92 có 4 cấp độ cô lập, nhưng vì sao trên thực tế PostgreSQL chỉ có 3 mức hành vi khác biệt?',
+          options: [
+            'Vì PostgreSQL đã bỏ qua cấp độ Serializable do lo ngại tốn bộ nhớ RAM.',
+            'Vì PostgreSQL không hỗ trợ cấp độ Repeatable Read trên hệ điều hành Linux.',
+            'Vì mức READ UNCOMMITTED được PostgreSQL tự động đối xử tương đương với READ COMMITTED; kiến trúc MVCC của PostgreSQL không bao giờ cho phép đọc dữ liệu bẩn chưa commit dưới bất kỳ cấu hình nào.',
+            'Vì hệ quản trị PostgreSQL chỉ cho phép chạy tối đa ba tiến trình worker cùng một thời điểm.'
+          ],
+          correctIndex: 2,
+          explanation: 'PostgreSQL chấp nhận cú pháp SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED, nhưng bên dưới engine tự động chuyển thành READ COMMITTED. Lý do là cơ chế MVCC của PostgreSQL luôn kiểm tra xmin đã commit chưa, không có cách nào (và không có lý do gì) để đọc các tuple chưa commit.'
+        },
+        {
+          id: 'c6-l1-q7',
+          question: 'Đánh đổi kỹ thuật tiêu cực lớn nhất khi nâng cấp toàn bộ hệ thống lên cấp độ cô lập SERIALIZABLE trong môi trường lưu lượng cao (High-Concurrency) là gì?',
+          options: [
+            'Tất cả các tệp tin hình ảnh của người dùng sẽ bị xóa khỏi cơ sở dữ liệu.',
+            'Tăng tỷ lệ giao dịch bị abort với mã lỗi 40001 (serialization_failure) do xung đột phụ thuộc chéo, làm tăng tải CPU vì phải retry liên tục, đồng thời tiêu tốn thêm RAM trong Lock Space để lưu trữ đồ thị SIREAD locks.',
+            'Cơ sở dữ liệu sẽ tự động chuyển các kết nối TCP sang giao thức UDP không an toàn.',
+            'Bảng dữ liệu sẽ không thể tạo thêm bất kỳ chỉ mục Index nào trong tương lai.'
+          ],
+          correctIndex: 1,
+          explanation: 'SSI phải duy trì bộ nhớ theo dõi các SIREAD lock để phát hiện xung đột. Khi có nhiều transaction đồng thời ghi và đọc các bảng liên quan, tỷ lệ serialization failure tăng vọt, đòi hỏi hệ thống phải retry liên tục, làm tăng độ trễ P99 và hao phí tài nguyên xử lý.'
+        },
+        {
+          id: 'c6-l1-q8',
+          question: 'Tại sao việc bổ sung một khoảng trễ ngẫu nhiên (Random Jitter Backoff) là bắt buộc khi thực hiện Retry giao dịch gặp lỗi Serialization Failure (40001)?',
+          options: [
+            'Để hệ điều hành Linux có đủ thời gian sạc pin cho các thanh RAM của máy chủ.',
+            'Để cho phép client có thể kịp gửi thêm một yêu cầu HTTP mới hủy giao dịch cũ.',
+            'Để giảm bớt nhiệt độ hoạt động của các lõi vi xử lý CPU trong trung tâm dữ liệu.',
+            'Để tránh hiện tượng Thundering Herd (Bầy đàn ùa vào) hoặc Lock Convoy: nếu nhiều giao dịch xung đột cùng retry tại một khoảng thời gian cố định chính xác, chúng sẽ tiếp tục đâm sầm vào nhau và gây ra chuỗi lỗi 40001 vô tận.'
+          ],
+          correctIndex: 3,
+          explanation: 'Nếu hai giao dịch A và B cùng gặp xung đột và retry sau đúng 50ms, chúng sẽ tiếp tục chạm mặt nhau ở lần thử tiếp theo và lại xung đột tiếp. Random Jitter (ví dụ: Math.random() * 50 + 10 ms) phân tán thời điểm thử lại của các giao dịch, giải tỏa tranh chấp tài nguyên hiệu quả.'
         }
       ],
       codeChallenge: {
         id: 'c6-l1-c1',
         title: 'Mô Phỏng Transaction Retry Runner Chống Lỗi Serialization (40001)',
-        description: 'Hiện thực hàm \`runWithRetry<T>(action: () => T, maxRetries: number): T\`. Hàm thực thi \`action()\`. Nếu \`action()\` ném ra Error có \`message === "40001"\`, hàm phải bắt lỗi và thử lại tối đa \`maxRetries\` lần. Nếu lần chạy nào trả về kết quả thành công, trả về kết quả đó ngay. Nếu thử hết \`maxRetries\` lần mà vẫn lỗi, ném ra Error cuối cùng.',
-        starterCode: `
-export function runWithRetry<T>(action: () => T, maxRetries: number): T {
+        description: 'Hiện thực hàm \`runWithRetry<T>(action: () => T, maxRetries: number): T\`. Hàm thực thi \`action()\`. Nếu \`action()\` ném ra Error có \`message === "40001"\`, hàm phải bắt lỗi và thử lại tối đa \`maxRetries\` lần. Nếu lần chạy nào trả về kết quả thành công, trả về kết quả đó ngay. Nếu gặp lỗi khác \`"40001"\`, ném lỗi đó ngay lập tức mà không retry. Nếu thử hết \`maxRetries\` lần mà vẫn gặp \`"40001"\`, ném ra Error cuối cùng.',
+        starterCode: `export function runWithRetry<T>(action: () => T, maxRetries: number): T {
   // TODO: Hiện thực cơ chế Retry khi gặp lỗi 40001
   return action();
-}
-`,
-        solution: `
-export function runWithRetry<T>(action: () => T, maxRetries: number): T {
+}`,
+        solution: `export function runWithRetry<T>(action: () => T, maxRetries: number): T {
   let attempts = 0;
   let lastError: unknown;
 
   while (attempts <= maxRetries) {
     try {
       return action();
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      if (err?.message === '40001' && attempts < maxRetries) {
+      const isSerializationError =
+        err instanceof Error && err.message === '40001';
+      if (isSerializationError && attempts < maxRetries) {
         attempts++;
         continue;
       }
@@ -268,16 +331,16 @@ export function runWithRetry<T>(action: () => T, maxRetries: number): T {
   }
 
   throw lastError;
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Thực thi thành công ngay lần đầu',
+            name: 'Case 1 (Visible): Thực thi thành công ngay lần đầu',
             input: [() => 'SUCCESS', 3],
-            expected: 'SUCCESS'
+            expected: 'SUCCESS',
+            hidden: false
           },
           {
-            name: 'Thử lại 2 lần lỗi 40001 và thành công ở lần thứ 3',
+            name: 'Case 2 (Visible): Thử lại 2 lần lỗi 40001 và thành công ở lần thứ 3',
             input: [
               (() => {
                 let count = 0;
@@ -289,7 +352,26 @@ export function runWithRetry<T>(action: () => T, maxRetries: number): T {
               })(),
               3
             ],
-            expected: 'RECOVERED'
+            expected: 'RECOVERED',
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Gặp lỗi khác ngoài 40001 -> Ném lỗi ngay lập tức',
+            input: [() => { throw new Error('50000'); }, 3],
+            expected: 'ERROR_THROWN',
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Thử hết maxRetries mà vẫn bị 40001 -> Ném lỗi',
+            input: [() => { throw new Error('40001'); }, 2],
+            expected: 'ERROR_THROWN',
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): maxRetries = 0 và gặp lỗi 40001 -> Ném lỗi ngay',
+            input: [() => { throw new Error('40001'); }, 0],
+            expected: 'ERROR_THROWN',
+            hidden: true
           }
         ]
       }
@@ -436,16 +518,29 @@ PHÁT HIỆN BẢNG DỮ LIỆU BỊ PHÌNH TO DUNG LƯỢNG (BLOAT > 40%)?
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+export interface DeadTupleInspectionRecord {
+  schemaname: string;
+  table_name: string;
+  live_tuples: number;
+  dead_tuples: number;
+  dead_tuple_ratio: string;
+  last_vacuum: string | null;
+  last_autovacuum: string | null;
+}
+
+/**
+ * ADR: PostgreSQL Dead Tuples & Table Bloat Diagnostics
+ * - Theo dõi tỉ lệ Dead Tuples trên các bảng có lưu lượng UPDATE/DELETE lớn.
+ * - Cảnh báo sớm khi dead_tuple_ratio vượt ngưỡng 20% để chủ động tinh chỉnh autovacuum_vacuum_scale_factor.
+ * - Phát hiện nguy cơ Table Bloat gây suy giảm hiệu năng Sequential Scan.
+ */
 @Injectable()
 export class DatabaseVacuumDiagnosticsService {
   private readonly logger = new Logger(DatabaseVacuumDiagnosticsService.name);
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Giám sát số lượng Dead Tuples và phát hiện các bảng có nguy cơ Bloat nghiêm trọng
-   */
-  public async inspectDeadTuplesAndBloat(): Promise<unknown[]> {
+  public async inspectDeadTuplesAndBloat(): Promise<DeadTupleInspectionRecord[]> {
     const query = \`
       SELECT 
         schemaname,
@@ -461,7 +556,7 @@ export class DatabaseVacuumDiagnosticsService {
       LIMIT 10;
     \`;
 
-    const results = await this.dataSource.query(query);
+    const results = await this.dataSource.query<DeadTupleInspectionRecord[]>(query);
 
     for (const row of results) {
       if (parseFloat(row.dead_tuple_ratio) > 20) {
@@ -480,19 +575,19 @@ export class DatabaseVacuumDiagnosticsService {
           id: 'c6-l2-q1',
           question: 'Trong cơ chế Multi-Version Concurrency Control (MVCC) của PostgreSQL, điều gì thực sự xảy ra ở cấp độ vật lý khi thực thi một câu lệnh UPDATE?',
           options: [
-            'Dòng dữ liệu cũ được đánh dấu đã bị xóa bằng cách ghi giá trị xmax, và một dòng dữ liệu mới toanh được chèn vào bảng với xmin mới.',
             'Dữ liệu mới được ghi đè trực tiếp lên chính các byte bộ nhớ của dòng cũ giúp tiết kiệm tối đa dung lượng lưu trữ trên đĩa cứng.',
+            'Dòng dữ liệu cũ được giữ nguyên nhưng được đánh dấu đã bị xóa bằng cách ghi transaction ID hiện tại vào trường xmax; đồng thời một Heap Tuple mới toanh được chèn vào bảng với xmin bằng transaction ID hiện tại, và con trỏ t_ctid của dòng cũ được cập nhật để trỏ sang dòng mới.',
             'Cơ sở dữ liệu tạm thời di chuyển toàn bộ bảng dữ liệu vào bộ nhớ đệm RAM để thay đổi giá trị của cột rồi mới ghi ngược lại đĩa.',
             'Hệ điều hành tạo ra một bản sao lưu toàn bộ cơ sở dữ liệu sang một thư mục tạm thời trước khi tiến hành cập nhật bản ghi.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Trong PostgreSQL, UPDATE được hiện thực bằng cách: 1) Dòng cũ được giữ nguyên, chỉ cập nhật xmax bằng ID của transaction hiện tại để đánh dấu đã bị thay thế; 2) Tạo ra một Heap Tuple mới chứa giá trị mới với xmin bằng transaction ID hiện tại. Điều này cho phép các transaction đang đọc trước đó vẫn nhìn thấy dòng cũ mà không bị gián đoạn.'
         },
         {
           id: 'c6-l2-q2',
           question: 'Vì sao việc một giao dịch bị rơi vào trạng thái "Idle in transaction" trong thời gian dài lại có thể gây tê liệt khả năng dọn dẹp của tiến trình AutoVacuum?',
           options: [
-            'Vì AutoVacuum không thể dọn dẹp bất kỳ Dead Tuple nào có xmax lớn hơn xmin của giao dịch đang treo đó vì nó vẫn có thể cần đọc dữ liệu.',
+            'Vì một giao dịch bị treo sẽ giữ cố định một Snapshot với Transaction ID cũ (Active Snapshot); AutoVacuum bắt buộc phải tôn trọng Snapshot này và tuyệt đối không được phép dọn dẹp bất kỳ Dead Tuple nào sinh ra sau thời điểm transaction đó bắt đầu, khiến Dead Tuples tích tụ khổng lồ và gây Table Bloat nghiêm trọng.',
             'Vì hệ điều hành Linux sẽ tự động khóa cứng toàn bộ các tiến trình nền khi phát hiện có một kết nối mạng đang nhàn rỗi.',
             'Vì các tệp tin nhật ký WAL sẽ tự động ngừng ghi dữ liệu khiến cho dung lượng bộ nhớ chia sẻ Shared Buffers bị đầy tràn.',
             'Vì tiến trình AutoVacuum bắt buộc phải xin phép người dùng thông qua giao diện dòng lệnh mỗi khi muốn dọn dẹp các bảng lớn.'
@@ -504,43 +599,88 @@ export class DatabaseVacuumDiagnosticsService {
           id: 'c6-l2-q3',
           question: 'Sự khác biệt mang tính sống còn giữa câu lệnh VACUUM thông thường và câu lệnh VACUUM FULL trong môi trường Production là gì?',
           options: [
-            'VACUUM thường không khóa bảng và chỉ đánh dấu tái sử dụng khoảng trống, còn VACUUM FULL chiếm giữ Exclusive Lock khóa cứng toàn bộ bảng.',
             'VACUUM thường chỉ dọn dẹp các cột số nguyên, trong khi VACUUM FULL có khả năng dọn dẹp toàn bộ các cột chứa định dạng văn bản JSON.',
             'VACUUM thường bắt buộc phải khởi động lại máy chủ cơ sở dữ liệu, còn VACUUM FULL có thể chạy ngầm hoàn toàn không tốn tài nguyên CPU.',
-            'VACUUM FULL chỉ xóa bỏ các tệp tin log nhật ký giao dịch cũ mà không can thiệp vào bất kỳ tệp dữ liệu chính nào của bảng.'
+            'VACUUM FULL chỉ xóa bỏ các tệp tin log nhật ký giao dịch cũ mà không can thiệp vào bất kỳ tệp dữ liệu chính nào của bảng.',
+            'VACUUM thông thường chạy ngầm (online), không khóa bảng đọc/ghi, chỉ dọn Dead Tuples và cập nhật Free Space Map để tái sử dụng chỗ trống; trong khi VACUUM FULL sao chép toàn bộ dữ liệu còn sống sang tệp tin mới để trả lại dung lượng cho OS nhưng chiếm giữ ACCESS EXCLUSIVE LOCK khóa cứng toàn bộ bảng, cấm tiệt mọi câu lệnh đọc ghi của ứng dụng.'
           ],
-          correctIndex: 0,
+          correctIndex: 3,
           explanation: 'VACUUM thông thường chạy online, không chặn các thao tác SELECT/INSERT/UPDATE/DELETE, chỉ gom chỗ trống để bảng tái sử dụng. Ngược lại, VACUUM FULL tạo ra một tệp bảng mới và copy dữ liệu sang để trả lại dung lượng cho OS; nó đòi hỏi ACCESS EXCLUSIVE LOCK, chặn đứng mọi thao tác đọc/ghi của người dùng, có thể làm sập hệ thống Production nếu bảng lớn.'
         },
         {
           id: 'c6-l2-q4',
           question: 'Cơ chế tối ưu Heap-Only Tuple (HOT) trong PostgreSQL giúp tiết kiệm chi phí tài nguyên nào lớn nhất khi cập nhật dữ liệu?',
           options: [
-            'Loại bỏ hoàn toàn việc phải cập nhật các cây chỉ mục B-Tree nếu dòng mới được đặt vừa vặn trong cùng một Page 8KB với dòng cũ.',
             'Tự động giải phóng toàn bộ bộ nhớ RAM của máy chủ và chuyển sang sử dụng bộ nhớ đệm ảo trên các dịch vụ đám mây.',
             'Cho phép thực hiện các phép toán nhân ma trận trực tiếp bên trong nhân hệ điều hành mà không cần thông qua V8 engine.',
+            'Loại bỏ hoàn toàn việc phải chèn thêm con trỏ vào các cây chỉ mục B-Tree nếu câu lệnh UPDATE không làm thay đổi các cột có đánh Index và dòng mới được đặt vừa vặn trong cùng một 8KB Page với dòng cũ.',
             'Tự động chuyển đổi các bảng dữ liệu quan hệ sang định dạng tệp tin nhị phân không thể giải mã để nâng cao tính bảo mật.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Thông thường mỗi khi có tuple mới, tất cả các Index của bảng đều phải chèn thêm con trỏ trỏ tới tuple mới đó. Kỹ thuật HOT (Heap-Only Tuple) cho phép: Nếu câu UPDATE không làm thay đổi các cột có đánh Index và Page 8KB hiện tại còn chỗ trống, PostgreSQL sẽ đặt dòng mới ngay trong Page đó và nối con trỏ từ dòng cũ sang dòng mới, hoàn toàn không cần chạm vào Index!'
+        },
+        {
+          id: 'c6-l2-q5',
+          question: 'Hiện tượng "Transaction ID Wraparound" (Tràn số ID giao dịch) trong PostgreSQL là gì và AutoVacuum đóng vai trò phòng chống như thế nào?',
+          options: [
+            'Transaction ID trong PostgreSQL là số nguyên 32-bit (tối đa 4 tỷ giá trị). Sau khoảng 2 tỷ giao dịch, bộ đếm có nguy cơ bị tràn vòng (wraparound), khiến PostgreSQL có thể hiểu nhầm các giao dịch trong quá khứ thành tương lai và làm biến mất toàn bộ dữ liệu; AutoVacuum chủ động chạy tiến trình Freeze để đóng băng các tuple cũ thành trạng thái vĩnh cửu (FrozenXID).',
+            'Hiện tượng các câu truy vấn SELECT chạy vòng tròn không có điểm dừng do vòng lặp while trong mã nguồn.',
+            'Hiện tượng hai bảng dữ liệu có cùng số lượng cột và khóa ngoại trùng tên nhau.',
+            'Hiện tượng hệ điều hành tự động nhân đôi kích thước của tệp tin nhật ký WAL khi dung lượng ổ cứng còn dưới 10%.'
+          ],
+          correctIndex: 0,
+          explanation: 'Vì Transaction ID chỉ có 32-bit (khoảng 4.2 tỷ giá trị, dùng số học modulo 2^31 để so sánh quá khứ/tương lai), nếu không có cơ chế Freeze, sau 2.1 tỷ transaction hệ thống sẽ bị wraparound. AutoVacuum định kỳ quét bảng để "Freeze" các tuple cũ (gán cờ HEAP_XMIN_FROZEN), biến chúng thành dữ liệu luôn luôn hiển thị với mọi transaction trong tương lai.'
+        },
+        {
+          id: 'c6-l2-q6',
+          question: 'Vì sao công cụ mã nguồn mở "pg_repack" lại được cộng đồng Database Engineer coi là tiêu chuẩn vàng thay thế cho VACUUM FULL trên Production?',
+          options: [
+            'Vì pg_repack tự động chuyển toàn bộ cơ sở dữ liệu sang chạy trên bộ nhớ RAM để tăng tốc.',
+            'Vì pg_repack có khả năng tái cấu trúc bảng, loại bỏ Table Bloat và giải phóng dung lượng đĩa thừa về cho hệ điều hành mà KHÔNG HỀ khóa bảng (Zero-Downtime), chỉ chiếm khóa độc quyền rất ngắn (vài mili-giây) ở bước hoán đổi bảng cuối cùng.',
+            'Vì pg_repack cho phép khôi phục lại các bản ghi đã bị xóa cách đây 10 năm mà không cần tệp sao lưu.',
+            'Vì pg_repack được tích hợp sẵn bên trong nhân Linux kernel từ phiên bản 5.0 trở lên.'
+          ],
+          correctIndex: 1,
+          explanation: 'VACUUM FULL khóa cứng bảng (ACCESS EXCLUSIVE LOCK) trong suốt thời gian copy (hàng chục phút đến nhiều giờ). pg_repack khắc phục bằng cách: tạo bảng phụ, copy dữ liệu, dùng log trigger để thu thập các thay đổi phát sinh trong lúc copy, và cuối cùng chỉ khóa bảng trong tích tắc (vài mili-giây) để hoán đổi tên bảng, hoàn toàn không gây downtime.'
+        },
+        {
+          id: 'c6-l2-q7',
+          question: 'Để tinh chỉnh AutoVacuum cho một bảng có cường độ UPDATE cực kỳ lớn (như bảng orders hoặc sessions) nhằm ngăn ngừa tình trạng Table Bloat, thông số nào sau đây nên được điều chỉnh?',
+          options: [
+            'Tăng autovacuum_vacuum_scale_factor lên 0.9 để trì hoãn việc dọn rác đến cuối tuần.',
+            'Tắt hoàn toàn autovacuum bằng lệnh ALTER TABLE ... SET (autovacuum_enabled = false).',
+            'Giảm autovacuum_vacuum_scale_factor từ 0.2 (mặc định 20%) xuống 0.05 (5%) và tăng autovacuum_vacuum_cost_limit để AutoVacuum kích hoạt dọn dẹp thường xuyên hơn với tốc độ I/O cao hơn.',
+            'Tăng kích thước khối đĩa của PostgreSQL từ 8KB lên 64KB.'
+          ],
+          correctIndex: 2,
+          explanation: 'Mặc định autovacuum_vacuum_scale_factor = 0.2 nghĩa là phải có 20% bản ghi chết thì AutoVacuum mới chạy. Với bảng 50 triệu dòng, 20% là 10 triệu dead tuples - quá muộn và gây bloat khổng lồ. Giảm scale factor xuống 0.05 hoặc dùng autovacuum_vacuum_threshold số lượng tuyệt đối kết hợp tăng cost limit sẽ giúp dọn rác liên tục, giữ bảng nhỏ gọn.'
+        },
+        {
+          id: 'c6-l2-q8',
+          question: 'Quy tắc xác định tính khả kiến (Tuple Visibility) của một dòng bản ghi đối với một Transaction Snapshot trong PostgreSQL dựa trên nguyên lý nào?',
+          options: [
+            'Dòng bản ghi chỉ hiển thị nếu có kích thước nhỏ hơn 100 bytes và được tạo bởi tài khoản admin.',
+            'Dòng bản ghi hiển thị nếu có giá trị khóa chính ID là số chẵn.',
+            'Dòng bản ghi chỉ hiển thị nếu nó nằm ở Page thứ nhất trên đĩa cứng.',
+            'Dòng bản ghi hiển thị khi và chỉ khi: 1) Transaction tạo ra nó (xmin) đã COMMIT thành công trước thời điểm Snapshot bắt đầu; VÀ 2) Transaction xóa nó (xmax) hoặc bằng 0 (chưa bị xóa), hoặc đã ROLLBACK, hoặc là một transaction sinh ra sau thời điểm Snapshot bắt đầu.'
+          ],
+          correctIndex: 3,
+          explanation: 'Đây là công thức cốt lõi của PostgreSQL Snapshot Isolation: Tuple hiển thị khi transaction xmin đã commit trước snapshot (hoặc chính là transaction hiện tại), VÀ tuple chưa bị xóa (xmax = 0) hoặc transaction xmax chưa commit hoặc sinh ra sau snapshot.'
         }
       ],
       codeChallenge: {
         id: 'c6-l2-c1',
         title: 'Bộ Thẩm Định Tính Khả Kiến Của Bản Ghi (MVCC Visibility Evaluator)',
         description: 'Hiện thực hàm \`isTupleVisible(tuple: { xmin: number; xmax: number }, snapshotXmin: number, activeTxIds: number[]): boolean\`. Một tuple được coi là khả kiến (visible) đối với snapshot nếu: 1. \`tuple.xmin < snapshotXmin\` VÀ \`tuple.xmin\` không nằm trong danh sách các transaction đang chạy (\`activeTxIds\`). 2. VÀ (tuple chưa bị xóa: \`tuple.xmax === 0\` HOẶC giao dịch xóa nó sinh ra sau snapshot: \`tuple.xmax >= snapshotXmin\` HOẶC giao dịch xóa nó vẫn đang chạy dở: \`activeTxIds.includes(tuple.xmax)\`). Trả về \`true\` nếu thỏa mãn, ngược lại \`false\`.',
-        starterCode: `
-export function isTupleVisible(
+        starterCode: `export function isTupleVisible(
   tuple: { xmin: number; xmax: number },
   snapshotXmin: number,
   activeTxIds: number[]
 ): boolean {
   // TODO: Kiểm tra tính khả kiến theo quy tắc MVCC
   return false;
-}
-`,
-        solution: `
-export function isTupleVisible(
+}`,
+        solution: `export function isTupleVisible(
   tuple: { xmin: number; xmax: number },
   snapshotXmin: number,
   activeTxIds: number[]
@@ -563,23 +703,37 @@ export function isTupleVisible(
     tuple.xmax >= snapshotXmin || activeTxIds.includes(tuple.xmax);
 
   return isDeletedAfterOrInProgress;
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Tuple hợp lệ chưa từng bị xóa (xmin = 50, xmax = 0, snapshot = 100)',
+            name: 'Case 1 (Visible): Tuple hợp lệ chưa từng bị xóa (xmin = 50, xmax = 0, snapshot = 100)',
             input: [{ xmin: 50, xmax: 0 }, 100, []],
-            expected: true
+            expected: true,
+            hidden: false
           },
           {
-            name: 'Tuple đã bị xóa trước thời điểm snapshot (xmin = 50, xmax = 80, snapshot = 100)',
+            name: 'Case 2 (Visible): Tuple đã bị xóa trước thời điểm snapshot (xmin = 50, xmax = 80, snapshot = 100)',
             input: [{ xmin: 50, xmax: 80 }, 100, []],
-            expected: false
+            expected: false,
+            hidden: false
           },
           {
-            name: 'Tuple bị xóa bởi transaction đang chạy dở chưa commit (xmax = 90 nằm trong activeTxIds)',
+            name: 'Case 3 (Visible): Tuple bị xóa bởi transaction đang chạy dở chưa commit (xmax = 90)',
             input: [{ xmin: 50, xmax: 90 }, 100, [90]],
-            expected: true
+            expected: true,
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Tuple có xmin nằm trong activeTxIds (chưa commit)',
+            input: [{ xmin: 60, xmax: 0 }, 100, [60]],
+            expected: false,
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Tuple sinh ra sau thời điểm snapshot (xmin >= snapshotXmin)',
+            input: [{ xmin: 150, xmax: 0 }, 100, []],
+            expected: false,
+            hidden: true
           }
         ]
       }
@@ -745,59 +899,74 @@ BẠN ĐANG XỬ LÝ TRANH CHẤP DỮ LIỆU ĐỒNG THỜI?
 | **Advisory Locks** | Khóa định danh logic | Rất cao, linh hoạt | Tùy thuộc lập trình viên | Cron job cluster, migrate dữ liệu |
 `,
       realCodeSnippet: `
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+export interface AccountBalanceRecord {
+  id: number;
+  balance: number;
+}
+
+/**
+ * ADR: Deadlock-Free Pessimistic Transfer Service
+ * - Sử dụng Explicit Row Lock (SELECT ... FOR UPDATE) để đảm bảo an toàn tuyệt đối cho số dư tài khoản.
+ * - Áp dụng nguyên tắc Lock Ordering (Math.min, Math.max):
+ *   Bắt buộc mọi giao dịch luôn chiếm giữ khóa theo thứ tự ID tăng dần, triệt tiêu hoàn toàn chu trình Circular Wait (Deadlock-Free 100%).
+ */
 @Injectable()
 export class HighConcurrencyTransferService {
+  private readonly logger = new Logger(HighConcurrencyTransferService.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Chuyển tiền giữa hai tài khoản với Khóa Bi Quan và Sắp xếp thứ tự khóa để triệt tiêu Deadlock 100%
-   */
   public async transferMoney(
     fromAccountId: number,
     toAccountId: number,
     amount: number
   ): Promise<void> {
     if (fromAccountId === toAccountId) {
-      throw new Error('Tài khoản gửi và nhận không thể trùng nhau.');
+      throw new Error('IDENTICAL_ACCOUNTS: Tài khoản gửi và nhận không thể trùng nhau.');
+    }
+    if (amount <= 0) {
+      throw new Error('INVALID_AMOUNT: Số tiền chuyển phải lớn hơn 0.');
     }
 
-    // NGUYÊN TẮC SẮP XẾP THỨ TỰ KHÓA ĐỂ CHỐNG DEADLOCK
+    // NGUYÊN TẮC VÀNG: SẮP XẾP THỨ TỰ KHÓA ĐỂ TRIỆT TIÊU DEADLOCK
     const firstLockId = Math.min(fromAccountId, toAccountId);
     const secondLockId = Math.max(fromAccountId, toAccountId);
 
     await this.dataSource.transaction(async (manager) => {
       // 1. Khóa theo thứ tự ID tăng dần một cách nhất quán
-      const firstAccount = await manager.query(
-        \`SELECT id, balance FROM accounts WHERE id = $1 FOR UPDATE\`,
-        [firstLockId]
-      );
-      const secondAccount = await manager.query(
-        \`SELECT id, balance FROM accounts WHERE id = $1 FOR UPDATE\`,
-        [secondLockId]
-      );
+      const firstAccount = await manager.query<AccountBalanceRecord[]>(\`
+        SELECT id, balance FROM accounts WHERE id = $1 FOR UPDATE
+      \`, [firstLockId]);
+
+      const secondAccount = await manager.query<AccountBalanceRecord[]>(\`
+        SELECT id, balance FROM accounts WHERE id = $1 FOR UPDATE
+      \`, [secondLockId]);
 
       const sender = fromAccountId === firstLockId ? firstAccount[0] : secondAccount[0];
       const receiver = toAccountId === firstLockId ? firstAccount[0] : secondAccount[0];
 
       if (!sender || !receiver) {
-        throw new Error('Tài khoản không tồn tại.');
+        throw new Error('ACCOUNT_NOT_FOUND: Một trong hai tài khoản không tồn tại.');
       }
 
       if (sender.balance < amount) {
-        throw new Error('Số dư không đủ để thực hiện giao dịch.');
+        throw new Error('INSUFFICIENT_FUNDS: Số dư không đủ để thực hiện giao dịch.');
       }
 
       // 2. Thực hiện trừ và cộng tiền
-      await manager.query(
-        \`UPDATE accounts SET balance = balance - $1 WHERE id = $2\`,
-        [amount, fromAccountId]
-      );
-      await manager.query(
-        \`UPDATE accounts SET balance = balance + $1 WHERE id = $2\`,
-        [amount, toAccountId]
+      await manager.query(\`
+        UPDATE accounts SET balance = balance - $1 WHERE id = $2
+      \`, [amount, fromAccountId]);
+
+      await manager.query(\`
+        UPDATE accounts SET balance = balance + $1 WHERE id = $2
+      \`, [amount, toAccountId]);
+
+      this.logger.log(
+        \`[TRANSFER SUCCESS] Chuyển \${amount} từ Account \${fromAccountId} sang Account \${toAccountId}\`
       );
     });
   }
@@ -808,10 +977,10 @@ export class HighConcurrencyTransferService {
           id: 'c6-l3-q1',
           question: 'Vì sao kỹ thuật "Sắp xếp thứ tự khóa" (Lock Ordering: Math.min / Math.max) lại có thể triệt tiêu hoàn toàn nguy cơ Deadlock trong nghiệp vụ chuyển tiền giữa hai tài khoản?',
           options: [
-            'Vì nó phá vỡ điều kiện chờ đợi vòng tròn bằng cách ép buộc mọi giao dịch đều phải chiếm giữ tài nguyên theo cùng một chiều duy nhất.',
+            'Vì nó phá vỡ điều kiện chờ đợi vòng tròn (Circular Wait) bằng cách ép buộc mọi giao dịch đều phải chiếm giữ tài nguyên theo cùng một chiều thứ tự ID xác định duy nhất, khiến hai giao dịch không bao giờ có thể giữ tài nguyên của nhau mà đợi tài nguyên còn lại.',
             'Vì hàm Math.min trong JavaScript có khả năng tự động liên lạc với nhân Linux để hủy bỏ các tiến trình đang bị nghẽn mạng.',
             'Vì cơ sở dữ liệu sẽ tự động chuyển đổi các câu lệnh cập nhật số dư thành các phép tính toán song song trên card đồ họa.',
-            'Vì các tài khoản có số ID nhỏ hơn luôn có số dư lớn hơn giúp giao dịch không bao giờ gặp phải lỗi thiếu tiền.',
+            'Vì các tài khoản có số ID nhỏ hơn luôn có số dư lớn hơn giúp giao dịch không bao giờ gặp phải lỗi thiếu tiền.'
           ],
           correctIndex: 0,
           explanation: 'Deadlock chỉ có thể xảy ra khi thỏa mãn điều kiện Chờ đợi vòng tròn (Circular Wait - Giao dịch 1 giữ A chờ B, Giao dịch 2 giữ B chờ A). Bằng cách sắp xếp ID tăng dần (khóa Min trước, Max sau), tất cả mọi giao dịch dù chuyển tiền theo chiều nào cũng đều phải yêu cầu khóa tài nguyên theo cùng một trật tự xác định, phá vỡ hoàn toàn chu trình khép kín, triệt tiêu Deadlock 100%.'
@@ -820,54 +989,99 @@ export class HighConcurrencyTransferService {
           id: 'c6-l3-q2',
           question: 'Mệnh đề "SELECT ... FOR UPDATE SKIP LOCKED" đem lại giải pháp đột phá nào khi hiện thực hệ thống hàng đợi công việc (Job Queue) trên cơ sở dữ liệu quan hệ?',
           options: [
-            'Cho phép nhiều worker đọc đồng thời mà không bị block lẫn nhau vì mỗi worker tự động bỏ qua các dòng đã bị worker khác khóa.',
             'Tự động tăng tốc độ xử lý của CPU máy chủ lên gấp mười lần bằng cách vô hiệu hóa hoàn toàn cơ chế ghi log nhật ký WAL.',
             'Giúp các tác vụ công việc bị lỗi tự động được sửa đổi dữ liệu thành công mà không cần lập trình viên viết mã xử lý ngoại lệ.',
-            'Cho phép các worker có thể đọc được dữ liệu của nhau ngay cả khi giao dịch của worker khác đã bị rollback thất bại.',
+            'Cho phép nhiều worker đọc đồng thời mà không bị block lẫn nhau vì mỗi worker tự động bỏ qua (skip) các dòng đã bị worker khác khóa và lấy ngay dòng tự do tiếp theo; đạt thông lượng xử lý song song tối đa tương đương Redis Queue.',
+            'Cho phép các worker có thể đọc được dữ liệu của nhau ngay cả khi giao dịch của worker khác đã bị rollback thất bại.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Nếu chỉ dùng "FOR UPDATE", các Worker đến sau sẽ bị treo cứng (blocked) chờ Worker đầu tiên xử lý xong dòng đó. Với "SKIP LOCKED", PostgreSQL kiểm tra các dòng thỏa mãn điều kiện: dòng nào đang bị khóa bởi Worker khác sẽ được tự động bỏ qua (skip), và trả về ngay dòng tự do tiếp theo. Nhờ đó hàng chục Worker có thể lấy các task khác nhau đồng thời mà không hề bị nghẽn.'
         },
         {
           id: 'c6-l3-q3',
           question: 'Trong trường hợp nào sau đây, việc sử dụng Khóa Lạc Quan (Optimistic Locking) sẽ trở nên KÉM HIỆU QUẢ hơn hẳn so với Khóa Bi Quan (Pessimistic Locking)?',
           options: [
-            'Khi mức độ tranh chấp dữ liệu cực kỳ cao ví dụ như hàng chục nghìn người cùng tranh mua một số lượng hàng tồn kho rất nhỏ trong Flash Sale.',
             'Khi ứng dụng chỉ thực hiện các thao tác đọc dữ liệu thống kê báo cáo và rất hiếm khi có người dùng sửa đổi thông tin cá nhân.',
+            'Khi mức độ tranh chấp dữ liệu cực kỳ cao (High Write Contention như Flash Sale 100 chiếc iPhone cho 50,000 người mua); lúc này 99.9% giao dịch lạc quan sẽ bị thất bại ở bước commit do version mismatch sau khi đã tốn nhiều tài nguyên xử lý, gây lãng phí CPU và bùng nổ retry.',
             'Khi hệ thống được triển khai trên duy nhất một máy chủ vật lý và không sử dụng bất kỳ mạng phân tán nào từ bên ngoài.',
-            'Khi bảng dữ liệu có số lượng cột ít hơn mười trường và tất cả các trường đều có kiểu dữ liệu là số nguyên nguyên thủy.',
+            'Khi bảng dữ liệu có số lượng cột ít hơn mười trường và tất cả các trường đều có kiểu dữ liệu là số nguyên nguyên thủy.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Trong kịch bản xung đột cực cao (High Contention như Flash Sale), nếu dùng Khóa Lạc Quan, 99.9% giao dịch sẽ bị lỗi xung đột phiên bản (OptimisticLockException) ở bước cuối cùng sau khi đã tốn rất nhiều tài nguyên tính toán logic, buộc phải rollback và retry liên tục gây lãng phí CPU. Dùng Khóa Bi Quan (SELECT FOR UPDATE) xếp hàng ngay từ đầu sẽ hiệu quả hơn nhiều.'
         },
         {
           id: 'c6-l3-q4',
           question: 'Cơ chế phát hiện Deadlock nội bộ của PostgreSQL (Deadlock Detector) hoạt động dựa trên nguyên lý nào khi phát hiện có chu trình bế tắc giữa các giao dịch?',
           options: [
-            'Duyệt đồ thị chờ đợi khóa (Lock Wait-For Graph), nếu phát hiện chu trình sau khoảng thời gian deadlock_timeout sẽ chủ động hủy một giao dịch.',
             'Tự động ngắt kết nối internet của toàn bộ máy chủ để ép buộc tất cả các client phải thực hiện đăng nhập lại từ đầu.',
             'Tự động gộp dữ liệu của hai giao dịch bị nghẽn thành một giao dịch tổng thể duy nhất và commit vào lúc nửa đêm.',
             'Chuyển đổi toàn bộ cơ sở dữ liệu sang chế độ chỉ đọc vĩnh viễn cho đến khi có sự can thiệp thủ công của quản trị viên hệ thống.',
+            'Sau khi một tiến trình bị chặn chờ khóa vượt quá khoảng thời gian deadlock_timeout (mặc định 1 giây), PostgreSQL sẽ quét đồ thị chờ khóa (Lock Wait-For Graph); nếu phát hiện chu trình phụ thuộc khép kín, engine sẽ chủ động abort một giao dịch và ném mã lỗi 40P01 (deadlock_detected) để giải phóng các giao dịch còn lại.'
+          ],
+          correctIndex: 3,
+          explanation: 'PostgreSQL có một tiến trình Deadlock Detector. Sau một khoảng thời gian chờ đợi (mặc định tham số deadlock_timeout = 1s), tiến trình này sẽ quét đồ thị chờ khóa (Lock Wait-For Graph). Nếu phát hiện một chu trình phụ thuộc khép kín (A đợi B, B đợi A), nó sẽ chọn một giao dịch làm "vật hy sinh", chủ động ROLLBACK giao dịch đó và trả về lỗi "40P01 deadlock_detected" để giải phóng các giao dịch còn lại.'
+        },
+        {
+          id: 'c6-l3-q5',
+          question: 'Điểm khác biệt cốt lõi giữa "FOR UPDATE NOWAIT" và "FOR UPDATE SKIP LOCKED" trong PostgreSQL là gì?',
+          options: [
+            'FOR UPDATE NOWAIT lập tức ném ngoại lệ 55P03 (lock_not_available) nếu dòng đang bị giao dịch khác khóa; trong khi FOR UPDATE SKIP LOCKED âm thầm bỏ qua dòng bị khóa và tiếp tục quét để trả về dòng tự do tiếp theo mà không ném lỗi.',
+            'FOR UPDATE NOWAIT chỉ dùng cho MySQL, còn SKIP LOCKED chỉ dùng cho MongoDB.',
+            'FOR UPDATE NOWAIT tự động commit sau 1 giây, còn SKIP LOCKED tự động rollback.',
+            'FOR UPDATE NOWAIT cho phép đọc dữ liệu bẩn chưa commit, còn SKIP LOCKED thì không.'
           ],
           correctIndex: 0,
-          explanation: 'PostgreSQL có một tiến trình Deadlock Detector. Sau một khoảng thời gian chờ đợi (mặc định tham số deadlock_timeout = 1s), tiến trình này sẽ quét đồ thị chờ khóa (Lock Wait-For Graph). Nếu phát hiện một chu trình phụ thuộc khép kín (A đợi B, B đợi A), nó sẽ chọn một giao dịch làm "vật hy sinh", chủ động ROLLBACK giao dịch đó và trả về lỗi "40P01 deadlock_detected" để giải phóng các giao dịch còn lại.'
+          explanation: 'Cả hai đều không đứng chờ (non-blocking). Tuy nhiên NOWAIT sẽ quăng lỗi ngay nếu gặp dòng bị khóa (fail-fast), thích hợp cho việc từ chối nhanh nếu tài nguyên bận. Còn SKIP LOCKED không quăng lỗi mà bỏ qua dòng đó để lấy dòng khác, cực kỳ lý tưởng cho hệ thống hàng đợi công việc nhiều worker.'
+        },
+        {
+          id: 'c6-l3-q6',
+          question: 'Khóa ứng dụng tùy biến (Advisory Locks, ví dụ: pg_advisory_xact_lock(bigint)) trong PostgreSQL mang lại lợi thế độc đáo nào?',
+          options: [
+            'Tự động phát hiện virus và mã độc trong các câu truy vấn SQL.',
+            'Cho phép ứng dụng khóa một định danh số logic trừu tượng (như userId hoặc cronJobId) ở cấp độ toàn cục cluster mà hoàn toàn không cần phải tồn tại một dòng bản ghi vật lý nào trong bất kỳ bảng nào, và tự động giải phóng khi transaction kết thúc.',
+            'Tự động tăng tốc độ mạng của card mạng LAN máy chủ lên 10 Gbps.',
+            'Cho phép xóa toàn bộ bảng dữ liệu mà không cần quyền quản trị viên database.'
+          ],
+          correctIndex: 1,
+          explanation: 'Advisory Locks là các khóa do lập trình viên tự định nghĩa thông qua số nguyên 64-bit. Chúng không gắn với bảng hay dòng vật lý nào, rất hữu ích cho các bài toán phân tán như: đảm bảo chỉ 1 node trong cluster được chạy cronjob tại một thời điểm, hoặc khóa tài khoản người dùng khi đang nạp tiền mà không cần sửa bảng.'
+        },
+        {
+          id: 'c6-l3-q7',
+          question: 'Hiểm họa kiến trúc nguy hiểm nhất khi một kỹ sư thực hiện lệnh gọi HTTP sang cổng thanh toán của bên thứ ba (Third-party API) bên trong một khối Transaction có giữ Khóa Bi Quan (SELECT FOR UPDATE) là gì?',
+          options: [
+            'Làm cho hệ điều hành Linux tự động hạ xung nhịp của CPU.',
+            'Làm cho dữ liệu trong bộ nhớ RAM tự động bị mã hóa không thể phục hồi.',
+            'Giam giữ khóa hàng và connection trong suốt thời gian chờ phản hồi mạng (có thể mất 5-30 giây); khi có nhiều request đồng thời, toàn bộ kết nối trong Database Connection Pool bị cạn kiệt, kéo sập toàn bộ hệ thống API backend.',
+            'Cơ sở dữ liệu sẽ tự động chuyển đổi sang giao thức WebSocket.'
+          ],
+          correctIndex: 2,
+          explanation: 'Tuyệt đối cấm thực hiện I/O mạng chậm (gọi HTTP API, gửi mail, nén file) bên trong transaction đang giữ khóa DB. Nếu API bên thứ 3 bị chậm vài giây, hàng trăm transaction sẽ giữ chặt connection và row locks, làm tê liệt toàn bộ connection pool của backend và gây hiệu ứng sụp đổ dây chuyền (Cascading Failure).'
+        },
+        {
+          id: 'c6-l3-q8',
+          question: 'Trong ORM như TypeORM, cơ chế Khóa Lạc Quan (Optimistic Locking) được hiện thực tự động thông qua decorator nào và xử lý ngoại lệ ra sao?',
+          options: [
+            'Decorator @PrimaryGeneratedColumn() và ném lỗi EntityNotFoundError.',
+            'Decorator @Index() và ném lỗi DuplicateKeyException.',
+            'Decorator @CreateDateColumn() và ném lỗi TimeoutException.',
+            'Decorator @VersionColumn(): TypeORM tự động thêm điều kiện "WHERE id = :id AND version = :currentVersion" khi UPDATE; nếu số dòng bị ảnh hưởng bằng 0, TypeORM lập tức ném OptimisticLockVersionMismatchError để ứng dụng xử lý retry.'
+          ],
+          correctIndex: 3,
+          explanation: 'Khi gắn @VersionColumn() vào entity, mỗi khi save(), TypeORM sẽ kiểm tra version hiện tại và tăng version lên 1 trong mệnh đề WHERE. Nếu một transaction khác đã kịp ghi đè và tăng version trước đó, câu lệnh UPDATE sẽ khớp 0 dòng, kích hoạt OptimisticLockVersionMismatchError.'
         }
       ],
       codeChallenge: {
         id: 'c6-l3-c1',
         title: 'Bộ Sắp Xếp Cặp Khóa An Toàn Chống Deadlock (Lock Ordering Pair Sorter)',
-        description: 'Hiện thực hàm \`getOrderedLockPairs(accountA: number, accountB: number): [number, number]\`. Hàm nhận vào 2 ID tài khoản bất kỳ. Nếu 2 ID trùng nhau, ném ra Error \`"IDENTICAL_ACCOUNTS"\`. Ngược lại, luôn luôn trả về một mảng tuple 2 phần tử được sắp xếp theo thứ tự số nguyên tăng dần \`[minId, maxId]\` để đảm bảo thứ tự khóa chống Deadlock.',
-        starterCode: `
-export function getOrderedLockPairs(
+        description: 'Hiện thực hàm \`getOrderedLockPairs(accountA: number, accountB: number): [number, number]\`. Hàm nhận vào 2 ID tài khoản bất kỳ. Nếu 2 ID trùng nhau (\`accountA === accountB\`), ném ra Error \`"IDENTICAL_ACCOUNTS"\`. Ngược lại, luôn luôn trả về một mảng tuple 2 phần tử được sắp xếp theo thứ tự số nguyên tăng dần \`[minId, maxId]\` để đảm bảo trật tự chiếm giữ khóa triệt tiêu Deadlock 100%.',
+        starterCode: `export function getOrderedLockPairs(
   accountA: number,
   accountB: number
 ): [number, number] {
   // TODO: Hiện thực sắp xếp cặp khóa chống deadlock
   return [accountA, accountB];
-}
-`,
-        solution: `
-export function getOrderedLockPairs(
+}`,
+        solution: `export function getOrderedLockPairs(
   accountA: number,
   accountB: number
 ): [number, number] {
@@ -876,23 +1090,37 @@ export function getOrderedLockPairs(
   }
 
   return accountA < accountB ? [accountA, accountB] : [accountB, accountA];
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Sắp xếp khi A < B (ID 10 và ID 20)',
+            name: 'Case 1 (Visible): Sắp xếp khi A < B (ID 10 và ID 20)',
             input: [10, 20],
-            expected: [10, 20]
+            expected: [10, 20],
+            hidden: false
           },
           {
-            name: 'Sắp xếp khi A > B (ID 50 và ID 15) đảo ngược trật tự',
+            name: 'Case 2 (Visible): Sắp xếp khi A > B (ID 50 và ID 15) đảo ngược trật tự',
             input: [50, 15],
-            expected: [15, 50]
+            expected: [15, 50],
+            hidden: false
           },
           {
-            name: 'Ném lỗi khi 2 ID trùng nhau (ID 99 và ID 99)',
+            name: 'Case 3 (Visible): Ném lỗi khi 2 ID trùng nhau (ID 99 và ID 99)',
             input: [99, 99],
-            expected: 'THREW_ERROR'
+            expected: 'ERROR_THROWN',
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Sắp xếp số âm và số dương (-5 và 10)',
+            input: [-5, 10],
+            expected: [-5, 10],
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Ném lỗi khi 2 ID trùng nhau là số 0 (0 và 0)',
+            input: [0, 0],
+            expected: 'ERROR_THROWN',
+            hidden: true
           }
         ]
       }

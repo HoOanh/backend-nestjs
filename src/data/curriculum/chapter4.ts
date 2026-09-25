@@ -152,143 +152,228 @@ BẠN CẦN ĐĂNG KÝ MỘT PROVIDER VÀO MODULE?
 | **useFactory (Async)** | Bootstrapping (Chờ Promise)| Cực kỳ linh hoạt, đọc async | Khởi tạo 1 lần lúc startup | Kết nối Database, Microservice Client |
 | **useExisting** | Bootstrapping | Tạo bí danh (Alias) cho token| $0\\%$ (Trỏ chung con trỏ) | Đổi tên token mà không duplicate RAM |
 `,
-      realCodeSnippet: `
-import { Injectable, Inject } from '@nestjs/common';
+      realCodeSnippet: `// File: src/modules/notification/notification.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - Decoupled Notification Architecture with DIP
+import { Injectable, Inject, Logger } from '@nestjs/common';
 
-// 1. Định nghĩa Injection Token bằng Symbol để tránh xung đột chuỗi
-export const NOTIFICATION_SERVICE = Symbol('NOTIFICATION_SERVICE');
+export const NOTIFICATION_GATEWAY = Symbol('NOTIFICATION_GATEWAY');
 
-// 2. Interface trừu tượng tuân thủ Dependency Inversion
-export interface INotificationService {
-  send(recipient: string, message: string): Promise<boolean>;
+export interface NotificationPayload {
+  recipient: string;
+  subject: string;
+  body: string;
 }
 
-// 3. Hiện thực cấp thấp: Gửi qua SendGrid
+export interface INotificationGateway {
+  send(payload: NotificationPayload): Promise<boolean>;
+}
+
 @Injectable()
-export class SendGridEmailService implements INotificationService {
-  async send(recipient: string, message: string): Promise<boolean> {
-    console.log(\`[SendGrid] Đang gửi mail đến \${recipient}: \${message}\`);
+export class SendGridNotificationGateway implements INotificationGateway {
+  private readonly logger = new Logger(SendGridNotificationGateway.name);
+
+  async send(payload: NotificationPayload): Promise<boolean> {
+    this.logger.log(\`[SendGrid Gateway] Gửi email đến: \${payload.recipient} - Chủ đề: \${payload.subject}\`);
     return true;
   }
 }
 
-// 4. Hiện thực giả lập cho môi trường Unit Test
+/**
+ * ADR: Áp dụng Dependency Inversion Principle (DIP):
+ * - UserNotificationService (Cấp cao) chỉ phụ thuộc vào Interface INotificationGateway trừu tượng.
+ * - Được inject thông qua Symbol NOTIFICATION_GATEWAY, không phụ thuộc vào SendGrid cụ thể.
+ * - Cho phép hoán đổi cổng thông báo (AWS SES, Twilio, MockGateway) dễ dàng trong Module configuration.
+ */
 @Injectable()
-export class MockNotificationService implements INotificationService {
-  public sentMessages: Array<{ to: string; msg: string }> = [];
-
-  async send(recipient: string, message: string): Promise<boolean> {
-    this.sentMessages.push({ to: recipient, msg: message });
-    return true;
-  }
-}
-
-// 5. Service cấp cao: Hoàn toàn không phụ thuộc vào SendGrid hay Mock
-@Injectable()
-export class UserRegistrationService {
+export class UserNotificationService {
   constructor(
-    @Inject(NOTIFICATION_SERVICE)
-    private readonly notifier: INotificationService
+    @Inject(NOTIFICATION_GATEWAY)
+    private readonly gateway: INotificationGateway,
   ) {}
 
-  async registerUser(email: string): Promise<void> {
-    // Logic tạo tài khoản trong DB...
-    await this.notifier.send(email, 'Chào mừng bạn gia nhập Arc Irobot!');
+  public async notifyUserWelcome(email: string): Promise<boolean> {
+    return this.gateway.send({
+      recipient: email,
+      subject: 'Chào mừng bạn gia nhập hệ thống!',
+      body: 'Tài khoản của bạn đã được kích hoạt thành công.',
+    });
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c4-l1-q1',
-          question: 'Bản chất cơ chế nào giúp NestJS IoC Container có thể tự động nhận diện và khởi tạo đúng các tham số phụ thuộc trong Constructor của một Service?',
+          question: 'Cơ chế kỹ thuật nào cho phép NestJS IoC Container tự động phân giải đúng các Class Constructor phụ thuộc trong hàm khởi tạo của một Service?',
           options: [
-            'Sử dụng thư viện reflect-metadata kết hợp cờ emitDecoratorMetadata của TypeScript để đọc kiểu dữ liệu tại runtime.',
-            'Quét toàn bộ mã nguồn dạng văn bản thô bằng các biểu thức chính quy regex trong lúc máy chủ đang khởi động.',
-            'Dựa vào tên đặt của biến tham số trong constructor để suy đoán loại dịch vụ cần được bơm vào theo quy ước đặt tên.',
-            'Bắt buộc lập trình viên phải khai báo thủ công danh sách các con trỏ bộ nhớ RAM trong tệp tin cấu hình package.json.'
+            'Sử dụng thư viện reflect-metadata kết hợp với cờ compiler emitDecoratorMetadata: true của TypeScript để phát sinh metadata design:paramtypes lưu vết tham chiếu của các class tại runtime.',
+            'Dựa vào trình phân tích tĩnh (Static AST parser) của Webpack trong quá trình bundle mã nguồn.',
+            'Tự động gửi truy vấn kiểm tra danh mục lớp đối tượng lên dịch vụ Cloud Schema Registry.',
+            'Phân tích tên biến tham số trong constructor bằng Regular Expression và ánh xạ theo quy tắc CamelCase.'
           ],
           correctIndex: 0,
-          explanation: 'Khi bật cờ emitDecoratorMetadata: true trong tsconfig.json, TypeScript compiler sẽ tự động chèn metadata mang tên "design:paramtypes" vào mã JavaScript lúc biên dịch decorator. NestJS IoC Container sử dụng thư viện reflect-metadata tại thời điểm runtime để đọc ra các class constructor này và tiến hành khởi tạo.'
+          explanation: 'Khi bật emitDecoratorMetadata, TypeScript compiler lưu vết các kiểu dữ liệu của constructor parameters vào metadata mang tên "design:paramtypes" tại runtime. NestJS dùng reflect-metadata để đọc các constructor function này và đệ quy khởi tạo dependency.'
         },
         {
           id: 'c4-l1-q2',
-          question: 'Vì sao trong kiến trúc NestJS chuyên nghiệp, khi áp dụng nguyên lý Dependency Inversion ta bắt buộc phải dùng Custom Token (Symbol hoặc String) thay vì dùng TypeScript Interface?',
+          question: 'Vì sao trong NestJS, khi thực thi nguyên lý Dependency Inversion (DIP) để inject một Interface trừu tượng, ta bắt buộc phải sử dụng Custom Token (Symbol hoặc String) đi kèm decorator @Inject()?',
           options: [
-            'Vì TypeScript Interface bị xóa sạch hoàn toàn trong quá trình biên dịch JavaScript nên không còn tồn tại ở Runtime.',
-            'Vì các interface trong TypeScript không hỗ trợ các phương thức bất đồng bộ trả về đối tượng dạng Promise.',
-            'Vì NestJS IoC Container từ chối các đối tượng có kích thước lớn hơn một kilobyte bộ nhớ heap theo mặc định.',
-            'Vì chuẩn ECMAScript mới nhất đã thay thế hoàn toàn khái niệm Interface bằng các Class trừu tượng thuần túy.'
+            'Vì NestJS IoC Container bị giới hạn chỉ hỗ trợ nạp các class có kích thước dưới 10KB.',
+            'Vì việc dùng class làm token sẽ làm chậm tốc độ khởi động của ứng dụng do xung đột bộ nhớ Stack.',
+            'Vì TypeScript áp dụng cơ chế Type Erasure (xóa sạch toàn bộ Interface và Type Alias khi biên dịch sang JavaScript thuần), khiến chúng không còn tồn tại ở Runtime để Reflect Metadata có thể lưu vết; do đó cần một giá trị Runtime cụ thể (String/Symbol) làm Injection Token.',
+            'Vì chuẩn ECMAScript mới nhất đã cấm hoàn toàn việc sử dụng từ khóa interface trong các ứng dụng máy chủ.'
           ],
-          correctIndex: 0,
-          explanation: 'TypeScript áp dụng cơ chế Type Erasure: toàn bộ Interface, Type Alias đều bị compiler xóa sạch khi tạo ra mã JavaScript chạy trên Node.js. Do đó, Reflect Metadata không thể lưu vết một Interface tại Runtime. Ta bắt buộc phải dùng một thực thể tồn tại ở Runtime làm định danh (Symbol hoặc chuỗi String Token kèm @Inject()).'
+          correctIndex: 2,
+          explanation: 'Interface chỉ tồn tại trong giai đoạn biên dịch type-check của TypeScript. Khi sang mã JavaScript runtime, interface bị xóa hoàn toàn (Type Erasure). Do đó Reflect.getMetadata("design:paramtypes") trả về Object chung chung chứ không biết interface nào. Ta bắt buộc phải dùng @Inject(CUSTOM_TOKEN) với String hoặc Symbol để định danh dependency.'
         },
         {
           id: 'c4-l1-q3',
-          question: 'Sự khác biệt cốt lõi giữa hai khái niệm Dependency Injection (DI) và Dependency Inversion Principle (DIP) là gì?',
+          question: 'Điểm khác biệt bản chất giữa Dependency Injection (DI) và Dependency Inversion Principle (DIP) trong thiết kế kiến trúc phần mềm là gì?',
           options: [
-            'DI là mẫu hình kỹ thuật truyền phụ thuộc từ ngoài vào, còn DIP là nguyên lý kiến trúc hướng cả hai phụ thuộc vào Interface trừu tượng.',
-            'DI là một tính năng độc quyền của NestJS, còn DIP là công cụ tối ưu hóa tốc độ biên dịch của trình thông dịch JavaScript.',
-            'Cả hai là một thuật ngữ giống hệt nhau được các kiến trúc sư phần mềm sử dụng thay thế cho nhau tùy theo sở thích cá nhân.',
-            'DIP yêu cầu sử dụng cơ chế đa luồng worker threads, trong khi DI chỉ hoạt động trên môi trường đơn luồng của V8 engine.'
+            'DI là công cụ biên dịch của Babel, còn DIP là một thư viện kiểm thử tự động của Jest.',
+            'DI là một kỹ thuật / thiết kế mẫu (Design Pattern) dùng để truyền đối tượng phụ thuộc vào class từ bên ngoài (thường qua Constructor); còn DIP là một nguyên lý kiến trúc bậc cao (chữ D trong SOLID) yêu cầu các module cấp cao và cấp thấp không được phụ thuộc trực tiếp vào nhau mà phải cùng phụ thuộc vào lớp trừu tượng (Abstraction).',
+            'DI chỉ áp dụng được cho cơ sở dữ liệu quan hệ, trong khi DIP chỉ áp dụng cho NoSQL.',
+            'Cả hai là một khái niệm duy nhất được dùng thay thế cho nhau tùy theo sở thích ngôn ngữ lập trình.'
           ],
-          correctIndex: 0,
-          explanation: 'Dependency Injection (DI) chỉ đơn thuần là kỹ thuật đưa instance vào qua Constructor/Setter. Còn Dependency Inversion Principle (DIP) là một nguyên lý SOLID cao cấp hơn: yêu cầu tách rời sự phụ thuộc trực tiếp giữa module cấp cao và cấp thấp thông qua một lớp Abstraction trung gian.'
+          correctIndex: 1,
+          explanation: 'DI chỉ là một phương thức kỹ thuật đưa dependency từ ngoài vào. Bạn hoàn toàn có thể dùng DI nhưng vẫn vi phạm DIP nếu class cấp cao inject trực tiếp class cấp thấp cụ thể (ví dụ: constructor(private stripe: StripeService)). Để tuân thủ DIP, class cấp cao phải inject một Abstraction (ví dụ: @Inject(PAYMENT_GATEWAY) private payment: IPaymentGateway).'
         },
         {
           id: 'c4-l1-q4',
-          question: 'Khi sử dụng Custom Provider dạng useFactory trong NestJS, trường hợp nào sau đây là kịch bản ứng dụng bắt buộc và chuẩn xác nhất?',
+          question: 'Trong NestJS, Provider dạng useFactory vượt trội hơn các dạng Provider khác (useClass, useValue) trong kịch bản kiến trúc nào sau đây?',
           options: [
-            'Khi việc tạo đối tượng phụ thuộc đòi hỏi phải thực thi tác vụ bất đồng bộ hoặc đọc cấu hình động trước khi trả về instance.',
-            'Khi cần tạo ra một hằng số số học cố định để chia sẻ cho các controller tính toán thuế thu nhập cá nhân.',
-            'Khi muốn tự động chuyển đổi toàn bộ mã nguồn của một service sang thực thi trực tiếp trên card đồ họa rời.',
-            'Khi muốn vô hiệu hóa hoàn toàn cơ chế thu gom rác tự động của V8 engine cho đối tượng service đó.'
+            'Khi cần khai báo một hằng số chuỗi text bất biến không bao giờ thay đổi trong toàn bộ vòng đời ứng dụng.',
+            'Khi cần tối ưu hóa tốc độ tải trang frontend bằng cách nén mã nguồn nhị phân trước khi chạy.',
+            'Khi muốn tạo một service chạy trực tiếp trên GPU máy chủ để huấn luyện mô hình học sâu.',
+            'Khi việc khởi tạo đối tượng phụ thuộc đòi hỏi phải thực thi logic bất đồng bộ (async/await), kết nối cơ sở dữ liệu động, hoặc inject các provider khác (thông qua mảng inject: [...]) để tính toán cấu hình trước khi trả về instance.'
+          ],
+          correctIndex: 3,
+          explanation: 'useFactory là provider duy nhất cho phép định nghĩa hàm factory bất đồng bộ (async useFactory), có thể nhận các dependency khác thông qua mảng inject (như ConfigService, ConnectionPool) để khởi tạo dynamic client trước khi cung cấp cho IoC Container.'
+        },
+        {
+          id: 'c4-l1-q5',
+          question: 'Khi một Provider được đăng ký trong mảng providers của Module A nhưng Module B muốn inject Provider đó, điều kiện bắt buộc nào phải được thỏa mãn theo nguyên lý Encapsulation của NestJS Module?',
+          options: [
+            'Module B phải được gắn decorator @Global() ở cấp ứng dụng.',
+            'Module A bắt buộc phải đưa Provider đó vào mảng exports, và Module B bắt buộc phải khai báo Module A trong mảng imports của mình.',
+            'Cả Module A và Module B phải dùng chung một tệp tin cấu hình tsconfig.json.',
+            'Provider đó bắt buộc phải sử dụng Scope.REQUEST thay vì Scope.DEFAULT.'
+          ],
+          correctIndex: 1,
+          explanation: 'NestJS module có tính đóng gói (encapsulation) nghiêm ngặt. Mặc định mọi provider trong mảng providers là private đối với module đó. Muốn module khác sử dụng, module sở hữu phải chủ động exports provider đó, và module tiêu thụ phải imports module sở hữu.'
+        },
+        {
+          id: 'c4-l1-q6',
+          question: 'Vòng đời phân giải Dependency Graph (Đồ thị phụ thuộc) của NestJS IoC Container diễn ra tại thời điểm nào trong chu kỳ sống của ứng dụng?',
+          options: [
+            'Tại thời điểm Bootstrap ứng dụng (khi gọi NestFactory.create()), IoC Container quét toàn bộ Module Graph, xây dựng cây DAG (Directed Acyclic Graph), phân giải và khởi tạo toàn bộ các Singleton Providers trước khi server bắt đầu lắng nghe cổng mạng HTTP.',
+            'Tại thời điểm HTTP request đầu tiên từ client gửi tới máy chủ backend.',
+            'Tại thời điểm trình biên dịch TypeScript build file sang thư mục dist/.',
+            'Định kỳ mỗi 60 giây một lần trong suốt quá trình server hoạt động.'
           ],
           correctIndex: 0,
-          explanation: 'useFactory là loại Provider duy nhất trong NestJS cho phép viết logic bất đồng bộ (async useFactory) có thể inject các dependency khác (thông qua mảng inject: [...]) để tính toán, kết nối Database, hoặc đọc cấu hình trước khi resolve ra instance cho IoC Container.'
+          explanation: 'IoC Container phân giải toàn bộ đồ thị phụ thuộc và khởi tạo các Singleton Provider một lần duy nhất tại bước Bootstrap (NestFactory.create()). Quá trình này hoàn tất trước khi server mở cổng TCP tiếp nhận kết nối (app.listen()), bảo đảm thời gian đáp ứng của HTTP request đầu tiên không bị trễ do tạo service.'
+        },
+        {
+          id: 'c4-l1-q7',
+          question: 'Khi sử dụng @Optional() decorator đi kèm với @Inject() trong Constructor của một Service, hành vi của IoC Container sẽ thay đổi như thế nào nếu dependency tương ứng không được tìm thấy trong Container?',
+          options: [
+            'Container lập tức ném lỗi ngoại lệ Fatal Exception và dừng ngay tiến trình khởi động của ứng dụng.',
+            'Container sẽ tự động tạo một instance giả lập (mock instance) rỗng để gán vào tham số.',
+            'Container sẽ bỏ qua lỗi không tìm thấy provider và gán giá trị undefined cho tham số đó, cho phép service tự xử lý fallback logic trong mã nguồn.',
+            'Container sẽ tự động tìm kiếm trên kho lưu trữ npm để cài đặt gói thư viện tương ứng.'
+          ],
+          correctIndex: 2,
+          explanation: 'Mặc định nếu một dependency bị thiếu trong module graph, NestJS sẽ ném lỗi "Nest can\'t resolve dependencies of..." và dừng app. Decorator @Optional() đánh dấu dependency này là tùy chọn: nếu không tìm thấy provider đăng ký, NestJS sẽ gán undefined thay vì quăng lỗi, rất hữu ích cho các plugin hoặc tính năng tùy biến cấu hình.'
+        },
+        {
+          id: 'c4-l1-q8',
+          question: 'Trong NestJS, Provider dạng useExisting (Aliased Provider) được sử dụng nhằm mục đích kỹ thuật nào sau đây?',
+          options: [
+            'Để nhân bản một class thành 2 instance hoàn toàn độc lập nằm ở 2 vùng nhớ RAM khác nhau.',
+            'Để chuyển đổi một provider đồng bộ thành bất đồng bộ mà không cần sửa code.',
+            'Để vô hiệu hóa quyền truy cập của các interceptor vào provider đó.',
+            'Để tạo ra một bí danh (alias) trỏ về cùng một instance đã tồn tại của một Provider khác (ví dụ: cho phép truy xuất cùng một service thông qua cả Class Token gốc lẫn một Custom Symbol/String Token trừu tượng).'
+          ],
+          correctIndex: 3,
+          explanation: 'useExisting cho phép tạo một token mới trỏ về một provider đã được đăng ký trước đó. Cả hai token sẽ cùng resolve về CHÍNH XÁC CÙNG MỘT INSTANCE (singleton) trong bộ nhớ, thường dùng khi muốn tái cấu trúc (refactoring) hoặc cung cấp nhiều interface cho cùng một service mà không tạo thêm instance thừa.'
         }
       ],
       codeChallenge: {
         id: 'c4-l1-c1',
-        title: 'Xây Dựng Mini Inversion-of-Control (IoC) Container',
-        description: 'Hiện thực class \`SimpleIoCContainer\` với hai phương thức: \`register<T>(token: string, instance: T): void\` và \`resolve<T>(token: string): T\`. Nếu token chưa được đăng ký, \`resolve\` phải ném ra Error \`"PROVIDER_NOT_FOUND: \${token}"\`. Đảm bảo container lưu trữ và trả về đúng đối tượng Singleton đã đăng ký.',
-        starterCode: `
-export class SimpleIoCContainer {
-  public register<T>(token: string, instance: T): void {
-    // TODO: Lưu trữ instance vào registry
+        title: 'Mô Phỏng Inversion-of-Control (IoC) Container Resolution',
+        description: 'Hiện thực hàm \`simulateIoCContainer(operations: Array<{ op: "register"; token: string; instance: unknown } | { op: "resolve"; token: string }>): unknown[]\`. Khi gặp \`op: "register"\`, lưu \`instance\` vào registry với \`token\` tương ứng (cho phép ghi đè nếu token đã tồn tại). Khi gặp \`op: "resolve"\`, nếu \`token\` tồn tại trong registry, đẩy instance vào mảng kết quả; nếu chưa từng đăng ký, ném Error(\`PROVIDER_NOT_FOUND: \${item.token}\`). Nếu tham số \`operations\` rỗng hoặc không phải mảng, trả về mảng rỗng \`[]\`.',
+        starterCode: `export function simulateIoCContainer(
+  operations: Array<{ op: 'register'; token: string; instance: unknown } | { op: 'resolve'; token: string }>
+): unknown[] {
+  // TODO: Mô phỏng IoC container register & resolve
+  return [];
+}`,
+        solution: `export function simulateIoCContainer(
+  operations: Array<{ op: 'register'; token: string; instance: unknown } | { op: 'resolve'; token: string }>
+): unknown[] {
+  if (!Array.isArray(operations) || operations.length === 0) {
+    return [];
   }
 
-  public resolve<T>(token: string): T {
-    // TODO: Trả về instance hoặc ném lỗi nếu không tìm thấy
-    throw new Error('Not implemented');
-  }
-}
-`,
-        solution: `
-export class SimpleIoCContainer {
-  private readonly registry = new Map<string, unknown>();
+  const registry = new Map<string, unknown>();
+  const results: unknown[] = [];
 
-  public register<T>(token: string, instance: T): void {
-    this.registry.set(token, instance);
-  }
-
-  public resolve<T>(token: string): T {
-    if (!this.registry.has(token)) {
-      throw new Error(\`PROVIDER_NOT_FOUND: \${token}\`);
+  for (const item of operations) {
+    if (item.op === 'register') {
+      registry.set(item.token, item.instance);
+    } else if (item.op === 'resolve') {
+      if (!registry.has(item.token)) {
+        throw new Error(\`PROVIDER_NOT_FOUND: \${item.token}\`);
+      }
+      results.push(registry.get(item.token));
     }
-    return this.registry.get(token) as T;
   }
-}
-`,
+
+  return results;
+}`,
         testCases: [
           {
-            name: 'Đăng ký và lấy thành công Service',
-            input: ['AUTH_SERVICE', { login: () => true }],
-            expected: true
+            name: 'Case 1 (Visible): Đăng ký và resolve thành công 1 singleton service',
+            input: [[
+              { op: 'register', token: 'AUTH_SERVICE', instance: { authenticated: true } },
+              { op: 'resolve', token: 'AUTH_SERVICE' }
+            ]],
+            expected: [{ authenticated: true }],
+            hidden: false
           },
           {
-            name: 'Ném lỗi khi resolve token chưa từng được đăng ký',
-            input: ['UNKNOWN_TOKEN'],
-            expected: 'THREW_ERROR'
+            name: 'Case 2 (Visible): Resolve token chưa từng được đăng ký -> Ném lỗi',
+            input: [[
+              { op: 'resolve', token: 'UNKNOWN_SERVICE' }
+            ]],
+            expected: 'ERROR_THROWN',
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Đăng ký nhiều service và resolve theo thứ tự',
+            input: [[
+              { op: 'register', token: 'DB', instance: 'PostgresConn' },
+              { op: 'register', token: 'CACHE', instance: 'RedisConn' },
+              { op: 'resolve', token: 'DB' },
+              { op: 'resolve', token: 'CACHE' }
+            ]],
+            expected: ['PostgresConn', 'RedisConn'],
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Mảng operations rỗng -> Trả về mảng rỗng',
+            input: [[]],
+            expected: [],
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Đăng ký ghi đè token cũ bằng instance mới',
+            input: [[
+              { op: 'register', token: 'LOGGER', instance: 'ConsoleLogger' },
+              { op: 'register', token: 'LOGGER', instance: 'WinstonLogger' },
+              { op: 'resolve', token: 'LOGGER' }
+            ]],
+            expected: ['WinstonLogger'],
+            hidden: true
           }
         ]
       }
@@ -426,44 +511,67 @@ import {
   ExecutionContext,
   CallHandler,
   Logger,
+  HttpStatus,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { tap, map } from 'rxjs/operators';
+import { Request, Response } from 'express';
+import { Observable, throwError } from 'rxjs';
+import { tap, map, catchError } from 'rxjs/operators';
 
-// Định dạng vỏ bọc phản hồi chuẩn mực (Envelope Pattern)
-export interface StandardResponse<T> {
+/**
+ * ADR: Standardized API Envelope Pattern
+ * - Chuẩn hóa toàn bộ phản hồi trả về từ Controller theo cấu trúc Envelope duy nhất.
+ * - Đo lường độ trễ (latency durationMs) của từng request phục vụ APM & Metrics.
+ * - Đảm bảo bất kể Controller trả về Entity thô hay Array, Client đều nhận định dạng nhất quán.
+ */
+export interface ApiResponseEnvelope<T> {
+  success: boolean;
   statusCode: number;
   timestamp: string;
   durationMs: number;
+  path: string;
   data: T;
 }
 
 @Injectable()
 export class ResponseTransformInterceptor<T>
-  implements NestInterceptor<T, StandardResponse<T>> {
+  implements NestInterceptor<T, ApiResponseEnvelope<T>>
+{
   private readonly logger = new Logger(ResponseTransformInterceptor.name);
 
   intercept(
     context: ExecutionContext,
-    next: CallHandler
-  ): Observable<StandardResponse<T>> {
+    next: CallHandler<T>
+  ): Observable<ApiResponseEnvelope<T>> {
     const startTime = Date.now();
     const httpContext = context.switchToHttp();
-    const request = httpContext.getRequest();
-    const response = httpContext.getResponse();
+    const request = httpContext.getRequest<Request>();
+    const response = httpContext.getResponse<Response>();
 
     return next.handle().pipe(
-      // Biến đổi cấu trúc dữ liệu trả về cho toàn bộ client
-      map((data) => ({
-        statusCode: response.statusCode || 200,
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        data,
-      })),
+      map((data: T): ApiResponseEnvelope<T> => {
+        const durationMs = Date.now() - startTime;
+        const statusCode = response.statusCode || HttpStatus.OK;
+        return {
+          success: true,
+          statusCode,
+          timestamp: new Date().toISOString(),
+          durationMs,
+          path: request.url,
+          data,
+        };
+      }),
       tap((envelope) => {
         this.logger.log(
-          \`[\${request.method}] \${request.url} - Hoàn tất trong \${envelope.durationMs}ms\`
+          \`[\${request.method}] \${request.url} - \${envelope.statusCode} (\${envelope.durationMs}ms)\`
         );
+      }),
+      catchError((err: unknown) => {
+        const durationMs = Date.now() - startTime;
+        this.logger.error(
+          \`[\${request.method}] \${request.url} - FAILED (\${durationMs}ms)\`,
+          err instanceof Error ? err.stack : undefined
+        );
+        return throwError(() => err);
       })
     );
   }
@@ -474,98 +582,157 @@ export class ResponseTransformInterceptor<T>
           id: 'c4-l2-q1',
           question: 'Vì sao NestJS Guard được ưu tiên sử dụng để phân quyền truy cập (Authorization) thay vì sử dụng Express Middleware thông thường?',
           options: [
-            'Vì Guard có quyền truy cập vào ExecutionContext để đọc Metadata của Controller và Route Handler thông qua Reflector.',
-            'Vì Guard được thực thi ở tầng nhân Linux kernel nên có tốc độ kiểm tra quyền nhanh hơn gấp mười lần middleware.',
-            'Vì Middleware của Express không thể đọc được nội dung Authorization Header gửi kèm trong request của client.',
-            'Vì Guard tự động mã hóa mật khẩu người dùng trước khi gửi thông tin xuống tầng xử lý của cơ sở dữ liệu quan hệ.'
+            'Vì Guard có quyền truy cập vào ExecutionContext để đọc Metadata khai báo trên Controller/Action (@Roles, @Permissions) thông qua Reflector trước khi cho phép request đi tiếp.',
+            'Vì Guard được thực thi ở tầng nhân Linux kernel nên có tốc độ kiểm tra quyền nhanh hơn gấp mười lần Express middleware.',
+            'Vì Middleware của Express không thể đọc được nội dung Authorization Header hoặc Bearer Token gửi kèm trong request của client.',
+            'Vì Guard tự động mã hóa thông tin người dùng bằng thuật toán RSA-4096 trước khi chuyển tiếp dữ liệu xuống tầng Service.'
           ],
           correctIndex: 0,
           explanation: 'Express Middleware chạy trước khi NestJS thực hiện định tuyến (Routing), do đó Middleware hoàn toàn không biết Request sắp được chuyển vào Controller hay Action nào. Ngược lại, Guard chạy sau khi router đã xác định đích đến, có thể truy cập ExecutionContext và Reflector để đọc các metadata như @Roles("ADMIN"), giúp phân quyền chính xác.'
         },
         {
           id: 'c4-l2-q2',
-          question: 'Thứ tự thực thi nào sau đây mô tả đúng tuyệt đối chu trình xử lý một HTTP Request thành công trong kiến trúc NestJS?',
+          question: 'Thứ tự thực thi tuần tự nào sau đây mô tả đúng tuyệt đối chu trình xử lý một HTTP Request đi qua trọn vẹn Execution Pipeline của NestJS?',
           options: [
-            'Middleware -> Guards -> Interceptors (Pre) -> Pipes -> Route Handler -> Interceptors (Post).',
-            'Pipes -> Middleware -> Guards -> Route Handler -> Interceptors -> Exception Filters.',
-            'Guards -> Middleware -> Pipes -> Interceptors -> Route Handler -> Response Formatter.',
-            'Interceptors -> Pipes -> Middleware -> Guards -> Route Handler -> Exception Filters.'
+            'Global Pipes -> Module Middleware -> Route Guards -> Route Interceptors -> Controller Handler -> Global Exception Filters.',
+            'Route Guards -> Module Middleware -> Controller Pipes -> Route Handler -> Response Interceptor -> Exception Filters.',
+            'Incoming Request -> Middleware (Global -> Module) -> Guards (Global -> Controller -> Route) -> Interceptors Pre-controller -> Pipes (Global -> Controller -> Route/Param) -> Controller Route Handler -> Interceptors Post-controller (RxJS Stream) -> Outgoing Response.',
+            'Controller Handler -> Interceptors Pre-controller -> Global Guards -> Pipes -> Middleware -> Interceptors Post-controller -> Outgoing Response.'
           ],
-          correctIndex: 0,
-          explanation: 'Theo chuẩn NestJS Request Lifecycle: Request đầu tiên đi qua Middleware (tầng ngoài cùng) -> Guards (kiểm tra quyền) -> Interceptors (phần pre-controller) -> Pipes (validate & transform dữ liệu params/body) -> Route Handler (Controller thực thi) -> Interceptors (phần post-controller xử lý kết quả trả về).'
+          correctIndex: 2,
+          explanation: 'Theo chuẩn NestJS Request Lifecycle: Request đầu tiên đi qua Middleware (tầng ngoài cùng) -> Guards (kiểm tra quyền) -> Interceptors (phần pre-controller) -> Pipes (validate & transform dữ liệu params/body) -> Route Handler (Controller thực thi) -> Interceptors (phần post-controller xử lý kết quả trả về qua RxJS).'
         },
         {
           id: 'c4-l2-q3',
-          question: 'Nếu một ngoại lệ (Exception) xảy ra bên trong một NestJS Pipe trong quá trình validate dữ liệu, thành phần nào tiếp theo sẽ xử lý lỗi này?',
+          question: 'Trong kịch bản một tham số Body không hợp lệ bị chặn bởi ValidationPipe, điều gì sẽ xảy ra tiếp theo trong vòng đời Request của NestJS?',
           options: [
-            'Exception Filter tương ứng sẽ bắt lấy ngoại lệ và định dạng lại cấu trúc lỗi trả về cho client mà không vào Controller.',
-            'Controller Handler vẫn tiếp tục được thực thi với dữ liệu chưa được validate để đảm bảo hệ thống không bị gián đoạn.',
-            'Pha Poll của Libuv Event Loop sẽ hủy bỏ socket kết nối và tự động khởi động lại tiến trình Node.js ngay lập tức.',
-            'Interceptor phần Post-controller sẽ tự động gán dữ liệu mặc định vào request body và chuyển tiếp cho service.'
+            'Request vẫn tiếp tục đi vào Controller Route Handler nhưng đối tượng DTO được gán giá trị null để controller tự quyết định fallback.',
+            'ValidationPipe lập tức ném ra ngoại lệ BadRequestException; chuỗi pipeline ngắt ngay lập tức, bỏ qua Controller Handler và chuyển quyền điều khiển trực tiếp tới Exception Filter để định dạng phản hồi lỗi 400.',
+            'Interceptor phần Post-controller sẽ tự động phục hồi dữ liệu bị thiếu từ cache Redis và tiếp tục thực thi ngầm.',
+            'Tiến trình Node.js kích hoạt sự kiện uncaughtException và tự động khởi động lại tiến trình server thông qua PM2.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Khi Pipe phát hiện dữ liệu không hợp lệ (ví dụ BadRequestException từ ValidationPipe), nó lập tức ném ra ngoại lệ. Pipeline dừng ngay lập tức tại Pipe, bỏ qua hoàn toàn việc gọi Controller, và chuyển quyền xử lý trực tiếp sang Exception Filter để tạo mã lỗi 400 Bad Request trả về cho client.'
         },
         {
           id: 'c4-l2-q4',
-          question: 'Khả năng độc đáo nào của NestJS Interceptor mà các thành phần khác như Guard hay Pipe hoàn toàn KHÔNG THỂ thực hiện được?',
+          question: 'Khả năng độc đáo nào sau đây của NestJS Interceptor mà các thành phần khác như Guard hay Pipe hoàn toàn KHÔNG THỂ thực hiện được?',
           options: [
-            'Bao bọc việc thực thi của hàm để can thiệp cả trước khi Controller chạy lẫn biến đổi kết quả trả về bằng RxJS Observable.',
-            'Chuyển đổi kiểu dữ liệu từ chuỗi ký tự sang số nguyên nguyên thủy của các tham số đường dẫn URL trên trình duyệt.',
-            'Chặn đứng ngay lập tức các yêu cầu chưa có thông tin xác thực danh tính người dùng trước khi tiến hành định tuyến.',
-            'Bắt tất cả các lỗi cấp hệ điều hành khi máy chủ bị mất điện đột ngột trong các trung tâm lưu trữ dữ liệu đám mây.'
+            'Chuyển đổi một chuỗi ký tự string thành số nguyên integer nguyên thủy trên thanh địa chỉ URL của trình duyệt.',
+            'Đọc thông tin IP của client từ network socket để thực hiện chặn tường lửa IP Whitelist ở tầng mạng thô.',
+            'Tự động khởi tạo kết nối cơ sở dữ liệu MongoDB trong quá trình ứng dụng khởi động.',
+            'Áp dụng tư tưởng Lập trình Hướng khía cạnh (Aspect-Oriented Programming - AOP) để bao bọc (wrap) lời gọi hàm Handler: can thiệp logic cả trước khi Handler chạy và biến đổi luồng dữ liệu trả về (hoặc bắt lỗi/timeout) sau khi Handler kết thúc nhờ luồng Observable của RxJS.'
+          ],
+          correctIndex: 3,
+          explanation: 'Chỉ có Interceptor được xây dựng trên nền tảng RxJS Observable stream. Nhờ phương thức next.handle(), Interceptor có khả năng thực thi code TRƯỚC khi controller chạy, và sử dụng các toán tử RxJS (map, tap, catchError, timeout) để biến đổi, đo đạc, hoặc ghi đè kết quả SAU KHI controller hoàn thành.'
+        },
+        {
+          id: 'c4-l2-q5',
+          question: 'Lớp trừu tượng ExecutionContext trong NestJS đóng vai trò quan trọng như thế nào đối với các ứng dụng Microservices hoặc Đa giao thức?',
+          options: [
+            'Kế thừa từ ArgumentsHost, ExecutionContext cung cấp các phương thức switchToHttp(), switchToRpc(), switchToWs() và getClass(), getHandler() giúp Guard/Interceptor tái sử dụng 100% logic bảo mật và giám sát xuyên suốt HTTP REST, WebSockets, gRPC và Message Queue mà không bị trói buộc vào giao thức cụ thể.',
+            'Tự động cân bằng tải Round-Robin giữa các cụm Kubernetes Pods mà không cần thông qua Ingress Controller.',
+            'Đồng bộ hóa trạng thái bộ nhớ RAM giữa các Node.js Worker Threads mà không cần serialize dữ liệu.',
+            'Tự động biên dịch mã nguồn TypeScript thành WebAssembly để tăng tốc xử lý toán học.'
           ],
           correctIndex: 0,
-          explanation: 'Chỉ có Interceptor được xây dựng trên nền tảng RxJS Observable stream. Nhờ phương thức next.handle(), Interceptor có khả năng thực thi code TRƯỚC khi controller chạy, và sử dụng các toán tử RxJS (map, tap, catchError, timeout) để biến đổi, đo đạc, hoặc ghi đè kết quả SAU KHI controller hoàn thành.'
+          explanation: 'ExecutionContext trừu tượng hóa ngữ cảnh thực thi, cho phép truy xuất Controller Class và Method Handler thông qua getClass() / getHandler(), đồng thời cung cấp các bộ chuyển đổi switchToHttp(), switchToRpc(), switchToWs() để truy cập đối tượng ngữ cảnh của từng giao thức tương ứng.'
+        },
+        {
+          id: 'c4-l2-q6',
+          question: 'Khi cần đăng ký một Interceptor hoặc Guard ở phạm vi toàn cục (Global Scope) nhưng Interceptor đó CÓ phụ thuộc vào một Service khác (cần Dependency Injection), cách khai báo nào sau đây là CHUẨN XÁC NHẤT trong NestJS?',
+          options: [
+            'Sử dụng app.useGlobalInterceptors(new MyInterceptor()) trong file main.ts và truyền null vào constructor của MyInterceptor.',
+            'Khai báo MyInterceptor trong file package.json dưới mục globalDependencies.',
+            'Đăng ký MyInterceptor dưới dạng một Custom Provider với token APP_INTERCEPTOR (hoặc APP_GUARD) trong mảng providers của AppModule hoặc CoreModule.',
+            'Gắn decorator @Global() trực tiếp lên trên class MyInterceptor mà không cần khai báo vào bất kỳ module nào.'
+          ],
+          correctIndex: 2,
+          explanation: 'Khi dùng app.useGlobalInterceptors(new Interceptor()), instance được tạo bên ngoài IoC container nên không thể inject bất kỳ dependency nào. Để giải quyết, NestJS cung cấp token đặc biệt APP_INTERCEPTOR (hoặc APP_GUARD, APP_PIPE, APP_FILTER) để đăng ký trực tiếp trong mảng providers của một Module, cho phép container tự inject đầy đủ dependencies.'
+        },
+        {
+          id: 'c4-l2-q7',
+          question: 'Khi định nghĩa một Custom Exception Filter trong NestJS bằng decorator @Catch(), nếu decorator này hoàn toàn không truyền tham số nào (@Catch()), hành vi của Filter đó là gì?',
+          options: [
+            'Filter sẽ chỉ bắt duy nhất ngoại lệ NotFoundException (404) của NestJS.',
+            'Filter sẽ bị IoC Container bỏ qua và không bao giờ được kích hoạt trong suốt vòng đời ứng dụng.',
+            'Filter sẽ chỉ xử lý các lỗi cú pháp (SyntaxError) phát sinh trong mã nguồn JavaScript.',
+            'Filter trở thành một Catch-All Exception Filter, có khả năng tóm bắt mọi ngoại lệ chưa được xử lý (cả HttpException lẫn Error thuần của JavaScript/Node.js) trên toàn hệ thống.'
+          ],
+          correctIndex: 3,
+          explanation: 'Khi để trống tham số @Catch(), Filter sẽ bắt toàn bộ mọi exception unhandled phát sinh trong pipeline mà không phân biệt kiểu (Catch-all). Thường được dùng ở cấp Global để chuẩn hóa mọi lỗi runtime (500 Internal Server Error, TypeErrors, unhandled rejections) thành cấu trúc JSON chuẩn trước khi phản hồi về client.'
+        },
+        {
+          id: 'c4-l2-q8',
+          question: 'Hai nhiệm vụ kỹ thuật cốt lõi và duy nhất của NestJS Pipe theo thiết kế chuẩn mực của framework là gì?',
+          options: [
+            'Authentication (Xác minh danh tính) và Encryption (Mã hóa đường truyền TLS).',
+            'Transformation (Chuyển đổi kiểu dữ liệu đầu vào về định dạng mong muốn) và Validation (Kiểm định tính hợp lệ của dữ liệu trước khi chuyển giao cho Route Handler).',
+            'Auditing (Ghi log vết kiểm toán vào database) và Caching (Lưu kết quả truy vấn vào Redis).',
+            'Rate Limiting (Giới hạn lưu lượng request) và Throttling (Điều tiết băng thông mạng).'
+          ],
+          correctIndex: 1,
+          explanation: 'Pipe trong NestJS có 2 use-cases cốt lõi: 1) Transformation (ví dụ: ParseIntPipe ép chuỗi "123" thành số 123), và 2) Validation (ví dụ: ValidationPipe kết hợp class-validator để kiểm tra schema DTO, nếu không thỏa mãn sẽ ném ngoại lệ 400 Bad Request).'
         }
       ],
       codeChallenge: {
         id: 'c4-l2-c1',
         title: 'Mô Phỏng NestJS Execution Pipeline Chặn Lỗi Chuẩn Xác',
-        description: 'Hiện thực hàm \`runPipeline(request: { token?: string; age?: number }): { status: number; body: unknown }\`. Pipeline gồm 3 bước: 1. Guard: nếu không có \`token\`, trả về \`{ status: 401, body: "UNAUTHORIZED" }\`. 2. Pipe: nếu \`age < 18\`, trả về \`{ status: 400, body: "INVALID_AGE" }\`. 3. Handler: nếu hợp lệ, trả về \`{ status: 200, body: { success: true } }\`. Không được gọi các bước sau nếu bước trước đã thất bại.',
-        starterCode: `
-export function runPipeline(request: { token?: string; age?: number }): {
+        description: 'Hiện thực hàm \`runPipeline(request: { token?: string; age?: number }): { status: number; body: unknown }\`. Pipeline gồm 3 bước: 1. Guard: nếu không có \`token\` hoặc token là chuỗi rỗng sau khi trim, trả về \`{ status: 401, body: "UNAUTHORIZED" }\`. 2. Pipe: nếu \`age\` không hợp lệ (không phải số hoặc \`age < 18\`), trả về \`{ status: 400, body: "INVALID_AGE" }\`. 3. Handler: nếu hợp lệ, trả về \`{ status: 200, body: { success: true } }\`. Không được gọi các bước sau nếu bước trước đã thất bại.',
+        starterCode: `export function runPipeline(request: { token?: string; age?: number }): {
   status: number;
   body: unknown;
 } {
   // TODO: Hiện thực các trạm kiểm soát tuần tự
   return { status: 200, body: 'OK' };
-}
-`,
-        solution: `
-export function runPipeline(request: { token?: string; age?: number }): {
+}`,
+        solution: `export function runPipeline(request: { token?: string; age?: number }): {
   status: number;
   body: unknown;
 } {
-  // Trạm 1: Guard kiểm tra quyền truy cập
-  if (!request.token) {
+  // Trạm 1: Guard kiểm tra token danh tính
+  if (!request.token || typeof request.token !== 'string' || request.token.trim() === '') {
     return { status: 401, body: 'UNAUTHORIZED' };
   }
 
-  // Trạm 2: Pipe kiểm tra và thẩm định dữ liệu
-  if (request.age === undefined || request.age < 18) {
+  // Trạm 2: Pipe kiểm tra và validate dữ liệu tuổi
+  if (request.age === undefined || typeof request.age !== 'number' || isNaN(request.age) || request.age < 18) {
     return { status: 400, body: 'INVALID_AGE' };
   }
 
   // Trạm 3: Controller Handler thực thi thành công
   return { status: 200, body: { success: true } };
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Chặn tại Guard khi thiếu token',
+            name: 'Case 1 (Visible): Chặn tại Guard khi thiếu token',
             input: [{ age: 20 }],
-            expected: { status: 401, body: 'UNAUTHORIZED' }
+            expected: { status: 401, body: 'UNAUTHORIZED' },
+            hidden: false
           },
           {
-            name: 'Chặn tại Pipe khi age dưới 18 tuổi',
+            name: 'Case 2 (Visible): Chặn tại Pipe khi age dưới 18 tuổi',
             input: [{ token: 'valid-jwt', age: 16 }],
-            expected: { status: 400, body: 'INVALID_AGE' }
+            expected: { status: 400, body: 'INVALID_AGE' },
+            hidden: false
           },
           {
-            name: 'Thực thi thành công qua toàn bộ pipeline',
+            name: 'Case 3 (Visible): Thực thi thành công qua toàn bộ pipeline',
             input: [{ token: 'valid-jwt', age: 25 }],
-            expected: { status: 200, body: { success: true } }
+            expected: { status: 200, body: { success: true } },
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Token là chuỗi khoảng trắng rỗng -> Chặn tại Guard',
+            input: [{ token: '   ', age: 20 }],
+            expected: { status: 401, body: 'UNAUTHORIZED' },
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Biên tuổi đúng bằng 18 tuổi -> Cho phép qua pipeline',
+            input: [{ token: 'valid-jwt', age: 18 }],
+            expected: { status: 200, body: { success: true } },
+            hidden: true
           }
         ]
       }
@@ -716,29 +883,48 @@ import { Request } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 
 // =========================================================================
-// GIẢI PHÁP 1: DÙNG SCOPE.REQUEST (Tốn tài nguyên bộ nhớ)
+// ANTI-PATTERN: DÙNG SCOPE.REQUEST (Tốn CPU/RAM, gây GC Thrashing ở tải cao)
 // =========================================================================
 @Injectable({ scope: Scope.REQUEST })
 export class RequestScopedLoggerService {
   constructor(@Inject(REQUEST) private readonly request: Request) {}
 
-  log(message: string) {
-    const traceId = this.request.headers['x-trace-id'];
-    console.log(\`[Trace: \${traceId}] \${message}\`);
+  public log(message: string): void {
+    const traceId = (this.request.headers['x-trace-id'] as string) || 'UNKNOWN';
+    console.log(\`[RequestScoped Trace: \${traceId}] \${message}\`);
   }
 }
 
 // =========================================================================
-// GIẢI PHÁP 2: DÙNG ASYNCLOCALSTORAGE (Singleton tối ưu hiệu năng cao nhất)
+// ENTERPRISE PATTERN: DÙNG ASYNCLOCALSTORAGE (Singleton 100% Zero-Allocation)
 // =========================================================================
-export const requestContextStorage = new AsyncLocalStorage<Map<string, unknown>>();
+export interface RequestContextStore {
+  traceId: string;
+  userId?: string;
+  tenantId?: string;
+  startTime: number;
+}
 
-@Injectable() // Vẫn là SINGLETON mặc định 100% tiết kiệm tài nguyên!
-export class HighPerformanceLoggerService {
-  log(message: string) {
+export const requestContextStorage = new AsyncLocalStorage<RequestContextStore>();
+
+@Injectable() // SINGLETON Scope.DEFAULT mặc định - Cực kỳ tiết kiệm bộ nhớ!
+export class AsyncLocalStorageContextService {
+  public setContext(context: RequestContextStore, next: () => void): void {
+    requestContextStorage.run(context, next);
+  }
+
+  public getTraceId(): string {
     const store = requestContextStorage.getStore();
-    const traceId = store ? store.get('traceId') : 'N/A';
-    console.log(\`[High-Perf Trace: \${traceId}] \${message}\`);
+    return store?.traceId || 'N/A';
+  }
+
+  public getContext(): RequestContextStore | undefined {
+    return requestContextStorage.getStore();
+  }
+
+  public log(message: string): void {
+    const traceId = this.getTraceId();
+    console.log(\`[Enterprise ALS Trace: \${traceId}] \${message}\`);
   }
 }
 `,
@@ -747,63 +933,112 @@ export class HighPerformanceLoggerService {
           id: 'c4-l3-q1',
           question: 'Hiện tượng "Scope Bubbling" trong NestJS Dependency Injection gây ra hậu quả tiêu cực nào về mặt hiệu năng hệ thống?',
           options: [
-            'Nếu một Service cấp thấp dùng Scope.REQUEST, toàn bộ các Controller và Service phụ thuộc vào nó đều bị biến thành Scope.REQUEST theo.',
+            'Trình biên dịch TypeScript sẽ báo lỗi đỏ toàn bộ dự án và từ chối xuất ra mã JavaScript cho các tệp tin liên quan.',
+            'Nếu một Service cấp thấp (như Repository) được cấu hình Scope.REQUEST, toàn bộ các Service và Controller phụ thuộc vào nó dọc theo chuỗi DI đều bị ép biến thành Scope.REQUEST theo, gây bùng nổ cấp phát instance trên Heap.',
             'Các module bị dính Scope Bubbling sẽ tự động ngừng hoạt động sau khi phục vụ đủ một nghìn yêu cầu HTTP từ người dùng.',
-            'Dữ liệu của người dùng này sẽ tự động ghi đè lên bộ nhớ của người dùng khác do các luồng bị gộp chung vào một instance.',
-            'Trình biên dịch TypeScript sẽ báo lỗi đỏ toàn bộ dự án và từ chối xuất ra mã JavaScript cho các tệp tin liên quan.'
+            'Dữ liệu của người dùng này sẽ tự động ghi đè lên bộ nhớ của người dùng khác do các luồng bị gộp chung vào một biến static.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Scope.REQUEST có tính lan truyền ngược (Bubbling) lên toàn bộ chuỗi dependency. Nếu một Repository hoặc Service sâu bên dưới được cấu hình Scope.REQUEST, tất cả các Service và Controller gián tiếp hoặc trực tiếp inject nó bắt buộc phải được tái tạo lại trên mỗi HTTP request, làm bùng nổ số lượng instance và gây áp lực khủng khiếp lên Garbage Collector.'
         },
         {
           id: 'c4-l3-q2',
-          question: 'Tại sao việc lạm dụng Scope.REQUEST để lấy thông tin người dùng (User Context) trong NestJS bị các Senior Architect coi là một "Anti-Pattern"?',
+          question: 'Tại sao việc lạm dụng Scope.REQUEST để trích xuất Request Context (như userId, traceId) bị coi là một Anti-Pattern nghiêm trọng trong hệ thống High-Concurrency?',
           options: [
-            'Vì nó phá hủy ưu thế tái sử dụng bộ nhớ của Singleton, làm tăng vọt chi phí cấp phát và gây hiện tượng GC Thrashing làm chậm API.',
-            'Vì Scope.REQUEST chỉ hỗ trợ giao thức HTTP/1.0 và hoàn toàn không tương thích với các kết nối mạng hiện đại HTTP/2.',
-            'Vì đối tượng Request trong Node.js không cho phép truy cập vào các trường header xác thực như Authorization hay Cookie.',
-            'Vì hệ điều hành Linux sẽ tự động khóa các cổng mạng TCP nếu phát hiện một tiến trình tạo quá nhiều biến cục bộ.'
+            'Vì Scope.REQUEST chỉ hỗ trợ giao thức HTTP/1.0 và hoàn toàn không tương thích với HTTP/2 và HTTP/3.',
+            'Vì đối tượng Request trong Node.js không cho phép truy cập vào các trường header xác thực như Authorization.',
+            'Vì hệ điều hành Linux sẽ tự động khóa các cổng mạng TCP nếu phát hiện một tiến trình tạo quá nhiều instance.',
+            'Vì nó phá hủy hoàn toàn ưu thế tái sử dụng bộ nhớ của Singleton; hàng nghìn request/giây tạo ra hàng chục nghìn instance mới trên Young Generation, khiến V8 Garbage Collector rơi vào tình trạng GC Thrashing và làm độ trễ P99 tăng vọt.'
           ],
-          correctIndex: 0,
+          correctIndex: 3,
           explanation: 'Trong môi trường tải cao, việc khởi tạo lại hàng chục service instances cho mỗi request chỉ để đọc một trường userId/traceId gây lãng phí CPU và RAM cực lớn (GC Thrashing). Giải pháp chuẩn của các Senior Architect là giữ toàn bộ Service ở dạng Singleton (Scope.DEFAULT) và sử dụng Node.js AsyncLocalStorage để chia sẻ ngữ cảnh request.'
         },
         {
           id: 'c4-l3-q3',
-          question: 'Bản chất kỹ thuật của hàm forwardRef() trong NestJS giúp giải quyết tình trạng Circular Dependency giữa hai Provider là gì?',
+          question: 'Bản chất kỹ thuật của hàm forwardRef(() => TargetService) trong NestJS giúp giải quyết tình trạng Circular Dependency giữa hai Provider là gì?',
           options: [
-            'Bọc tham chiếu class bên trong một hàm callback đóng gói (closure) để trì hoãn việc đọc định danh cho đến khi cả hai class đã nạp xong.',
-            'Tự động sao chép mã nguồn của service thứ hai ghép vào service thứ nhất để biến hai class độc lập thành một class duy nhất.',
-            'Chuyển một trong hai service sang thực thi trên một tiến trình Node.js hoàn toàn mới tách biệt ngoài hệ thống mạng.',
-            'Tạo ra một bản sao lưu dữ liệu trong cơ sở dữ liệu Redis để hai service có thể trao đổi thông tin mà không cần constructor.'
+            'Bọc tham chiếu class bên trong một hàm callback đóng gói (closure) để trì hoãn việc phân giải token cho đến khi cả hai class đều đã được nạp và khởi tạo trong module context.',
+            'Tự động sao chép mã nguồn của service thứ hai ghép vào service thứ nhất để hợp nhất thành một class duy nhất trong RAM.',
+            'Chuyển một trong hai service sang thực thi trên một tiến trình Node.js hoàn toàn mới tách biệt ngoài mạng nội bộ.',
+            'Lưu trữ toàn bộ phương thức của class vào Redis để hai service có thể gọi RPC không cần thông qua constructor.'
           ],
           correctIndex: 0,
           explanation: 'forwardRef(() => TargetService) trả về một đối tượng chứa hàm callback. Khi file mã nguồn đang được nạp, tham chiếu chưa tồn tại (undefined). Bằng cách bọc trong hàm closure () => TargetService, NestJS trì hoãn việc đánh giá con trỏ cho đến khi toàn bộ các class đã được JavaScript nạp vào bộ nhớ, cho phép giải quyết vòng lặp phụ thuộc.'
         },
         {
           id: 'c4-l3-q4',
-          question: 'Cách tốt nhất và chuẩn mực nhất để refactor triệt để lỗi Circular Dependency mà KHÔNG CẦN phải dùng đến forwardRef() là gì?',
+          question: 'Cách thức refactor chuẩn mực và triệt để nhất trong thiết kế kiến trúc phần mềm khi phát hiện Circular Dependency giữa UserService và OrderService là gì?',
           options: [
-            'Tách phần logic chung mà cả hai service cùng cần sang một Service thứ ba, hoặc chuyển sang cơ chế giao tiếp hướng sự kiện Event-Driven.',
-            'Chuyển toàn bộ các phương thức của cả hai service sang dạng hàm static đồng bộ để không cần sử dụng đến constructor.',
-            'Khai báo tất cả các service bị vòng lặp thành biến toàn cục (global variables) gắn trực tiếp vào đối tượng global của Node.js.',
-            'Tăng thời gian timeout khởi động của NestJS lên mười giây để hệ điều hành có đủ thời gian tự động gỡ rối vòng lặp.'
+            'Khai báo tất cả các service bị vòng lặp thành biến toàn cục (global variables) gắn trực tiếp vào global object của Node.js.',
+            'Chuyển toàn bộ các phương thức của cả hai service sang dạng hàm static đồng bộ để bỏ qua việc inject constructor.',
+            'Tách phần logic chung hoặc phụ thuộc lẫn nhau sang một Service trung gian thứ 3 (đưa đồ thị phụ thuộc trở lại dạng DAG không chu trình), hoặc chuyển sang cơ chế giao tiếp lỏng lẻo hướng sự kiện (Event-Driven với EventEmitter).',
+            'Tăng thời gian timeout khởi động của NestJS lên sáu mươi giây để hệ điều hành tự động phân giải chu trình.'
+          ],
+          correctIndex: 2,
+          explanation: 'forwardRef() chỉ là giải pháp tạm thời (workaround). Cách refactor chuẩn mực trong kiến trúc phần mềm là: 1) Tách các phương thức dùng chung sang một Service trung gian thứ 3 (đưa đồ thị trở lại dạng DAG thuần túy), hoặc 2) Chuyển mối quan hệ gọi trực tiếp thành cơ chế phát sự kiện bất đồng bộ lỏng lẻo (Event-Driven với EventEmitter hoặc Message Broker).'
+        },
+        {
+          id: 'c4-l3-q5',
+          question: 'Thuật toán Sắp xếp Tô pô (Topological Sort) được IoC Container sử dụng để xác định thứ tự khởi tạo các Provider trong đồ thị DAG dựa trên nguyên lý nào?',
+          options: [
+            'Liên tục tìm và khởi tạo các đỉnh (Provider/Module) có bậc vào bằng không (In-degree = 0, tức không phụ thuộc vào ai), sau đó loại bỏ đỉnh đó khỏi đồ thị và lặp lại quy trình cho đến khi tất cả các đỉnh đều được giải quyết.',
+            'Sắp xếp các Provider theo thứ tự bảng chữ cái alphabet của tên Class.',
+            'Ưu tiên khởi tạo các Service có dung lượng dòng mã nguồn (LOC) ngắn nhất trước.',
+            'Khởi tạo ngẫu nhiên tất cả các Provider cùng một lúc bằng Promise.all() và tự động retry nếu có lỗi.'
           ],
           correctIndex: 0,
-          explanation: 'forwardRef() chỉ là giải pháp tạm thời (workaround). Cách refactor chuẩn mực trong kiến trúc phần mềm là: 1) Tách các phương thức dùng chung sang một Service trung gian thứ 3 (đưa đồ thị trở lại dạng DAG thuần túy), hoặc 2) Chuyển mối quan hệ gọi trực tiếp thành cơ chế phát sự kiện bất đồng bộ lỏng lẻo (Event-Driven với EventEmitter hoặc Message Broker).'
+          explanation: 'Topological Sort duyệt qua các đỉnh trong Directed Acyclic Graph: đỉnh nào có In-degree = 0 (không có dependency) được đưa vào hàng đợi khởi tạo trước. Khi đỉnh đó khởi tạo xong, các cạnh đi ra từ nó được gỡ bỏ, làm giảm In-degree của các đỉnh phụ thuộc kế tiếp.'
+        },
+        {
+          id: 'c4-l3-q6',
+          question: 'Điểm khác biệt bản chất giữa Scope.DEFAULT (Singleton) và Scope.TRANSIENT trong NestJS là gì?',
+          options: [
+            'Scope.DEFAULT chỉ dùng cho Controller, còn Scope.TRANSIENT chỉ dùng cho Database Repository.',
+            'Scope.DEFAULT chia sẻ một instance duy nhất trên toàn bộ ứng dụng; còn Scope.TRANSIENT sẽ tạo ra một instance mới độc lập tại mỗi vị trí được inject (injection site) trong quá trình khởi tạo ứng dụng.',
+            'Scope.DEFAULT lưu dữ liệu trên ổ cứng SSD, còn Scope.TRANSIENT lưu dữ liệu trực tiếp trong CPU Cache L1.',
+            'Scope.DEFAULT tự động hủy sau mỗi request, còn Scope.TRANSIENT tồn tại vĩnh viễn không bao giờ giải phóng.'
+          ],
+          correctIndex: 1,
+          explanation: 'Scope.DEFAULT duy trì một Singleton duy nhất trong container. Scope.TRANSIENT tạo một instance mới cho mỗi injection site (mỗi khi được inject vào một provider khác), nhưng instance đó vẫn tồn tại theo vòng đời của provider chứa nó và không bị tạo lại theo từng request như Scope.REQUEST.'
+        },
+        {
+          id: 'c4-l3-q7',
+          question: 'Để hiện thực giải pháp lưu trữ Request Context (Correlation ID, Tenant ID) bằng AsyncLocalStorage trong NestJS mà không làm ô nhiễm Singleton Scope, vị trí nào trong pipeline là lý tưởng nhất để gọi asyncLocalStorage.run()?',
+          options: [
+            'Bên trong phương thức onModuleDestroy() của AppModule.',
+            'Bên trong Controller Route Handler sau khi đã trả về HTTP Response.',
+            'Bên trong Exception Filter khi có ngoại lệ HTTP 500 xảy ra.',
+            'Bên trong NestJS Middleware (hoặc Fastify/Express Middleware hook) - nơi đầu tiên tiếp nhận incoming HTTP request để bọc toàn bộ chuỗi thực thi downstream vào ngữ cảnh storage.'
+          ],
+          correctIndex: 3,
+          explanation: 'NestJS Middleware là thành phần đầu tiên trong request pipeline tiếp nhận request. Khi gọi asyncLocalStorage.run(store, () => next()), toàn bộ các bước tiếp theo (Guards, Interceptors, Pipes, Controller, Services, Repositories) chạy trong callback này đều kế thừa và truy xuất được store mà không cần truyền tham số thủ công.'
+        },
+        {
+          id: 'c4-l3-q8',
+          question: 'Nếu xảy ra Circular Dependency giữa Module A và Module B (Module A imports Module B và Module B imports Module A) ở cấp độ Module, điều gì sẽ xảy ra lúc khởi động nếu không sử dụng forwardRef() trong mảng imports?',
+          options: [
+            'NestJS tự động chuyển một trong hai Module sang chế độ hoạt động offline.',
+            'Ứng dụng vẫn khởi động bình thường nhưng tốc độ xử lý mạng bị giảm 50%.',
+            'Một trong hai Module sẽ nhận giá trị undefined tại thời điểm nạp, dẫn tới lỗi runtime crash ngay lập tức: "Nest cannot create the module instance... circular dependency between modules".',
+            'Toàn bộ dữ liệu của cơ sở dữ liệu sẽ bị xóa sạch do cơ chế bảo vệ của NestJS.'
+          ],
+          correctIndex: 2,
+          explanation: 'Khi 2 module import lẫn nhau mà không dùng forwardRef(() => ModuleB) và forwardRef(() => ModuleA), JavaScript module system (CommonJS/ESM) gặp chu trình và gán undefined cho module đang nạp dở, khiến NestJS ném lỗi crash "Nest cannot create the module instance... circular dependency".'
         }
       ],
       codeChallenge: {
         id: 'c4-l3-c1',
         title: 'Phát Hiện Vòng Lặp Phụ Thuộc Trong Đồ Thị Module (Cycle Detector)',
-        description: 'Hiện thực hàm \`hasCircularDependency(graph: Record<string, string[]>): boolean\` nhận vào một đồ thị biểu diễn danh sách phụ thuộc giữa các module (key là tên module, value là mảng các module mà nó phụ thuộc vào). Trả về \`true\` nếu đồ thị có chứa chu trình khép kín (Circular Dependency), ngược lại trả về \`false\`. Sử dụng thuật toán DFS hoặc topological sort.',
-        starterCode: `
-export function hasCircularDependency(graph: Record<string, string[]>): boolean {
+        description: 'Hiện thực hàm \`hasCircularDependency(graph: Record<string, string[]>): boolean\` nhận vào một đồ thị biểu diễn danh sách phụ thuộc giữa các module (key là tên module, value là mảng các module mà nó phụ thuộc vào). Trả về \`true\` nếu đồ thị có chứa chu trình khép kín (Circular Dependency), ngược lại trả về \`false\`. Xử lý chính xác cả đồ thị rỗng và đồ thị gồm nhiều thành phần liên thông rời rạc.',
+        starterCode: `export function hasCircularDependency(graph: Record<string, string[]>): boolean {
   // TODO: Phát hiện chu trình khép kín trong đồ thị phụ thuộc
   return false;
-}
-`,
-        solution: `
-export function hasCircularDependency(graph: Record<string, string[]>): boolean {
+}`,
+        solution: `export function hasCircularDependency(graph: Record<string, string[]>): boolean {
+  if (!graph || typeof graph !== 'object' || Object.keys(graph).length === 0) {
+    return false;
+  }
+
   const visited = new Set<string>();
   const recStack = new Set<string>();
 
@@ -831,23 +1066,37 @@ export function hasCircularDependency(graph: Record<string, string[]>): boolean 
   }
 
   return false;
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Đồ thị DAG tuyến tính không có vòng lặp',
+            name: 'Case 1 (Visible): Đồ thị DAG tuyến tính không có vòng lặp',
             input: [{ A: ['B'], B: ['C'], C: [] }],
-            expected: false
+            expected: false,
+            hidden: false
           },
           {
-            name: 'Phát hiện vòng lặp trực tiếp giữa A và B (A -> B -> A)',
+            name: 'Case 2 (Visible): Phát hiện vòng lặp trực tiếp giữa A và B (A -> B -> A)',
             input: [{ A: ['B'], B: ['A'] }],
-            expected: true
+            expected: true,
+            hidden: false
           },
           {
-            name: 'Phát hiện vòng lặp tam giác (A -> B -> C -> A)',
+            name: 'Case 3 (Visible): Phát hiện vòng lặp tam giác (A -> B -> C -> A)',
             input: [{ A: ['B'], B: ['C'], C: ['A'] }],
-            expected: true
+            expected: true,
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Đồ thị rỗng -> Trả về false',
+            input: [{}],
+            expected: false,
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Đồ thị có nhiều nhánh rời rạc, nhánh thứ hai có vòng lặp khép kín',
+            input: [{ X: ['Y'], Y: [], M: ['N'], N: ['P'], P: ['M'] }],
+            expected: true,
+            hidden: true
           }
         ]
       }

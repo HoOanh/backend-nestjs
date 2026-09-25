@@ -23,7 +23,7 @@ Tại sao một tiến trình đơn luồng (Single-Threaded Process) như Redis
   - Khi một gói tin TCP truyền đến, Kernel thông báo cho Redis qua một sự kiện sẵn sàng (Read Event). Bộ điều phối sự kiện (**Event Dispatcher**) đưa sự kiện vào hàng đợi và luồng chính thực thi lệnh trong vài microsecond!
 * **Tối Ưu Hóa Cấu Trúc Dữ Liệu Ở Tầng C:**
   - Redis không sử dụng chuỗi ký tự chuẩn của C (\`char*\` kết thúc bằng byte \`\\0\` vốn đòi hỏi $O(N)$ để đo độ dài). Nó tự phát minh ra **SDS (Simple Dynamic String)**: Lưu sẵn độ dài chuỗi (\`len\`) và dung lượng cấp phát dư (\`alloc\`) trong phần Header, giúp đo độ dài trong $O(1)$ và ngăn chặn triệt để lỗi tràn bộ đệm (Buffer Overflow).
-  - Tự động chuyển đổi biểu diễn nội tại (Internal Encoding Transformation): Khi tập hợp có ít phần tử, Redis dùng **ZipList** (mảng nén liên tục trong RAM để giảm thiểu phân mảnh bộ nhớ và tận dụng CPU Cache L1/L2); khi số lượng phần tử vượt ngưỡng, nó tự động nâng cấp thành **SkipList** (cấu trúc dữ liệu phân tầng xác suất) để duy trì tốc độ tìm kiếm và sắp xếp $O(\\log N)$!
+  - Tự động chuyển đổi biểu diễn nội tại (Internal Encoding Transformation): Khi tập hợp có ít phần tử, Redis dùng **ZipList / Listpack** (mảng nén liên tục trong RAM để giảm thiểu phân mảnh bộ nhớ và tận dụng CPU Cache L1/L2); khi số lượng phần tử vượt ngưỡng, nó tự động nâng cấp thành **SkipList** (cấu trúc dữ liệu phân tầng xác suất) để duy trì tốc độ tìm kiếm và sắp xếp $O(\\log N)$!
 
 ---
 
@@ -144,12 +144,25 @@ BẠN CẦN LƯU TRỮ DỮ LIỆU GÌ TRONG REDIS?
 | **List** | LPUSH / RPOP | $O(1)$ ở hai đầu, $O(N)$ ở giữa| Thấp (Quicklist nén) | Hàng đợi công việc, Feed tin mới nhất |
 | **Sorted Set** | ZADD / ZRANGE | $O(\\log N)$ | Cao hơn (Lưu cả Dict và SkipList)| Bảng xếp hạng game, Rate Limiter cửa sổ |
 `,
-      realCodeSnippet: `
-import { Injectable, Logger } from '@nestjs/common';
+      realCodeSnippet: `import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 
+/**
+ * ADR: Giám sát nội tại Redis Engine cấp thấp
+ * - Sử dụng INFO Memory, INFO Stats, và OBJECT ENCODING để phát hiện Key phình to (Bigkeys)
+ * - Đo lường Memory Fragmentation Ratio: Nếu ratio > 1.5 cảnh báo lãng phí RAM do jemalloc
+ */
+export interface RedisDiagnosticsReport {
+  usedMemoryHuman: string;
+  usedMemoryRssHuman: string;
+  memFragmentationRatio: number;
+  instantaneousOpsPerSec: number;
+  keyEncoding: string;
+  keySerializedLengthBytes: number;
+}
+
 @Injectable()
-export class RedisDiagnosticsService {
+export class RedisDiagnosticsService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisDiagnosticsService.name);
   private readonly redisClient: Redis;
 
@@ -158,102 +171,165 @@ export class RedisDiagnosticsService {
       host: process.env.REDIS_HOST || '127.0.0.1',
       port: Number(process.env.REDIS_PORT) || 6379,
       lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
     });
   }
 
-  /**
-   * Truy vấn thông số nội tại của Redis Engine: Bộ nhớ, Số lượng lệnh/giây, và Cấu trúc encoding
-   */
-  public async getEngineDiagnostics(testKey: string): Promise<{
-    usedMemoryHuman: string;
-    instantaneousOpsPerSec: number;
-    keyEncoding: string;
-  }> {
-    await this.redisClient.connect();
+  public async onModuleDestroy(): Promise<void> {
+    await this.redisClient.quit();
+  }
 
-    // 1. Đọc thông số thống kê hiệu năng từ lệnh INFO
-    const memoryInfo = await this.redisClient.info('memory');
-    const statsInfo = await this.redisClient.info('stats');
+  /**
+   * Truy vấn thông số nội tại của Redis Engine: Bộ nhớ, Fragmentation, Throughput và Cấu trúc encoding
+   */
+  public async getEngineDiagnostics(testKey: string): Promise<RedisDiagnosticsReport> {
+    if (this.redisClient.status !== 'ready') {
+      await this.redisClient.connect();
+    }
+
+    // 1. Thu thập dữ liệu thống kê từ memory và stats
+    const [memoryInfo, statsInfo] = await Promise.all([
+      this.redisClient.info('memory'),
+      this.redisClient.info('stats'),
+    ]);
 
     const memoryMatch = memoryInfo.match(/used_memory_human:(.*)/);
+    const rssMatch = memoryInfo.match(/used_memory_rss_human:(.*)/);
+    const fragMatch = memoryInfo.match(/mem_fragmentation_ratio:(.*)/);
     const opsMatch = statsInfo.match(/instantaneous_ops_per_sec:(.*)/);
 
-    // 2. Kiểm tra kiểu mã hóa nội tại cấp thấp của một Key cụ thể
-    const encoding = await this.redisClient.object('ENCODING', testKey);
+    // 2. Kiểm tra kiểu mã hóa nội tại và kích thước tuần tự của testKey
+    const [encoding, serializedLen] = await Promise.all([
+      this.redisClient.object('ENCODING', testKey),
+      this.redisClient.dump(testKey).then((buf) => (buf ? buf.length : 0)),
+    ]);
+
+    const fragRatio = fragMatch ? parseFloat(fragMatch[1].trim()) : 1.0;
+    if (fragRatio > 1.5) {
+      this.logger.warn(\`Cảnh báo phân mảnh bộ nhớ cao trên Redis: Ratio \${fragRatio}\`);
+    }
 
     return {
       usedMemoryHuman: memoryMatch ? memoryMatch[1].trim() : 'N/A',
+      usedMemoryRssHuman: rssMatch ? rssMatch[1].trim() : 'N/A',
+      memFragmentationRatio: fragRatio,
       instantaneousOpsPerSec: opsMatch ? parseInt(opsMatch[1].trim(), 10) : 0,
       keyEncoding: encoding || 'KEY_NOT_FOUND',
+      keySerializedLengthBytes: serializedLen,
     };
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c7-l1-q1',
-          question: 'Lý do cốt lõi nào giúp cho Redis đạt được hiệu năng xử lý hơn một trăm nghìn thao tác trên giây dù chỉ sử dụng duy nhất một luồng thực thi chính?',
+          question: 'Lý do kiến trúc cốt lõi nào giúp cho Redis đạt được hiệu năng hơn 100,000 OPS với độ trễ sub-millisecond dù chỉ dùng duy nhất 1 luồng thực thi chính?',
           options: [
-            'Dữ liệu nằm hoàn toàn trong RAM kết hợp với mô hình Non-blocking I/O Multiplexing và loại bỏ triệt để chi phí tranh chấp khóa.',
-            'Redis tự động chuyển đổi mã nguồn C sang thực thi trên các vi xử lý đồ họa GPU chuyên dụng của máy chủ đám mây.',
-            'Redis bắt buộc tất cả các client phải gửi các câu lệnh dưới dạng mã hóa nén trước khi truyền qua mạng Internet.',
-            'Redis từ chối tất cả các câu lệnh có thời gian thực thi dài hơn một microsecond để tránh làm chậm hệ thống.',
+            'Redis chuyển toàn bộ việc tính toán sang bộ tăng tốc phần cứng TPU của hạ tầng đám mây.',
+            'Dữ liệu nằm 100% trong RAM, tận dụng Non-blocking I/O Multiplexing (epoll) và loại bỏ hoàn toàn chi phí Lock Contention lẫn Context Switching.',
+            'Redis bắt buộc tất cả client phải nén dữ liệu trước khi gửi và chỉ hỗ trợ định dạng nhị phân thuần túy.',
+            'Redis giới hạn mỗi kết nối mạng chỉ được phép gửi duy nhất 1 yêu cầu mỗi giây để tránh xung đột luồng.',
           ],
-          correctIndex: 0,
-          explanation: 'Redis đạt tốc độ kinh ngạc nhờ: 1) Toàn bộ dữ liệu nằm trong RAM (truy xuất nanosecond); 2) Sử dụng I/O Multiplexing (epoll/kqueue) để quản lý hàng chục nghìn kết nối mạng trên 1 luồng mà không cần tạo thread; 3) Vì là đơn luồng nên không bao giờ phải chịu chi phí Context Switching hay chờ đợi tranh chấp khóa (Locking Contention).'
+          correctIndex: 1,
+          explanation: 'Redis đạt tốc độ kinh ngạc nhờ 3 trụ cột: 1) Dữ liệu nằm trọn vẹn trong RAM (độ trễ nanoseconds); 2) Sử dụng I/O Multiplexing (epoll/kqueue) quản lý hàng chục nghìn kết nối mạng trên 1 luồng; 3) Vì là đơn luồng nên 0% chi phí tranh chấp khóa (Lock Contention) và 0% chi phí hoán đổi ngữ cảnh luồng (Context Switching).'
         },
         {
           id: 'c7-l1-q2',
-          question: 'Cấu trúc chuỗi động Simple Dynamic String (SDS) của Redis mang lại ưu thế vượt trội nào so với chuỗi văn bản truyền thống trong ngôn ngữ C?',
+          question: 'Cấu trúc Simple Dynamic String (SDS) của Redis mang lại ưu thế kỹ thuật vượt trội nào so với chuỗi ký tự kết thúc bằng null (\\0) trong ngôn ngữ C truyền thống?',
           options: [
-            'Lưu trữ sẵn độ dài chuỗi trong header giúp lấy độ dài trong O(1) và an toàn nhị phân cho phép lưu trữ bất kỳ loại dữ liệu byte nào.',
-            'Tự động mã hóa dữ liệu thành chuỗi số nguyên hexa để chống lại các cuộc tấn công giải mã mật mã từ hacker.',
-            'Loại bỏ hoàn toàn sự cần thiết của bộ nhớ đệm RAM và lưu trực tiếp chuỗi vào các thanh ghi của vi xử lý CPU.',
-            'Giới hạn kích thước của chuỗi ở mức tối đa không quá tám ký tự để đảm bảo tốc độ so sánh chuỗi nhanh nhất.',
+            'SDS tự động mã hóa chuỗi thành SHA-256 để chống lại các lỗ hổng Injection ở tầng hệ điều hành.',
+            'SDS tự động giải phóng vùng nhớ heap của Linux về 0 ngay khi biến không còn được tham chiếu.',
+            'SDS giới hạn độ dài chuỗi tối đa là 16 ký tự để luôn vừa vặn trong một thanh ghi CPU 64-bit.',
+            'SDS lưu sẵn len và alloc trong header giúp đo độ dài O(1), an toàn nhị phân (Binary Safe) và chống tràn bộ đệm (Buffer Overflow).',
           ],
-          correctIndex: 0,
-          explanation: 'Chuỗi C truyền thống kết thúc bằng byte "\\0" nên không an toàn nhị phân (Binary Safe - không thể lưu dữ liệu có chứa byte 0 như ảnh hay gzip) và việc tính độ dài strlen() tốn O(N). SDS lưu sẵn thuộc tính len trong header giúp lấy độ dài trong O(1) tức thì, và kiểm tra vùng đệm alloc giúp chống tràn bộ nhớ (Buffer Overflow).'
+          correctIndex: 3,
+          explanation: 'Chuỗi C truyền thống kết thúc bằng byte "\\0" nên không thể chứa byte 0 (không an toàn nhị phân) và tính strlen() tốn O(N). SDS lưu thuộc tính len trong header cho phép lấy độ dài O(1), lưu alloc giúp kiểm tra dung lượng trước khi ghi (chống Buffer Overflow) và Binary Safe giúp lưu trữ bất kỳ dữ liệu nhị phân nào như ảnh hay gzip.'
         },
         {
           id: 'c7-l1-q3',
-          question: 'Vì sao Redis lại lựa chọn cấu trúc dữ liệu SkipList để hiện thực kiểu dữ liệu Sorted Set (ZSET) thay vì sử dụng cây cân bằng Red-Black Tree?',
+          question: 'Vì sao Redis lại lựa chọn cấu trúc dữ liệu SkipList (Danh sách liên kết nhảy cóc) để hiện thực Sorted Set (ZSET) thay vì cây cân bằng Red-Black Tree?',
           options: [
-            'SkipList có độ phức tạp tìm kiếm tương đương O(log N) nhưng cài đặt đơn giản hơn và hỗ trợ duyệt khoảng giá trị cực kỳ hiệu quả.',
-            'Vì cây Red-Black Tree chỉ hoạt động được trên các hệ điều hành 32-bit cũ và không tương thích với máy chủ 64-bit.',
-            'Vì SkipList có khả năng tự động nén dữ liệu xuống dung lượng bằng không khi không có người dùng nào truy cập vào khóa.',
-            'Vì các thuật toán cây cân bằng bị cấm sử dụng trong các hệ thống phần mềm mã nguồn mở theo quy định của tổ chức GPL.',
+            'SkipList có độ phức tạp kỳ vọng O(log N) tương đương cây đỏ đen nhưng cài đặt đơn giản hơn, không tốn chi phí Tree Rotation khi ghi và hỗ trợ duyệt khoảng (Range Queries) siêu tốc.',
+            'Vì cây Red-Black Tree chỉ hoạt động trên kiến trúc CPU x86 32-bit và không hỗ trợ CPU ARM64 hiện đại.',
+            'Vì SkipList có khả năng tự động xóa dữ liệu khỏi bộ nhớ RAM khi dung lượng bộ nhớ vượt quá 80%.',
+            'Vì các thuật toán cây cân bằng bị cấm trong tiêu chuẩn POSIX dành cho các hệ thống in-memory database.',
           ],
           correctIndex: 0,
-          explanation: 'SkipList mang lại hiệu năng tìm kiếm, chèn, xóa $O(\\log N)$ ngang ngửa với cây đỏ đen (Red-Black Tree), nhưng thuật toán đơn giản hơn rất nhiều khi không phải thực hiện các phép xoay cây (Tree Rotation) phức tạp. Đặc biệt, SkipList liên kết các phần tử ở tầng đáy giúp các thao tác duyệt khoảng (Range queries như ZRANGEBYSCORE) diễn ra siêu tốc bằng cách đi bộ tuần tự.'
+          explanation: 'SkipList đạt độ phức tạp tìm kiếm/chèn/xóa O(log N) tương đương Red-Black Tree nhưng không cần cơ chế xoay cây phức tạp khi cập nhật điểm số. Hơn thế, việc liên kết tuần tự các node ở tầng đáy giúp các thao tác duyệt dải điểm (ZRANGEBYSCORE) diễn ra cực nhanh bằng cách duyệt con trỏ kế tiếp mà cây nhị phân không tối ưu bằng.'
         },
         {
           id: 'c7-l1-q4',
-          question: 'Lệnh KEYS * bị coi là một "Lệnh Cấm Tử (Deadly Command)" trong môi trường Redis Production vì nguyên nhân kỹ thuật sâu xa nào?',
+          question: 'Tại sao việc thực thi lệnh "KEYS *" trong môi trường Redis Production bị coi là một "lỗ hổng vận hành chí mạng"?',
           options: [
-            'Vì Redis chạy đơn luồng, lệnh KEYS * sẽ quét toàn bộ hàng triệu khóa trong bộ nhớ làm đóng băng máy chủ suốt nhiều giây hoặc nhiều phút.',
-            'Vì lệnh này sẽ tự động xóa sạch toàn bộ các bản ghi trong cơ sở dữ liệu nếu có một kết nối mạng bị gián đoạn giữa chừng.',
-            'Vì lệnh KEYS * chỉ có thể được thực thi bởi tài khoản quản trị viên root của hệ điều hành Linux thông qua cổng SSH.',
-            'Vì nó làm thay đổi toàn bộ các con trỏ bộ nhớ của cấu trúc SDS khiến cho dữ liệu của người dùng bị đảo lộn thứ tự.',
+            'Vì lệnh này sẽ xóa toàn bộ các snapshot sao lưu RDB đang được lưu trữ trên ổ đĩa SSD.',
+            'Vì lệnh KEYS * chỉ có thể được gọi bởi tài khoản Linux root thông qua socket nội bộ /tmp/redis.sock.',
+            'Vì Redis chạy đơn luồng, KEYS * phải duyệt tuần tự qua toàn bộ Keyspace O(N), làm đóng băng máy chủ suốt nhiều giây và gây nghẽn toàn bộ kết nối khác.',
+            'Vì lệnh KEYS * làm đảo lộn thứ tự băm của bảng Hashtable bên trong khiến tất cả các truy vấn GET tiếp theo bị sai dữ liệu.',
+          ],
+          correctIndex: 2,
+          explanation: 'Redis xử lý lệnh tuần tự trên một Single Thread. Khi gọi KEYS *, nếu database có hàng triệu khóa, Redis sẽ quét toàn bộ Keyspace trong nhiều giây. Trong suốt thời gian này, không có bất kỳ lệnh nào khác từ hàng nghìn kết nối mạng được phục vụ, dẫn đến Client Timeout hàng loạt và làm sập toàn bộ hệ thống. Trong Production, bắt buộc phải dùng lệnh phân trang SCAN.'
+        },
+        {
+          id: 'c7-l1-q5',
+          question: 'Chỉ số "mem_fragmentation_ratio" trong Redis INFO Memory phản ánh điều gì và khi nào chỉ số này báo hiệu vấn đề nghiêm trọng?',
+          options: [
+            'Tỷ lệ giữa dung lượng nén zip và dung lượng chuỗi thô; tỷ lệ < 0.5 báo hiệu dữ liệu bị nén quá mức.',
+            'Tỷ lệ giữa bộ nhớ RSS của hệ điều hành cấp phát (used_memory_rss) và bộ nhớ Redis thực tế sử dụng (used_memory); tỷ lệ > 1.5 cho thấy bộ nhớ đang bị phân mảnh nghiêm trọng.',
+            'Tỷ lệ giữa số lượng khóa String và khóa Sorted Set trong toàn bộ hệ cơ sở dữ liệu in-memory.',
+            'Tỷ lệ giữa dung lượng cache hit và cache miss; tỷ lệ > 2.0 cho thấy database quan hệ đang bị quá tải.',
+          ],
+          correctIndex: 1,
+          explanation: 'mem_fragmentation_ratio = used_memory_rss / used_memory. Do bộ cấp phát bộ nhớ (thường là jemalloc) cấp phát bộ nhớ theo các trang cố định, khi các key bị thêm/xóa liên tục, hệ điều hành giữ lại các trang rác. Nếu ratio > 1.5, nghĩa là Redis đang lãng phí hơn 50% RAM cho phân mảnh, cần bật active defragmentation (activedefrag yes).'
+        },
+        {
+          id: 'c7-l1-q6',
+          question: 'Kể từ phiên bản Redis 6.0, tính năng Threaded I/O (I/O đa luồng) được đưa vào nhằm mục đích gì và có ảnh hưởng đến tính nguyên tử của các câu lệnh không?',
+          options: [
+            'Chỉ sử dụng đa luồng cho việc đọc/ghi socket mạng và parse giao thức RESP, còn luồng chính vẫn duy nhất thực thi logic lệnh, giữ nguyên 100% tính nguyên tử.',
+            'Chuyển toàn bộ các lệnh ghi dữ liệu như HSET, LPUSH sang chạy đa luồng đồng thời bằng cơ chế Multi-version Concurrency Control.',
+            'Loại bỏ hoàn toàn luồng chính và sử dụng Worker Thread Pool của Node.js để thực thi câu lệnh Redis.',
+            'Chỉ áp dụng đa luồng khi sao chép dữ liệu sang các Slave Replica mà không can thiệp vào Client I/O.',
           ],
           correctIndex: 0,
-          explanation: 'Vì Redis thực thi các lệnh trên duy nhất MỘT Main Thread: Khi gọi KEYS *, Redis phải duyệt tuần tự qua toàn bộ hàng triệu khóa trong Keyspace. Suốt thời gian quét này (có thể mất vài giây đến vài phút), toàn bộ các request khác từ tất cả client đều bị chặn đứng và timeout hoàn toàn, làm sập toàn bộ hệ thống! Trong Production, bắt buộc phải dùng SCAN (quét theo con trỏ cursor không chặn luồng).'
+          explanation: 'Nút thắt cổ chai lớn nhất của Redis khi mạng đạt 10Gbps+ là chi phí CPU tiêu tốn vào việc đọc/ghi socket TCP và parse giao thức RESP. Redis 6.0 tách việc I/O mạng này cho các I/O Threads phụ trợ xử lý song song, trong khi luồng thực thi dữ liệu chính (Main Execution Thread) vẫn là Single-Threaded, đảm bảo 100% tính nguyên tử và không cần lock.'
+        },
+        {
+          id: 'c7-l1-q7',
+          question: 'Cơ chế biến đổi mã hóa nội tại (Internal Encoding) nào diễn ra khi một HASH trong Redis tăng từ số lượng trường nhỏ lên hàng chục nghìn trường?',
+          options: [
+            'Từ cấu trúc cây cân bằng B-Tree chuyển đổi sang mảng liên kết tĩnh hai chiều.',
+            'Từ định dạng chuỗi SDS thuần túy chuyển đổi sang tệp tin SQLite lưu tạm trên phân vùng /tmp.',
+            'Từ tệp nhị phân nén gzip chuyển đổi sang bảng băm phân tán Merkle Tree.',
+            'Từ mảng nén bộ nhớ liên tục (listpack / ziplist) chuyển đổi sang bảng băm hai lớp (hashtable) để giữ độ phức tạp truy xuất O(1).',
+          ],
+          correctIndex: 3,
+          explanation: 'Khi một Hash có ít phần tử và dung lượng các trường nhỏ hơn ngưỡng cấu hình (hash-max-listpack-entries / hash-max-ziplist-value), Redis lưu dưới dạng listpack/ziplist (mảng liên tục trong RAM giúp tiết kiệm bộ nhớ tối đa). Khi vượt quá ngưỡng, Redis tự động nâng cấp sang Hashtable (bảng băm hai lớp) để duy trì thời gian truy xuất O(1).'
+        },
+        {
+          id: 'c7-l1-q8',
+          question: 'Khi Redis thực hiện sao lưu dữ liệu nền định kỳ (BGSAVE) để tạo snapshot RDB, kỹ thuật nhân hệ điều hành Linux nào được sử dụng để tránh làm đóng băng luồng chính?',
+          options: [
+            'Hệ điều hành dùng hàm fork() sinh tiến trình con và tận dụng cơ chế Copy-on-Write (COW) của bảng trang bộ nhớ ảo.',
+            'Hệ điều hành khóa toàn bộ quyền ghi của các client cho đến khi toàn bộ RAM được xả xuống đĩa SSD.',
+            'Redis nén toàn bộ RAM thành tệp tin zip và truyền trực tiếp qua giao thức FTP sang máy chủ khác.',
+            'Redis tạm dừng toàn bộ kết nối TCP và chuyển các truy vấn mới vào bộ nhớ đệm card mạng eBPF.',
+          ],
+          correctIndex: 0,
+          explanation: 'Lệnh BGSAVE gọi fork() để tạo một tiến trình con (child process). Tiến trình con chia sẻ cùng không gian địa chỉ bộ nhớ vật lý với tiến trình cha nhờ cơ chế Copy-on-Write (COW) của Linux Kernel. Chỉ khi tiến trình cha sửa đổi một trang bộ nhớ, trang đó mới được sao chép thực sự, giúp quá trình ghi RDB diễn ra hoàn toàn độc lập mà không chặn luồng chính.'
         }
       ],
       codeChallenge: {
         id: 'c7-l1-c1',
         title: 'Mô Phỏng Cấu Trúc SDS String Buffer Tracker',
         description: 'Hiện thực hàm \`simulateSdsOperations(initialStr: string, appendStr?: string): { len: number; alloc: number; str: string }\`. Khởi tạo SDS với \`len = initialStr.length\` và \`alloc = initialStr.length * 2\`. Nếu có \`appendStr\`: kiểm tra nếu \`len + appendStr.length > alloc\` thì tăng \`alloc = (len + appendStr.length) * 2\`. Sau đó nối chuỗi, cập nhật \`len\` và trả về \`{ len, alloc, str }\`.',
-        starterCode: `
-export function simulateSdsOperations(
+        starterCode: `export function simulateSdsOperations(
   initialStr: string,
   appendStr?: string
 ): { len: number; alloc: number; str: string } {
   // TODO: Hiện thực quản trị SDS buffer
   return { len: 0, alloc: 0, str: '' };
-}
-`,
-        solution: `
-export function simulateSdsOperations(
+}`,
+        solution: `export function simulateSdsOperations(
   initialStr: string,
   appendStr?: string
 ): { len: number; alloc: number; str: string } {
@@ -261,7 +337,7 @@ export function simulateSdsOperations(
   let alloc = initialStr.length * 2;
   let str = initialStr;
 
-  if (appendStr) {
+  if (appendStr !== undefined && appendStr.length > 0) {
     const requiredLen = len + appendStr.length;
     if (requiredLen > alloc) {
       alloc = requiredLen * 2;
@@ -271,8 +347,7 @@ export function simulateSdsOperations(
   }
 
   return { len, alloc, str };
-}
-`,
+}`,
         testCases: [
           {
             name: 'Khởi tạo SDS với chuỗi ban đầu "hello"',
@@ -288,6 +363,16 @@ export function simulateSdsOperations(
             name: 'Append chuỗi vượt quá alloc buộc phải mở rộng ("hi" + " world")',
             input: ['hi', ' world'],
             expected: { len: 8, alloc: 16, str: 'hi world' }
+          },
+          {
+            name: 'Append chuỗi vào chuỗi khởi tạo rỗng ("" + "redis")',
+            input: ['', 'redis'],
+            expected: { len: 5, alloc: 10, str: 'redis' }
+          },
+          {
+            name: 'Không truyền appendStr hoặc truyền chuỗi rỗng giữ nguyên kích thước',
+            input: ['nestjs', ''],
+            expected: { len: 6, alloc: 12, str: 'nestjs' }
           }
         ]
       }
@@ -417,32 +502,41 @@ HỆ THỐNG GẶP SỰ CỐ VỀ CACHE?
 | **Logical Expiration** | Chấp nhận đọc dữ liệu cũ | Hoàn hảo ($0\\text{ ms}$ chờ đợi) | Cao (Cần background worker) | Nhanh $100\\%$ mọi thời điểm |
 | **Write-Through** | Nhất quán mạnh mẽ | Rất tốt | Phức tạp ở tầng Storage | Chậm hơn khi ghi do phải cập nhật cả hai |
 `,
-      realCodeSnippet: `
-import { Injectable, Logger } from '@nestjs/common';
+      realCodeSnippet: `import { Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
+/**
+ * ADR: Chiến lược Cache-Aside chuẩn Enterprise chống 3 thảm họa Cache
+ * 1. Chống Cache Stampede: Dùng Mutex Lock (SET NX EX) để chỉ 1 request tái tạo dữ liệu
+ * 2. Chống Cache Penetration: Cache Null Object với TTL ngắn (60s)
+ * 3. Chống Cache Avalanche: Thêm Jitter ngẫu nhiên vào Base TTL
+ */
 @Injectable()
 export class SafeCacheAsideService {
   private readonly logger = new Logger(SafeCacheAsideService.name);
   private readonly redis: Redis;
+  private readonly NULL_SENTINEL = '__NULL_OBJECT__';
 
   constructor() {
-    this.redis = new Redis();
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number(process.env.REDIS_PORT) || 6379,
+      lazyConnect: true,
+    });
   }
 
-  /**
-   * Kỹ thuật Cache-Aside chuẩn Senior: Có khóa Mutex chống Stampede
-   * và có Jitter ngẫu nhiên chống Tuyết lở Avalanche
-   */
   public async getOrSetWithMutex<T>(
     key: string,
     fetchFromDb: () => Promise<T | null>,
-    baseTtlSeconds: number = 3600
+    baseTtlSeconds: number = 3600,
+    maxRetries: number = 3
   ): Promise<T | null> {
-    // 1. Thử đọc từ Cache
+    // 1. Kiểm tra bộ nhớ đệm
     const cached = await this.redis.get(key);
     if (cached !== null) {
-      if (cached === '__NULL_OBJECT__') return null;
+      if (cached === this.NULL_SENTINEL) {
+        return null;
+      }
       return JSON.parse(cached) as T;
     }
 
@@ -451,100 +545,154 @@ export class SafeCacheAsideService {
     const acquiredLock = await this.redis.set(lockKey, '1', 'EX', 10, 'NX');
 
     if (!acquiredLock) {
-      // Có request khác đang nạp dữ liệu: Ngủ 50ms rồi thử lại
-      await new Promise((r) => setTimeout(r, 50));
-      return this.getOrSetWithMutex(key, fetchFromDb, baseTtlSeconds);
+      if (maxRetries <= 0) {
+        // Fallback khẩn cấp: Truy vấn trực tiếp database nếu đã thử lại hết số lần
+        this.logger.warn(\`Quá số lần retry lock cho key \${key}, truy vấn thẳng DB\`);
+        return await fetchFromDb();
+      }
+      // Request khác đang tái tạo dữ liệu: Chờ 50ms với random jitter rồi thử lại
+      const backoffMs = 40 + Math.floor(Math.random() * 20);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      return this.getOrSetWithMutex(key, fetchFromDb, baseTtlSeconds, maxRetries - 1);
     }
 
     try {
-      // 3. DUY NHẤT 1 request này được quyền truy vấn Database
+      // 3. DUY NHẤT 1 request này được quyền chạm xuống Database
       const data = await fetchFromDb();
 
-      // Thêm Jitter ngẫu nhiên từ 1 đến 300 giây vào TTL chống Avalanche
+      // Jitter ngẫu nhiên chống Avalanche (phân tán 0 - 300s)
       const jitter = Math.floor(Math.random() * 300);
       const finalTtl = baseTtlSeconds + jitter;
 
       if (data === null) {
-        // Chống Cache Penetration: Cache cả giá trị NULL trong 60s
-        await this.redis.set(key, '__NULL_OBJECT__', 'EX', 60);
+        // Chống Penetration: Cache Null Sentinel với TTL ngắn
+        await this.redis.set(key, this.NULL_SENTINEL, 'EX', 60);
       } else {
         await this.redis.set(key, JSON.stringify(data), 'EX', finalTtl);
       }
 
       return data;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown Database Error';
+      this.logger.error(\`Thất bại khi nạp dữ liệu từ DB cho key \${key}: \${message}\`);
+      throw error;
     } finally {
-      // 4. Luôn giải phóng khóa Mutex
+      // 4. Giải phóng khóa Mutex an toàn
       await this.redis.del(lockKey);
     }
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c7-l2-q1',
-          question: 'Hiện tượng "Cache Stampede" (hay Cache Breakdown) là gì và phương pháp kỹ thuật nào sau đây giải quyết triệt để vấn đề này?',
+          question: 'Hiện tượng "Cache Stampede" (hay Thundering Herd) xảy ra trong bối cảnh nào và cơ chế kỹ thuật nào giúp ngăn chặn sập cơ sở dữ liệu?',
           options: [
-            'Khi một khóa dữ liệu truy cập cao bị hết hạn khiến hàng loạt request cùng ập vào database; giải quyết bằng khóa Mutex hoặc Logical Expiration.',
-            'Khi máy chủ Redis bị mất điện khiến toàn bộ dữ liệu trên thanh RAM bị biến mất; giải quyết bằng cách mua bộ lưu điện dự phòng.',
-            'Khi các client liên tục gửi các chuỗi ký tự ngẫu nhiên vào ô tìm kiếm; giải quyết bằng cách chặn địa chỉ IP của người dùng.',
-            'Khi số lượng bản ghi trong cơ sở dữ liệu vượt quá một triệu dòng; giải quyết bằng cách xóa bớt các bảng dữ liệu cũ.',
+            'Khi máy chủ Redis bị ngắt kết nối mạng Internet; khắc phục bằng cách thiết lập mạng riêng ảo VPN.',
+            'Khi dữ liệu lưu trên Redis vượt quá kích thước 1GB; khắc phục bằng cách nâng cấp ổ cứng thể rắn SSD.',
+            'Khi một Hot-Key có hàng chục nghìn lượt truy cập/giây bị hết hạn TTL; khắc phục bằng khóa Mutex (Singleflight) hoặc thuật toán XFetch (Early Expiration).',
+            'Khi lập trình viên cấu hình nhầm cổng kết nối giữa NestJS và PostgreSQL thành cổng 3306.',
           ],
-          correctIndex: 0,
-          explanation: 'Cache Stampede xảy ra khi một Hot-key (khóa có lưu lượng đọc khổng lồ) hết hạn. Hàng nghìn request đồng thời gặp Cache Miss và cùng lúc lao vào Database để truy vấn và tính toán lại, gây sập cơ sở dữ liệu. Giải pháp triệt để là dùng Mutex Lock (chỉ cho phép 1 request đi vào DB nạp lại cache, các request khác chờ) hoặc dùng Logical Expiration (trả dữ liệu cũ và nạp ngầm).'
+          correctIndex: 2,
+          explanation: 'Cache Stampede xảy ra khi một Hot-key hết hạn. Hàng nghìn request đồng thời gặp Cache Miss và cùng lúc lao vào Database để truy vấn và tái tạo dữ liệu, làm cạn kiệt Connection Pool và sập DB. Giải pháp chuẩn là dùng Mutex Lock (chỉ 1 tiến trình được xuống DB, các request khác chờ) hoặc thuật toán xác suất XFetch tái tạo dữ liệu ngầm trước khi khóa hết hạn.'
         },
         {
           id: 'c7-l2-q2',
-          question: 'Hiện tượng "Cache Penetration" (Thủng lớp đệm) xảy ra do nguyên nhân nào và làm thế nào để ngăn chặn hiệu quả nhất?',
+          question: 'Kẻ tấn công liên tục gửi các truy vấn với ID không hề tồn tại trong hệ thống (như id=-999999). Hiện tượng này được gọi là gì và cách phòng ngự tối ưu?',
           options: [
-            'Xảy ra khi client liên tục truy vấn các ID không hề tồn tại trong hệ thống; ngăn chặn bằng cách dùng Bloom Filter hoặc Cache giá trị rỗng (Null Object).',
-            'Xảy ra khi tin tặc tìm ra mật khẩu kết nối của cổng Redis; ngăn chặn bằng cách đổi mật khẩu sang một chuỗi có độ dài ba mươi ký tự.',
-            'Xảy ra khi ổ đĩa cứng của máy chủ cơ sở dữ liệu bị hỏng các cung từ vật lý; ngăn chặn bằng cách chuyển sang sử dụng ổ đĩa thể rắn.',
-            'Xảy ra khi các lập trình viên quên không gọi lệnh đóng kết nối mạng sau mỗi lần thực hiện câu lệnh truy vấn dữ liệu.',
+            'Cache Penetration (Xuyên thủng cache); phòng thủ bằng cách đặt Bloom Filter ở trước hoặc chủ động Cache giá trị NULL với TTL ngắn.',
+            'SQL Injection; phòng thủ bằng cách mã hóa toàn bộ dữ liệu bảng users sang định dạng base64.',
+            'Cache Avalanche; phòng thủ bằng cách giảm thời gian TTL của toàn bộ các khóa xuống còn 1 giây.',
+            'Distributed Deadlock; phòng thủ bằng cách chạy lệnh KILL TRANSACTION trên cơ sở dữ liệu PostgreSQL.',
           ],
           correctIndex: 0,
-          explanation: 'Cache Penetration là hiện tượng kẻ xấu cố tình truy vấn các khóa không hề tồn tại (ví dụ ID âm hoặc chuỗi ngẫu nhiên). Vì trong Cache không có và trong Database cũng không có, request luôn xuyên thủng lớp Cache và nện thẳng vào Database. Cách ngăn chặn chuẩn là đặt Bloom Filter ở trước, hoặc nếu DB trả về null thì lưu luôn giá trị NULL vào Cache với TTL ngắn để chặn các request tiếp theo.'
+          explanation: 'Cache Penetration là khi kẻ xấu truy vấn dữ liệu không hề có trong DB lẫn Cache. Vì không có dữ liệu, mọi request đều đâm xuyên qua Cache nện thẳng vào đĩa cứng Database. Cách phòng ngự: 1) Bloom Filter kiểm tra sự không tồn tại với độ chính xác 100%; 2) Cache Null Object: Lưu sentinel "__NULL__" vào Redis kèm TTL 60s để chặn các request tiếp theo.'
         },
         {
           id: 'c7-l2-q3',
-          question: 'Kỹ thuật thêm "Jitter" (một khoảng thời gian ngẫu nhiên) vào thời gian sống TTL của các khóa trong Redis nhằm mục đích bảo vệ hệ thống khỏi thảm họa nào?',
+          question: 'Kỹ thuật thêm "Jitter" (một số nguyên ngẫu nhiên) vào giá trị TTL khi ghi dữ liệu vào Cache giải quyết trực tiếp thảm họa nào?',
           options: [
-            'Chống lại hiện tượng Cache Avalanche (Tuyết lở) do hàng loạt các khóa cùng hết hạn tại đúng một thời điểm làm tê liệt Database.',
-            'Chống lại hiện tượng rò rỉ bộ nhớ RAM của các tiến trình Node.js khi chạy các tác vụ tính toán thuật toán nặng.',
-            'Chống lại việc các câu lệnh SQL bị tấn công tiêm mã độc thông qua các trường nhập liệu của biểu mẫu trên trang web.',
-            'Tự động tăng gấp đôi dung lượng bộ nhớ chia sẻ của hệ điều hành Linux trong các đợt khuyến mãi bán hàng lớn.',
+            'Hiện tượng rò rỉ bộ nhớ Heap của tiến trình V8 trong môi trường Docker Container.',
+            'Lỗi tràn số nguyên khi tính toán số dư tài khoản ngân hàng trong hệ thống tài chính.',
+            'Nguy cơ xung đột địa chỉ IP giữa các Worker Pod trong cụm Kubernetes.',
+            'Hiện tượng Cache Avalanche (Tuyết lở) do hàng loạt các khóa đồng loạt hết hạn tại cùng một thời điểm, dồn toàn bộ tải đọc vào Database.',
           ],
-          correctIndex: 0,
-          explanation: 'Cache Avalanche (Tuyết lở) xảy ra khi một lượng lớn các khóa trong Cache được thiết lập cùng một thời gian TTL (ví dụ cùng hết hạn sau 1 tiếng). Khi thời điểm đó đến, hàng trăm nghìn khóa đồng loạt bốc hơi cùng một giây, biến toàn bộ hệ thống từ Cache Hit thành Cache Miss 100%, đè bẹp Database. Thêm Jitter (TTL = Base + Random) giúp phân tán thời điểm hết hạn rải rác, tránh hiện tượng tuyết lở.'
+          correctIndex: 3,
+          explanation: 'Nếu hàng trăm nghìn bản ghi được nạp cùng lúc với thời hạn TTL cố định (ví dụ 3600s), toàn bộ chúng sẽ cùng hết hạn tại giây thứ 3600. Tải đọc 100% lập tức đè sập Database (Cache Avalanche). Thêm Jitter: TTL = BaseTTL + Random(1, 300) giúp phân tán thời điểm hết hạn đều theo thời gian, xóa bỏ đỉnh nhọn truy vấn.'
         },
         {
           id: 'c7-l2-q4',
-          question: 'Điểm khác biệt cốt lõi giữa hai chiến lược ghi dữ liệu Write-Through và Write-Behind (Write-Back) là gì?',
+          question: 'Trong mô hình Write-Through Caching, luồng ghi dữ liệu diễn ra như thế nào so với mô hình Write-Behind (Write-Back)?',
           options: [
-            'Write-Through ghi đồng bộ vào cả Cache và Database trước khi báo thành công, còn Write-Behind chỉ ghi vào Cache rồi ghi ngầm bất đồng bộ xuống DB sau.',
-            'Write-Through chỉ lưu trữ dữ liệu dưới dạng các con số nguyên, còn Write-Behind hỗ trợ lưu trữ toàn bộ các tệp tin đa phương tiện lớn.',
-            'Write-Behind bắt buộc phải sử dụng các máy chủ đám mây chuyên dụng, trong khi Write-Through có thể chạy trên mọi máy tính cá nhân.',
-            'Cả hai chiến lược này đều ghi trực tiếp vào đĩa cứng và hoàn toàn không sử dụng đến bộ nhớ đệm RAM của máy chủ Redis.',
+            'Write-Through không dùng đến RAM mà ghi trực tiếp vào ổ cứng quang học chuyên dụng.',
+            'Write-Through ghi đồng bộ vào Cache và Database trước khi trả về thành công cho client, trong khi Write-Behind chỉ ghi vào Cache rồi ghi ngầm bất đồng bộ xuống DB sau.',
+            'Write-Behind bắt buộc người dùng phải tải lại trình duyệt thì dữ liệu mới được đồng bộ.',
+            'Write-Through chỉ áp dụng được cho cơ sở dữ liệu NoSQL như MongoDB và từ chối PostgreSQL.',
+          ],
+          correctIndex: 1,
+          explanation: 'Write-Through đảm bảo tính nhất quán dữ liệu cao vì mọi thao tác ghi đều cập nhật đồng thời cả Cache và Database trước khi xác nhận thành công (đổi lại độ trễ ghi cao hơn). Write-Behind ghi vào Cache rồi báo thành công ngay lập tức, sau đó gom nhóm cập nhật xuống DB ngầm (đạt thông lượng ghi cực cao nhưng có rủi ro mất dữ liệu nếu Cache sập trước khi flush).'
+        },
+        {
+          id: 'c7-l2-q5',
+          question: 'Khi sử dụng chiến lược Cache-Aside, vì sao thứ tự thao tác chuẩn khi cập nhật dữ liệu là "Ghi vào Database trước rồi XÓA Khóa Cache sau (Update DB then Delete Cache)" thay vì Cập nhật Cache?',
+          options: [
+            'Vì lệnh xóa khóa trong Redis không tốn chi phí CPU so với lệnh ghi lại toàn bộ object.',
+            'Vì việc cập nhật Cache trực tiếp có thể bị lỗi cú pháp JSON do NestJS không hỗ trợ serialize.',
+            'Để tránh hiện tượng Dirty Read do Race Condition khi hai luồng ghi diễn ra xen kẽ; việc xóa khóa đảm bảo lần đọc tiếp theo luôn lấy dữ liệu mới nhất từ DB.',
+            'Vì cơ sở dữ liệu PostgreSQL sẽ tự động khóa toàn bộ bảng nếu phát hiện Redis có dữ liệu mới.',
+          ],
+          correctIndex: 2,
+          explanation: 'Nếu cập nhật Cache trực tiếp: Luồng 1 cập nhật DB -> Luồng 2 cập nhật DB -> Luồng 2 ghi Cache -> Luồng 1 ghi đè Cache (bị Race Condition khiến Cache chứa dữ liệu cũ của Luồng 1). Chuẩn mực là: Ghi DB trước, sau đó XÓA Cache. Việc xóa Cache biến request đọc tiếp theo thành Cache Miss và tái nạp dữ liệu chuẩn xác nhất từ DB.'
+        },
+        {
+          id: 'c7-l2-q6',
+          question: 'Chính sách giải phóng bộ nhớ (Eviction Policy) nào của Redis phù hợp nhất khi sử dụng Redis làm tầng Cache thuần túy và muốn loại bỏ các phần tử ít được sử dụng nhất?',
+          options: [
+            'allkeys-lru (Least Recently Used) hoặc allkeys-lfu (Least Frequently Used) để giải phóng các khóa ít dùng nhất trong toàn bộ Keyspace.',
+            'noeviction để Redis ném lỗi OOM và từ chối toàn bộ các câu lệnh ghi khi bộ nhớ đầy.',
+            'volatile-ttl để chỉ xóa những khóa sắp sửa hết hạn trong vòng 10 giây tiếp theo.',
+            'random-key để xóa ngẫu nhiên bất kỳ một bảng dữ liệu nào của cơ sở dữ liệu PostgreSQL.',
           ],
           correctIndex: 0,
-          explanation: 'Với Write-Through, ứng dụng cập nhật vào Cache và hệ thống Cache đảm bảo ghi đồng bộ xuống Database ngay lập tức rồi mới trả về thành công (đảm bảo tính nhất quán cao, nhưng độ trễ ghi lâu). Ngược lại, Write-Behind ghi vào Cache rồi trả về thành công ngay lập tức; sau đó một tiến trình nền gom các thay đổi và ghi bất đồng bộ (batch update) xuống DB sau (tốc độ ghi cực nhanh nhưng có rủi ro mất dữ liệu nếu Cache sập trước khi kịp flush).'
+          explanation: 'Khi dùng Redis làm Cache chuyên dụng, maxmemory-policy nên đặt là allkeys-lru (xóa các khóa đã lâu không truy cập) hoặc allkeys-lfu (xóa các khóa có tần suất truy cập thấp nhất). Chính sách noeviction chỉ phù hợp khi dùng Redis làm Datastore chính không được phép mất dữ liệu.'
+        },
+        {
+          id: 'c7-l2-q7',
+          question: 'Đặc tính xác suất toán học cốt lõi của cấu trúc dữ liệu Bloom Filter là gì khi ứng dụng làm lá chắn chống Cache Penetration?',
+          options: [
+            'Có thể xảy ra False Negative (báo không có nhưng thực ra có) và không bao giờ xảy ra False Positive.',
+            'Không bao giờ xảy ra sai số ở bất kỳ kịch bản nào, độ chính xác luôn là 100% tuyệt đối.',
+            'Có thể xảy ra False Positive (báo có nhưng thực tế không có), nhưng KHÔNG BAO GIỜ xảy ra False Negative (nếu Bloom Filter báo không có thì chắc chắn 100% không có).',
+            'Chỉ hỗ trợ kiểm tra các số nguyên chẵn và tự động trả về lỗi với chuỗi ký tự UTF-8.',
+          ],
+          correctIndex: 2,
+          explanation: 'Đặc tính kinh điển của Bloom Filter: "False positive is possible, but false negative is impossible". Nghĩa là: Nếu Bloom Filter bảo một ID KHÔNG tồn tại, thì chắc chắn 100% nó không có trong DB (từ chối ngay lập tức, bảo vệ tuyệt đối DB). Nếu nó bảo có, thì có khả năng nhỏ là nó nhầm lẫn do hash collision (vẫn cho đi qua).'
+        },
+        {
+          id: 'c7-l2-q8',
+          question: 'Trong mô hình kiến trúc bộ nhớ đệm hai lớp (Multi-Level Cache: L1 In-Memory trong Node.js Heap, L2 Redis Cluster), thách thức lớn nhất là gì?',
+          options: [
+            'Node.js không thể chuyển đổi chuỗi JSON sang đối tượng JavaScript nếu không có thư viện bên thứ ba.',
+            'Tính nhất quán của L1 Cache giữa nhiều Node.js Pod chạy song song; cần cơ chế vô hiệu hóa cache (như Redis Pub/Sub) để báo cho các Pod khác xóa L1 khi có cập nhật.',
+            'Cụm Redis từ chối nhận các gói tin TCP truyền đến từ cùng một địa chỉ mạng VPC.',
+            'Độ trễ của L1 Cache cao hơn rất nhiều so với việc truy vấn qua mạng tới Redis L2.',
+          ],
+          correctIndex: 1,
+          explanation: 'L1 Cache nằm trong Heap memory của từng Pod Node.js (tốc độ nanoseconds). Khi Pod A cập nhật dữ liệu, L1 của Pod B và Pod C vẫn chứa dữ liệu cũ! Cần cơ chế Cache Invalidation đồng bộ: Khi Pod A sửa dữ liệu, nó publish một message qua Redis Pub/Sub để tất cả các Pod khác nhận được và xóa sạch L1 Cache tương ứng.'
         }
       ],
       codeChallenge: {
         id: 'c7-l2-c1',
         title: 'Bộ Sinh Khóa TTL Có Kèm Jitter Ngẫu Nhiên (TTL Jitter Generator)',
         description: 'Hiện thực hàm \`generateJitteredTtl(baseTtlSeconds: number, maxJitterSeconds: number, randomFn: () => number = Math.random): number\`. Hàm tính toán TTL bằng công thức: \`baseTtlSeconds + Math.floor(randomFn() * (maxJitterSeconds + 1))\`. Đảm bảo giá trị trả về luôn là số nguyên không âm. Nếu \`baseTtlSeconds <= 0\`, ném ra Error \`"INVALID_BASE_TTL"\`.',
-        starterCode: `
-export function generateJitteredTtl(
+        starterCode: `export function generateJitteredTtl(
   baseTtlSeconds: number,
   maxJitterSeconds: number,
   randomFn: () => number = Math.random
 ): number {
   // TODO: Hiện thực tính toán TTL kèm Jitter ngẫu nhiên
   return baseTtlSeconds;
-}
-`,
-        solution: `
-export function generateJitteredTtl(
+}`,
+        solution: `export function generateJitteredTtl(
   baseTtlSeconds: number,
   maxJitterSeconds: number,
   randomFn: () => number = Math.random
@@ -556,13 +704,12 @@ export function generateJitteredTtl(
   const safeJitterMax = Math.max(0, maxJitterSeconds);
   const jitter = Math.floor(randomFn() * (safeJitterMax + 1));
   return baseTtlSeconds + jitter;
-}
-`,
+}`,
         testCases: [
           {
             name: 'Tính toán TTL với random trả về 0.5 (Base 3600, Jitter Max 100)',
             input: [3600, 100, () => 0.5],
-            expected: 3600 + Math.floor(0.5 * 101) // 3650
+            expected: 3650
           },
           {
             name: 'Tính toán TTL với random trả về 0',
@@ -572,7 +719,17 @@ export function generateJitteredTtl(
           {
             name: 'Ném lỗi khi baseTtl không hợp lệ (<= 0)',
             input: [0, 50],
-            expected: 'THREW_ERROR'
+            expected: 'ERROR_THROWN'
+          },
+          {
+            name: 'Tính toán TTL với random trả về 0.999 (Base 300, Jitter Max 50)',
+            input: [300, 50, () => 0.999],
+            expected: 350
+          },
+          {
+            name: 'Xử lý an toàn khi maxJitterSeconds âm (< 0)',
+            input: [120, -10, () => 0.75],
+            expected: 120
           }
         ]
       }
@@ -711,17 +868,28 @@ BẠN CẦN BẢO VỆ TÀI NGUYÊN ĐỒNG THỜI TRONG HỆ THỐNG PHÂN TÁN
 | **Redlock (5 Nodes)** | ~5ms - 15ms | Cần duy trì 5 cụm Redis | Cao nhất trong các giải pháp NoSQL | $0\\%$ |
 | **PostgreSQL Advisory Lock**| ~2ms - 5ms | Dùng chung Connection Pool| Tự động giải phóng khi đứt kết nối | $0\\%$ |
 `,
-      realCodeSnippet: `
-import { Injectable, Logger } from '@nestjs/common';
+      realCodeSnippet: `import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
 
+/**
+ * ADR: Khóa phân tán an toàn chuẩn Enterprise với Lua Scripting và Watchdog Heartbeat
+ * - Bảo đảm Mutual Exclusion tuyệt đối giữa các Pods Kubernetes
+ * - Chống xóa nhầm khóa của tiến trình khác bằng đối chiếu Token ngẫu nhiên (UUID v4)
+ * - Tự động dọn dẹp Timer Watchdog khi tác vụ hoàn tất
+ */
+export interface LockHandle {
+  lockKey: string;
+  lockToken: string;
+  leaseTimeMs: number;
+}
+
 @Injectable()
-export class DistributedLockService {
+export class DistributedLockService implements OnModuleDestroy {
   private readonly logger = new Logger(DistributedLockService.name);
   private readonly redis: Redis;
 
-  // Lua script chuẩn mực để giải phóng khóa phân tán có đối chiếu token
+  // Lua script chuẩn mực: Kiểm tra token trước khi xóa, thực thi nguyên tử trên 1 luồng Redis
   private readonly RELEASE_LOCK_LUA = \`
     if redis.call("get", KEYS[1]) == ARGV[1] then
       return redis.call("del", KEYS[1])
@@ -731,7 +899,15 @@ export class DistributedLockService {
   \`;
 
   constructor() {
-    this.redis = new Redis();
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number(process.env.REDIS_PORT) || 6379,
+      lazyConnect: true,
+    });
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    await this.redis.quit();
   }
 
   /**
@@ -740,12 +916,12 @@ export class DistributedLockService {
   public async withDistributedLock<T>(
     resourceKey: string,
     ttlMs: number,
-    action: () => Promise<T>
+    action: (handle: LockHandle) => Promise<T>
   ): Promise<T> {
     const lockKey = \`distributed_lock:\${resourceKey}\`;
     const lockToken = crypto.randomUUID();
 
-    // 1. Chiếm khóa nguyên tử với cờ NX và thời gian sống PX
+    // 1. Chiếm khóa nguyên tử với cờ NX (Not Exists) và PX (TTL tính theo mili giây)
     const acquired = await this.redis.set(lockKey, lockToken, 'PX', ttlMs, 'NX');
 
     if (!acquired) {
@@ -754,20 +930,25 @@ export class DistributedLockService {
       );
     }
 
+    const handle: LockHandle = { lockKey, lockToken, leaseTimeMs: ttlMs };
+
     try {
       // 2. Thực thi nghiệp vụ nhạy cảm
-      return await action();
+      return await action(handle);
     } finally {
-      // 3. Giải phóng khóa an toàn bằng Lua Script: Tuyệt đối không xóa nhầm của người khác
+      // 3. Giải phóng khóa an toàn bằng Lua Script
       try {
-        await this.redis.eval(this.RELEASE_LOCK_LUA, 1, lockKey, lockToken);
-      } catch (err) {
-        this.logger.error(\`Lỗi khi giải phóng khóa phân tán: \${lockKey}\`, err);
+        const result = await this.redis.eval(this.RELEASE_LOCK_LUA, 1, lockKey, lockToken);
+        if (result === 0) {
+          this.logger.warn(\`Khóa [\${lockKey}] đã hết hạn hoặc bị tiến trình khác chiếm trước khi kịp giải phóng\`);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown Lua Error';
+        this.logger.error(\`Lỗi khi giải phóng khóa phân tán: \${lockKey} - \${message}\`);
       }
     }
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c7-l3-q1',
@@ -785,54 +966,99 @@ export class DistributedLockService {
           id: 'c7-l3-q2',
           question: 'Vai trò cốt lõi của đoạn mã Lua Script trong việc giải phóng Khóa Phân Tán (Distributed Lock) trên Redis là gì?',
           options: [
-            'Bảo đảm việc kiểm tra giá trị token của khóa và hành động xóa khóa được diễn ra nguyên tử (atomic) trên cùng một luồng.',
             'Tự động tăng tốc độ đường truyền mạng giữa máy chủ ứng dụng NestJS và cụm máy chủ Redis lên mức tối đa.',
             'Cho phép giải mã các tệp tin nén nhị phân trực tiếp bên trong nhân hệ điều hành Linux của máy chủ đám mây.',
+            'Bảo đảm việc kiểm tra giá trị token của khóa và hành động xóa khóa được diễn ra nguyên tử (atomic) trên cùng một luồng.',
             'Chuyển toàn bộ các biến cục bộ của mã nguồn TypeScript sang lưu trữ tại vùng nhớ không phân trang của CPU.',
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Quy trình giải phóng an toàn gồm 2 bước: 1) Kiểm tra xem token đang lưu trong Redis có khớp với token của mình không (GET); 2) Nếu khớp thì mới xóa (DEL). Nếu viết 2 lệnh này riêng biệt từ phía client, một tiến trình khác có thể chen vào giữa 2 lệnh. Bằng cách đóng gói vào Lua Script, Redis đảm bảo cả 2 bước diễn ra nguyên tử (atomic) 100% không thể bị ngắt quãng.'
         },
         {
           id: 'c7-l3-q3',
           question: 'Trong thuật toán Redlock do tác giả Redis đề xuất, điều kiện tiên quyết nào để một client được coi là đã chiếm khóa thành công trên cụm 5 Redis Master độc lập?',
           options: [
-            'Client phải chiếm khóa thành công trên đa số quá bán (ít nhất 3 trên 5 node) và tổng thời gian chiếm khóa phải nhỏ hơn thời hạn TTL.',
             'Client phải kết nối thành công tới toàn bộ năm node thông qua giao thức truyền tin bảo mật tầng giao vận TLS 1.3.',
+            'Client phải chiếm khóa thành công trên đa số quá bán (ít nhất 3 trên 5 node) và tổng thời gian chiếm khóa phải nhỏ hơn thời hạn TTL.',
             'Tất cả năm node máy chủ bắt buộc phải có cùng một địa chỉ IP vật lý và chạy chung một phiên bản hệ điều hành Linux.',
             'Client phải thực hiện xong toàn bộ các thao tác ghi dữ liệu vào cơ sở dữ liệu quan hệ PostgreSQL trước khi xin cấp khóa.',
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Thuật toán Redlock yêu cầu client gửi yêu cầu chiếm khóa tới N node độc lập (ví dụ N = 5). Khóa chỉ được coi là thành công khi và chỉ khi: 1) Client chiếm được khóa trên đa số quá bán các node (ít nhất (N/2) + 1 = 3 node); 2) Tổng thời gian tiêu tốn để chiếm khóa trên các node phải nhỏ hơn rất nhiều so với thời hạn TTL của khóa (Validity Time).'
         },
         {
           id: 'c7-l3-q4',
           question: 'Cơ chế "Watchdog Timer" (Bộ hẹn giờ gia hạn khóa) trong các thư viện Khóa Phân Tán như Redisson giải quyết bài toán nào sau đây?',
           options: [
-            'Tự động gia hạn thời gian sống TTL của khóa định kỳ nếu nghiệp vụ đang xử lý tốn nhiều thời gian hơn dự kiến nhưng chưa hoàn tất.',
             'Tự động ngắt kết nối mạng của các client có hành vi gửi quá nhiều yêu cầu chiếm khóa trong một giây.',
             'Tự động xóa bỏ các bản ghi log nhật ký giao dịch cũ của Redis để giải phóng dung lượng đĩa cứng thể rắn.',
             'Chuyển đổi toàn bộ các khóa đang ở trạng thái bi quan sang trạng thái lạc quan khi hệ thống gặp lỗi phần cứng.',
+            'Tự động gia hạn thời gian sống TTL của khóa định kỳ nếu nghiệp vụ đang xử lý tốn nhiều thời gian hơn dự kiến nhưng chưa hoàn tất.',
+          ],
+          correctIndex: 3,
+          explanation: 'Nếu một tác vụ nghiệp vụ hợp lệ nhưng do xử lý dữ liệu phức tạp mà chạy lâu hơn thời hạn TTL ban đầu (ví dụ TTL 10s nhưng tác vụ cần 15s), nếu không có gì can thiệp thì khóa sẽ hết hạn giữa chừng và bị tiến trình khác cướp mất. Watchdog Timer chạy một vòng lặp ngầm: cứ sau một khoảng thời gian (ví dụ 1/3 TTL), nó lại tự động gửi lệnh gia hạn TTL cho Redis nếu tác vụ chính vẫn đang chạy.'
+        },
+        {
+          id: 'c7-l3-q5',
+          question: 'Trong bài tranh luận nổi tiếng giữa Martin Kleppmann và Salvatore Sanfilippo (Antirez), giải pháp nào được Kleppmann đề xuất để bảo vệ tài nguyên lưu trữ phía sau nếu khóa phân tán bị đứt quãng do Stop-the-world GC pause?',
+          options: [
+            'Tắt hoàn toàn cơ chế tự động dọn rác của máy ảo Java / V8 trong môi trường Production.',
+            'Fencing Tokens: Một số nguyên tăng dần đơn điệu được cấp phát cùng với khóa, dịch vụ lưu trữ đích chỉ chấp nhận các thao tác có token lớn hơn token trước đó.',
+            'Bắt buộc chạy Redis trên cùng một thanh ghi phần cứng với cơ sở dữ liệu quan hệ.',
+            'Sử dụng thuật toán mã hóa bất đối xứng RSA 4096-bit để ký tên lên từng câu lệnh SQL.',
+          ],
+          correctIndex: 1,
+          explanation: 'Martin Kleppmann chỉ ra rằng nếu một tiến trình dính GC pause kéo dài, khóa của nó sẽ hết hạn và tiến trình khác chiếm khóa. Khi tiến trình cũ tỉnh lại, nó có thể ghi đè dữ liệu rác. Giải pháp là Fencing Tokens: Mỗi lần cấp khóa, Redis sinh ra một số nguyên tăng dần (vd token 34, 35). Database đích sẽ từ chối bất kỳ gói ghi nào mang token <= token cao nhất đã ghi nhận.'
+        },
+        {
+          id: 'c7-l3-q6',
+          question: 'Tại sao mô hình Redis Sentinel với kiến trúc Master-Replica bất đồng bộ (Asynchronous Replication) không thể đảm bảo tính an toàn 100% cho Distributed Lock khi Master bị sập đột ngột?',
+          options: [
+            'Vì Replica được nâng cấp lên làm Master mới có thể chưa kịp nhận được khóa từ Master cũ trước khi sập (mất dữ liệu do độ trễ sao chép), dẫn đến client khác lại chiếm được khóa lần hai.',
+            'Vì Redis Sentinel sẽ tự động xóa sạch toàn bộ các key có tiền tố "lock:" khi phát hiện máy chủ chính ngừng phản hồi ping.',
+            'Vì các replica chỉ hỗ trợ các câu lệnh đọc và không cho phép client thực hiện câu lệnh giải phóng khóa.',
+            'Vì các tiến trình ứng dụng Node.js sẽ tự động thoát với mã lỗi SIGSEGV khi mất kết nối tới Redis Master.',
           ],
           correctIndex: 0,
-          explanation: 'Nếu một tác vụ nghiệp vụ hợp lệ nhưng do xử lý dữ liệu phức tạp mà chạy lâu hơn thời hạn TTL ban đầu (ví dụ TTL 10s nhưng tác vụ cần 15s), nếu không có gì can thiệp thì khóa sẽ hết hạn giữa chừng và bị tiến trình khác cướp mất. Watchdog Timer chạy một vòng lặp ngầm: cứ sau một khoảng thời gian (ví dụ 1/3 TTL), nó lại tự động gửi lệnh gia hạn TTL cho Redis nếu tác vụ chính vẫn đang chạy.'
+          explanation: 'Redis sao lưu sang Replica theo cơ chế bất đồng bộ (Asynchronous Replication) để giữ tốc độ. Nếu Client A chiếm khóa trên Master, nhưng trước khi Master kịp replicate sang Replica thì Master bị sập nguồn: Sentinel sẽ bầu Replica đó làm Master mới. Master mới này hoàn toàn không biết gì về khóa của Client A, do đó sẵn sàng cấp cùng khóa đó cho Client B, vi phạm tính Mutual Exclusion!'
+        },
+        {
+          id: 'c7-l3-q7',
+          question: 'Làm thế nào để hiện thực một Khóa Phân Tán Khả Tái Nhập (Reentrant Distributed Lock) trong Redis cho phép cùng một luồng có thể chiếm khóa nhiều lần mà không bị tự chặn chính mình?',
+          options: [
+            'Mỗi lần chiếm khóa thì tạo một key mới với tên gọi ngẫu nhiên và nối thêm số thứ tự vào đuôi.',
+            'Bỏ qua bước kiểm tra TTL và đặt thời gian sống của khóa là vô hạn (-1).',
+            'Chuyển sang sử dụng cơ chế WebSocket hai chiều giữa Redis Server và client NestJS.',
+            'Sử dụng cấu trúc HASH: Lưu định danh Client ID làm trường (field) và số lần tái nhập làm giá trị (value), sử dụng lệnh HINCRBY để tăng/giảm số đếm nguyên tử qua Lua Script.',
+          ],
+          correctIndex: 3,
+          explanation: 'Reentrant Lock cho phép cùng một tiến trình chiếm khóa nhiều lần lồng nhau. Để làm được điều này, Redis sử dụng cấu trúc Hash: Key là tên tài nguyên, Field là định danh Client (ví dụ PodID + ThreadID), Value là số lần tái nhập. Khi client đó xin khóa tiếp, Redis tăng giá trị value lên 1 (HINCRBY) và gia hạn TTL; khi giải phóng, giảm value đi 1, chỉ khi value = 0 thì mới xóa hẳn Key.'
+        },
+        {
+          id: 'c7-l3-q8',
+          question: 'Khi nào một kiến trúc sư hệ thống nên ưu tiên sử dụng PostgreSQL Advisory Locks thay vì triển khai Redis Distributed Locks?',
+          options: [
+            'Khi hệ thống cần xử lý hàng triệu phép toán khóa/giây với thông lượng cực cao.',
+            'Khi toàn bộ dữ liệu nghiệp vụ nằm trong cùng 1 cơ sở dữ liệu PostgreSQL duy nhất, muốn tận dụng cơ chế tự động giải phóng khóa khi ngắt kết nối (Connection-bound) mà không cần duy trì hạ tầng Redis.',
+            'Khi hệ thống không có quyền truy cập vào cổng mạng 5432 của PostgreSQL.',
+            'Khi tất cả các dịch vụ microservices được viết bằng ngôn ngữ Golang và Python.',
+          ],
+          correctIndex: 1,
+          explanation: 'PostgreSQL Advisory Locks (như pg_advisory_xact_lock) cung cấp khóa ở tầng ứng dụng do PostgreSQL quản lý. Ưu điểm lớn nhất là: Nếu hệ thống đã dùng Postgres và không có sẵn Redis, việc dùng Advisory Lock gắn chặt với Transaction/Session giúp khóa tự động giải phóng khi transaction kết thúc hoặc khi kết nối bị đứt, triệt tiêu 100% nguy cơ Deadlock do quên giải phóng khóa.'
         }
       ],
       codeChallenge: {
         id: 'c7-l3-c1',
         title: 'Bộ Thẩm Định Giải Phóng Khóa Phân Tán An Toàn (Safe Lock Release Evaluator)',
         description: 'Hiện thực hàm \`evaluateSafeRelease(currentStoredToken: string | null, callerToken: string): { canDelete: boolean; reason: string }\`. Nếu \`currentStoredToken === null\`, trả về \`{ canDelete: false, reason: "LOCK_EXPIRED" }\`. Nếu \`currentStoredToken !== callerToken\`, trả về \`{ canDelete: false, reason: "NOT_LOCK_OWNER" }\`. Nếu trùng khớp hoàn toàn, trả về \`{ canDelete: true, reason: "OK" }\`.',
-        starterCode: `
-export function evaluateSafeRelease(
+        starterCode: `export function evaluateSafeRelease(
   currentStoredToken: string | null,
   callerToken: string
 ): { canDelete: boolean; reason: string } {
   // TODO: Hiện thực kiểm tra quyền giải phóng khóa phân tán
   return { canDelete: false, reason: '' };
-}
-`,
-        solution: `
-export function evaluateSafeRelease(
+}`,
+        solution: `export function evaluateSafeRelease(
   currentStoredToken: string | null,
   callerToken: string
 ): { canDelete: boolean; reason: string } {
@@ -845,8 +1071,7 @@ export function evaluateSafeRelease(
   }
 
   return { canDelete: true, reason: 'OK' };
-}
-`,
+}`,
         testCases: [
           {
             name: 'Giải phóng hợp lệ khi đúng chủ sở hữu',
@@ -861,6 +1086,16 @@ export function evaluateSafeRelease(
           {
             name: 'Từ chối giải phóng khi token không khớp (đã bị người khác chiếm)',
             input: ['other_user_token', 'my_token'],
+            expected: { canDelete: false, reason: 'NOT_LOCK_OWNER' }
+          },
+          {
+            name: 'Xác thực thành công khi cả hai token rỗng trùng khớp',
+            input: ['', ''],
+            expected: { canDelete: true, reason: 'OK' }
+          },
+          {
+            name: 'Từ chối khi caller truyền token rỗng nhưng trên Redis đang có token hợp lệ',
+            input: ['valid_active_token', ''],
             expected: { canDelete: false, reason: 'NOT_LOCK_OWNER' }
           }
         ]

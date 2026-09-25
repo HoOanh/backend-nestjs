@@ -177,146 +177,177 @@ CẦN HOÃN THỰC THI MỘT CALLBACK TRONG BACKEND?
 | **setImmediate** | Tại pha Check sau khi kết thúc Poll | Thấp (Libuv Check Queue) | Chạy chậm hơn 1 nhịp so với Microtask | Phân mảnh tác vụ CPU-bound lớn thành nhiều chunks |
 | **setTimeout(fn, 0)** | Tại pha Timers vòng lặp kế tiếp | Trung bình (Min-Heap traversal) | Độ trễ thực tế bị kẹp tối thiểu 1ms, không ổn định | Tác vụ hẹn giờ thực sự cần delay, retry exponential |
 `,
-      realCodeSnippet: `
+      realCodeSnippet: `// File: src/modules/platform/queues/non-blocking-chunk.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - High-Throughput CPU Chunking Service
 import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs';
 
+export interface ChunkProgress {
+  processedChunks: number;
+  totalItems: number;
+  durationMs: number;
+}
+
+/**
+ * Service xử lý hàng triệu phần tử trong NestJS mà không làm chặn V8 Main Thread:
+ * - Sử dụng setImmediate để trả quyền điều phối lại cho Libuv Event Loop giữa các chunk.
+ * - Cho phép các kết nối HTTP mạng (Poll Phase) và Timers tiếp tục được xử lý mượt mà.
+ */
 @Injectable()
-export class EventLoopDiagnosticsService {
-  private readonly logger = new Logger(EventLoopDiagnosticsService.name);
+export class NonBlockingChunkService {
+  private readonly logger = new Logger(NonBlockingChunkService.name);
 
-  /**
-   * Minh họa sự khác biệt thứ tự thực thi giữa Microtasks và Macrotasks
-   */
-  public demonstrateExecutionOrder(): string[] {
-    const executionTrace: string[] = [];
-
-    executionTrace.push('1. Synchronous Code (Call Stack)');
-
-    setTimeout(() => {
-      executionTrace.push('6. MacroTask: setTimeout (Timers Phase)');
-    }, 0);
-
-    setImmediate(() => {
-      executionTrace.push('5. MacroTask: setImmediate (Check Phase)');
-    });
-
-    Promise.resolve().then(() => {
-      executionTrace.push('4. MicroTask: Promise.then (Microtask Queue)');
-    });
-
-    process.nextTick(() => {
-      executionTrace.push('2. High Priority MicroTask: process.nextTick');
-      
-      process.nextTick(() => {
-        executionTrace.push('3. Nested nextTick (Drained before Promise)');
-      });
-    });
-
-    return executionTrace;
-  }
-
-  /**
-   * Kỹ thuật phân tách một mảng lớn thành các chunks nhỏ dùng setImmediate
-   * để không làm block Event Loop của NestJS
-   */
-  public processLargeArrayNonBlocking<T>(
+  public async processBatchNonBlocking<T>(
     items: T[],
     chunkSize: number,
-    processor: (chunk: T[]) => void
-  ): Promise<void> {
-    return new Promise((resolve) => {
-      let currentIndex = 0;
+    processor: (chunk: T[]) => void | Promise<void>,
+  ): Promise<ChunkProgress> {
+    if (!Array.isArray(items) || items.length === 0 || chunkSize <= 0) {
+      throw new Error('INVALID_CHUNK_PARAMETERS');
+    }
 
-      const processNextChunk = () => {
-        const chunk = items.slice(currentIndex, currentIndex + chunkSize);
-        currentIndex += chunkSize;
+    const start = Date.now();
+    let currentIndex = 0;
+    let processedChunks = 0;
 
-        if (chunk.length > 0) {
-          processor(chunk);
-          // Nhường lại quyền kiểm soát cho Event Loop xử lý I/O rồi mới chạy tiếp chunk sau
-          setImmediate(processNextChunk);
-        } else {
-          resolve();
-        }
-      };
+    while (currentIndex < items.length) {
+      const chunk = items.slice(currentIndex, currentIndex + chunkSize);
+      currentIndex += chunkSize;
+      processedChunks++;
 
-      processNextChunk();
-    });
+      // Xử lý chunk hiện tại
+      await processor(chunk);
+
+      // Nếu vẫn còn dữ liệu, nhường quyền kiểm soát cho Event Loop (Check Phase)
+      if (currentIndex < items.length) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+    }
+
+    const durationMs = Date.now() - start;
+    this.logger.debug(\`Đã hoàn thành \${processedChunks} chunks (\${items.length} items) trong \${durationMs}ms\`);
+
+    return { processedChunks, totalItems: items.length, durationMs };
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c2-l1-q1',
           question: 'Hiện tượng Event Loop Starvation xảy ra khi nào và để lại hậu quả gì nghiêm trọng nhất cho máy chủ backend Node.js/NestJS?',
           options: [
-            'Khi microtask queue liên tục được bơm tác vụ mới khiến Event Loop không thể chuyển sang pha I/O làm toàn bộ HTTP request bị treo.',
-            'Khi heap memory vượt quá hạn mức tối đa của V8 khiến garbage collector kích hoạt chế độ dừng toàn hệ thống để thu gom bộ nhớ.',
-            'Khi libuv threadpool sử dụng hết toàn bộ bốn luồng mặc định khiến các truy vấn cơ sở dữ liệu đọc file bị từ chối kết nối tức thì.',
-            'Khi số lượng kết nối đồng thời vượt quá ngưỡng mười nghìn khiến hệ điều hành từ chối tạo file descriptor mới cho socket mạng.'
+            'Khi V8 Heap vượt quá ngưỡng max-old-space-size, buộc bộ thu gom rác phải kích hoạt chu kỳ Full Mark-Sweep-Compact dừng toàn bộ thế giới (Stop-The-World) kéo dài.',
+            'Khi Microtask Queue (process.nextTickQueue hoặc Promise microtasks) liên tục sinh thêm tác vụ đệ quy mới mà không cạn, khiến Event Loop bị giam cầm vĩnh viễn giữa hai pha và không bao giờ tiến vào pha Poll I/O để nhận kết nối HTTP mới.',
+            'Khi Libuv Threadpool bị chiếm dụng toàn bộ bởi các tác vụ mã hóa crypto, khiến kernel từ chối tiếp nhận thêm các gói tin TCP SYN trên cổng socket.',
+            'Khi số lượng kết nối đồng thời vượt quá giới hạn file descriptor (ulimit -n), khiến hệ điều hành tự động khóa luồng chính của tiến trình Node.js ở chế độ Read-Only.'
           ],
-          correctIndex: 0,
+          correctIndex: 1,
           explanation: 'Event Loop Starvation xảy ra khi microtask queue (đặc biệt là process.nextTick đệ quy liên tục) không bao giờ cạn rỗng. Do quy tắc xả cạn kiệt (drain completely) microtask trước khi chuyển pha, Event Loop bị kẹt cứng tại chỗ, không thể tiến vào pha Poll để tiếp nhận kết nối HTTP hay pha Timers, làm máy chủ hoàn toàn tê liệt.'
         },
         {
           id: 'c2-l1-q2',
-          question: 'Khi đặt lệnh setTimeout(fn, 0) và setImmediate(fn) bên trong một callback của fs.readFile, thứ tự thực thi chắc chắn sẽ là gì?',
+          question: 'Khi đặt lệnh setTimeout(fn, 0) và setImmediate(fn) bên trong một callback I/O (ví dụ: fs.readFile), thứ tự thực thi chắc chắn sẽ là gì và tại sao?',
           options: [
-            'setImmediate luôn chạy trước setTimeout vì callback đọc file nằm ở pha Poll và pha tiếp theo của vòng lặp là pha Check.',
-            'setTimeout luôn chạy trước setImmediate vì các hàm hẹn giờ có mức độ ưu tiên tuyệt đối cao hơn trong cấu trúc min-heap.',
-            'Thứ tự hoàn toàn ngẫu nhiên phụ thuộc vào việc hệ điều hành trả về kết quả đọc file nhanh hay chậm tại thời điểm đó.',
-            'Cả hai callback được gom nhóm và thực thi song song trên hai luồng khác nhau của thư viện libuv worker threadpool.'
+            'Thứ tự thực thi là không xác định (non-deterministic), phụ thuộc hoàn toàn vào độ trễ phân bổ xung nhịp CPU của hệ điều hành tại thời điểm đọc xong file.',
+            'setTimeout luôn chạy trước vì các bộ hẹn giờ có độ ưu tiên cao nhất trong cấu trúc Min-Heap của pha Timers.',
+            'setImmediate luôn chạy trước setTimeout 100%, vì callback đọc file được xử lý tại pha Poll; ngay sau khi rời pha Poll theo chiều kim đồng hồ, Event Loop lập tức tiến vào pha Check (nơi xử lý setImmediate) trước khi quay lại pha Timers ở vòng tick tiếp theo.',
+            'Cả hai callback được nạp đồng thời vào hai luồng Worker Thread khác nhau của Libuv Threadpool nên hàm nào tính toán xong trước sẽ in trước.'
           ],
-          correctIndex: 0,
+          correctIndex: 2,
           explanation: 'Khi fs.readFile hoàn thành, callback của nó được thực thi tại pha Poll. Khi rời khỏi pha Poll theo chiều kim đồng hồ của Event Loop, pha kế tiếp ngay lập tức là pha Check (nơi xử lý setImmediate). Ngược lại, callback của setTimeout(fn, 0) nằm ở pha Timers, bắt buộc phải đợi Event Loop đi hết một vòng lặp trọn vẹn mới được gọi tới.'
         },
         {
           id: 'c2-l1-q3',
-          question: 'Điểm khác biệt cốt lõi về thứ tự ưu tiên giữa process.nextTick() và Promise.resolve().then() trong Node.js là gì?',
+          question: 'Điểm khác biệt cốt lõi về cơ chế điều phối giữa process.nextTick() và Promise.resolve().then() trong runtime của Node.js là gì?',
           options: [
-            'process.nextTick quản lý hàng đợi riêng và được xả sạch trước khi V8 engine xử lý hàng đợi Promise microtask queue.',
-            'Promise.then được đưa vào hàng đợi vi mô của trình duyệt trong khi nextTick được chuyển trực tiếp xuống kernel hệ điều hành.',
-            'Cả hai cơ chế sử dụng chung một hàng đợi FIFO duy nhất và tác vụ nào được đăng ký trước theo mã nguồn sẽ chạy trước.',
-            'Promise.then có độ ưu tiên cao hơn vì tuân thủ chuẩn ECMAScript toàn cầu trong khi nextTick chỉ là hàm nội bộ thử nghiệm.'
+            'Node.js duy trì hai hàng đợi microtask tách biệt: process.nextTickQueue có độ ưu tiên tối thượng và luôn được xả sạch hoàn toàn trước khi V8 tiến hành xả các tác vụ trong Promise reaction microtask queue.',
+            'Promise.then được quản lý bởi V8 Microtask Queue, trong khi process.nextTick được đẩy xuống pha Timers của Libuv dưới dạng một macrotask trễ 0ms.',
+            'Cả hai sử dụng chung một hàng đợi FIFO duy nhất của V8 Engine; hàm nào được đăng ký trước trong mã nguồn JavaScript sẽ được thực thi trước.',
+            'Promise.then chạy trên luồng chính của V8, còn process.nextTick được gửi trực tiếp xuống hàng đợi ngắt (Interrupt Queue) của nhân hệ điều hành thông qua Libuv C++ bindings.'
           ],
           correctIndex: 0,
           explanation: 'Trong kiến trúc của Node.js, process.nextTickQueue có độ ưu tiên tuyệt đối cao hơn Promise reaction microtask queue. Khi Call Stack vừa trống, Node.js sẽ luôn xả sạch toàn bộ các callback trong nextTickQueue trước, sau đó mới tiến hành xả các Promise microtask.'
         },
         {
           id: 'c2-l1-q4',
-          question: 'Để xử lý một mảng dữ liệu cực lớn gồm hàng triệu phần tử trong NestJS mà không làm chặn (block) Event Loop, giải pháp chuẩn kỹ thuật là gì?',
+          question: 'Để xử lý một mảng dữ liệu cực lớn (hàng triệu bản ghi) bằng thuật toán CPU-bound trong NestJS mà không làm tê liệt khả năng tiếp nhận HTTP request của Event Loop, giải pháp kỹ thuật nào sau đây là chuẩn xác?',
           options: [
-            'Chia nhỏ mảng thành nhiều phần và dùng setImmediate để nhường lượt cho Event Loop xử lý I/O giữa các lần lặp.',
-            'Bọc toàn bộ vòng lặp xử lý dữ liệu bên trong một Promise hoặc hàm async/await để biến nó thành bất đồng bộ hoàn toàn.',
-            'Chuyển hàm xử lý sang setTimeout với khoảng trễ 0ms để đưa toàn bộ quá trình tính toán sang nhân đồ họa chuyên dụng.',
-            'Sử dụng vòng lặp for đồng bộ kết hợp với try/catch để đảm bảo nếu xảy ra nghẽn thì ngoại lệ sẽ tự động giải phóng stack.'
+            'Bọc toàn bộ vòng lặp tính toán bên trong một new Promise(resolve => ...) và gọi bằng await để tự động biến nó thành tác vụ bất đồng bộ phi chặn.',
+            'Sử dụng setTimeout(..., 0) bên trong mỗi bước lặp vì các trình duyệt và Node.js đều tự động chuyển callback của timer sang lõi CPU phụ rảnh rỗi.',
+            'Sử dụng vòng lặp for đồng bộ kết hợp với khối try/catch có lệnh yield để nhân hệ điều hành tự động giải phóng Call Stack khi phát hiện độ trễ vượt quá 10ms.',
+            'Chia nhỏ mảng dữ liệu thành từng phần (chunking) và sử dụng setImmediate() giữa các chunk, cho phép Event Loop nhường quyền cho các pha I/O (Poll, Timers) xử lý các request mới trước khi tiếp tục chu kỳ tính toán tiếp theo.'
+          ],
+          correctIndex: 3,
+          explanation: 'Bọc vòng lặp CPU-bound nặng trong Promise hay async/await không hề giải phóng luồng, vì mã tính toán đồng bộ vẫn chiếm giữ Call Stack duy nhất của V8. Kỹ thuật đúng là chia nhỏ thành từng chunk và sử dụng setImmediate() sau mỗi chunk, cho phép Event Loop xen kẽ xử lý các request HTTP ở pha Poll trước khi tiếp tục tính toán.'
+        },
+        {
+          id: 'c2-l1-q5',
+          question: 'Cấu trúc dữ liệu nào được Libuv sử dụng để quản lý các bộ hẹn giờ (setTimeout, setInterval) trong Pha Timers nhằm đạt hiệu năng truy xuất tối ưu?',
+          options: [
+            'Một mảng liên kết đơn (Linked List) được duyệt tuần tự từ đầu đến cuối mỗi khi có tín hiệu ngắt thời gian từ hệ điều hành.',
+            'Cây nhị phân Min-Heap sắp xếp theo thời điểm hết hạn (expiration time), cho phép lấy ra timer cần kích hoạt sớm nhất với độ phức tạp O(1).',
+            'Bảng băm phân tán (Distributed Hash Map) lưu trữ địa chỉ con trỏ của callback trên bộ nhớ ngoài Heap.',
+            'Hàng đợi vòng tròn (Ring Buffer) có kích thước cố định 1024 phần tử được cấp phát sẵn trong bộ nhớ Stack.'
+          ],
+          correctIndex: 1,
+          explanation: 'Libuv lưu trữ các timer trong cấu trúc dữ liệu Min-Heap. Điểm nút gốc của heap luôn là timer hết hạn sớm nhất. Mỗi lần kiểm tra pha Timers, Libuv chỉ cần so sánh thời gian hiện tại với nút gốc O(1), nếu chưa tới hạn thì toàn bộ heap chắc chắn chưa tới hạn, không tốn công duyệt qua toàn bộ danh sách.'
+        },
+        {
+          id: 'c2-l1-q6',
+          question: 'Quy tắc xả Microtask Queue trong Node.js từ phiên bản 11 trở đi có sự thay đổi mang tính bước ngoặt nào so với các phiên bản cũ?',
+          options: [
+            'Microtasks chỉ được xả một lần duy nhất tại điểm kết thúc của toàn bộ một vòng lặp Event Loop sau pha Close Callbacks.',
+            'Node.js gom nhóm tất cả các Microtasks và chuyển sang thực thi song song trên Libuv Threadpool.',
+            'Ngay sau khi mỗi callback đơn lẻ của bất kỳ pha nào trong Event Loop kết thúc, runtime sẽ lập tức xả sạch Microtask Queue trước khi tiếp tục callback tiếp theo, đồng bộ hoàn toàn với chuẩn Web Browser.',
+            'Microtasks bị giới hạn số lượng tối đa 10 tác vụ mỗi chu kỳ; các tác vụ vượt ngưỡng sẽ bị tự động hủy bỏ.'
+          ],
+          correctIndex: 2,
+          explanation: 'Trước Node 11, Node.js chỉ xả Microtasks sau khi toàn bộ một pha của Event Loop kết thúc. Kể từ Node 11, để đồng bộ với tiêu chuẩn của HTML5 và Web Browsers, Node.js xả Microtasks (nextTick rồi Promise) ngay giữa từng callback đơn lẻ của bất kỳ pha nào.'
+        },
+        {
+          id: 'c2-l1-q7',
+          question: 'Khi hàng đợi I/O của Pha Poll hoàn toàn trống và không có bất kỳ bộ hẹn giờ nào đang chờ, Libuv sẽ hành xử như thế nào nếu có tác vụ setImmediate() đang chờ trong Pha Check?',
+          options: [
+            'Libuv sẽ lập tức kết thúc pha Poll và chuyển ngay sang pha Check để thực thi các callback của setImmediate() mà không bị chặn luồng.',
+            'Libuv sẽ cưỡng chế đưa luồng chính vào trạng thái ngủ trong 1000ms để chờ có gói tin mạng mới gửi đến.',
+            'Libuv sẽ hủy bỏ toàn bộ các callback trong pha Check và quay trở lại pha Timers từ đầu.',
+            'Libuv sẽ chuyển các tác vụ setImmediate() sang hàng đợi của process.nextTick để thực thi khẩn cấp.'
           ],
           correctIndex: 0,
-          explanation: 'Bọc vòng lặp CPU-bound nặng trong Promise hay async/await không hề giải phóng luồng, vì mã tính toán đồng bộ vẫn chiếm giữ Call Stack duy nhất của V8. Kỹ thuật đúng là chia nhỏ thành từng chunk và sử dụng setImmediate() sau mỗi chunk, cho phép Event Loop xen kẽ xử lý các request HTTP ở pha Poll trước khi tiếp tục tính toán.'
+          explanation: 'Khi pha Poll rỗng, nếu Libuv phát hiện có script được lên lịch bởi setImmediate(), nó sẽ không ngủ chờ I/O mà sẽ lập tức chuyển sang pha Check để thực thi. Điều này giúp các tác vụ setImmediate() luôn được đảm bảo chạy liền kề sau pha Poll mà không bị delay.'
+        },
+        {
+          id: 'c2-l1-q8',
+          question: 'Tại sao việc lạm dụng queueMicrotask() hoặc chuỗi Promise dài trong các NestJS Interceptors có thể gây nguy cơ nghẽn I/O tương tự như process.nextTick()?',
+          options: [
+            'Vì queueMicrotask() tự động chuyển đổi tiến trình sang chế độ đa luồng làm cạn kiệt tài nguyên CPU.',
+            'Vì các microtask được ưu tiên xả sạch hoàn toàn trước khi Event Loop có thể tiến vào pha Poll, việc liên tục tạo thêm microtask mới sẽ ngăn chặn luồng chính tiếp nhận các gói tin mạng HTTP mới.',
+            'Vì queueMicrotask() ghi đè lên bộ nhớ Stack của hàm cha và làm mất hiệu lực của các biến trong Closure.',
+            'Vì NestJS Interceptors không hỗ trợ xử lý các tác vụ bất đồng bộ dựa trên chuẩn ECMAScript Promise.'
+          ],
+          correctIndex: 1,
+          explanation: 'Dù Promise microtasks có độ ưu tiên sau process.nextTick, nhưng chúng vẫn thuộc tầng Microtask tối cao được xả cạn kiệt (Drain) trước khi Event Loop được phép chuyển sang pha tiếp theo. Nếu một Interceptor hoặc Middleware liên tục sinh ra chuỗi Promise vô tận, Event Loop sẽ bị bỏ đói (Starvation) và không bao giờ đọc được I/O mạng mới.'
         }
       ],
       codeChallenge: {
         id: 'c2-l1-c1',
         title: 'Xây Dựng Queue Chunk Processor Chống Blocking Event Loop',
-        description: 'Hiện thực hàm \`chunkProcessor<T>(items: T[], chunkSize: number, onChunk: (chunk: T[]) => void): Promise<number>\` nhận vào một danh sách items, xử lý từng đợt (chunk) với kích thước chỉ định thông qua callback \`onChunk\`. Giữa các đợt xử lý, phải trả lại quyền kiểm soát cho Event Loop (dùng Promise với setTimeout/setImmediate) để không làm block luồng. Trả về tổng số chunk đã xử lý thành công.',
-        starterCode: `
-export async function chunkProcessor<T>(
+        description: 'Hiện thực hàm `chunkProcessor<T>(items: T[], chunkSize: number, onChunk: (chunk: T[]) => void): Promise<number>` nhận vào một danh sách items, xử lý từng đợt (chunk) với kích thước chỉ định thông qua callback `onChunk`. Giữa các đợt xử lý, phải trả lại quyền kiểm soát cho Event Loop (dùng Promise với setImmediate) để không làm block luồng. Trả về tổng số chunk đã xử lý thành công. Nếu items rỗng hoặc chunkSize <= 0, trả về 0. Nếu items không phải là mảng, ném Error("INVALID_INPUT_ARRAY").',
+        starterCode: `export async function chunkProcessor<T>(
   items: T[],
   chunkSize: number,
   onChunk: (chunk: T[]) => void
 ): Promise<number> {
   // TODO: Viết thuật toán chunking không chặn Event Loop
   return 0;
-}
-`,
-        solution: `
-export async function chunkProcessor<T>(
+}`,
+        solution: `export async function chunkProcessor<T>(
   items: T[],
   chunkSize: number,
   onChunk: (chunk: T[]) => void
 ): Promise<number> {
-  if (!items || items.length === 0 || chunkSize <= 0) {
+  if (items === null || items === undefined || !Array.isArray(items)) {
+    throw new Error('INVALID_INPUT_ARRAY');
+  }
+  if (items.length === 0 || typeof chunkSize !== 'number' || chunkSize <= 0) {
     return 0;
   }
 
@@ -330,29 +361,38 @@ export async function chunkProcessor<T>(
     currentIndex += chunkSize;
 
     if (currentIndex < items.length) {
-      // Nhường luồng cho Event Loop xử lý I/O
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      // Nhường luồng cho Event Loop xử lý I/O mạng
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
   }
 
   return chunkCount;
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Xử lý mảng rỗng hoặc chunkSize không hợp lệ',
+            name: 'Case 1 (Visible): Xử lý mảng rỗng hoặc chunkSize không hợp lệ',
             input: [[], 10, () => {}],
             expected: 0
           },
           {
-            name: 'Chia 10 phần tử với chunkSize 3 (phải ra 4 chunks: 3, 3, 3, 1)',
+            name: 'Case 2 (Visible): Chia 10 phần tử với chunkSize 3 (phải ra 4 chunks)',
             input: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3, () => {}],
             expected: 4
           },
           {
-            name: 'Chia 5 phần tử với chunkSize 5 (phải ra đúng 1 chunk duy nhất)',
+            name: 'Case 3 (Visible): Chia 5 phần tử với chunkSize 5 (phải ra đúng 1 chunk)',
             input: [['a', 'b', 'c', 'd', 'e'], 5, () => {}],
             expected: 1
+          },
+          {
+            name: 'Case 4 (Hidden): Input items null -> Ném lỗi INVALID_INPUT_ARRAY',
+            input: [null, 5, () => {}],
+            expected: 'ERROR_THROWN'
+          },
+          {
+            name: 'Case 5 (Hidden): chunkSize âm -> Trả về 0',
+            input: [[1, 2, 3], -5, () => {}],
+            expected: 0
           }
         ]
       }
@@ -512,163 +552,233 @@ TÁC VỤ CẦN THỰC THI TRONG BACKEND LÀ GÌ?
 | **Libuv Threadpool (Size 64-128)**| Cao hơn (~128MB-256MB RAM stack) | Xử lý được nhiều tác vụ fs/crypto | CPU Context Switching overhead nếu CPU ít core | Máy chủ xử lý chuyển đổi tệp tin, nén ảnh hàng loạt |
 | **Worker Threads (Chuyên dụng)** | Cao (~30MB-50MB mỗi Worker Isolate) | Tùy thuộc số lượng Core vật lý của CPU | Nếu spawn quá nhiều worker sẽ làm sập máy chủ do OOM | Tính toán thuật toán nặng, parse file bảng tính phức tạp |
 `,
-      realCodeSnippet: `
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+      realCodeSnippet: `// File: src/modules/security/crypto/crypto-threadpool-manager.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - Asynchronous Crypto Offloading & Threadpool Protection
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as crypto from 'crypto';
 
-@Injectable()
-export class KernelIoBenchmarkService implements OnModuleInit {
-  private readonly logger = new Logger(KernelIoBenchmarkService.name);
+export interface HashTaskResult {
+  derivedKey: string;
+  durationMs: number;
+  threadpoolSaturated: boolean;
+}
 
-  onModuleInit() {
-    this.logger.log(\`[System Info] Node.js Version: \${process.version}\`);
-    this.logger.log(\`[System Info] UV_THREADPOOL_SIZE mặc định: \${process.env.UV_THREADPOOL_SIZE || '4'}\`);
+/**
+ * ADR: Quản trị tác vụ CPU-bound mã hóa mật khẩu trên Libuv Threadpool:
+ * 1. pbkdf2 chạy bất đồng bộ trên C++ Worker Threadpool của Libuv (mặc định 4 threads).
+ * 2. Cần giới hạn số lượng tác vụ đồng thời để tránh làm tắc nghẽn (Threadpool Starvation)
+ *    khiến các tác vụ filesystem (fs) và DNS lookup (getaddrinfo) bị chậm trễ.
+ */
+@Injectable()
+export class CryptoThreadpoolManagerService implements OnModuleInit {
+  private readonly logger = new Logger(CryptoThreadpoolManagerService.name);
+  private activeCryptoTasks = 0;
+  private readonly maxConcurrentCryptoTasks = 4; // Bằng kích thước mặc định UV_THREADPOOL_SIZE
+
+  onModuleInit(): void {
+    const poolSize = process.env.UV_THREADPOOL_SIZE ?? '4 (default)';
+    this.logger.log(\`Khởi tạo CryptoThreadpoolManagerService. Libuv UV_THREADPOOL_SIZE: \${poolSize}\`);
   }
 
-  /**
-   * Benchmark thực nghiệm chứng minh sự cạnh tranh (contention) trên Libuv Threadpool.
-   * Chạy song song N tác vụ hash mật khẩu pbkdf2 để thấy rõ tác động của kích thước Pool.
-   */
-  public async benchmarkThreadpoolContention(taskCount: number = 8): Promise<{
-    taskCount: number;
-    totalDurationMs: number;
-    taskDurations: number[];
-  }> {
-    const startTime = Date.now();
-    const taskPromises: Promise<number>[] = [];
-
-    for (let i = 0; i < taskCount; i++) {
-      taskPromises.push(
-        new Promise<number>((resolve) => {
-          const taskStart = Date.now();
-          // pbkdf2 sử dụng Libuv Threadpool ngầm bên dưới
-          crypto.pbkdf2('myStrongPassword123!', 'fixedSaltSaltSalt', 100000, 64, 'sha512', () => {
-            const taskEnd = Date.now();
-            resolve(taskEnd - taskStart);
-          });
-        })
-      );
+  public async hashPasswordAsync(password: string, salt: string, iterations = 100000): Promise<HashTaskResult> {
+    if (!password || !salt) {
+      throw new Error('INVALID_CRYPTO_ARGUMENTS');
     }
 
-    const taskDurations = await Promise.all(taskPromises);
-    const totalDurationMs = Date.now() - startTime;
+    const start = Date.now();
+    const isSaturated = this.activeCryptoTasks >= this.maxConcurrentCryptoTasks;
+    if (isSaturated) {
+      this.logger.warn(\`Threadpool cảnh báo quá tải: \${this.activeCryptoTasks} tác vụ crypto đang chiếm dụng thread!\`);
+    }
 
-    return {
-      taskCount,
-      totalDurationMs,
-      taskDurations
-    };
+    this.activeCryptoTasks++;
+    try {
+      const derivedKey = await new Promise<string>((resolve, reject) => {
+        crypto.pbkdf2(password, salt, iterations, 64, 'sha512', (err, key) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(key.toString('hex'));
+        });
+      });
+
+      const durationMs = Date.now() - start;
+      return {
+        derivedKey,
+        durationMs,
+        threadpoolSaturated: isSaturated,
+      };
+    } finally {
+      this.activeCryptoTasks--;
+    }
   }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c2-l2-q1',
           question: 'Vì sao Linux epoll vượt trội hơn hẳn các system call cũ như select() hay poll() khi phục vụ hàng chục nghìn kết nối mạng đồng thời?',
           options: [
-            'Vì epoll duy trì danh sách sẵn sàng trong kernel giúp báo sự kiện với độ phức tạp O(1) thay vì duyệt mảng O(N).',
-            'Vì epoll tự động chuyển toàn bộ các socket mạng sang thực thi đa luồng trên card mạng chuyên dụng.',
-            'Vì epoll nén toàn bộ dữ liệu gói tin TCP trước khi chuyển lên không gian người dùng giúp tiết kiệm băng thông.',
-            'Vì epoll chỉ hỗ trợ duy nhất giao thức HTTP/2 và tự động loại bỏ các kết nối sử dụng phiên bản HTTP/1 cũ.'
+            'Vì epoll tự động nén toàn bộ các gói tin TCP ở tầng phần cứng Card mạng (NIC) trước khi nạp vào bộ nhớ RAM.',
+            'Vì epoll tạo ra một luồng hệ điều hành riêng biệt cho từng socket mở, giúp tận dụng tối đa số lượng CPU Core.',
+            'Vì epoll quản lý danh bạ File Descriptors bằng cây đỏ-đen (Red-Black Tree) trong Kernel và sử dụng Ready List để trả về danh sách các socket có sự kiện với độ phức tạp O(1), thay vì phải quét tuyến tính O(N) qua toàn bộ mảng socket như select/poll.',
+            'Vì epoll chỉ hỗ trợ giao thức HTTP/3 qua UDP và tự động loại bỏ các cơ chế bắt tay ba bước phức tạp của TCP.'
           ],
-          correctIndex: 0,
-          explanation: 'Với select() và poll(), mỗi lần muốn biết socket nào có dữ liệu, ứng dụng phải truyền toàn bộ danh sách socket xuống kernel để kernel quét tuyến tính O(N). Ngược lại, epoll sử dụng Ready List trong không gian kernel; khi gói tin đến, kernel đẩy socket vào Ready List và trả về ngay lập tức với độ phức tạp O(1) cho các socket có hoạt động.'
+          correctIndex: 2,
+          explanation: 'Với select và poll, mỗi lần kiểm tra xem socket nào có dữ liệu, ứng dụng phải gửi toàn bộ danh sách socket xuống kernel để duyệt tuyến tính O(N). Với epoll, kernel duy trì cây đỏ-đen và Ready List; khi socket có dữ liệu do card mạng kích hoạt ngắt, kernel chỉ đưa socket đó vào Ready List, giúp epoll_wait trả về danh sách các socket sẵn sàng trong thời gian O(1).'
         },
         {
           id: 'c2-l2-q2',
-          question: 'Những tác vụ nào sau đây trong Node.js thực sự sử dụng các luồng trong Libuv Threadpool chứ KHÔNG dùng cơ chế non-blocking socket của kernel?',
+          question: 'Những tác vụ nào sau đây trong Node.js thực sự được chuyển giao (offload) sang Libuv Worker Threadpool, thay vì dùng cơ chế Non-blocking I/O hướng sự kiện của Kernel?',
           options: [
-            'Các thao tác đọc ghi tệp tin fs, phân giải tên miền dns.lookup, hàm băm crypto và nén tệp tin zlib.',
-            'Các kết nối TCP socket, máy chủ HTTP tiếp nhận request và các kết nối cơ sở dữ liệu qua mạng.',
-            'Các hàm xử lý mảng JavaScript, thuật toán JSON.parse và các vòng lặp tính toán logic nghiệp vụ.',
-            'Các hàm điều phối luồng như process.nextTick, Promise.resolve và câu lệnh gán biến môi trường.'
+            'Kết nối TCP socket, máy chủ HTTP tiếp nhận request và kết nối WebSocket qua mạng.',
+            'Thao tác đọc/ghi tệp tin trên ổ đĩa (fs), phân giải DNS qua dns.lookup, hàm băm mật mã (crypto.pbkdf2, scrypt) và nén dữ liệu (zlib).',
+            'Phân tích cú pháp chuỗi JSON, thuật toán sắp xếp mảng và các vòng lặp tính toán logic nghiệp vụ JavaScript.',
+            'Các hàm điều phối luồng như process.nextTick, Promise microtasks và hàm gán biến môi trường process.env.'
           ],
-          correctIndex: 0,
-          explanation: 'Hệ điều hành không hỗ trợ API bất đồng bộ hoàn toàn cho tệp tin đĩa cứng (regular files) và việc phân giải DNS (getaddrinfo), do đó Libuv bắt buộc phải chuyển các tác vụ fs, dns.lookup, crypto và zlib sang thực thi trên Libuv Threadpool (mặc định 4 luồng).'
+          correctIndex: 1,
+          explanation: 'Nhân Linux không hỗ trợ cơ chế bất đồng bộ hoàn toàn cho tập tin đĩa (regular files) và DNS lookup (hàm getaddrinfo của hệ thống là blocking). Do đó, Libuv bắt buộc phải chuyển giao các tác vụ fs, dns.lookup, crypto và zlib sang Libuv Threadpool (mặc định 4 threads) để tránh làm nghẽn luồng chính V8. Ngược lại, TCP/HTTP network socket dùng epoll/kqueue hoàn toàn non-blocking ở tầng kernel.'
         },
         {
           id: 'c2-l2-q3',
-          question: 'Nếu đại ca gán process.env.UV_THREADPOOL_SIZE = 16 bên trong mã nguồn TypeScript của main.ts trong NestJS, kết quả sẽ ra sao?',
+          question: 'Nếu một kỹ sư viết dòng lệnh process.env.UV_THREADPOOL_SIZE = "16" bên trong tệp main.ts của ứng dụng NestJS, kết quả thực tế tại runtime sẽ như thế nào?',
           options: [
-            'Hoàn toàn không có tác dụng vì Libuv khởi tạo kích thước threadpool từ trước khi V8 engine chạy mã JavaScript.',
-            'Threadpool lập tức mở rộng lên mười sáu luồng và giải phóng ngay các tác vụ đọc ghi tệp tin đang xếp hàng.',
-            'Hệ thống sẽ ném ra lỗi Runtime Exception và dừng tiến trình do vi phạm quy tắc bảo mật của hệ điều hành.',
-            'Kích thước pool được tăng lên nhưng chỉ có tác dụng đối với các tác vụ mã hóa mật khẩu bằng crypto module.'
+            'Hoàn toàn không có tác dụng; Libuv Threadpool đã được khởi tạo kích thước cố định ở tầng C++ ngay khi tiến trình Node.js khởi động, trước khi V8 engine nạp và thực thi dòng code JavaScript đầu tiên.',
+            'Threadpool lập tức mở rộng lên 16 worker threads và xử lý song song ngay các tác vụ fs đang xếp hàng.',
+            'Node.js ném ra ngoại lệ UnhandledPromiseRejection và buộc tiến trình phải dừng lại do vi phạm quyền ghi biến môi trường hệ thống.',
+            'Kích thước threadpool được nâng lên 16 nhưng chỉ có tác dụng đối với các tác vụ mã hóa crypto, còn các tác vụ đọc ghi file vẫn giữ nguyên mức 4 threads.'
           ],
           correctIndex: 0,
-          explanation: 'Libuv khởi tạo Threadpool tại thời điểm tiến trình C++ Node.js vừa được kích hoạt, trước cả khi V8 Engine nạp và thông dịch dòng code JavaScript/TypeScript đầu tiên. Do đó, việc thay đổi biến process.env bên trong code JS là quá muộn và hoàn toàn không có hiệu lực. Biến này phải được truyền từ môi trường bên ngoài lúc chạy lệnh shell.'
+          explanation: 'Libuv khởi tạo Threadpool tại thời điểm bootstrap tiến trình C++ của Node.js, trước khi V8 Engine nạp và chạy mã JS. Do đó, việc thay đổi biến process.env trong mã nguồn là quá muộn và không có bất kỳ tác dụng nào. Biến này bắt buộc phải được truyền từ shell trước khi tiến trình khởi chạy (ví dụ: UV_THREADPOOL_SIZE=16 node dist/main.js).'
         },
         {
           id: 'c2-l2-q4',
-          question: 'Điều gì xảy ra khi hệ thống backend tiếp nhận 8 yêu cầu băm mật khẩu bằng crypto.pbkdf2() cùng lúc trong khi UV_THREADPOOL_SIZE đang để mặc định?',
+          question: 'Điều gì xảy ra khi hệ thống backend tiếp nhận 8 yêu cầu băm mật khẩu bằng crypto.pbkdf2() cùng lúc trong khi UV_THREADPOOL_SIZE đang giữ nguyên giá trị mặc định là 4?',
           options: [
-            'Bốn tác vụ đầu chiếm trọn bốn luồng của pool, bốn tác vụ sau phải xếp hàng đợi dẫn đến thời gian đáp ứng bị kéo dài.',
-            'Cả tám tác vụ cùng chạy song song trên tám luồng ảo do Node.js tự động chia sẻ thời gian xung nhịp CPU.',
-            'Bốn tác vụ đến sau lập tức bị từ chối với mã lỗi 503 Service Unavailable để bảo vệ an toàn cho máy chủ.',
-            'V8 engine sẽ tự động chuyển bốn tác vụ bị nghẽn sang thực thi đồng bộ ngay trên Main Thread duy nhất.'
+            '4 yêu cầu đến sau lập tức bị từ chối với mã phản hồi HTTP 503 Service Unavailable để tránh sập máy chủ.',
+            'V8 engine tự động chuyển 4 yêu cầu bị nghẽn sang thực thi đồng bộ ngay trên luồng chính Call Stack.',
+            'Cả 8 yêu cầu được chia sẻ thời gian xung nhịp CPU và hoàn thành gần như đồng thời sau cùng một khoảng thời gian.',
+            '4 yêu cầu đầu tiên chiếm dụng toàn bộ 4 worker threads của Libuv; 4 yêu cầu đến sau buộc phải nằm chờ trong hàng đợi threadpool, dẫn đến thời gian phản hồi của chúng bị kéo dài gấp đôi.'
+          ],
+          correctIndex: 3,
+          explanation: 'Vì mặc định UV_THREADPOOL_SIZE = 4, 4 tác vụ crypto.pbkdf2 đầu tiên sẽ chiếm giữ toàn bộ 4 worker threads. 4 tác vụ còn lại phải chờ trong hàng đợi Libuv cho đến khi có worker thread rảnh rỗi, dẫn đến tổng thời gian hoàn thành của đợt thứ hai bị nhân đôi (hiện tượng Threadpool Contention).'
+        },
+        {
+          id: 'c2-l2-q5',
+          question: 'Tại sao nhân hệ điều hành Linux truyền thống lại không hỗ trợ cơ chế Non-blocking I/O hoàn hảo cho tệp tin thông thường (Regular Files) như đối với Network Sockets?',
+          options: [
+            'Vì các tập tin trên đĩa cứng luôn được mã hóa ở cấp độ BIOS khiến nhân hệ điều hành không thể đọc trực tiếp.',
+            'Vì kiến trúc Linux coi tệp tin cục bộ luôn sẵn sàng thông qua bộ nhớ đệm trang (Page Cache); khi trang bộ nhớ chưa có dữ liệu (Cache Miss), lời gọi read/write buộc phải chặn (block) để chờ phần cứng đĩa nạp dữ liệu.',
+            'Vì tập tin trên đĩa không có File Descriptor (FD) mà chỉ được định danh bằng đường dẫn inode.',
+            'Vì hệ thống tệp tin Ext4 và XFS không hỗ trợ cấu trúc dữ liệu bảng băm cho các con trỏ tệp.'
+          ],
+          correctIndex: 1,
+          explanation: 'Trong thiết kế Unix/Linux, các tệp tin trên đĩa cứng luôn được ánh xạ qua Page Cache của kernel. Kernel luôn mặc định tệp tin có thể đọc được ngay từ RAM. Nếu xảy ra Page Cache Miss, kernel phải dừng luồng gọi hàm để nạp dữ liệu từ ổ cứng vật lý. Do đó, các cờ O_NONBLOCK không có tác dụng với regular files trên Linux truyền thống, buộc Libuv phải dùng Threadpool.'
+        },
+        {
+          id: 'c2-l2-q6',
+          question: 'Trong module DNS của Node.js, điểm khác biệt căn bản giữa dns.lookup() và dns.resolve() là gì?',
+          options: [
+            'dns.lookup() gọi hàm đồng bộ getaddrinfo() của hệ điều hành nên bị offload sang Libuv Threadpool (có nguy cơ nghẽn pool), trong khi dns.resolve() kết nối trực tiếp đến DNS server qua network socket bằng thư viện c-ares hoàn toàn non-blocking.',
+            'dns.lookup() sử dụng giao thức UDP, còn dns.resolve() bắt buộc phải sử dụng giao thức TCP có mã hóa TLS.',
+            'dns.lookup() chỉ phân giải được địa chỉ IPv6, còn dns.resolve() chỉ phân giải được địa chỉ IPv4.',
+            'dns.lookup() thực thi trực tiếp trên GPU, còn dns.resolve() chạy trên CPU Main Thread.'
           ],
           correctIndex: 0,
-          explanation: 'Vì mặc định UV_THREADPOOL_SIZE = 4, 4 tác vụ đầu tiên sẽ chiếm giữ toàn bộ 4 worker threads của Libuv. 4 tác vụ còn lại buộc phải nằm chờ trong hàng đợi của Libuv cho đến khi các luồng trước hoàn tất, khiến tổng thời gian xử lý của các tác vụ sau tăng vọt.'
+          explanation: 'dns.lookup sử dụng hàm getaddrinfo() của thư viện C hệ điều hành, tuân theo file cấu hình /etc/hosts và /etc/resolv.conf, nhưng vì getaddrinfo là blocking nên Libuv phải nạp nó vào Threadpool. Ngược lại, dns.resolve sử dụng thư viện c-ares, tự tạo kết nối mạng UDP/TCP trực tiếp tới DNS server, hoàn toàn non-blocking và không tốn thread trong Libuv Threadpool.'
+        },
+        {
+          id: 'c2-l2-q7',
+          question: 'Nếu triển khai một container backend chạy trên máy ảo chỉ có 2 vCPU, việc thiết lập UV_THREADPOOL_SIZE=128 có thể mang lại tác dụng ngược tiêu cực nào?',
+          options: [
+            'V8 Engine sẽ tự động tắt tính năng thu gom rác Garbage Collector để dành tài nguyên cho các luồng.',
+            'Không có tác dụng ngược nào; càng nhiều thread thì hiệu năng xử lý tác vụ đọc ghi tệp và crypto càng tăng tỷ lệ thuận.',
+            'Gây ra hiện tượng CPU Thrashing do chi phí chuyển đổi ngữ cảnh (Context Switching) giữa 128 luồng tranh chấp 2 lõi CPU vật lý quá lớn, làm giảm thông lượng tổng thể của hệ thống.',
+            'Hệ điều hành Linux sẽ tự động chuyển tiến trình sang chế độ đơn luồng để bảo vệ CPU.'
+          ],
+          correctIndex: 2,
+          explanation: 'Khi số lượng luồng vượt quá xa số lõi CPU vật lý (ví dụ: 128 threads trên 2 vCPU), hệ điều hành phải liên tục dừng một luồng và nạp trạng thái luồng khác (Context Switching Overhead). Chi phí lưu/khôi phục registers, làm mất hiệu lực CPU cache (Cache Invalidation) sẽ ngốn phần lớn chu kỳ CPU, khiến hiệu năng thực tế bị sụt giảm nghiêm trọng (CPU Thrashing).'
+        },
+        {
+          id: 'c2-l2-q8',
+          question: 'Ba hàm API cấp thấp của Linux epoll (epoll_create, epoll_ctl, epoll_wait) phối hợp với nhau như thế nào trong vòng đời xử lý I/O mạng của Libuv?',
+          options: [
+            'epoll_create mở một tệp tin tạm; epoll_ctl ghi dữ liệu vào tệp; epoll_wait đọc dữ liệu từ tệp ra ngoài.',
+            'epoll_create cấp phát mảng 1024 phần tử; epoll_ctl duyệt tuyến tính mảng; epoll_wait giải phóng bộ nhớ Stack.',
+            'epoll_create khởi tạo socket UDP; epoll_ctl thực hiện bắt tay TLS; epoll_wait đóng kết nối mạng.',
+            'epoll_create tạo một epoll instance trong kernel; epoll_ctl đăng ký/sửa/xóa các socket File Descriptor cần theo dõi trên cây Red-Black; epoll_wait đưa luồng chính vào trạng thái ngủ chờ cho đến khi có socket sẵn sàng trong Ready List.'
+          ],
+          correctIndex: 3,
+          explanation: 'epoll_create khởi tạo một đối tượng epoll trong không gian kernel. epoll_ctl thêm, chỉnh sửa hoặc xóa các File Descriptor cần theo dõi trong cây đỏ-đen. epoll_wait đưa luồng gọi vào trạng thái chờ (sleep) cho đến khi kernel ghi nhận có gói tin đến và đưa FD vào Ready List, lúc đó luồng được đánh thức ngay lập tức với chi phí O(1).'
         }
       ],
       codeChallenge: {
         id: 'c2-l2-c1',
-        title: 'Giả Lập Hệ Thống Giới Hạn Tác Vụ Đồng Thời (Concurrency Worker Pool)',
-        description: 'Hiện thực class \`ConcurrentTaskPool\` với phương thức \`runTask<T>(task: () => Promise<T>): Promise<T>\`. Constructor nhận vào tham số \`maxConcurrency: number\`. Class này phải đảm bảo tại một thời điểm chỉ có tối đa \`maxConcurrency\` tác vụ được thực thi song song; các tác vụ vượt ngưỡng phải được xếp vào hàng đợi FIFO và tự động chạy tiếp khi có tác vụ trước hoàn thành.',
-        starterCode: `
-export class ConcurrentTaskPool {
-  constructor(private readonly maxConcurrency: number) {}
-
-  public async runTask<T>(task: () => Promise<T>): Promise<T> {
-    // TODO: Hiện thực điều phối luồng tác vụ với giới hạn maxConcurrency
-    return task();
+        title: 'Giới Hạn Tác Vụ Bất Đồng Bộ Đồng Thời (Concurrency Task Pool)',
+        description: 'Hiện thực hàm \`limitConcurrency<T>(tasks: Array<() => Promise<T>>, maxConcurrency: number): Promise<T[]>\` nhận vào danh sách các hàm tác vụ bất đồng bộ \`tasks\` và số lượng tác vụ tối đa được chạy đồng thời \`maxConcurrency\`. Hàm phải điều phối để tại bất kỳ thời điểm nào không có quá \`maxConcurrency\` tác vụ đang được thực thi. Kết quả trả về là một mảng chứa kết quả của từng tác vụ theo đúng thứ tự ban đầu trong mảng \`tasks\`. Nếu \`tasks\` rỗng hoặc \`maxConcurrency <= 0\`, trả về mảng rỗng \`[]\`. Nếu \`tasks\` không phải là mảng, ném Error("INVALID_TASKS_ARRAY").',
+        starterCode: `export async function limitConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  maxConcurrency: number
+): Promise<T[]> {
+  // TODO: Điều phối thực thi tasks với ngưỡng maxConcurrency
+  return [];
+}`,
+        solution: `export async function limitConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  maxConcurrency: number
+): Promise<T[]> {
+  if (tasks === null || tasks === undefined || !Array.isArray(tasks)) {
+    throw new Error('INVALID_TASKS_ARRAY');
   }
-}
-`,
-        solution: `
-export class ConcurrentTaskPool {
-  private activeCount = 0;
-  private readonly queue: Array<() => void> = [];
-
-  constructor(private readonly maxConcurrency: number) {}
-
-  public runTask<T>(task: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const execute = async () => {
-        this.activeCount++;
-        try {
-          const result = await task();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        } finally {
-          this.activeCount--;
-          if (this.queue.length > 0) {
-            const next = this.queue.shift();
-            if (next) next();
-          }
-        }
-      };
-
-      if (this.activeCount < this.maxConcurrency) {
-        execute();
-      } else {
-        this.queue.push(execute);
-      }
-    });
+  if (tasks.length === 0 || typeof maxConcurrency !== 'number' || maxConcurrency <= 0) {
+    return [];
   }
-}
-`,
+
+  const results: T[] = new Array(tasks.length);
+  let currentIndex = 0;
+
+  const worker = async () => {
+    while (currentIndex < tasks.length) {
+      const taskIndex = currentIndex++;
+      results[taskIndex] = await tasks[taskIndex]();
+    }
+  };
+
+  const poolSize = Math.min(maxConcurrency, tasks.length);
+  const workers = Array.from({ length: poolSize }, () => worker());
+  await Promise.all(workers);
+
+  return results;
+}`,
         testCases: [
           {
-            name: 'Chạy tác vụ đơn lẻ thành công',
-            input: [async () => 'success'],
-            expected: 'success'
+            name: 'Case 1 (Visible): Chạy 3 tác vụ với maxConcurrency = 2',
+            input: [[() => Promise.resolve('A'), () => Promise.resolve('B'), () => Promise.resolve('C')], 2],
+            expected: ['A', 'B', 'C'],
+            hidden: false
           },
           {
-            name: 'Xử lý tuần tự khi maxConcurrency = 1',
-            input: [async () => 100 * 2],
-            expected: 200
+            name: 'Case 2 (Visible): Xử lý tuần tự khi maxConcurrency = 1',
+            input: [[() => Promise.resolve(10), () => Promise.resolve(20), () => Promise.resolve(30)], 1],
+            expected: [10, 20, 30],
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Danh sách tác vụ rỗng -> Trả về mảng rỗng',
+            input: [[], 4],
+            expected: [],
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): maxConcurrency <= 0 -> Trả về mảng rỗng',
+            input: [[() => Promise.resolve('skip')], -1],
+            expected: [],
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): tasks không hợp lệ (null) -> Ném lỗi INVALID_TASKS_ARRAY',
+            input: [null, 2],
+            expected: 'ERROR_THROWN',
+            hidden: true
           }
         ]
       }
@@ -831,152 +941,231 @@ HỆ THỐNG GẶP TÌNH TRẠNG EVENT LOOP LAG CAO (>50MS)?
 | **Child Process (Fork)** | ~50ms - 100ms (New OS Process) | OS Pipe IPC (JSON Serialize) | Ngốn nhiều RAM nhất trong 3 cơ chế | Chạy script Python, thực thi binary CLI riêng |
 | **External Queue Worker** | Phụ thuộc độ trễ mạng Redis | Message Broker Network Packets | Tăng độ phức tạp kiến trúc phân tán | Xử lý video, tác vụ chạy ngầm mất nhiều phút |
 `,
-      realCodeSnippet: `
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+      realCodeSnippet: `// File: src/modules/health/indicators/event-loop-health.indicator.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - Production Event Loop Lag Health Indicator
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { monitorEventLoopDelay, IntervalHistogram } from 'perf_hooks';
 
-@Injectable()
-export class EventLoopMonitorService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(EventLoopMonitorService.name);
-  private histogram!: IntervalHistogram;
-  private monitorInterval!: NodeJS.Timeout;
+export interface EventLoopHealthReport {
+  status: 'UP' | 'DOWN';
+  p50LagMs: number;
+  p90LagMs: number;
+  p99LagMs: number;
+  maxLagMs: number;
+  thresholdMs: number;
+}
 
-  onModuleInit() {
-    // Độ phân giải 20ms: Đo độ trễ vòng lặp liên tục ở cấp độ nano giây
+/**
+ * ADR: Giám sát Event Loop Lag theo thời gian thực để bảo vệ Pod Kubernetes:
+ * - Sử dụng monitorEventLoopDelay từ perf_hooks với độ phân giải nano giây.
+ * - Cung cấp chỉ số P99 Event Loop Delay cho Liveness/Readiness Probe.
+ * - Tự động kích hoạt Circuit Breaker khi P99 vượt ngưỡng an toàn (mặc định 50ms).
+ */
+@Injectable()
+export class EventLoopHealthIndicatorService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(EventLoopHealthIndicatorService.name);
+  private histogram: IntervalHistogram | null = null;
+  private readonly lagThresholdMs = 50;
+
+  onModuleInit(): void {
     this.histogram = monitorEventLoopDelay({ resolution: 20 });
     this.histogram.enable();
-
-    // Giám sát định kỳ mỗi 5 giây
-    this.monitorInterval = setInterval(() => {
-      this.checkHealth();
-    }, 5000);
+    this.logger.log('Khởi tạo EventLoopHealthIndicatorService: Bật perf_hooks event loop delay monitor.');
   }
 
-  onModuleDestroy() {
+  onModuleDestroy(): void {
     if (this.histogram) {
       this.histogram.disable();
-    }
-    if (this.monitorInterval) {
-      clearInterval(this.monitorInterval);
+      this.histogram = null;
     }
   }
 
-  public getMetrics() {
+  public checkHealth(): EventLoopHealthReport {
+    if (!this.histogram) {
+      throw new Error('HISTOGRAM_NOT_INITIALIZED');
+    }
+
+    const p50LagMs = Number((this.histogram.percentile(50) / 1e6).toFixed(2));
+    const p90LagMs = Number((this.histogram.percentile(90) / 1e6).toFixed(2));
+    const p99LagMs = Number((this.histogram.percentile(99) / 1e6).toFixed(2));
+    const maxLagMs = Number((this.histogram.max / 1e6).toFixed(2));
+
+    const isHealthy = p99LagMs <= this.lagThresholdMs;
+
+    if (!isHealthy) {
+      this.logger.warn(\`Event Loop Degraded! P99: \${p99LagMs}ms > Threshold: \${this.lagThresholdMs}ms\`);
+    }
+
+    // Reset histogram định kỳ sau mỗi chu kỳ kiểm tra probe để tránh tích lũy độ trễ cũ
+    this.histogram.reset();
+
     return {
-      p50LagMs: (this.histogram.percentile(50) / 1e6).toFixed(2),
-      p99LagMs: (this.histogram.percentile(99) / 1e6).toFixed(2),
-      maxLagMs: (this.histogram.max / 1e6).toFixed(2),
+      status: isHealthy ? 'UP' : 'DOWN',
+      p50LagMs,
+      p90LagMs,
+      p99LagMs,
+      maxLagMs,
+      thresholdMs: this.lagThresholdMs,
     };
   }
-
-  private checkHealth() {
-    const p99Ms = this.histogram.percentile(99) / 1e6;
-    const maxMs = this.histogram.max / 1e6;
-
-    if (p99Ms > 50) {
-      this.logger.warn(
-        \`[EVENT LOOP WARNING] P99 Lag vượt ngưỡng an toàn: \${p99Ms.toFixed(2)}ms (Max: \${maxMs.toFixed(2)}ms)\`
-      );
-    } else {
-      this.logger.debug(\`[EVENT LOOP HEALTHY] P99 Lag: \${p99Ms.toFixed(2)}ms\`);
-    }
-
-    // Reset histogram định kỳ để tránh dữ liệu cũ làm lệch metric
-    this.histogram.reset();
-  }
-}
-`,
+}`,
       quiz: [
         {
           id: 'c2-l3-q1',
-          question: 'Event Loop Lag đo lường điều gì và vì sao chỉ số này là sinh tử đối với độ khả dụng của một dịch vụ Node.js trong môi trường Kubernetes?',
+          question: 'Khi một tác vụ CPU-bound (như JSON.parse 100MB) chiếm giữ luồng chính trong 4 giây, vì sao dịch vụ Node.js trên Kubernetes thường bị rơi vào vòng lặp tử thần CrashLoopBackOff?',
           options: [
-            'Đo thời gian chênh lệch giữa lúc timer dự kiến chạy và lúc thực tế chạy; nếu lag quá cao Kubernetes sẽ coi Pod bị treo và khởi động lại.',
-            'Đo tổng dung lượng ram vật lý bị chiếm dụng bởi các file buffer; nếu lag cao hệ điều hành sẽ tự động ngắt kết nối mạng của tiến trình.',
-            'Đo tốc độ phản hồi trung bình của cơ sở dữ liệu postgresql; nếu lag cao thì nestjs sẽ tự động hủy bỏ các kết nối pool hiện hành.',
-            'Đo số lượng luồng đang ngủ bên trong thư viện c++ libuv; nếu lag cao thì hệ thống sẽ tự động chuyển sang mô hình đa luồng apache.'
+            'Vì Linux Kernel phát hiện CPU usage đạt 100% trong 4 giây và tự động gửi tín hiệu SIGKILL để bảo vệ phần cứng máy chủ.',
+            'Vì luồng chính bị đóng băng nên không thể tiếp nhận và phản hồi HTTP request kiểm tra sức khỏe của Kubernetes Liveness Probe (/healthz); Kubernetes coi Pod đã bị treo (Deadlock) và tiến hành tiêu diệt rồi khởi động lại container liên tục.',
+            'Vì Libuv Threadpool bị cạn kiệt bộ nhớ ảo swap, khiến toàn bộ tiến trình V8 bị tràn RAM và ném lỗi Out-Of-Memory.',
+            'Vì mạng nội bộ SDN của Kubernetes tự động ngắt kết nối TCP của các Pod có độ trễ phân giải DNS vượt quá 2000ms.'
           ],
-          correctIndex: 0,
-          explanation: 'Event Loop Lag là khoảng thời gian chậm trễ khi Event Loop hoàn thành một chu kỳ so với thời gian lý tưởng. Khi Main Thread bị nghẽn bởi phép toán CPU-bound, Lag sẽ tăng vọt, khiến endpoint Health Check (/health) không thể phản hồi đúng hạn, dẫn tới việc Kubernetes Liveness Probe báo thất bại và liên tục Restart Pod (CrashLoopBackOff).'
+          correctIndex: 1,
+          explanation: 'Kubelet định kỳ gửi HTTP request đến Liveness Probe endpoint để kiểm tra Pod có còn sống hay không. Khi luồng chính V8 bị chặn bởi tác vụ CPU-bound, request này không được xử lý trong thời gian timeout (thường là 1-3s), Kubelet kết luận container đã chết và kill Pod, gây ra tình trạng CrashLoopBackOff.'
         },
         {
           id: 'c2-l3-q2',
-          question: 'Khi cần chuyển một mảng dữ liệu nhị phân dung lượng cực lớn (khoảng 200MB) sang Worker Thread để xử lý, phương án nào tối ưu hiệu năng và bộ nhớ nhất?',
+          question: 'Khi cần chuyển giao một khối dữ liệu nhị phân lớn (200MB) giữa Main Thread và Worker Thread trong Node.js, giải pháp nào giúp tối ưu bộ nhớ và loại bỏ hoàn toàn độ trễ sao chép (zero-copy)?',
           options: [
-            'Sử dụng SharedArrayBuffer để chia sẻ trực tiếp vùng nhớ vật lý giữa hai luồng với chi phí tuần tự hóa bằng không.',
-            'Sử dụng JSON.stringify để mã hóa toàn bộ dữ liệu thành chuỗi text rồi truyền qua cổng IPC socket tiêu chuẩn.',
-            'Ghi mảng dữ liệu ra một tệp tin tạm trên ổ cứng ssd rồi yêu cầu worker thread đọc lại bằng fs.readFileSync.',
-            'Nhân bản dữ liệu bằng cơ chế structured clone mặc định của hàm postMessage để đảm bảo tính độc lập bộ nhớ tuyệt đối.'
+            'Sử dụng JSON.stringify trên Main Thread rồi truyền chuỗi qua cổng IPC socket tiêu chuẩn để Worker parse lại.',
+            'Lưu mảng dữ liệu vào biến toàn cục globalThis trên Main Thread để Worker Thread truy cập trực tiếp từ bộ nhớ dùng chung.',
+            'Ghi dữ liệu ra tệp tin tạm trên ổ cứng SSD NVMe và truyền đường dẫn tuyệt đối của file sang cho Worker đọc.',
+            'Sử dụng SharedArrayBuffer hoặc cơ chế Transfer List của postMessage để chuyển quyền sở hữu bộ nhớ nhị phân mà không cần nhân bản dữ liệu qua thuật toán Structured Clone.'
           ],
-          correctIndex: 0,
-          explanation: 'Mặc định postMessage sử dụng thuật toán Structured Clone, tức là phải copy toàn bộ 200MB dữ liệu sang vùng nhớ của Worker, tiêu tốn gấp đôi RAM và gây khựng luồng. Sử dụng SharedArrayBuffer cho phép cả 2 luồng cùng truy cập vào cùng một vùng nhớ vật lý (Zero-copy), mang lại hiệu năng cao nhất.'
+          correctIndex: 3,
+          explanation: 'Mặc định postMessage sử dụng thuật toán Structured Clone để nhân bản (deep copy) dữ liệu, gây tốn gấp đôi RAM và làm nghẽn luồng. Sử dụng Transfer List (với ArrayBuffer) hoặc SharedArrayBuffer cho phép truyền hoặc chia sẻ trực tiếp con trỏ vùng nhớ vật lý (Zero-copy), mang lại hiệu năng tối đa.'
         },
         {
           id: 'c2-l3-q3',
-          question: 'Vì sao trong một ứng dụng backend NestJS chịu tải cao, chúng ta KHÔNG nên liên tục gọi new Worker() cho từng HTTP request đơn lẻ?',
+          question: 'Tại sao trong một hệ thống backend NestJS chịu tải cao, việc khởi tạo new Worker() trực tiếp cho mỗi HTTP request là một phản mẫu kiến trúc (Anti-pattern) nguy hiểm?',
           options: [
-            'Vì mỗi lần khởi tạo Worker tốn chi phí CPU nạp một V8 Isolate mới và ngốn hàng chục MB RAM gây quá tải hệ thống.',
-            'Vì hệ điều hành giới hạn mỗi tiến trình Node.js chỉ được phép tạo duy nhất tối đa một worker thread trong suốt vòng đời.',
-            'Vì các worker thread được tạo ra sẽ tự động chia sẻ chung một call stack duy nhất khiến xảy ra tình trạng xung đột biến.',
-            'Vì giao thức HTTP trong NestJS không tương thích với mô hình đa luồng và sẽ tự động từ chối các request có sử dụng worker.'
+            'Vì Node.js giới hạn cứng mỗi tiến trình hệ điều hành chỉ được phép khởi tạo tối đa 8 Worker Threads trong suốt vòng đời.',
+            'Vì mỗi Worker Thread khởi tạo một V8 Isolate độc lập (tốn ~20-40MB RAM và 10-30ms CPU bootstrapping); việc tạo mới trên mỗi request sẽ nhanh chóng gây cạn kiệt bộ nhớ và tê liệt CPU do context switching.',
+            'Vì các Worker Threads khi khởi tạo sẽ cạnh tranh trực tiếp và ghi đè lên Call Stack duy nhất của Main Thread.',
+            'Vì giao thức HTTP trong NestJS chỉ hỗ trợ xử lý đơn luồng đồng bộ theo chuẩn ECMAScript.'
           ],
-          correctIndex: 0,
-          explanation: 'Mỗi Worker Thread tương đương với một môi trường thực thi V8 riêng biệt (V8 Isolate), cần khởi tạo Call Stack, Heap và Context riêng, tiêu tốn từ 20MB đến 40MB RAM và vài chục ms khởi động. Nếu tạo mới trên mỗi request, hệ thống sẽ nhanh chóng cạn kiệt RAM và sập vì CPU Thrashing. Giải pháp chuẩn là dùng Worker Thread Pool (như Piscina).'
+          correctIndex: 1,
+          explanation: 'Mỗi Worker Thread là một V8 Isolate hoàn chỉnh với Call Stack, Microtask Queue và V8 Heap riêng biệt. Chi phí khởi tạo một Isolate là rất đắt đỏ (~20-40MB RAM và hàng chục ms). Trong môi trường sản xuất tải cao, bắt buộc phải sử dụng Worker Pool (như thư viện Piscina) để tái sử dụng các worker có sẵn.'
         },
         {
           id: 'c2-l3-q4',
           question: 'Nếu phát hiện chỉ số P99 Event Loop Lag tăng cao bất thường do xử lý một tệp tin JSON cực lớn (50MB), giải pháp kiến trúc đúng đắn nhất là gì?',
           options: [
-            'Sử dụng kỹ thuật streaming parser để đọc và xử lý từng phần dữ liệu thay vì gọi JSON.parse đồng bộ một khối dữ liệu lớn.',
-            'Bọc lệnh JSON.parse trong một hàm async/await để tự động chuyển quá trình parse sang luồng phụ của hệ điều hành.',
-            'Tăng biến môi trường UV_THREADPOOL_SIZE lên gấp đôi để thư viện libuv tự động tối ưu hóa việc phân tích chuỗi dữ liệu.',
-            'Chuyển hàm JSON.parse vào bên trong một hàm callback của process.nextTick để đảm bảo quyền ưu tiên xử lý cao nhất.'
+            'Bọc lời gọi JSON.parse() trong một Promise và await nó ngay trong service để biến nó thành tác vụ bất đồng bộ.',
+            'Đẩy chuỗi JSON vào process.nextTick() để V8 engine cấp độ ưu tiên tính toán cao nhất cho tiến trình phân tích cú pháp.',
+            'Sử dụng Stream JSON Parser (như stream-json hoặc oboe) để phân tích cú pháp theo từng chunk nhỏ trực tiếp từ luồng request, hoặc chuyển chuỗi sang Worker Thread xử lý.',
+            'Tăng cấu hình UV_THREADPOOL_SIZE lên 64 để Libuv tự động phân chia chuỗi JSON sang các luồng C++ xử lý song song.'
+          ],
+          correctIndex: 2,
+          explanation: 'JSON.parse() là hàm C++ chạy hoàn toàn đồng bộ trên luồng chính V8, không phụ thuộc vào Libuv Threadpool. Cho dù bọc trong async/await hay nextTick, nó vẫn chiếm giữ luồng chính. Cách giải quyết chuẩn là stream-parsing (đọc đến đâu parse đến đó) hoặc offload sang Worker Thread độc lập.'
+        },
+        {
+          id: 'c2-l3-q5',
+          question: 'Điểm khác biệt cốt lõi về tài nguyên và cơ chế chia sẻ bộ nhớ giữa worker_threads và child_process.fork() trong Node.js là gì?',
+          options: [
+            'worker_threads chạy trong cùng tiến trình OS và có thể chia sẻ bộ nhớ zero-copy qua SharedArrayBuffer, trong khi child_process.fork tạo một tiến trình OS riêng biệt hoàn toàn với không gian địa chỉ bộ nhớ cô lập và giao tiếp qua IPC pipe.',
+            'child_process.fork chia sẻ chung Call Stack với tiến trình cha, còn worker_threads có Call Stack độc lập hoàn toàn.',
+            'worker_threads chỉ chạy được trên hệ điều hành Linux 64-bit, trong khi child_process.fork chỉ chạy được trên Windows và macOS.',
+            'child_process.fork có tốc độ khởi tạo nhanh gấp 10 lần worker_threads do không cần nạp lại V8 Engine.'
           ],
           correctIndex: 0,
-          explanation: 'JSON.parse() là hàm C++ chạy hoàn toàn đồng bộ trên V8 Main Thread. Cho dù bọc trong async/await hay nextTick, nó vẫn chiếm giữ luồng và làm tê liệt Event Loop suốt thời gian phân tích chuỗi 50MB. Giải pháp đúng đắn là sử dụng Stream JSON Parser (như stream-json, oboe) để phân tích từng phần nhỏ của dữ liệu mà không làm nghẽn luồng.'
+          explanation: 'child_process.fork sinh ra một OS process mới (tốn nhiều RAM, cô lập hoàn toàn địa chỉ bộ nhớ, IPC thông qua OS pipes với serialization). worker_threads tạo luồng bên trong cùng OS process, mỗi luồng có V8 Isolate riêng nhưng có khả năng chia sẻ trực tiếp bộ nhớ vật lý qua SharedArrayBuffer mà không cần serialize.'
+        },
+        {
+          id: 'c2-l3-q6',
+          question: 'Khi nhiều Worker Threads cùng đọc và ghi đồng thời vào một SharedArrayBuffer, cơ chế nào bắt buộc phải được sử dụng để tránh lỗi Race Condition và Data Corruption?',
+          options: [
+            'Sử dụng cú pháp async/await kết hợp vòng lặp while để kiểm tra cờ trạng thái boolean trên biến JavaScript thông thường.',
+            'Sử dụng thư viện RxJS Subject với cơ chế ReplayBuffer để phát lại các giá trị bị ghi đè.',
+            'Sử dụng các phép toán nguyên tử của đối tượng Atomics (như Atomics.add, Atomics.compareExchange, Atomics.wait/notify) được hỗ trợ trực tiếp từ CPU instruction level.',
+            'Bọc toàn bộ các thao tác ghi dữ liệu bên trong khối lệnh synchronized của TypeScript.'
+          ],
+          correctIndex: 2,
+          explanation: 'Khi dùng bộ nhớ chia sẻ SharedArrayBuffer giữa nhiều luồng, các phép toán số học thông thường không có tính nguyên tử (atomic), dẫn tới race conditions. Đối tượng Atomics cung cấp các phép toán nguyên tử (như Atomics.compareExchange, Atomics.wait, Atomics.notify) hoạt động trực tiếp ở cấp độ tập lệnh CPU để đảm bảo an toàn luồng.'
+        },
+        {
+          id: 'c2-l3-q7',
+          question: 'Hiện tượng "Bão Request" (Retry Storm) phát sinh như thế nào khi máy chủ NestJS gặp tình trạng Event Loop Lag kéo dài?',
+          options: [
+            'Khi Libuv Threadpool bị đầy, card mạng tự động phát sóng liên tục các gói tin TCP RST ra toàn bộ mạng LAN.',
+            'Khi cơ sở dữ liệu thấy kết nối bị idle quá lâu sẽ tự động nhân bản 100 truy vấn giống nhau để kiểm tra mạng.',
+            'Khi V8 garbage collector kích hoạt chế độ Compaction, nó sẽ gửi tín hiệu yêu cầu tất cả các client kết nối lại ngay lập tức.',
+            'Khi luồng chính bị nghẽn khiến API không kịp phản hồi, các client/microservices khác bị timeout và liên tục gửi lại các request cũ; lượng request dồn dập đổ vào một máy chủ đang nghẽn khiến hệ thống sụp đổ hoàn toàn.'
+          ],
+          correctIndex: 3,
+          explanation: 'Khi Event Loop bị nghẽn, thời gian phản hồi vượt quá client timeout (hoặc do người dùng sốt ruột bấm refresh liên tục). Cơ chế tự động thử lại (Retry) của các microservices gọi đến sẽ liên tục bơm thêm request mới vào hàng đợi Poll I/O, tạo ra hiệu ứng tuyết lở (Retry Storm) đánh sập máy chủ.'
+        },
+        {
+          id: 'c2-l3-q8',
+          question: 'Một kỹ sư cho rằng: "Vì JSON.stringify() là một hàm tích hợp sẵn của Node.js runtime, nên nó sẽ được Libuv tự động chuyển sang Threadpool để không làm chậm luồng chính". Nhận định này đúng hay sai và vì sao?',
+          options: [
+            'Hoàn toàn sai; JSON.stringify() là hàm của V8 JavaScript Engine chạy đồng bộ 100% trên Call Stack của Main Thread và không hề liên quan đến Libuv Threadpool.',
+            'Hoàn toàn đúng; mọi hàm thuộc tiêu chuẩn ECMAScript đều được Libuv tự động nhận diện và chuyển sang chạy nền trên 4 Worker Threads.',
+            'Sai một phần; JSON.stringify() chỉ chạy trên Threadpool khi chuỗi dữ liệu đầu ra có kích thước lớn hơn 1MB.',
+            'Đúng một phần; JSON.stringify() chạy trên Threadpool nếu được bọc trong hàm setImmediate().'
+          ],
+          correctIndex: 0,
+          explanation: 'JSON.stringify và JSON.parse là các phương thức nguyên bản của ECMAScript engine (V8), được thực thi đồng bộ ngay trên Call Stack của Main Thread. Libuv Threadpool chỉ dành riêng cho các tác vụ I/O đĩa (fs), DNS lookup (getaddrinfo), crypto và nén zlib.'
         }
       ],
       codeChallenge: {
         id: 'c2-l3-c1',
         title: 'Giám Sát Vòng Lặp & Ngắt Lời Gọi Khi Event Loop Quá Tải',
-        description: 'Hiện thực hàm \`executeWithLagGuard<T>(task: () => Promise<T>, currentLagMs: number, maxAllowedLagMs: number): Promise<T>\`. Hàm kiểm tra xem độ trễ Event Loop hiện tại (\`currentLagMs\`) có vượt quá ngưỡng cho phép (\`maxAllowedLagMs\`) hay không. Nếu vượt ngưỡng, lập tức từ chối với Error \`"SERVICE_OVERLOADED_LAG_TOO_HIGH"\` để kích hoạt Circuit Breaker, ngược lại thực thi \`task()\` và trả về kết quả.',
-        starterCode: `
-export async function executeWithLagGuard<T>(
+        description: 'Hiện thực hàm \`executeWithLagGuard<T>(task: () => Promise<T>, currentLagMs: number, maxAllowedLagMs: number): Promise<T>\`. Hàm kiểm tra xem độ trễ Event Loop hiện tại (\`currentLagMs\`) có vượt quá ngưỡng cho phép (\`maxAllowedLagMs\`) hay không. Nếu vượt ngưỡng, lập tức từ chối với Error \`"SERVICE_OVERLOADED_LAG_TOO_HIGH"\` để kích hoạt Circuit Breaker, ngược lại thực thi \`task()\` và trả về kết quả. Nếu \`task\` không phải là function, ném Error("INVALID_TASK_FUNCTION"). Nếu \`maxAllowedLagMs <= 0\` hoặc không phải là number, ném Error("INVALID_LAG_THRESHOLD").',
+        starterCode: `export async function executeWithLagGuard<T>(
   task: () => Promise<T>,
   currentLagMs: number,
   maxAllowedLagMs: number
 ): Promise<T> {
   // TODO: Kiểm tra ngưỡng Lag và bảo vệ hệ thống khỏi quá tải
   return task();
-}
-`,
-        solution: `
-export async function executeWithLagGuard<T>(
+}`,
+        solution: `export async function executeWithLagGuard<T>(
   task: () => Promise<T>,
   currentLagMs: number,
   maxAllowedLagMs: number
 ): Promise<T> {
+  if (typeof task !== 'function') {
+    throw new Error('INVALID_TASK_FUNCTION');
+  }
+  if (typeof maxAllowedLagMs !== 'number' || maxAllowedLagMs <= 0) {
+    throw new Error('INVALID_LAG_THRESHOLD');
+  }
   if (currentLagMs > maxAllowedLagMs) {
     throw new Error('SERVICE_OVERLOADED_LAG_TOO_HIGH');
   }
 
   return await task();
-}
-`,
+}`,
         testCases: [
           {
-            name: 'Thực thi bình thường khi Lag trong ngưỡng an toàn (20ms < 50ms)',
-            input: [async () => 'OK', 20, 50],
-            expected: 'OK'
+            name: 'Case 1 (Visible): Thực thi bình thường khi Lag trong ngưỡng an toàn (20ms < 50ms)',
+            input: [async () => 'SYSTEM_HEALTHY', 20, 50],
+            expected: 'SYSTEM_HEALTHY',
+            hidden: false
           },
           {
-            name: 'Từ chối tác vụ khi Lag vượt ngưỡng cho phép (80ms > 50ms)',
-            input: [
-              async () => 'FAIL',
-              80,
-              50
-            ],
-            expected: 'THREW_ERROR'
+            name: 'Case 2 (Visible): Lag chạm ngưỡng cho phép (50ms == 50ms) -> Vẫn cho phép chạy',
+            input: [async () => 'BORDERLINE_OK', 50, 50],
+            expected: 'BORDERLINE_OK',
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Từ chối tác vụ khi Lag vượt ngưỡng cho phép (80ms > 50ms)',
+            input: [async () => 'SHOULD_NOT_RUN', 80, 50],
+            expected: 'ERROR_THROWN',
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): task không hợp lệ (null) -> Ném lỗi INVALID_TASK_FUNCTION',
+            input: [null, 10, 50],
+            expected: 'ERROR_THROWN',
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): maxAllowedLagMs âm hoặc bằng 0 -> Ném lỗi INVALID_LAG_THRESHOLD',
+            input: [async () => 'OK', 10, -5],
+            expected: 'ERROR_THROWN',
+            hidden: true
           }
         ]
       }

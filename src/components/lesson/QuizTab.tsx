@@ -126,7 +126,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
               <span className="quiz-badge-count">{totalQuestions} câu hỏi chuyên sâu</span>
             </div>
             <p className="quiz-header-desc">
-              Bộ câu hỏi được thiết kế theo chuẩn phỏng vấn & thiết kế hệ thống Senior Backend. ĐÁP ÁN ĐÃ ĐƯỢC XÁO TRỘN NGẪU NHIÊN trên các vị trí A, B, C, D. ĐẠI CA hãy đọc kỹ câu hỏi và tư duy bản chất trước khi nộp bài.
+              Bộ câu hỏi được thiết kế theo chuẩn phỏng vấn & thiết kế hệ thống Senior Backend. ĐẠI CA hãy đọc kỹ câu hỏi và tư duy bản chất trước khi nộp bài.
             </p>
           </div>
 

@@ -324,65 +324,80 @@ export function renderLayeredStack(text: string, title?: string): string {
                   <path d="M 1340 515 C 1420 515, 1470 260, 1530 260" stroke="#8b5cf6" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
                   <!-- Main Category Card: Tier 04 (translate 1530, 260) -->
-                  <g class="branch-card-group mindmap-interactive-node" data-node-id="t4-root" transform="translate(1530, 260)" cursor="pointer">
+                  <g class="branch-card-group tier-card-trigger" data-tier-id="t4" transform="translate(1530, 260)" cursor="pointer">
                     <rect x="-55" y="-45" width="110" height="90" rx="16" class="node-card-bg card-border-purple" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">🏛️</text>
                     <text x="0" y="16" text-anchor="middle" class="card-svg-title">Tier 04: NestJS</text>
                     <text x="0" y="32" text-anchor="middle" class="card-svg-sub">Application & IoC</text>
-                    <!-- Toggle collapse badge -->
+                    <!-- Toggle collapse badge cấp 1 -->
                     <g class="tier-toggle-badge badge-purple" transform="translate(42, -34)">
                       <rect x="-12" y="-10" width="24" height="20" rx="6" fill="#8b5cf6" />
                       <text x="0" y="4" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff" class="toggle-text">−</text>
                     </g>
                   </g>
 
-                  <!-- Sub-branches container -->
+                  <!-- Sub-branches container (Cấp 2 & Cấp 3) -->
                   <g class="tier-sub-branches">
                     <!-- Stem connector -->
                     <path d="M 1585 260 L 1630 260" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
                     <circle cx="1630" cy="260" r="4.5" class="fork-joint-circle circle-purple" />
 
                     <!-- Sub-branch 4A: Controllers & Routers (Y=140) -->
-                    <path d="M 1630 260 C 1660 260, 1680 140, 1720 140" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="1720" cy="140" r="4" class="sub-joint-circle circle-purple" />
-                    <text x="1735" y="144" text-anchor="start" class="sub-cat-title mindmap-interactive-node" data-node-id="t4-controllers" cursor="pointer">Controllers & Routers</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 1910 140 L 1940 140" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="1940" cy="140" r="3.5" class="leaf-joint-circle circle-purple" />
-                    <path d="M 1940 140 C 1965 140, 1975 110, 2005 110" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2015" y="114" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t4-dto" cursor="pointer">DTO ValidationPipe (Class-validator & Whitelist)</text>
-
-                    <path d="M 1940 140 C 1965 140, 1975 170, 2005 170" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2015" y="174" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t4-routes" cursor="pointer">Route Context & Interceptors Pipeline (AOP)</text>
+                    <g class="sub-branch-group" data-sub-id="t4-controllers">
+                      <path d="M 1630 260 C 1660 260, 1680 140, 1720 140" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="1720" cy="140" r="4" class="sub-joint-circle circle-purple" />
+                      <text x="1735" y="144" text-anchor="start" class="sub-cat-title sub-title-trigger" cursor="pointer">Controllers & Routers</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(1930, 140)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#8b5cf6" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 1938 140 C 1965 140, 1975 110, 2005 110" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2015" y="114" text-anchor="start" class="leaf-svg-text" data-node-id="t4-dto" cursor="pointer">DTO ValidationPipe (Class-validator & Whitelist)</text>
+                        <path d="M 1938 140 C 1965 140, 1975 170, 2005 170" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2015" y="174" text-anchor="start" class="leaf-svg-text" data-node-id="t4-routes" cursor="pointer">Route Context & Interceptors Pipeline (AOP)</text>
+                      </g>
+                    </g>
 
                     <!-- Sub-branch 4B: Services & Domain Logic (Y=260) -->
-                    <path d="M 1630 260 L 1720 260" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="1720" cy="260" r="4" class="sub-joint-circle circle-purple" />
-                    <text x="1735" y="264" text-anchor="start" class="sub-cat-title mindmap-interactive-node" data-node-id="t4-services" cursor="pointer">Services & Domain Logic</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 1945 260 L 1975 260" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="1975" cy="260" r="3.5" class="leaf-joint-circle circle-purple" />
-                    <path d="M 1975 260 C 2000 260, 2010 230, 2040 230" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2050" y="234" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t4-ioc" cursor="pointer">IoC Container & Singleton Lifecycle</text>
-
-                    <path d="M 1975 260 C 2000 260, 2010 290, 2040 290" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2050" y="294" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t4-services" cursor="pointer">Stateless Pure Business Logic Services</text>
+                    <g class="sub-branch-group" data-sub-id="t4-services">
+                      <path d="M 1630 260 L 1720 260" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="1720" cy="260" r="4" class="sub-joint-circle circle-purple" />
+                      <text x="1735" y="264" text-anchor="start" class="sub-cat-title sub-title-trigger" cursor="pointer">Services & Domain Logic</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(1965, 260)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#8b5cf6" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 1973 260 C 2000 260, 2010 230, 2040 230" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2050" y="234" text-anchor="start" class="leaf-svg-text" data-node-id="t4-ioc" cursor="pointer">IoC Container & Singleton Lifecycle</text>
+                        <path d="M 1973 260 C 2000 260, 2010 290, 2040 290" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2050" y="294" text-anchor="start" class="leaf-svg-text" data-node-id="t4-services" cursor="pointer">Stateless Pure Business Logic Services</text>
+                      </g>
+                    </g>
 
                     <!-- Sub-branch 4C: Repositories & Caching (Y=380) -->
-                    <path d="M 1630 260 C 1660 260, 1680 380, 1720 380" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="1720" cy="380" r="4" class="sub-joint-circle circle-purple" />
-                    <text x="1735" y="384" text-anchor="start" class="sub-cat-title mindmap-interactive-node" data-node-id="t4-repos" cursor="pointer">Repositories & Caching</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 1930 380 L 1960 380" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="1960" cy="380" r="3.5" class="leaf-joint-circle circle-purple" />
-                    <path d="M 1960 380 C 1985 380, 1995 350, 2025 350" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2035" y="354" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t4-repos" cursor="pointer">TypeORM / Prisma Pool (PostgreSQL)</text>
-
-                    <path d="M 1960 380 C 1985 380, 1995 410, 2025 410" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2035" y="414" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t4-repos" cursor="pointer">Redis Distributed Multi-tier Cache</text>
+                    <g class="sub-branch-group" data-sub-id="t4-repos">
+                      <path d="M 1630 260 C 1660 260, 1680 380, 1720 380" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="1720" cy="380" r="4" class="sub-joint-circle circle-purple" />
+                      <text x="1735" y="384" text-anchor="start" class="sub-cat-title sub-title-trigger" cursor="pointer">Repositories & Caching</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(1950, 380)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#8b5cf6" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 1958 380 C 1985 380, 1995 350, 2025 350" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2035" y="354" text-anchor="start" class="leaf-svg-text" data-node-id="t4-repos" cursor="pointer">TypeORM / Prisma Pool (PostgreSQL)</text>
+                        <path d="M 1958 380 C 1985 380, 1995 410, 2025 410" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2035" y="414" text-anchor="start" class="leaf-svg-text" data-node-id="t4-repos" cursor="pointer">Redis Distributed Multi-tier Cache</text>
+                      </g>
+                    </g>
                   </g>
                 </g>
 
@@ -392,65 +407,80 @@ export function renderLayeredStack(text: string, title?: string): string {
                   <path d="M 1340 565 C 1420 565, 1470 820, 1530 820" stroke="#0284c7" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
                   <!-- Main Category Card: Tier 03 (translate 1530, 820) -->
-                  <g class="branch-card-group mindmap-interactive-node" data-node-id="t3-root" transform="translate(1530, 820)" cursor="pointer">
+                  <g class="branch-card-group tier-card-trigger" data-tier-id="t3" transform="translate(1530, 820)" cursor="pointer">
                     <rect x="-55" y="-45" width="110" height="90" rx="16" class="node-card-bg card-border-sky" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">🔄</text>
                     <text x="0" y="16" text-anchor="middle" class="card-svg-title">Tier 03: Runtime</text>
                     <text x="0" y="32" text-anchor="middle" class="card-svg-sub">Node.js & Libuv</text>
-                    <!-- Toggle collapse badge -->
+                    <!-- Toggle collapse badge cấp 1 -->
                     <g class="tier-toggle-badge badge-sky" transform="translate(42, -34)">
                       <rect x="-12" y="-10" width="24" height="20" rx="6" fill="#0284c7" />
                       <text x="0" y="4" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff" class="toggle-text">−</text>
                     </g>
                   </g>
 
-                  <!-- Sub-branches container -->
+                  <!-- Sub-branches container (Cấp 2 & Cấp 3) -->
                   <g class="tier-sub-branches">
                     <!-- Stem connector -->
                     <path d="M 1585 820 L 1630 820" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
                     <circle cx="1630" cy="820" r="4.5" class="fork-joint-circle circle-sky" />
 
                     <!-- Sub-branch 3A: Libuv Asynchronous Engine (Y=700) -->
-                    <path d="M 1630 820 C 1660 820, 1680 700, 1720 700" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="1720" cy="700" r="4" class="sub-joint-circle circle-sky" />
-                    <text x="1735" y="704" text-anchor="start" class="sub-cat-title mindmap-interactive-node" data-node-id="t3-libuv" cursor="pointer">Libuv Asynchronous Engine</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 1965 700 L 1995 700" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="1995" cy="700" r="3.5" class="leaf-joint-circle circle-sky" />
-                    <path d="M 1995 700 C 2020 700, 2030 670, 2060 670" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2070" y="674" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t3-loop" cursor="pointer">1 Main Thread Event Loop (Tuần hoàn 6 pha)</text>
-
-                    <path d="M 1995 700 C 2020 700, 2030 730, 2060 730" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2070" y="734" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t3-threads" cursor="pointer">4 Worker Threads (fs, crypto băm, dns)</text>
+                    <g class="sub-branch-group" data-sub-id="t3-libuv">
+                      <path d="M 1630 820 C 1660 820, 1680 700, 1720 700" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="1720" cy="700" r="4" class="sub-joint-circle circle-sky" />
+                      <text x="1735" y="704" text-anchor="start" class="sub-cat-title sub-title-trigger" cursor="pointer">Libuv Asynchronous Engine</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(1985, 700)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#0284c7" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 1993 700 C 2020 700, 2030 670, 2060 670" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2070" y="674" text-anchor="start" class="leaf-svg-text" data-node-id="t3-loop" cursor="pointer">1 Main Thread Event Loop (Tuần hoàn 6 pha)</text>
+                        <path d="M 1993 700 C 2020 700, 2030 730, 2060 730" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2070" y="734" text-anchor="start" class="leaf-svg-text" data-node-id="t3-threads" cursor="pointer">4 Worker Threads (fs, crypto băm, dns)</text>
+                      </g>
+                    </g>
 
                     <!-- Sub-branch 3B: V8 Memory Architecture (Y=820) -->
-                    <path d="M 1630 820 L 1720 820" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="1720" cy="820" r="4" class="sub-joint-circle circle-sky" />
-                    <text x="1735" y="824" text-anchor="start" class="sub-cat-title mindmap-interactive-node" data-node-id="t3-v8" cursor="pointer">V8 Memory Architecture</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 1945 820 L 1975 820" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="1975" cy="820" r="3.5" class="leaf-joint-circle circle-sky" />
-                    <path d="M 1975 820 C 2000 820, 2010 790, 2040 790" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2050" y="794" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t3-stack" cursor="pointer">V8 Stack Space: Call Frames (0% GC overhead)</text>
-
-                    <path d="M 1975 820 C 2000 820, 2010 850, 2040 850" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2050" y="854" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t3-heap" cursor="pointer">V8 Heap: Young Scavenge & Old Mark-Sweep</text>
+                    <g class="sub-branch-group" data-sub-id="t3-v8">
+                      <path d="M 1630 820 L 1720 820" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="1720" cy="820" r="4" class="sub-joint-circle circle-sky" />
+                      <text x="1735" y="824" text-anchor="start" class="sub-cat-title sub-title-trigger" cursor="pointer">V8 Memory Architecture</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(1965, 820)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#0284c7" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 1973 820 C 2000 820, 2010 790, 2040 790" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2050" y="794" text-anchor="start" class="leaf-svg-text" data-node-id="t3-stack" cursor="pointer">V8 Stack Space: Call Frames (0% GC overhead)</text>
+                        <path d="M 1973 820 C 2000 820, 2010 850, 2040 850" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2050" y="854" text-anchor="start" class="leaf-svg-text" data-node-id="t3-heap" cursor="pointer">V8 Heap: Young Scavenge & Old Mark-Sweep</text>
+                      </g>
+                    </g>
 
                     <!-- Sub-branch 3C: C++ Non-Heap & Buffers (Y=940) -->
-                    <path d="M 1630 820 C 1660 820, 1680 940, 1720 940" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="1720" cy="940" r="4" class="sub-joint-circle circle-sky" />
-                    <text x="1735" y="944" text-anchor="start" class="sub-cat-title mindmap-interactive-node" data-node-id="t3-buffers" cursor="pointer">C++ Non-Heap & Buffers</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 1935 940 L 1965 940" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="1965" cy="940" r="3.5" class="leaf-joint-circle circle-sky" />
-                    <path d="M 1965 940 C 1990 940, 2000 910, 2030 910" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2040" y="914" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t3-buffers" cursor="pointer">Node.js Buffers malloc() ngoài V8 Heap</text>
-
-                    <path d="M 1965 940 C 1990 940, 2000 970, 2030 970" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="2040" y="974" text-anchor="start" class="leaf-svg-text mindmap-interactive-node" data-node-id="t3-libuv" cursor="pointer">Libuv C-Bindings & Syscall POSIX Bridge</text>
+                    <g class="sub-branch-group" data-sub-id="t3-buffers">
+                      <path d="M 1630 820 C 1660 820, 1680 940, 1720 940" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="1720" cy="940" r="4" class="sub-joint-circle circle-sky" />
+                      <text x="1735" y="944" text-anchor="start" class="sub-cat-title sub-title-trigger" cursor="pointer">C++ Non-Heap & Buffers</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(1955, 940)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#0284c7" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 1963 940 C 1990 940, 2000 910, 2030 910" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2040" y="914" text-anchor="start" class="leaf-svg-text" data-node-id="t3-buffers" cursor="pointer">Node.js Buffers malloc() ngoài V8 Heap</text>
+                        <path d="M 1963 940 C 1990 940, 2000 970, 2030 970" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="2040" y="974" text-anchor="start" class="leaf-svg-text" data-node-id="t3-libuv" cursor="pointer">Libuv C-Bindings & Syscall POSIX Bridge</text>
+                      </g>
+                    </g>
                   </g>
                 </g>
 
@@ -460,51 +490,61 @@ export function renderLayeredStack(text: string, title?: string): string {
                   <path d="M 1060 565 C 980 565, 930 820, 870 820" stroke="#16a34a" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
                   <!-- Main Category Card: Tier 02 (translate 870, 820) -->
-                  <g class="branch-card-group mindmap-interactive-node" data-node-id="t2-root" transform="translate(870, 820)" cursor="pointer">
+                  <g class="branch-card-group tier-card-trigger" data-tier-id="t2" transform="translate(870, 820)" cursor="pointer">
                     <rect x="-55" y="-45" width="110" height="90" rx="16" class="node-card-bg card-border-green" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">🐧</text>
                     <text x="0" y="16" text-anchor="middle" class="card-svg-title">Tier 02: Linux</text>
                     <text x="0" y="32" text-anchor="middle" class="card-svg-sub">Kernel & Epoll</text>
-                    <!-- Toggle collapse badge -->
+                    <!-- Toggle collapse badge cấp 1 -->
                     <g class="tier-toggle-badge badge-green" transform="translate(-42, -34)">
                       <rect x="-12" y="-10" width="24" height="20" rx="6" fill="#16a34a" />
                       <text x="0" y="4" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff" class="toggle-text">−</text>
                     </g>
                   </g>
 
-                  <!-- Sub-branches container -->
+                  <!-- Sub-branches container (Cấp 2 & Cấp 3) -->
                   <g class="tier-sub-branches">
                     <!-- Stem connector -->
                     <path d="M 815 820 L 770 820" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
                     <circle cx="770" cy="820" r="4.5" class="fork-joint-circle circle-green" />
 
                     <!-- Sub-branch 2A: Socket & Queue (Y=720) -->
-                    <path d="M 770 820 C 740 820, 720 720, 680 720" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="680" cy="720" r="4" class="sub-joint-circle circle-green" />
-                    <text x="665" y="724" text-anchor="end" class="sub-cat-title mindmap-interactive-node" data-node-id="t2-sockets" cursor="pointer">Socket & Queue</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 525 720 L 495 720" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="495" cy="720" r="3.5" class="leaf-joint-circle circle-green" />
-                    <path d="M 495 720 C 470 720, 460 690, 430 690" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="420" y="694" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t2-fd" cursor="pointer">File Descriptor Table [FD: 12] (O_NONBLOCK)</text>
-
-                    <path d="M 495 720 C 470 720, 460 750, 430 750" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="420" y="754" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t2-buffers" cursor="pointer">Kernel TCP Buffers (Receive/Send Queue)</text>
+                    <g class="sub-branch-group" data-sub-id="t2-sockets">
+                      <path d="M 770 820 C 740 820, 720 720, 680 720" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="680" cy="720" r="4" class="sub-joint-circle circle-green" />
+                      <text x="665" y="724" text-anchor="end" class="sub-cat-title sub-title-trigger" cursor="pointer">Socket & Queue</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(505, 720)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#16a34a" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 497 720 C 470 720, 460 690, 430 690" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="420" y="694" text-anchor="end" class="leaf-svg-text" data-node-id="t2-fd" cursor="pointer">File Descriptor Table [FD: 12] (O_NONBLOCK)</text>
+                        <path d="M 497 720 C 470 720, 460 750, 430 750" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="420" y="754" text-anchor="end" class="leaf-svg-text" data-node-id="t2-buffers" cursor="pointer">Kernel TCP Buffers (Receive/Send Queue)</text>
+                      </g>
+                    </g>
 
                     <!-- Sub-branch 2B: Multiplexing & Memory (Y=920) -->
-                    <path d="M 770 820 C 740 820, 720 920, 680 920" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="680" cy="920" r="4" class="sub-joint-circle circle-green" />
-                    <text x="665" y="924" text-anchor="end" class="sub-cat-title mindmap-interactive-node" data-node-id="t2-multiplexing" cursor="pointer">Multiplexing & Memory</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 490 920 L 460 920" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="460" cy="920" r="3.5" class="leaf-joint-circle circle-green" />
-                    <path d="M 460 920 C 435 920, 425 890, 395 890" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="385" y="894" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t2-epoll" cursor="pointer">Epoll / Kqueue (10K+ Sockets O(1) demux)</text>
-
-                    <path d="M 460 920 C 435 920, 425 950, 395 950" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="385" y="954" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t2-paging" cursor="pointer">Virtual Memory & Page Tables (RSS & OOM Guard)</text>
+                    <g class="sub-branch-group" data-sub-id="t2-multiplexing">
+                      <path d="M 770 820 C 740 820, 720 920, 680 920" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="680" cy="920" r="4" class="sub-joint-circle circle-green" />
+                      <text x="665" y="924" text-anchor="end" class="sub-cat-title sub-title-trigger" cursor="pointer">Multiplexing & Memory</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(470, 920)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#16a34a" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 462 920 C 435 920, 425 890, 395 890" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="385" y="894" text-anchor="end" class="leaf-svg-text" data-node-id="t2-epoll" cursor="pointer">Epoll / Kqueue (10K+ Sockets O(1) demux)</text>
+                        <path d="M 462 920 C 435 920, 425 950, 395 950" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="385" y="954" text-anchor="end" class="leaf-svg-text" data-node-id="t2-paging" cursor="pointer">Virtual Memory & Page Tables (RSS & OOM Guard)</text>
+                      </g>
+                    </g>
                   </g>
                 </g>
 
@@ -514,51 +554,61 @@ export function renderLayeredStack(text: string, title?: string): string {
                   <path d="M 1060 515 C 980 515, 930 260, 870 260" stroke="#d97706" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
                   <!-- Main Category Card: Tier 01 (translate 870, 260) -->
-                  <g class="branch-card-group mindmap-interactive-node" data-node-id="t1-root" transform="translate(870, 260)" cursor="pointer">
+                  <g class="branch-card-group tier-card-trigger" data-tier-id="t1" transform="translate(870, 260)" cursor="pointer">
                     <rect x="-55" y="-45" width="110" height="90" rx="16" class="node-card-bg card-border-amber" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">⚡</text>
                     <text x="0" y="16" text-anchor="middle" class="card-svg-title">Tier 01: Phần Cứng</text>
                     <text x="0" y="32" text-anchor="middle" class="card-svg-sub">Hardware & 1-100ns</text>
-                    <!-- Toggle collapse badge -->
+                    <!-- Toggle collapse badge cấp 1 -->
                     <g class="tier-toggle-badge badge-amber" transform="translate(-42, -34)">
                       <rect x="-12" y="-10" width="24" height="20" rx="6" fill="#d97706" />
                       <text x="0" y="4" text-anchor="middle" font-size="12" font-weight="900" fill="#ffffff" class="toggle-text">−</text>
                     </g>
                   </g>
 
-                  <!-- Sub-branches container -->
+                  <!-- Sub-branches container (Cấp 2 & Cấp 3) -->
                   <g class="tier-sub-branches">
                     <!-- Stem connector -->
                     <path d="M 815 260 L 770 260" stroke="#d97706" stroke-width="3" stroke-linecap="round" fill="none" />
                     <circle cx="770" cy="260" r="4.5" class="fork-joint-circle circle-amber" />
 
                     <!-- Sub-branch 1A: CPU Cores & Cache (Y=160) -->
-                    <path d="M 770 260 C 740 260, 720 160, 680 160" stroke="#d97706" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="680" cy="160" r="4" class="sub-joint-circle circle-amber" />
-                    <text x="665" y="164" text-anchor="end" class="sub-cat-title mindmap-interactive-node" data-node-id="t1-cpu" cursor="pointer">CPU Cores & Cache</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 515 160 L 485 160" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="485" cy="160" r="3.5" class="leaf-joint-circle circle-amber" />
-                    <path d="M 485 160 C 460 160, 450 130, 420 130" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="410" y="134" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t1-l1l2l3" cursor="pointer">CPU Cores & L1/L2/L3 Cache (1-10ns clock)</text>
-
-                    <path d="M 485 160 C 460 160, 450 190, 420 190" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="410" y="194" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t1-pipeline" cursor="pointer">Branch Predictor & Instructions Pipeline</text>
+                    <g class="sub-branch-group" data-sub-id="t1-cpu">
+                      <path d="M 770 260 C 740 260, 720 160, 680 160" stroke="#d97706" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="680" cy="160" r="4" class="sub-joint-circle circle-amber" />
+                      <text x="665" y="164" text-anchor="end" class="sub-cat-title sub-title-trigger" cursor="pointer">CPU Cores & Cache</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(495, 160)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#d97706" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 487 160 C 460 160, 450 130, 420 130" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="410" y="134" text-anchor="end" class="leaf-svg-text" data-node-id="t1-l1l2l3" cursor="pointer">CPU Cores & L1/L2/L3 Cache (1-10ns clock)</text>
+                        <path d="M 487 160 C 460 160, 450 190, 420 190" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="410" y="194" text-anchor="end" class="leaf-svg-text" data-node-id="t1-pipeline" cursor="pointer">Branch Predictor & Instructions Pipeline</text>
+                      </g>
+                    </g>
 
                     <!-- Sub-branch 1B: RAM Bus & Thiết Bị I/O (Y=360) -->
-                    <path d="M 770 260 C 740 260, 720 360, 680 360" stroke="#d97706" stroke-width="3" stroke-linecap="round" fill="none" />
-                    <circle cx="680" cy="360" r="4" class="sub-joint-circle circle-amber" />
-                    <text x="665" y="364" text-anchor="end" class="sub-cat-title mindmap-interactive-node" data-node-id="t1-io-bus" cursor="pointer">RAM Bus & Thiết Bị I/O</text>
-
-                    <!-- Fork to 2 Leaves -->
-                    <path d="M 485 360 L 455 360" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <circle cx="455" cy="360" r="3.5" class="leaf-joint-circle circle-amber" />
-                    <path d="M 455 360 C 430 360, 420 330, 390 330" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="380" y="334" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t1-ram" cursor="pointer">RAM Bus Vật Lý DDR4/DDR5 (~50-100ns)</text>
-
-                    <path d="M 455 360 C 430 360, 420 390, 390 390" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                    <text x="380" y="394" text-anchor="end" class="leaf-svg-text mindmap-interactive-node" data-node-id="t1-nvme-nic" cursor="pointer">NVMe SSD PCIe 4.0 & Card Mạng NIC 10Gbps</text>
+                    <g class="sub-branch-group" data-sub-id="t1-io-bus">
+                      <path d="M 770 260 C 740 260, 720 360, 680 360" stroke="#d97706" stroke-width="3" stroke-linecap="round" fill="none" />
+                      <circle cx="680" cy="360" r="4" class="sub-joint-circle circle-amber" />
+                      <text x="665" y="364" text-anchor="end" class="sub-cat-title sub-title-trigger" cursor="pointer">RAM Bus & Thiết Bị I/O</text>
+                      <!-- Sub toggle badge cấp 2 -->
+                      <g class="sub-toggle-badge" transform="translate(465, 360)" cursor="pointer" title="Đóng/Mở nhánh lá">
+                        <circle cx="0" cy="0" r="8" fill="#d97706" />
+                        <text x="0" y="3.5" text-anchor="middle" font-size="10" font-weight="900" fill="#ffffff" class="sub-toggle-text">−</text>
+                      </g>
+                      <!-- Cấp 3: Leaves -->
+                      <g class="sub-branch-leaves">
+                        <path d="M 457 360 C 430 360, 420 330, 390 330" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="380" y="334" text-anchor="end" class="leaf-svg-text" data-node-id="t1-ram" cursor="pointer">RAM Bus Vật Lý DDR4/DDR5 (~50-100ns)</text>
+                        <path d="M 457 360 C 430 360, 420 390, 390 390" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                        <text x="380" y="394" text-anchor="end" class="leaf-svg-text" data-node-id="t1-nvme-nic" cursor="pointer">NVMe SSD PCIe 4.0 & Card Mạng NIC 10Gbps</text>
+                      </g>
+                    </g>
                   </g>
                 </g>
               </svg>
@@ -566,7 +616,7 @@ export function renderLayeredStack(text: string, title?: string): string {
 
             <!-- Gợi ý tương tác nhanh nổi góc dưới -->
             <div class="mindmap-interaction-hint">
-              <span>✋ Kéo chuột để di chuyển canvas • 🔍 Cuộn chuột phóng to / thu nhỏ • 💡 Bấm vào bất kỳ thành phần nào để mở chi tiết kiến thức</span>
+              <span>✋ Kéo chuột để di chuyển • 🔍 Cuộn chuột phóng to/thu nhỏ • 💡 Bấm vào nhánh hoặc nút [＋]/[−] để mở/đóng cây con từng cấp</span>
             </div>
           </div>
 

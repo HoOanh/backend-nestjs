@@ -205,19 +205,37 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       });
     };
 
-    // ===== 2. COLLAPSIBLE BRANCHES LOGIC =====
+    // ===== 2. COLLAPSIBLE BRANCHES LOGIC THEO TỪNG CẤP (MINDMAPS.COM FLOW) =====
     const onExpandAll = () => {
       hideHint();
+      // 1. Mở tất cả 4 Tầng chính (Cấp 1)
       const branches = stage.querySelectorAll<SVGElement>('.mindmap-tier-branch');
       branches.forEach((b) => {
         b.classList.remove('is-collapsed');
         const textEl = b.querySelector<SVGTextElement>('.toggle-text');
         if (textEl) textEl.textContent = '−';
       });
+
+      // 2. Mở tất cả các Nhánh con (Cấp 2)
+      const subGroups = stage.querySelectorAll<SVGElement>('.sub-branch-group');
+      subGroups.forEach((sg) => {
+        sg.classList.remove('is-collapsed-sub');
+        const subTextEl = sg.querySelector<SVGTextElement>('.sub-toggle-text');
+        if (subTextEl) subTextEl.textContent = '−';
+      });
     };
 
     const onCollapseAll = () => {
       hideHint();
+      // 1. Thu gọn toàn bộ các nhánh con (Cấp 2)
+      const subGroups = stage.querySelectorAll<SVGElement>('.sub-branch-group');
+      subGroups.forEach((sg) => {
+        sg.classList.add('is-collapsed-sub');
+        const subTextEl = sg.querySelector<SVGTextElement>('.sub-toggle-text');
+        if (subTextEl) subTextEl.textContent = '+';
+      });
+
+      // 2. Thu gọn 4 Tầng chính (Cấp 1)
       const branches = stage.querySelectorAll<SVGElement>('.mindmap-tier-branch');
       branches.forEach((b) => {
         b.classList.add('is-collapsed');
@@ -256,7 +274,7 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       setTimeout(fitToScreen, 100);
     };
 
-    // ===== 3. ROBUST EVENT DELEGATION ON BOARD (KHÔNG BAO GIỜ BỊ MẤT SỰ KIỆN) =====
+    // ===== 3. ROBUST EVENT DELEGATION ON BOARD (FLOW MINDMAPS.COM: MỞ CÂY CON TỪNG CẤP) =====
     const onBoardClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | SVGElement | null;
       if (!target) return;
@@ -327,33 +345,64 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
         return;
       }
 
-      // Close inspector
+      // Close inspector (nếu có)
       if (target.closest('.inspector-close-btn')) {
         closeInspector();
         return;
       }
 
-      // Interactive node
-      const node = target.closest<SVGElement>('.mindmap-interactive-node');
-      if (node) {
+      // --- CẤP 0: CLICK CENTER HUB (Toggle toàn bộ 4 Tầng) ---
+      if (target.closest('.mindmap-hub')) {
         hideHint();
-        const nodeId = node.dataset.nodeId;
-        if (nodeId) openInspector(nodeId, node);
+        const hasCollapsed = stage.querySelector('.mindmap-tier-branch.is-collapsed');
+        if (hasCollapsed) {
+          onExpandAll();
+        } else {
+          onCollapseAll();
+        }
         return;
       }
 
-      // Toggle badge [−]/[+]
-      const badge = target.closest<SVGElement>('.tier-toggle-badge');
-      if (badge) {
+      // --- CẤP 2: CLICK SUB-BRANCH (Nút tròn sub-toggle-badge hoặc tiêu đề sub-cat-title) ---
+      const subToggleBadge = target.closest<SVGElement>('.sub-toggle-badge');
+      const subTitleTrigger = target.closest<SVGElement>('.sub-title-trigger');
+      if (subToggleBadge || subTitleTrigger) {
         hideHint();
-        const tierBranch = badge.closest<SVGElement>('.mindmap-tier-branch');
+        const subGroup = (subToggleBadge || subTitleTrigger)?.closest<SVGElement>('.sub-branch-group');
+        if (subGroup) {
+          const isNowCollapsedSub = subGroup.classList.toggle('is-collapsed-sub');
+          const subTextEl = subGroup.querySelector<SVGTextElement>('.sub-toggle-text');
+          if (subTextEl) {
+            subTextEl.textContent = isNowCollapsedSub ? '+' : '−';
+          }
+        }
+        return;
+      }
+
+      // --- CẤP 1: CLICK TIER CARD (Nút tier-toggle-badge hoặc bấm vào Card Tier) ---
+      const tierBadge = target.closest<SVGElement>('.tier-toggle-badge');
+      const tierCard = target.closest<SVGElement>('.tier-card-trigger');
+      if (tierBadge || tierCard) {
+        hideHint();
+        const tierBranch = (tierBadge || tierCard)?.closest<SVGElement>('.mindmap-tier-branch');
         if (tierBranch) {
           const isNowCollapsed = tierBranch.classList.toggle('is-collapsed');
-          const textEl = badge.querySelector<SVGTextElement>('.toggle-text');
+          const textEl = tierBranch.querySelector<SVGTextElement>('.toggle-text');
           if (textEl) {
             textEl.textContent = isNowCollapsed ? '+' : '−';
           }
         }
+        return;
+      }
+
+      // --- CẤP 3: CLICK LEAF (Chỉ highlight nhẹ nhàng, KHÔNG bật Drawer che màn hình) ---
+      const leafNode = target.closest<SVGElement>('.leaf-svg-text');
+      if (leafNode) {
+        hideHint();
+        stage.querySelectorAll('.leaf-svg-text.is-active-leaf').forEach((el) => {
+          el.classList.remove('is-active-leaf');
+        });
+        leafNode.classList.add('is-active-leaf');
         return;
       }
     };

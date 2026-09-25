@@ -1883,55 +1883,71 @@
   stroke: #d97706;
 }
 
-/* Toggle Badges on Tier Cards */
+/* Toggle Badges on Tier Cards (Cấp 1) - Smooth Không Giật */
 .tier-toggle-badge {
   cursor: pointer;
   user-select: none;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), filter 0.18s ease;
+  transition: opacity 0.15s ease, filter 0.15s ease;
 }
 
 .tier-toggle-badge:hover {
-  transform: scale(1.22);
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+  filter: brightness(1.2);
+  opacity: 0.9;
+}
+
+/* Sub-branch Toggle Badge (Cấp 2) - Mindmaps.com Flow */
+.sub-toggle-badge {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.sub-toggle-badge:hover {
+  filter: brightness(1.25);
+  opacity: 0.95;
+}
+
+.sub-branch-group {
+  transition: opacity 0.2s ease;
+}
+
+/* Ẩn hiện cây con theo từng cấp */
+.sub-branch-group.is-collapsed-sub .sub-branch-leaves {
+  display: none !important;
 }
 
 /* Collapsible Branches Behavior */
 .mindmap-tier-branch {
-  transition: opacity 0.25s ease, filter 0.25s ease;
+  transition: opacity 0.25s ease;
 }
 
 .mindmap-tier-branch.is-collapsed .tier-sub-branches {
   display: none !important;
 }
 
-.mindmap-tier-branch:hover .branch-stem,
+/* Giữ stroke-width ổn định, tuyệt đối không đổi kích thước khi hover để triệt tiêu hiện tượng giật */
 .mindmap-tier-branch.is-highlighted .branch-stem {
-  stroke-width: 6.5px;
-  filter: drop-shadow(0 0 10px currentColor);
+  stroke-width: 6px;
+  filter: drop-shadow(0 0 8px currentColor);
 }
 
-.mindmap-tier-branch:hover .node-card-bg,
 .mindmap-tier-branch.is-highlighted .node-card-bg {
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.25));
 }
 
-.mindmap-tier-branch:hover .sub-cat-title,
 .mindmap-tier-branch.is-highlighted .sub-cat-title {
   fill: #0284c7;
 }
 
-[data-theme='dark'] .mindmap-tier-branch:hover .sub-cat-title,
 [data-theme='dark'] .mindmap-tier-branch.is-highlighted .sub-cat-title {
   fill: #38bdf8;
 }
 
-.mindmap-tier-branch:hover .leaf-svg-text,
 .mindmap-tier-branch.is-highlighted .leaf-svg-text {
   fill: #0284c7;
   font-weight: 700;
 }
 
-[data-theme='dark'] .mindmap-tier-branch:hover .leaf-svg-text,
 [data-theme='dark'] .mindmap-tier-branch.is-highlighted .leaf-svg-text {
   fill: #38bdf8;
 }
@@ -1944,17 +1960,25 @@
 /* 8. Interactive Nodes & Selection Highlighting */
 .mindmap-interactive-node {
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: opacity 0.15s ease;
 }
 
 .mindmap-interactive-node:hover {
-  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.75));
+  opacity: 0.85;
+}
+
+.sub-cat-title:hover {
+  fill: #38bdf8 !important;
+  text-decoration: underline;
+}
+
+.leaf-svg-text:hover {
+  fill: #38bdf8 !important;
 }
 
 .mindmap-interactive-node.is-selected-node rect {
   stroke: #38bdf8 !important;
-  stroke-width: 3.5px !important;
-  filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.9)) !important;
+  stroke-width: 3px !important;
 }
 
 .mindmap-interactive-node.is-selected-node text {

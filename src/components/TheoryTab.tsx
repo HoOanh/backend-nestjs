@@ -2,7 +2,7 @@ import React from 'react';
 import type { Lesson } from '../data/curriculum.ts';
 import { TutorChat } from './TutorChat.tsx';
 import { CodeViewer, renderEditorHtml, renderDiagramHtml, escapeHtml } from './CodeViewer.tsx';
-import { renderSmartMindMapHtml } from './MindMapVisualizer.tsx';
+import { renderSmartMindMapHtml, initMindMapControllers } from './MindMapVisualizer.tsx';
 
 interface TheoryTabProps {
   lesson: Lesson;
@@ -185,11 +185,21 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
   onOpenTutor
 }) => {
   const referenceFilename = extractFilenameFromCode(lesson.realCodeSnippet || '');
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!contentRef.current) return;
+    const cleanup = initMindMapControllers(contentRef.current);
+    return () => {
+      cleanup();
+    };
+  }, [lesson.id, lesson.theory]);
 
   return (
     <div>
       <div className="theory-card">
         <div
+          ref={contentRef}
           className="theory-content"
           dangerouslySetInnerHTML={{ __html: formatMarkdown(lesson.theory) }}
         />

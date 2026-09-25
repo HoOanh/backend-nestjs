@@ -298,10 +298,16 @@ export function renderLayeredStack(text: string, title?: string): string {
             </button>
             <button class="arch-tab-btn" onclick="
               const board = document.getElementById('${uniqueId}');
-              board.querySelector('.arch-stack-container').style.display = 'none';
-              board.querySelector('.arch-radial-container').style.display = 'flex';
-              board.querySelectorAll('.arch-tab-btn').forEach(b => b.classList.remove('active'));
-              this.classList.add('active');
+              if (board) {
+                board.querySelector('.arch-stack-container').style.display = 'none';
+                board.querySelector('.arch-radial-container').style.display = 'flex';
+                board.querySelectorAll('.arch-tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                if (window.initMindMapControllers) {
+                  window.initMindMapControllers(board);
+                }
+                window.dispatchEvent(new CustomEvent('mindmap:tab-switch', { detail: { boardId: '${uniqueId}' } }));
+              }
             ">
               🧠 Sơ Đồ Tư Duy (Mindmap)
             </button>
@@ -520,23 +526,34 @@ export function renderLayeredStack(text: string, title?: string): string {
           </div>
         </div>
 
-        <!-- VIEW 2: SƠ ĐỒ TƯ DUY TỎA NHÁNH CHUẨN MINDMAPS.COM (ORGANIC MINDMAP CANVAS) -->
-        <div class="arch-radial-container" style="display: none;">
-          <div class="mindmap-canvas-container">
-            <div class="mindmap-toolbar-row">
-              <div class="mindmap-legend">
-                <span class="legend-chip chip-blue"><span class="chip-dot"></span> Phần Cứng (Hardware)</span>
-                <span class="legend-chip chip-green"><span class="chip-dot"></span> Linux Kernel</span>
-                <span class="legend-chip chip-sky"><span class="chip-dot"></span> Libuv Event Loop</span>
-                <span class="legend-chip chip-rose"><span class="chip-dot"></span> V8 Engine & RSS</span>
-              </div>
-              <div class="mindmap-tip-text">
-                ✨ <em>Chuẩn tư duy Mindmaps.com: Trực quan hóa 3 cấp độ từ Phần cứng vật lý đến Runtime Node.js</em>
-              </div>
+        <!-- VIEW 2: SƠ ĐỒ TƯ DUY TỎA NHÁNH HỮU CƠ TƯƠNG TÁC (ORGANIC VECTOR MINDMAP CANVAS) -->
+        <div class="arch-radial-container" id="radial_${uniqueId}" data-board-id="${uniqueId}" style="display: none;">
+          <!-- Thanh điều khiển trên cùng (Filter Chips & Pan/Zoom Controls) -->
+          <div class="mindmap-top-bar">
+            <!-- Nhóm bộ lọc nhánh tương tác -->
+            <div class="mindmap-legend-group">
+              <button type="button" class="mindmap-chip chip-all active" data-filter="all">Tất cả</button>
+              <button type="button" class="mindmap-chip chip-blue" data-filter="blue"><span class="chip-dot"></span> Phần Cứng</button>
+              <button type="button" class="mindmap-chip chip-green" data-filter="green"><span class="chip-dot"></span> Linux Kernel</button>
+              <button type="button" class="mindmap-chip chip-sky" data-filter="sky"><span class="chip-dot"></span> Libuv Core</button>
+              <button type="button" class="mindmap-chip chip-rose" data-filter="rose"><span class="chip-dot"></span> V8 & Bộ Nhớ</button>
             </div>
 
-            <div class="mindmap-svg-viewport">
-              <svg class="mindmap-master-svg" viewBox="0 0 1640 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Nhóm công cụ Thu phóng & Kéo Canvas -->
+            <div class="mindmap-ctrl-group">
+              <button type="button" class="mindmap-ctrl-btn btn-zoom-out" title="Thu nhỏ (Cuộn chuột xuống)">−</button>
+              <button type="button" class="mindmap-ctrl-btn btn-zoom-level" title="Bấm để đặt lại tỉ lệ chuẩn 100%">100%</button>
+              <button type="button" class="mindmap-ctrl-btn btn-zoom-in" title="Phóng to (Cuộn chuột lên)">+</button>
+              <button type="button" class="mindmap-ctrl-btn btn-zoom-fit" title="Thu phóng vừa vặn toàn màn hình">🎯 Vừa vặn</button>
+              <button type="button" class="mindmap-ctrl-btn btn-zoom-reset" title="Đặt lại vị trí trung tâm">🔄 Đặt lại</button>
+              <button type="button" class="mindmap-ctrl-btn btn-fullscreen" title="Phóng to toàn màn hình (Esc để thoát)">⛶ Toàn màn hình</button>
+            </div>
+          </div>
+
+          <!-- Viewport tương tác Pan & Zoom -->
+          <div class="mindmap-viewport" id="viewport_${uniqueId}">
+            <div class="mindmap-stage" id="stage_${uniqueId}">
+              <svg class="mindmap-master-svg" viewBox="0 0 2050 700" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                   <!-- Gradients for Stems -->
                   <linearGradient id="stem-blue" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -570,9 +587,9 @@ export function renderLayeredStack(text: string, title?: string): string {
                 </defs>
 
                 <!-- =================== 1. CENTER HUB =================== -->
-                <g class="mindmap-hub" transform="translate(820, 350)">
-                  <rect x="-120" y="-35" width="240" height="70" rx="20" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-opacity="0.35" stroke-dasharray="4 4" />
-                  <rect x="-110" y="-28" width="220" height="56" rx="16" fill="url(#hub-bg)" filter="url(#hub-shadow)" />
+                <g class="mindmap-hub" transform="translate(1025, 350)">
+                  <rect x="-125" y="-35" width="250" height="70" rx="20" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-opacity="0.35" stroke-dasharray="4 4" />
+                  <rect x="-115" y="-28" width="230" height="56" rx="16" fill="url(#hub-bg)" filter="url(#hub-shadow)" />
                   <text x="0" y="-3" text-anchor="middle" class="hub-svg-title">Runtime Taxonomy</text>
                   <text x="0" y="16" text-anchor="middle" class="hub-svg-sub">HỆ QUẢN TRỊ TOÀN CẢNH</text>
                 </g>
@@ -580,10 +597,10 @@ export function renderLayeredStack(text: string, title?: string): string {
                 <!-- =================== 2. BRANCH 1: PHẦN CỨNG & VẬT LÝ (TOP-LEFT) =================== -->
                 <g class="mindmap-branch branch-blue">
                   <!-- Main Stem from Hub to Card -->
-                  <path d="M 710 336 C 645 336, 640 160, 610 160" stroke="#3b82f6" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+                  <path d="M 900 336 C 810 336, 760 160, 710 160" stroke="#3b82f6" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
-                  <!-- Main Category Card: Phần Cứng (510 to 610, y: 115 to 205) -->
-                  <g class="branch-card-group" transform="translate(560, 160)">
+                  <!-- Main Category Card: Phần Cứng (translate 660, 160) -->
+                  <g class="branch-card-group" transform="translate(660, 160)">
                     <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-blue" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">⚙️</text>
                     <text x="0" y="18" text-anchor="middle" class="card-svg-title">Phần Cứng</text>
@@ -591,45 +608,45 @@ export function renderLayeredStack(text: string, title?: string): string {
                   </g>
 
                   <!-- Fork connector from Card to 2 Sub-branches -->
-                  <path d="M 510 160 L 480 160" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="480" cy="160" r="4.5" class="fork-joint-circle circle-blue" />
+                  <path d="M 610 160 L 580 160" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="580" cy="160" r="4.5" class="fork-joint-circle circle-blue" />
 
-                  <!-- Sub-branch 1A (UP): CPU & Cache -->
-                  <path d="M 480 160 C 455 160, 445 95, 420 95" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="420" cy="95" r="4" class="sub-joint-circle circle-blue" />
-                  <text x="408" y="99" text-anchor="end" class="sub-cat-title">CPU & Bộ Nhớ</text>
+                  <!-- Sub-branch 1A (UP): CPU & Bộ Nhớ -->
+                  <path d="M 580 160 C 555 160, 540 95, 510 95" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="510" cy="95" r="4" class="sub-joint-circle circle-blue" />
+                  <text x="495" y="99" text-anchor="end" class="sub-cat-title">CPU & Bộ Nhớ</text>
 
-                  <!-- Fork from CPU & Cache to 2 Leaves -->
-                  <path d="M 315 95 L 295 95" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="295" cy="95" r="3.5" class="leaf-joint-circle circle-blue" />
-                  <path d="M 295 95 C 280 95, 270 65, 250 65" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="240" y="69" text-anchor="end" class="leaf-svg-text">CPU Cores & Cache (1-10ns clock)</text>
+                  <!-- Fork from CPU & Bộ Nhớ to 2 Leaves -->
+                  <path d="M 390 95 L 365 95" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="365" cy="95" r="3.5" class="leaf-joint-circle circle-blue" />
+                  <path d="M 365 95 C 345 95, 335 65, 310 65" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="300" y="69" text-anchor="end" class="leaf-svg-text">CPU Cores & Cache (1-10ns clock)</text>
 
-                  <path d="M 295 95 C 280 95, 270 125, 250 125" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="240" y="129" text-anchor="end" class="leaf-svg-text">RAM Bus DDR4/DDR5 (~50-100ns)</text>
+                  <path d="M 365 95 C 345 95, 335 125, 310 125" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="300" y="129" text-anchor="end" class="leaf-svg-text">RAM Bus DDR4/DDR5 (~50-100ns)</text>
 
                   <!-- Sub-branch 1B (DOWN): Thiết Bị I/O -->
-                  <path d="M 480 160 C 455 160, 445 225, 420 225" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="420" cy="225" r="4" class="sub-joint-circle circle-blue" />
-                  <text x="408" y="229" text-anchor="end" class="sub-cat-title">Thiết Bị I/O</text>
+                  <path d="M 580 160 C 555 160, 540 225, 510 225" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="510" cy="225" r="4" class="sub-joint-circle circle-blue" />
+                  <text x="495" y="229" text-anchor="end" class="sub-cat-title">Thiết Bị I/O</text>
 
                   <!-- Fork from Thiết Bị I/O to 2 Leaves -->
-                  <path d="M 315 225 L 295 225" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="295" cy="225" r="3.5" class="leaf-joint-circle circle-blue" />
-                  <path d="M 295 225 C 280 225, 270 195, 250 195" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="240" y="199" text-anchor="end" class="leaf-svg-text">NVMe SSD PCIe 4.0 (10-100μs I/O)</text>
+                  <path d="M 405 225 L 380 225" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="380" cy="225" r="3.5" class="leaf-joint-circle circle-blue" />
+                  <path d="M 380 225 C 360 225, 350 195, 325 195" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="315" y="199" text-anchor="end" class="leaf-svg-text">NVMe SSD PCIe 4.0 (10-100μs I/O)</text>
 
-                  <path d="M 295 225 C 280 225, 270 255, 250 255" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="240" y="259" text-anchor="end" class="leaf-svg-text">Card Mạng NIC 10Gbps (RX/TX Queue)</text>
+                  <path d="M 380 225 C 360 225, 350 255, 325 255" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="315" y="259" text-anchor="end" class="leaf-svg-text">Card Mạng NIC 10Gbps (RX/TX Queue)</text>
                 </g>
 
                 <!-- =================== 3. BRANCH 2: LINUX OS KERNEL (BOTTOM-LEFT) =================== -->
                 <g class="mindmap-branch branch-green">
                   <!-- Main Stem from Hub to Card -->
-                  <path d="M 710 364 C 645 364, 640 540, 610 540" stroke="#16a34a" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+                  <path d="M 900 364 C 810 364, 760 540, 710 540" stroke="#16a34a" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
-                  <!-- Main Category Card: Linux Kernel (510 to 610, y: 495 to 585) -->
-                  <g class="branch-card-group" transform="translate(560, 540)">
+                  <!-- Main Category Card: Linux Kernel (translate 660, 540) -->
+                  <g class="branch-card-group" transform="translate(660, 540)">
                     <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-green" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">🐧</text>
                     <text x="0" y="18" text-anchor="middle" class="card-svg-title">Linux Kernel</text>
@@ -637,45 +654,45 @@ export function renderLayeredStack(text: string, title?: string): string {
                   </g>
 
                   <!-- Fork connector from Card to 2 Sub-branches -->
-                  <path d="M 510 540 L 480 540" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="480" cy="540" r="4.5" class="fork-joint-circle circle-green" />
+                  <path d="M 610 540 L 580 540" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="580" cy="540" r="4.5" class="fork-joint-circle circle-green" />
 
                   <!-- Sub-branch 2A (UP): Socket & Queue -->
-                  <path d="M 480 540 C 455 540, 445 475, 420 475" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="420" cy="475" r="4" class="sub-joint-circle circle-green" />
-                  <text x="408" y="479" text-anchor="end" class="sub-cat-title">Socket & Queue</text>
+                  <path d="M 580 540 C 555 540, 540 475, 510 475" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="510" cy="475" r="4" class="sub-joint-circle circle-green" />
+                  <text x="495" y="479" text-anchor="end" class="sub-cat-title">Socket & Queue</text>
 
                   <!-- Fork to 2 Leaves -->
-                  <path d="M 300 475 L 280 475" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="280" cy="475" r="3.5" class="leaf-joint-circle circle-green" />
-                  <path d="M 280 475 C 265 475, 255 445, 235 445" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="225" y="449" text-anchor="end" class="leaf-svg-text">File Descriptor Table [FD: 12]</text>
+                  <path d="M 380 475 L 355 475" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="355" cy="475" r="3.5" class="leaf-joint-circle circle-green" />
+                  <path d="M 355 475 C 335 475, 325 445, 300 445" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="290" y="449" text-anchor="end" class="leaf-svg-text">File Descriptor Table [FD: 12]</text>
 
-                  <path d="M 280 475 C 265 475, 255 505, 235 505" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="225" y="509" text-anchor="end" class="leaf-svg-text">Kernel TCP Buffers (Receive/Send)</text>
+                  <path d="M 355 475 C 335 475, 325 505, 300 505" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="290" y="509" text-anchor="end" class="leaf-svg-text">Kernel TCP Buffers (Receive/Send)</text>
 
                   <!-- Sub-branch 2B (DOWN): Multiplexing -->
-                  <path d="M 480 540 C 455 540, 445 605, 420 605" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="420" cy="605" r="4" class="sub-joint-circle circle-green" />
-                  <text x="408" y="609" text-anchor="end" class="sub-cat-title">Multiplexing</text>
+                  <path d="M 580 540 C 555 540, 540 605, 510 605" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="510" cy="605" r="4" class="sub-joint-circle circle-green" />
+                  <text x="495" y="609" text-anchor="end" class="sub-cat-title">Multiplexing</text>
 
                   <!-- Fork to 2 Leaves -->
-                  <path d="M 300 605 L 280 605" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="280" cy="605" r="3.5" class="leaf-joint-circle circle-green" />
-                  <path d="M 280 605 C 265 605, 255 575, 235 575" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="225" y="579" text-anchor="end" class="leaf-svg-text">Epoll / Kqueue (10K+ Sockets O(1))</text>
+                  <path d="M 395 605 L 370 605" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="370" cy="605" r="3.5" class="leaf-joint-circle circle-green" />
+                  <path d="M 370 605 C 350 605, 340 575, 315 575" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="305" y="579" text-anchor="end" class="leaf-svg-text">Epoll / Kqueue (10K+ Sockets O(1))</text>
 
-                  <path d="M 280 605 C 265 605, 255 635, 235 635" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="225" y="639" text-anchor="end" class="leaf-svg-text">Virtual Memory & Page Tables (RSS)</text>
+                  <path d="M 370 605 C 350 605, 340 635, 315 635" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="305" y="639" text-anchor="end" class="leaf-svg-text">Virtual Memory & Page Tables (RSS)</text>
                 </g>
 
                 <!-- =================== 4. BRANCH 3: LIBUV INTERNALS (TOP-RIGHT) =================== -->
                 <g class="mindmap-branch branch-sky">
                   <!-- Main Stem from Hub to Card -->
-                  <path d="M 930 336 C 995 336, 1000 160, 1030 160" stroke="#0284c7" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+                  <path d="M 1150 336 C 1240 336, 1290 160, 1340 160" stroke="#0284c7" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
-                  <!-- Main Category Card: Libuv Core (1030 to 1130, y: 115 to 205) -->
-                  <g class="branch-card-group" transform="translate(1080, 160)">
+                  <!-- Main Category Card: Libuv Core (translate 1390, 160) -->
+                  <g class="branch-card-group" transform="translate(1390, 160)">
                     <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-sky" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">🔄</text>
                     <text x="0" y="18" text-anchor="middle" class="card-svg-title">Libuv Core</text>
@@ -683,45 +700,45 @@ export function renderLayeredStack(text: string, title?: string): string {
                   </g>
 
                   <!-- Fork connector from Card to 2 Sub-branches -->
-                  <path d="M 1130 160 L 1160 160" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="1160" cy="160" r="4.5" class="fork-joint-circle circle-sky" />
+                  <path d="M 1440 160 L 1470 160" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1470" cy="160" r="4.5" class="fork-joint-circle circle-sky" />
 
                   <!-- Sub-branch 3A (UP): Event Loop -->
-                  <path d="M 1160 160 C 1185 160, 1195 95, 1220 95" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="1220" cy="95" r="4" class="sub-joint-circle circle-sky" />
-                  <text x="1232" y="99" text-anchor="start" class="sub-cat-title">Event Loop</text>
+                  <path d="M 1470 160 C 1495 160, 1510 95, 1540 95" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1540" cy="95" r="4" class="sub-joint-circle circle-sky" />
+                  <text x="1555" y="99" text-anchor="start" class="sub-cat-title">Event Loop</text>
 
                   <!-- Fork to 2 Leaves -->
-                  <path d="M 1325 95 L 1345 95" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="1345" cy="95" r="3.5" class="leaf-joint-circle circle-sky" />
-                  <path d="M 1345 95 C 1360 95, 1370 65, 1390 65" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="69" text-anchor="start" class="leaf-svg-text">1 Main Thread duy nhất tuần hoàn 6 pha</text>
+                  <path d="M 1645 95 L 1670 95" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1670" cy="95" r="3.5" class="leaf-joint-circle circle-sky" />
+                  <path d="M 1670 95 C 1690 95, 1700 65, 1725 65" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="69" text-anchor="start" class="leaf-svg-text">1 Main Thread duy nhất tuần hoàn 6 pha</text>
 
-                  <path d="M 1345 95 C 1360 95, 1370 125, 1390 125" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="129" text-anchor="start" class="leaf-svg-text">Libuv C-Bindings cầu nối Syscalls vào JS</text>
+                  <path d="M 1670 95 C 1690 95, 1700 125, 1725 125" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="129" text-anchor="start" class="leaf-svg-text">Libuv C-Bindings cầu nối Syscalls vào JS</text>
 
                   <!-- Sub-branch 3B (DOWN): Threadpool -->
-                  <path d="M 1160 160 C 1185 160, 1195 225, 1220 225" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="1220" cy="225" r="4" class="sub-joint-circle circle-sky" />
-                  <text x="1232" y="229" text-anchor="start" class="sub-cat-title">Threadpool</text>
+                  <path d="M 1470 160 C 1495 160, 1510 225, 1540 225" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1540" cy="225" r="4" class="sub-joint-circle circle-sky" />
+                  <text x="1555" y="229" text-anchor="start" class="sub-cat-title">Threadpool</text>
 
                   <!-- Fork to 2 Leaves -->
-                  <path d="M 1325 225 L 1345 225" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="1345" cy="225" r="3.5" class="leaf-joint-circle circle-sky" />
-                  <path d="M 1345 225 C 1360 225, 1370 195, 1390 195" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="199" text-anchor="start" class="leaf-svg-text">4 Worker Threads (fs file, crypto băm)</text>
+                  <path d="M 1645 225 L 1670 225" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1670" cy="225" r="3.5" class="leaf-joint-circle circle-sky" />
+                  <path d="M 1670 225 C 1690 225, 1700 195, 1725 195" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="199" text-anchor="start" class="leaf-svg-text">4 Worker Threads (fs file, crypto băm)</text>
 
-                  <path d="M 1345 225 C 1360 225, 1370 255, 1390 255" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="259" text-anchor="start" class="leaf-svg-text">Chặn blocking I/O gây đóng băng Main Loop</text>
+                  <path d="M 1670 225 C 1690 225, 1700 255, 1725 255" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="259" text-anchor="start" class="leaf-svg-text">Chặn blocking I/O gây đóng băng Main Loop</text>
                 </g>
 
                 <!-- =================== 5. BRANCH 4: V8 ENGINE & RSS MEMORY (BOTTOM-RIGHT) =================== -->
                 <g class="mindmap-branch branch-rose">
                   <!-- Main Stem from Hub to Card -->
-                  <path d="M 930 364 C 995 364, 1000 540, 1030 540" stroke="#f43f5e" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+                  <path d="M 1150 364 C 1240 364, 1290 540, 1340 540" stroke="#f43f5e" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
 
-                  <!-- Main Category Card: V8 & Bộ Nhớ (1030 to 1130, y: 495 to 585) -->
-                  <g class="branch-card-group" transform="translate(1080, 540)">
+                  <!-- Main Category Card: V8 & Bộ Nhớ (translate 1390, 540) -->
+                  <g class="branch-card-group" transform="translate(1390, 540)">
                     <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-rose" filter="url(#card-shadow)" />
                     <text x="0" y="-10" text-anchor="middle" font-size="28">🚀</text>
                     <text x="0" y="18" text-anchor="middle" class="card-svg-title">V8 & Bộ Nhớ</text>
@@ -729,38 +746,43 @@ export function renderLayeredStack(text: string, title?: string): string {
                   </g>
 
                   <!-- Fork connector from Card to 2 Sub-branches -->
-                  <path d="M 1130 540 L 1160 540" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="1160" cy="540" r="4.5" class="fork-joint-circle circle-rose" />
+                  <path d="M 1440 540 L 1470 540" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1470" cy="540" r="4.5" class="fork-joint-circle circle-rose" />
 
                   <!-- Sub-branch 4A (UP): Bộ Nhớ V8 -->
-                  <path d="M 1160 540 C 1185 540, 1195 475, 1220 475" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="1220" cy="475" r="4" class="sub-joint-circle circle-rose" />
-                  <text x="1232" y="479" text-anchor="start" class="sub-cat-title">Bộ Nhớ V8</text>
+                  <path d="M 1470 540 C 1495 540, 1510 475, 1540 475" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1540" cy="475" r="4" class="sub-joint-circle circle-rose" />
+                  <text x="1555" y="479" text-anchor="start" class="sub-cat-title">Bộ Nhớ V8</text>
 
                   <!-- Fork to 2 Leaves -->
-                  <path d="M 1325 475 L 1345 475" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="1345" cy="475" r="3.5" class="leaf-joint-circle circle-rose" />
-                  <path d="M 1345 475 C 1360 475, 1370 445, 1390 445" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="449" text-anchor="start" class="leaf-svg-text">V8 Stack: Call Frames (0% GC overhead)</text>
+                  <path d="M 1645 475 L 1670 475" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1670" cy="475" r="3.5" class="leaf-joint-circle circle-rose" />
+                  <path d="M 1670 475 C 1690 475, 1700 445, 1725 445" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="449" text-anchor="start" class="leaf-svg-text">V8 Stack: Call Frames (0% GC overhead)</text>
 
-                  <path d="M 1345 475 C 1360 475, 1370 505, 1390 505" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="509" text-anchor="start" class="leaf-svg-text">Young & Old Gen Heap: Scavenge & Mark-Sweep</text>
+                  <path d="M 1670 475 C 1690 475, 1700 505, 1725 505" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="509" text-anchor="start" class="leaf-svg-text">Young & Old Gen Heap: Scavenge & Mark-Sweep</text>
 
                   <!-- Sub-branch 4B (DOWN): Bộ Nhớ C++ -->
-                  <path d="M 1160 540 C 1185 540, 1195 605, 1220 605" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
-                  <circle cx="1220" cy="605" r="4" class="sub-joint-circle circle-rose" />
-                  <text x="1232" y="609" text-anchor="start" class="sub-cat-title">Bộ Nhớ C++</text>
+                  <path d="M 1470 540 C 1495 540, 1510 605, 1540 605" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1540" cy="605" r="4" class="sub-joint-circle circle-rose" />
+                  <text x="1555" y="609" text-anchor="start" class="sub-cat-title">Bộ Nhớ C++</text>
 
                   <!-- Fork to 2 Leaves -->
-                  <path d="M 1325 605 L 1345 605" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <circle cx="1345" cy="605" r="3.5" class="leaf-joint-circle circle-rose" />
-                  <path d="M 1345 605 C 1360 605, 1370 575, 1390 575" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="579" text-anchor="start" class="leaf-svg-text">C++ Buffers malloc() quản trị ngoài V8 Heap</text>
+                  <path d="M 1645 605 L 1670 605" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1670" cy="605" r="3.5" class="leaf-joint-circle circle-rose" />
+                  <path d="M 1670 605 C 1690 605, 1700 575, 1725 575" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="579" text-anchor="start" class="leaf-svg-text">C++ Buffers malloc() quản trị ngoài V8 Heap</text>
 
-                  <path d="M 1345 605 C 1360 605, 1370 635, 1390 635" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <text x="1400" y="639" text-anchor="start" class="leaf-svg-text">Resident Set Size (RSS) tổng tiêu thụ bộ nhớ</text>
+                  <path d="M 1670 605 C 1690 605, 1700 635, 1725 635" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1735" y="639" text-anchor="start" class="leaf-svg-text">Resident Set Size (RSS) tổng tiêu thụ bộ nhớ</text>
                 </g>
               </svg>
+            </div>
+
+            <!-- Gợi ý tương tác nhanh nổi góc dưới -->
+            <div class="mindmap-interaction-hint">
+              <span>✋ Giữ chuột kéo để di chuyển canvas • 🔍 Cuộn chuột để Phóng to / Thu nhỏ</span>
             </div>
           </div>
         </div>
@@ -1278,3 +1300,286 @@ export function renderSmartMindMapHtml(diagramText: string, title?: string): str
       return renderCleanBlueprint(diagramText, title);
   }
 }
+
+declare global {
+  interface Window {
+    initMindMapControllers?: (root?: HTMLElement | Document | null) => () => void;
+  }
+}
+
+/**
+ * Khởi tạo bộ điều khiển tương tác (Pan, Zoom, Fit, Fullscreen, Filter) cho Sơ đồ Mindmap
+ */
+export function initMindMapControllers(root?: HTMLElement | Document | null): () => void {
+  const container = root || (typeof document !== 'undefined' ? document : null);
+  if (!container) return () => {};
+
+  const boards = container.querySelectorAll<HTMLElement>('.system-architecture-board');
+  const cleanups: Array<() => void> = [];
+
+  boards.forEach((board) => {
+    if (board.dataset.mindmapInit === 'true') return;
+    board.dataset.mindmapInit = 'true';
+
+    const radialContainer = board.querySelector<HTMLElement>('.arch-radial-container');
+    const viewport = board.querySelector<HTMLElement>('.mindmap-viewport');
+    const stage = board.querySelector<HTMLElement>('.mindmap-stage');
+    const zoomLevelBtn = board.querySelector<HTMLElement>('.btn-zoom-level');
+    const zoomInBtn = board.querySelector<HTMLElement>('.btn-zoom-in');
+    const zoomOutBtn = board.querySelector<HTMLElement>('.btn-zoom-out');
+    const zoomFitBtn = board.querySelector<HTMLElement>('.btn-zoom-fit');
+    const zoomResetBtn = board.querySelector<HTMLElement>('.btn-zoom-reset');
+    const fullscreenBtn = board.querySelector<HTMLElement>('.btn-fullscreen');
+    const chips = board.querySelectorAll<HTMLButtonElement>('.mindmap-chip');
+    const hintBadge = board.querySelector<HTMLElement>('.mindmap-interaction-hint');
+
+    if (!viewport || !stage) return;
+
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const hideHint = () => {
+      if (hintBadge) {
+        hintBadge.style.opacity = '0';
+        setTimeout(() => {
+          if (hintBadge) hintBadge.style.display = 'none';
+        }, 500);
+      }
+    };
+
+    const updateTransform = () => {
+      stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      if (zoomLevelBtn) {
+        zoomLevelBtn.textContent = `${Math.round(scale * 100)}%`;
+      }
+    };
+
+    const fitToScreen = () => {
+      const vpWidth = viewport.clientWidth || 1000;
+      const vpHeight = viewport.clientHeight || 600;
+      const svgWidth = 2050;
+      const svgHeight = 700;
+      const scaleX = vpWidth / svgWidth;
+      const scaleY = vpHeight / svgHeight;
+      // Thu phóng vừa vặn toàn bộ sơ đồ với lề an toàn 94%
+      scale = Math.max(0.35, Math.min(1.2, Math.min(scaleX, scaleY) * 0.94));
+      panX = 0;
+      panY = 0;
+      updateTransform();
+    };
+
+    // Chuột kéo di chuyển (Pan)
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('.mindmap-ctrl-btn, .mindmap-chip')) return;
+      isDragging = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+      viewport.style.cursor = 'grabbing';
+      hideHint();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      updateTransform();
+    };
+
+    const onMouseUp = () => {
+      if (isDragging) {
+        isDragging = false;
+        viewport.style.cursor = 'grab';
+      }
+    };
+
+    // Cuộn chuột thu phóng (Zoom)
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      hideHint();
+      const zoomFactor = e.deltaY < 0 ? 0.12 : -0.12;
+      scale = Math.min(2.8, Math.max(0.35, scale + zoomFactor));
+      updateTransform();
+    };
+
+    // Cảm ứng Touch Pan & Pinch Zoom trên di động/trackpad
+    let touchStartDist = 0;
+    let initialTouchScale = 1;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('.mindmap-ctrl-btn, .mindmap-chip')) return;
+      hideHint();
+      if (e.touches.length === 1) {
+        isDragging = true;
+        startX = e.touches[0].clientX - panX;
+        startY = e.touches[0].clientY - panY;
+      } else if (e.touches.length === 2) {
+        isDragging = false;
+        touchStartDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialTouchScale = scale;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1 && isDragging) {
+        e.preventDefault();
+        panX = e.touches[0].clientX - startX;
+        panY = e.touches[0].clientY - startY;
+        updateTransform();
+      } else if (e.touches.length === 2 && touchStartDist > 0) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const ratio = dist / touchStartDist;
+        scale = Math.min(2.8, Math.max(0.35, initialTouchScale * ratio));
+        updateTransform();
+      }
+    };
+
+    const onTouchEnd = () => {
+      isDragging = false;
+      touchStartDist = 0;
+    };
+
+    // Nút Zoom
+    const onZoomIn = () => {
+      hideHint();
+      scale = Math.min(2.8, scale + 0.15);
+      updateTransform();
+    };
+
+    const onZoomOut = () => {
+      hideHint();
+      scale = Math.max(0.35, scale - 0.15);
+      updateTransform();
+    };
+
+    const onZoomReset = () => {
+      hideHint();
+      scale = 1.0;
+      panX = 0;
+      panY = 0;
+      updateTransform();
+    };
+
+    const onZoomFit = () => {
+      hideHint();
+      fitToScreen();
+    };
+
+    // Bật/tắt chế độ toàn màn hình
+    const toggleFullscreen = () => {
+      const isFs = board.classList.toggle('is-fullscreen');
+      if (fullscreenBtn) {
+        fullscreenBtn.textContent = isFs ? '✕ Thu nhỏ' : '⛶ Toàn màn hình';
+      }
+      setTimeout(fitToScreen, 120);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && board.classList.contains('is-fullscreen')) {
+        board.classList.remove('is-fullscreen');
+        if (fullscreenBtn) fullscreenBtn.textContent = '⛶ Toàn màn hình';
+        setTimeout(fitToScreen, 120);
+      }
+    };
+
+    // Lọc nhánh tương tác
+    const onChipClick = (chip: HTMLButtonElement) => {
+      chips.forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      const filter = chip.dataset.filter || 'all';
+
+      const branches = stage.querySelectorAll<SVGElement>('.mindmap-branch');
+      branches.forEach((b) => {
+        if (filter === 'all') {
+          b.classList.remove('is-dimmed', 'is-highlighted');
+        } else {
+          if (b.classList.contains(`branch-${filter}`)) {
+            b.classList.remove('is-dimmed');
+            b.classList.add('is-highlighted');
+          } else {
+            b.classList.add('is-dimmed');
+            b.classList.remove('is-highlighted');
+          }
+        }
+      });
+    };
+
+    // Lắng nghe sự kiện chuyển tab
+    const onTabChange = (e: Event) => {
+      const customEvt = e as CustomEvent<{ boardId: string }>;
+      if (customEvt.detail?.boardId === board.id) {
+        setTimeout(fitToScreen, 60);
+      }
+    };
+
+    // Gắn sự kiện
+    viewport.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    viewport.addEventListener('touchstart', onTouchStart, { passive: false });
+    viewport.addEventListener('touchmove', onTouchMove, { passive: false });
+    viewport.addEventListener('touchend', onTouchEnd);
+
+    zoomInBtn?.addEventListener('click', onZoomIn);
+    zoomOutBtn?.addEventListener('click', onZoomOut);
+    zoomResetBtn?.addEventListener('click', onZoomReset);
+    zoomLevelBtn?.addEventListener('click', onZoomReset);
+    zoomFitBtn?.addEventListener('click', onZoomFit);
+    fullscreenBtn?.addEventListener('click', toggleFullscreen);
+    window.addEventListener('keydown', onKeyDown);
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => onChipClick(chip));
+    });
+
+    window.addEventListener('mindmap:tab-switch', onTabChange);
+
+    // Tự động căn chỉnh nếu Mindmap đang hiển thị
+    if (radialContainer && radialContainer.style.display !== 'none') {
+      setTimeout(fitToScreen, 60);
+    }
+
+    cleanups.push(() => {
+      viewport.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      viewport.removeEventListener('wheel', onWheel);
+      viewport.removeEventListener('touchstart', onTouchStart);
+      viewport.removeEventListener('touchmove', onTouchMove);
+      viewport.removeEventListener('touchend', onTouchEnd);
+
+      zoomInBtn?.removeEventListener('click', onZoomIn);
+      zoomOutBtn?.removeEventListener('click', onZoomOut);
+      zoomResetBtn?.removeEventListener('click', onZoomReset);
+      zoomLevelBtn?.removeEventListener('click', onZoomReset);
+      zoomFitBtn?.removeEventListener('click', onZoomFit);
+      fullscreenBtn?.removeEventListener('click', toggleFullscreen);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('mindmap:tab-switch', onTabChange);
+      board.removeAttribute('data-mindmap-init');
+    });
+  });
+
+  return () => {
+    cleanups.forEach((c) => c());
+  };
+}
+
+// Khai báo hook toàn cục
+if (typeof window !== 'undefined') {
+  window.initMindMapControllers = initMindMapControllers;
+}
+

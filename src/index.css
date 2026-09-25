@@ -7767,122 +7767,289 @@ body {
 /* ==========================================================================
    VIEW 2: CLEAN RADIAL MINDMAP (BALANCED TWO-WING CANVAS)
    ========================================================================== */
+/* ==========================================================================
+   VIEW 2: FULL-WIDTH ORGANIC VECTOR MINDMAP WORKSPACE & PAN/ZOOM CANVAS
+   ========================================================================== */
 .arch-radial-container {
-  overflow-x: auto;
-  padding: 44px 28px;
+  width: 100%;
+  position: relative;
   background-color: var(--bg-surface);
-  background-image: radial-gradient(rgba(148, 163, 184, 0.22) 1.2px, transparent 1.2px);
+  background-image: radial-gradient(rgba(148, 163, 184, 0.28) 1.2px, transparent 1.2px);
   background-size: 20px 20px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--border-subtle);
 }
 
 [data-theme='light'] .arch-radial-container {
-  background-color: #fbfcfe;
+  background-color: #f8fafc;
   background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
 }
 
-/* ==========================================================================
-   MINDMAPS.COM AUTHENTIC ORGANIC VECTOR MINDMAP CANVAS
-   ========================================================================== */
-
-.mindmap-canvas-container {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 16px 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-  position: relative;
-  overflow: hidden;
-}
-
-[data-theme='light'] .mindmap-canvas-container {
-  background: #ffffff;
-  border-color: #e2e8f0;
-}
-
-[data-theme='dark'] .mindmap-canvas-container {
-  background: #0b0f19;
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.mindmap-toolbar-row {
+/* 1. Mindmap Top Control Bar */
+.mindmap-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px dashed var(--border-subtle);
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
   flex-wrap: wrap;
+  z-index: 10;
+  user-select: none;
 }
 
-.mindmap-legend {
+[data-theme='dark'] .mindmap-top-bar {
+  background: rgba(15, 23, 42, 0.8);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 2. Interactive Category Legend Chips */
+.mindmap-legend-group {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.legend-chip {
+.mindmap-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-subtle);
   color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
 }
 
-.legend-chip .chip-dot {
-  width: 9px;
-  height: 9px;
+.mindmap-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.mindmap-chip .chip-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   display: inline-block;
 }
 
 .chip-blue .chip-dot {
   background: #3b82f6;
-  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
 }
 
 .chip-green .chip-dot {
   background: #16a34a;
-  box-shadow: 0 0 6px rgba(22, 163, 74, 0.5);
+  box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);
 }
 
 .chip-sky .chip-dot {
   background: #0284c7;
-  box-shadow: 0 0 6px rgba(2, 132, 199, 0.5);
+  box-shadow: 0 0 6px rgba(2, 132, 199, 0.6);
 }
 
 .chip-rose .chip-dot {
   background: #f43f5e;
-  box-shadow: 0 0 6px rgba(244, 63, 94, 0.5);
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.6);
 }
 
-.mindmap-tip-text {
-  font-size: 11.5px;
-  color: var(--text-tertiary);
+.mindmap-chip.active {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
-.mindmap-svg-viewport {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+.mindmap-chip.chip-all.active {
+  border-color: #6366f1;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.mindmap-chip.chip-blue.active {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.mindmap-chip.chip-green.active {
+  border-color: #16a34a;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.mindmap-chip.chip-sky.active {
+  border-color: #0284c7;
+  color: #0284c7;
+  background: rgba(2, 132, 199, 0.12);
+}
+
+.mindmap-chip.chip-rose.active {
+  border-color: #f43f5e;
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.12);
+}
+
+/* 3. Pan & Zoom Control Toolbar */
+.mindmap-ctrl-group {
   display: flex;
-  justify-content: center;
-  padding: 8px 0;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.mindmap-master-svg {
-  width: 100%;
-  min-width: 1080px;
-  max-width: 1640px;
-  height: auto;
-  display: block;
+.mindmap-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
   user-select: none;
 }
 
-/* SVG Typography */
+.mindmap-ctrl-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.mindmap-ctrl-btn:active {
+  transform: translateY(0);
+}
+
+.mindmap-ctrl-btn.btn-zoom-level {
+  min-width: 52px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-primary);
+  background: var(--bg-surface-subtle);
+}
+
+.mindmap-ctrl-btn.btn-fullscreen {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #6366f1;
+}
+
+.mindmap-ctrl-btn.btn-fullscreen:hover {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+/* 4. Interactive Viewport & Stage */
+.mindmap-viewport {
+  position: relative;
+  width: 100%;
+  height: 640px;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mindmap-viewport:active {
+  cursor: grabbing;
+}
+
+.mindmap-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  transition: transform 0.04s linear;
+  will-change: transform;
+}
+
+.mindmap-master-svg {
+  width: 2050px;
+  height: 700px;
+  min-width: 2050px;
+  max-width: none;
+  display: block;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* 5. Minimal Interaction Hint */
+.mindmap-interaction-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(8px);
+  color: #f8fafc;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 20px;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  opacity: 0.92;
+  transition: opacity 0.5s ease;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+[data-theme='light'] .mindmap-interaction-hint {
+  background: rgba(30, 41, 59, 0.85);
+  color: #ffffff;
+}
+
+/* 6. Fullscreen Mode */
+.system-architecture-board.is-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  z-index: 99995 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.system-architecture-board.is-fullscreen .arch-board-header {
+  flex-shrink: 0;
+  border-radius: 0;
+}
+
+.system-architecture-board.is-fullscreen .arch-radial-container {
+  flex: 1 !important;
+  height: calc(100vh - 75px) !important;
+}
+
+.system-architecture-board.is-fullscreen .mindmap-viewport {
+  height: calc(100vh - 135px) !important;
+}
+
+/* 7. SVG Typography & Components */
 .hub-svg-title {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   font-size: 15px;
@@ -7895,7 +8062,7 @@ body {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   font-size: 9px;
   font-weight: 700;
-  fill: rgba(255, 255, 255, 0.9);
+  fill: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.8px;
 }
 
@@ -7999,28 +8166,37 @@ body {
   stroke: #f43f5e;
 }
 
-/* Branch Hover Interactions */
+/* 8. Branch Filter, Dimming & Highlight States */
 .mindmap-branch {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s ease, filter 0.25s ease;
   cursor: pointer;
 }
 
-.mindmap-branch:hover .branch-stem {
+.mindmap-branch:hover .branch-stem,
+.mindmap-branch.is-highlighted .branch-stem {
   stroke-width: 6.5px;
-  filter: drop-shadow(0 0 8px rgba(2, 132, 199, 0.4));
+  filter: drop-shadow(0 0 10px currentColor);
 }
 
-.mindmap-branch:hover .node-card-bg {
-  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.15));
+.mindmap-branch:hover .node-card-bg,
+.mindmap-branch.is-highlighted .node-card-bg {
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.2));
 }
 
-.mindmap-branch:hover .leaf-svg-text {
+.mindmap-branch:hover .leaf-svg-text,
+.mindmap-branch.is-highlighted .leaf-svg-text {
   fill: #0284c7;
   font-weight: 700;
 }
 
-[data-theme='dark'] .mindmap-branch:hover .leaf-svg-text {
+[data-theme='dark'] .mindmap-branch:hover .leaf-svg-text,
+[data-theme='dark'] .mindmap-branch.is-highlighted .leaf-svg-text {
   fill: #38bdf8;
+}
+
+.mindmap-branch.is-dimmed {
+  opacity: 0.18;
+  filter: grayscale(85%);
 }
 
 /* ==========================================================================
@@ -9107,104 +9283,122 @@ body {
   border-style: solid;
 }
 
-/* Modern Inline Popconfirm For Tab Deletion */
-.vs-tab-popconfirm {
+/* Modern Centered Modal Dialog For Tab Deletion (Non-clippable, Fail-safe) */
+.vs-tab-delete-overlay {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 230px;
-  background: #1e293b;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 10px;
-  padding: 12px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6);
-  z-index: 2000;
-  text-align: left;
-  animation: popconfirmFadeIn 0.16s ease-out;
+  inset: 0;
+  background: rgba(10, 15, 29, 0.78);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: tabModalOverlayFade 0.16s ease-out;
 }
 
-@keyframes popconfirmFadeIn {
+@keyframes tabModalOverlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.vs-tab-delete-modal {
+  width: 90%;
+  max-width: 380px;
+  background: #181d2f;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(239, 68, 68, 0.15);
+  text-align: left;
+  animation: tabModalScaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tabModalScaleUp {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-4px);
+    transform: scale(0.92) translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: scale(1) translateY(0);
   }
 }
 
-.popconfirm-arrow {
-  position: absolute;
-  top: -5px;
-  left: 50%;
-  transform: translateX(-50%) rotate(45deg);
-  width: 10px;
-  height: 10px;
-  background: #1e293b;
-  border-left: 1px solid rgba(239, 68, 68, 0.4);
-  border-top: 1px solid rgba(239, 68, 68, 0.4);
-}
-
-.popconfirm-header {
+.tab-delete-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
-.popconfirm-icon {
-  font-size: 14px;
+.tab-delete-icon {
+  font-size: 20px;
 }
 
-.popconfirm-title {
-  font-size: 12.5px;
-  font-weight: 700;
+.tab-delete-title {
+  font-size: 15px;
+  font-weight: 800;
   color: #f8fafc;
 }
 
-.popconfirm-desc {
-  font-size: 11px;
-  color: #94a3b8;
-  margin: 0 0 10px 0;
-  line-height: 1.35;
+.tab-delete-title strong {
+  color: #ef4444;
 }
 
-.popconfirm-actions {
+.tab-delete-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0 0 18px 0;
+  line-height: 1.5;
+}
+
+.tab-delete-desc code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #38bdf8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tab-delete-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 10px;
 }
 
-.popconfirm-btn {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
+.tab-delete-btn {
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
   cursor: pointer;
   border: none;
-  transition: all 0.15s ease;
+  transition: all 0.16s ease;
 }
 
-.popconfirm-btn.cancel {
+.tab-delete-btn.cancel {
   background: rgba(255, 255, 255, 0.1);
   color: #cbd5e1;
 }
 
-.popconfirm-btn.cancel:hover {
+.tab-delete-btn.cancel:hover {
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
 }
 
-.popconfirm-btn.delete {
+.tab-delete-btn.confirm {
   background: #ef4444;
   color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
 }
 
-.popconfirm-btn.delete:hover {
+.tab-delete-btn.confirm:hover {
   background: #dc2626;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
 }
 
 /* 11. Terminal Log Hint & Submission History */

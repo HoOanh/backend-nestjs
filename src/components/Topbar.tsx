@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types/user.ts';
+import { getModKey } from '../utils/platform.ts';
 
 interface TopbarProps {
   tag: string;
@@ -46,7 +47,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             className={`sidebar-toggle-btn ${isSidebarCollapsed ? 'is-collapsed' : ''}`}
             onClick={onToggleSidebar}
-            title={isSidebarCollapsed ? 'Mở danh mục bài học (Ctrl+B)' : 'Ẩn danh mục bài học để mở rộng màn hình (Ctrl+B)'}
+            title={isSidebarCollapsed ? `Mở danh mục bài học (${getModKey()}+B)` : `Ẩn danh mục bài học (${getModKey()}+B)`}
             aria-label="Đóng mở thanh điều hướng"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -64,7 +65,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             className={`topbar-tutor-btn ${isTutorOpen ? 'active' : ''}`}
             onClick={onToggleTutor}
-            title={isTutorOpen ? 'Đang mở Tutor AI Co-Pilot (Ctrl+J)' : 'Mở Tutor AI Co-Pilot hỗ trợ học tập (Ctrl+J)'}
+            title={isTutorOpen ? `Đang mở Tutor AI Co-Pilot (${getModKey()}+J)` : `Mở Tutor AI Co-Pilot hỗ trợ học tập (${getModKey()}+J)`}
             aria-label="Hỏi AI Tutor"
           >
             <span className="tutor-btn-sparkle">✦</span>

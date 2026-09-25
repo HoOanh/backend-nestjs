@@ -18,6 +18,7 @@ import { LearningHistoryModal } from './components/student/LearningHistoryModal.
 import { UserProfile, UserProgressState } from './types/user.ts';
 import { apiClient } from './services/apiClient.ts';
 import { useAppRouter } from './utils/router.ts';
+import { getModKey } from './utils/platform.ts';
 import {
   checkLessonUnlockStatus,
   checkSprintExamUnlockStatus,
@@ -737,12 +738,12 @@ export const App: React.FC = () => {
           <button
             className="floating-tutor-trigger-btn"
             onClick={() => setIsTutorOpen(true)}
-            aria-label="Mở Tutor AI Co-Pilot (Ctrl+J)"
+            aria-label={`Mở Tutor AI Co-Pilot (${getModKey()}+J)`}
           >
             <span className="fab-pulse-ring" />
             <img src="/logo.png" alt="Arc Irobot AI" className="fab-logo-img" />
             <span className="fab-status-dot" />
-            <span className="fab-tooltip">Hỏi Tutor AI (Ctrl+J)</span>
+            <span className="fab-tooltip">Hỏi Tutor AI ({getModKey()}+J)</span>
           </button>
         )}
       </main>

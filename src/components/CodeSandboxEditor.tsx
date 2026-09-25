@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CodeEvaluator, type TestOutcome, type TestCase } from '../services/codeEvaluator.ts';
 import { highlightSyntax } from './CodeViewer.tsx';
 import { FormattedText } from './FormattedText.tsx';
+import { getModKey } from '../utils/platform.ts';
 
 export interface CodeSandboxChallenge {
   title: string;
@@ -355,9 +356,11 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   const handleConfirmDeleteTab = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const next = solutions.filter((s) => s.id !== id);
+    if (next.length === 0) return;
     setSolutions(next);
     if (activeSolutionId === id) {
       setActiveSolutionId(next[0].id);
+      updateCurrentSolutionCode(next[0].code);
     }
     if (storageKey) {
       try {
@@ -366,6 +369,8 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
     }
     setTabToDeleteId(null);
   };
+
+  const tabToDelete = solutions.find((s) => s.id === tabToDeleteId);
 
   const handleRestoreHistory = (record: SubmissionHistoryRecord) => {
     updateCurrentSolutionCode(record.code);
@@ -384,6 +389,13 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 1. Phím tắt chạy thử Cmd+Enter (Mac) hoặc Ctrl+Enter (Windows) được ưu tiên xử lý ĐẦU TIÊN
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      void handleRunTests(false);
+      return;
+    }
+
     if (suggestions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -441,11 +453,6 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
         }
       }, 0);
       return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      void handleRunTests(false);
     }
   };
 
@@ -550,6 +557,37 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
 
       {/* VS Code Interactive Editor */}
       <div className="vs-code-editor sandbox-ide">
+        {/* Tab Delete Confirmation Overlay Modal */}
+        {tabToDelete && (
+          <div className="vs-tab-delete-overlay" onClick={() => setTabToDeleteId(null)}>
+            <div className="vs-tab-delete-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="tab-delete-header">
+                <span className="tab-delete-icon">⚠️</span>
+                <span className="tab-delete-title">Xóa tab <strong>{tabToDelete.name}</strong>?</span>
+              </div>
+              <p className="tab-delete-desc">
+                Mã nguồn của solution <code>{tabToDelete.name}</code> sẽ bị xóa vĩnh viễn và không thể khôi phục lại.
+              </p>
+              <div className="tab-delete-actions">
+                <button
+                  type="button"
+                  className="tab-delete-btn cancel"
+                  onClick={() => setTabToDeleteId(null)}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  className="tab-delete-btn confirm"
+                  onClick={(e) => handleConfirmDeleteTab(tabToDelete.id, e)}
+                >
+                  Xác nhận xóa tab
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="vs-editor-titlebar">
           <div className="vs-window-dots">
             <span className="dot dot-red" />
@@ -595,38 +633,10 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                   <span
                     className="vs-tab-action-icon close"
                     onClick={(e) => handlePromptDeleteTab(sol.id, e)}
-                    title="Xóa solution này"
+                    title={`Xóa tab ${sol.name}`}
                   >
                     ✕
                   </span>
-                )}
-
-                {/* Modern Inline Popconfirm */}
-                {tabToDeleteId === sol.id && (
-                  <div className="vs-tab-popconfirm" onClick={(e) => e.stopPropagation()}>
-                    <div className="popconfirm-arrow" />
-                    <div className="popconfirm-header">
-                      <span className="popconfirm-icon">⚠️</span>
-                      <span className="popconfirm-title">Xóa <strong>{sol.name}</strong>?</span>
-                    </div>
-                    <p className="popconfirm-desc">Mã nguồn của solution này sẽ không thể khôi phục lại.</p>
-                    <div className="popconfirm-actions">
-                      <button
-                        type="button"
-                        className="popconfirm-btn cancel"
-                        onClick={() => setTabToDeleteId(null)}
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="button"
-                        className="popconfirm-btn delete"
-                        onClick={(e) => handleConfirmDeleteTab(sol.id, e)}
-                      >
-                        Xác nhận xóa
-                      </button>
-                    </div>
-                  </div>
                 )}
               </div>
             ))}
@@ -716,7 +726,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             <span>•</span>
             <span>Tab: 2 spaces</span>
             <span>•</span>
-            <span className="shortcut-hint">Ctrl + Enter: Chạy thử</span>
+            <span className="shortcut-hint">{getModKey()} + Enter: Chạy thử</span>
           </div>
           <div className="sandbox-footer-actions">
             <button className="btn btn-secondary btn-sm" onClick={handleReset} title="Khôi phục code ban đầu của solution này">

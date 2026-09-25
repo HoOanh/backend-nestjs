@@ -121,3 +121,99 @@
   color: white;
   border-color: rgba(255, 255, 255, 0.25);
 }
+
+/* Code Body & Editor Lines */
+.vs-editor-body {
+  background: #181824;
+  padding: 14px 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #e2e8f0 !important;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3b4261 #12131c;
+  font-family: var(--font-mono);
+}
+
+.vs-editor-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.vs-editor-body::-webkit-scrollbar-track {
+  background: #12131c;
+  border-radius: 4px;
+}
+
+.vs-editor-body::-webkit-scrollbar-thumb {
+  background: #3b4261;
+  border-radius: 4px;
+  border: 1px solid #181824;
+}
+
+.editor-line {
+  display: flex;
+  align-items: flex-start;
+  min-height: 22px;
+  padding: 0 16px;
+  transition: background-color 0.15s ease;
+}
+
+.editor-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.line-num {
+  width: 40px;
+  min-width: 40px;
+  text-align: right;
+  padding-right: 18px;
+  color: #64748b;
+  user-select: none;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.line-text {
+  flex: 1;
+  white-space: pre;
+  word-break: normal;
+  color: #e2e8f0 !important;
+}
+
+/* Syntax Highlighting Tokens (One Dark Pro Theme) */
+.tok-comment {
+  color: #7f848e !important;
+  font-style: italic;
+}
+
+.tok-string {
+  color: #98c379 !important;
+}
+
+.tok-decorator {
+  color: #e5c07b !important;
+  font-weight: 600;
+}
+
+.tok-keyword {
+  color: #c678dd !important;
+  font-weight: 600;
+}
+
+.tok-type {
+  color: #4ec9b0 !important;
+  font-weight: 600;
+}
+
+.tok-number {
+  color: #d19a66 !important;
+}
+
+.tok-function {
+  color: #61afef !important;
+}
+
+.tok-punct {
+  color: #abb2bf !important;
+}

@@ -138,100 +138,145 @@ Client 3 ──┘           │                         Main Thread lập tức
 | **Tận dụng CPU Multi-core** | Tự động phân bổ qua OS Threads | Tự động phân bổ M:N | Cần chạy Cluster Mode hoặc nhiều Pods |
 | **Rủi ro sập hệ thống** | Hết RAM khi số lượng kết nối tăng | Dễ dính Race Condition bộ nhớ chia sẻ | **Bị nghẽn toàn bộ nếu dính vòng lặp CPU** |
       `,
-      realCodeSnippet: `// Trích đoạn mã theo dõi mức tiêu thụ bộ nhớ Resident Set Size (RSS) chuẩn mực
-import { memoryUsage } from 'node:process';
+      realCodeSnippet: `// File: src/health/health.controller.ts
+// Trích dẫn từ dự án thực tế Esmiles Backend - Probe Giám Sát Hạ Tầng & Kết Nối Mạng TCP
+import { Controller, Get, Inject, VERSION_NEUTRAL } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
+import Redis from 'ioredis';
+import { PrismaService } from '../prisma/prisma.service';
+import { REDIS_CLIENT } from '../redis/redis.module';
+import { Public } from '../modules/platform/auth/interface/decorator/public.decorator';
 
-export function logMemoryTelemetry(context: string) {
-  const usage = memoryUsage();
-  const toMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(2);
+/**
+ * Endpoint hạ tầng cho LB / Kubernetes Probe (ADR-0008 §7).
+ * Version-neutral + nằm NGOÀI global prefix 'api' để probe ổn định qua mọi version.
+ * - Liveness (/health): Đảm bảo V8 Event Loop & Main Thread không bị lock/starve.
+ * - Readiness (/ready): Kiểm tra toàn vẹn Socket TCP Pool đến Redis Cache & PostgreSQL DB.
+ */
+@SkipThrottle() // Probe LB/k8s poll liên tục mỗi 5s, tuyệt đối không được trả HTTP 429
+@ApiTags('health')
+@Controller({ version: VERSION_NEUTRAL })
+export class HealthController {
+  constructor(
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  console.log(\`[\${context}] Memory Telemetry:\`);
-  console.log(\` - RSS (Toàn bộ RAM tiến trình): \${toMB(usage.rss)} MB\`);
-  console.log(\` - Heap Total (V8 cấp phát):      \${toMB(usage.heapTotal)} MB\`);
-  console.log(\` - Heap Used (Dữ liệu thực tế):   \${toMB(usage.heapUsed)} MB\`);
-  console.log(\` - External (C++ Malloc/Buffer):   \${toMB(usage.external)} MB\`);
+  @Public()
+  @Get('health')
+  liveness() {
+    return { status: 'ok' };
+  }
+
+  @Public()
+  @Get('ready')
+  async readiness() {
+    // Ping đồng thời cả 2 kết nối hạ tầng để tránh tăng P99 Latency
+    const [redis, db] = await Promise.all([this.pingRedis(), this.pingDb()]);
+    const checks = { redis, db };
+    const ready = Object.values(checks).every((s) => s === 'up');
+    return { status: ready ? 'ok' : 'degraded', checks };
+  }
+
+  private async pingRedis(): Promise<'up' | 'down'> {
+    try {
+      return (await this.redis.ping()) === 'PONG' ? 'up' : 'down';
+    } catch {
+      return 'down';
+    }
+  }
+
+  private async pingDb(): Promise<'up' | 'down'> {
+    try {
+      await this.prisma.$queryRaw\`SELECT 1\`;
+      return 'up';
+    } catch {
+      return 'down';
+    }
+  }
 }`,
       quiz: [
         {
           id: 'c1-l1-q1',
           question: 'Tại sao mô hình đa luồng truyền thống (Thread-per-Request) bị sụp đổ khi phải đối mặt với Bài toán C10K (10,000 kết nối đồng thời)?',
           options: [
-            'Vì giao thức TCP bắt buộc phải ngắt kết nối mạng ngay lập tức nếu phát hiện máy chủ có nhiều hơn 1,000 luồng hệ điều hành.',
-            'Vì mỗi OS Thread tiêu tốn 1-2MB RAM Stack và chi phí Context Switching làm tiêu hao phần lớn công suất tính toán của CPU.',
-            'Vì cơ sở dữ liệu quan hệ PostgreSQL chỉ cho phép tối đa 50 luồng kết nối đồng thời từ toàn bộ các máy chủ ứng dụng bên ngoài.',
-            'Vì bảng phân trang bộ nhớ ảo của hệ điều hành Linux tự động khóa cứng toàn bộ tiến trình nếu vượt quá 100 luồng chạy song song.'
+            'Vì hệ điều hành giới hạn bảng mô tả tệp tin (ulimit -n) khiến kernel tự động drop toàn bộ các gói tin TCP SYN khi số kết nối vượt quá backlog queue của socket.',
+            'Vì mỗi OS Thread tiêu tốn 1-2MB RAM Stack riêng biệt (10K threads ngốn 10-20GB RAM) và chi phí Context Switching liên tục giữa hàng nghìn threads làm tê liệt CPU Cache (Cache Thrashing).',
+            'Vì nhân Linux sử dụng cơ chế Spinlock toàn cục trên bảng định tuyến mạng, khiến hàng nghìn threads bị kẹt trong trạng thái Uninterruptible Sleep (D-state) để tranh chấp socket mutex.',
+            'Vì thời gian chuyển đổi ngữ cảnh giữa các threads tăng theo hàm lũy thừa O(2^N), làm cạn kiệt 100% băng thông của thanh ghi CPU mà không phụ thuộc vào dung lượng RAM vật lý.'
           ],
           correctIndex: 1,
-          explanation: 'Mỗi thread của Linux cần 1-2MB bộ nhớ Stack riêng. 10,000 kết nối làm mất 10-20GB RAM chỉ để chứa call stack rỗng. Đồng thời, CPU tốn hơn 70% thời gian chỉ để lưu/nạp thanh ghi và làm mất hiệu lực CPU Cache (Context Switching Overhead).'
+          explanation: 'Mỗi thread của Linux cần 1-2MB bộ nhớ Stack riêng biệt. 10,000 kết nối làm mất 10-20GB RAM chỉ để chứa call stack rỗng. Đồng thời, CPU tốn phần lớn chu kỳ chỉ để lưu/nạp thanh ghi và làm mất hiệu lực CPU Cache L1/L2 (Context Switching Overhead).'
         },
         {
           id: 'c1-l1-q2',
-          question: 'Chỉ số memoryUsage().external trong Node.js phản ánh phân vùng bộ nhớ thực tế nào sau đây của tiến trình?',
+          question: 'Chỉ số process.memoryUsage().external trong Node.js phản ánh phân vùng bộ nhớ thực tế nào sau đây của tiến trình?',
           options: [
-            'Dung lượng bộ nhớ tạm thời được hệ điều hành hoán đổi (swap) sang ổ cứng SSD khi máy chủ bị cạn kiệt RAM vật lý.',
-            'Tổng dung lượng dữ liệu đang được lưu trữ trên cụm máy chủ Redis Cache phân tán được kết nối qua đường truyền mạng.',
-            'Bộ nhớ được cấp phát ngoài V8 Heap thông qua hàm malloc trực tiếp tại tầng C++ của Node.js (dành cho Buffer, Crypto).',
-            'Dung lượng các tệp tin hình ảnh và tài liệu tĩnh được lưu trữ trong thư mục public của ứng dụng web đang vận hành.'
+            'Bộ nhớ thuộc phân vùng Large Object Space của V8 Heap dùng để lưu trữ các mảng và chuỗi ký tự JavaScript có kích thước vượt quá 500KB.',
+            'Bộ nhớ dùng chung (Shared Memory) được cấp phát qua SharedArrayBuffer để truyền dữ liệu không qua sao chép giữa các Worker Threads độc lập.',
+            'Bộ nhớ cấp phát bằng hàm malloc ở tầng C++ bên ngoài V8 Heap (chẳng hạn như dữ liệu nhị phân của Buffer, ngữ cảnh mã hóa của module crypto, và stream zlib).',
+            'Dung lượng bộ nhớ ảo (Virtual Memory) của tiến trình đã bị hệ điều hành hoán đổi (swap) ra ổ đĩa khi máy chủ chạm ngưỡng cạn kiệt bộ nhớ vật lý.'
           ],
           correctIndex: 2,
-          explanation: 'Chỉ số external phản ánh bộ nhớ C++ malloc nằm ngoài V8 Heap. Điển hình nhất là các đối tượng Buffer: trên V8 Heap nó chỉ là wrapper nhỏ ~32 bytes, nhưng dữ liệu nhị phân thực tế lại nằm trong vùng nhớ external C++ này.'
+          explanation: 'Chỉ số external phản ánh bộ nhớ C++ malloc nằm ngoài V8 Heap. Điển hình nhất là các đối tượng Buffer: trên V8 Heap nó chỉ là JS wrapper nhỏ ~32 bytes, nhưng dữ liệu nhị phân thực tế lại nằm trong vùng nhớ external C++ này, không chịu sự quản lý trực tiếp của giới hạn max-old-space-size.'
         },
         {
           id: 'c1-l1-q3',
-          question: 'Khác biệt căn bản nhất giữa việc giải phóng bộ nhớ trên Stack Memory và Heap Memory của V8 Engine là gì?',
+          question: 'Khác biệt căn bản nhất giữa cơ chế giải phóng bộ nhớ trên Stack Memory và Heap Memory của V8 Engine là gì?',
           options: [
-            'Stack được giải phóng tức thì thông qua việc dịch chuyển con trỏ Stack Pointer của CPU, còn Heap cần Garbage Collector quét dọn.',
-            'Stack đòi hỏi thuật toán Mark-Sweep-Compact phức tạp chạy định kỳ, còn Heap tự động được dọn sạch sau mỗi lời gọi hàm kết thúc.',
-            'Stack lưu trữ toàn bộ các đối tượng mảng lớn và instance của class, còn Heap chỉ lưu trữ các số nguyên 31-bit kiểu con trỏ.',
-            'Stack có thể mở rộng kích thước vô hạn theo dung lượng RAM của máy chủ, còn Heap bị giới hạn cố định ở mức 64 kilobytes duy nhất.'
+            'Stack được giải phóng tức thì theo cơ chế LIFO bằng một phép toán tịnh tiến con trỏ Stack Pointer của CPU khi kết thúc hàm (0% GC overhead), trong khi Heap là vùng nhớ cấp phát động đòi hỏi Garbage Collector phải duyệt đồ thị tham chiếu để thu hồi.',
+            'Stack phân bổ các đối tượng có kích thước biến động và được dọn dẹp bằng thuật toán Cheney Scavenge, trong khi Heap chỉ lưu các địa chỉ trả về cố định và được CPU dọn dẹp theo chu kỳ xung nhịp.',
+            'Stack thu hồi bộ nhớ bằng cách đếm số lượng con trỏ tham chiếu (Reference Counting) ngay khi biến ra khỏi block scope, trong khi Heap chỉ được dọn dẹp khi tiến trình nhận tín hiệu kết thúc từ hệ điều hành.',
+            'Stack sử dụng cơ chế bảo vệ phân trang nhớ (Memory Page Protection) của nhân kernel để đánh dấu vùng nhớ khả dụng, còn Heap sử dụng bảng băm con trỏ nội bộ để ghi đè dữ liệu cũ.'
           ],
           correctIndex: 0,
-          explanation: 'Stack Memory hoạt động theo cơ chế LIFO: khi một hàm kết thúc, con trỏ Stack Pointer của CPU chỉ việc lùi lại (pop stack) để giải phóng toàn bộ vùng nhớ của hàm đó trong 1 chu kỳ xung nhịp. Heap Memory phân bổ động nên bắt buộc phải có GC chạy thuật toán quét đồ thị tham chiếu phức tạp.'
+          explanation: 'Stack Memory hoạt động theo cơ chế LIFO: khi một hàm kết thúc, con trỏ Stack Pointer của CPU chỉ việc lùi lại (pop stack frame) để giải phóng toàn bộ vùng nhớ của hàm đó trong 1 chu kỳ xung nhịp. Heap Memory phân bổ động nên bắt buộc phải có GC chạy thuật toán quét đồ thị tham chiếu phức tạp.'
         },
         {
           id: 'c1-l1-q4',
-          question: 'Hiện tượng CPU Cache Thrashing (mất hiệu lực bộ nhớ đệm CPU L1/L2) xảy ra nghiêm trọng nhất trong tình huống nào?',
+          question: 'Hiện tượng CPU Cache Thrashing (mất hiệu lực bộ nhớ đệm CPU L1/L2/L3) xảy ra nghiêm trọng nhất trong tình huống nào đối với các máy chủ I/O?',
           options: [
-            'Khi mã nguồn JavaScript thực thi các câu lệnh toán học thuần túy trên các biến nguyên thủy nằm cố định trong bộ nhớ Stack.',
-            'Khi máy chủ backend nhận một gói tin HTTP Request có chứa phần tiêu đề Authorization dài hơn giới hạn quy định của Nginx.',
-            'Khi cơ sở dữ liệu PostgreSQL thực hiện quét toàn bộ bảng dữ liệu không có chỉ mục thông qua lệnh Sequential Scan.',
-            'Khi hệ thống có quá nhiều luồng hệ điều hành tranh chấp và CPU phải liên tục chuyển đổi ngữ cảnh (Context Switching) giữa các thread.'
+            'Khi luồng thực thi duyệt một mảng 2 chiều theo thứ tự cột thay vì hàng, làm dữ liệu nạp vào mỗi dòng Cache Line 64-byte không được tái sử dụng.',
+            'Khi hai luồng chạy trên hai lõi CPU khác nhau cùng cập nhật hai biến độc lập nhưng vô tình nằm chung trên cùng một Cache Line phần cứng (False Sharing).',
+            'Khi tiến trình truy cập vào các trang bộ nhớ ảo không nằm trong RAM thực tế, buộc CPU phải dừng luồng để đọc dữ liệu từ ổ cứng thông qua Page Fault.',
+            'Khi hệ thống duy trì quá nhiều OS Threads đồng thời khiến CPU liên tục phải chuyển đổi ngữ cảnh (Context Switching), nạp/xả toàn bộ thanh ghi và làm bốc hơi tính cục bộ dữ liệu (Data Locality) trên L1/L2 Cache.'
           ],
           correctIndex: 3,
-          explanation: 'Khi CPU chuyển từ Thread A sang Thread B, dữ liệu của Thread A trên L1/L2 Cache trở nên vô dụng và bị đẩy ra ngoài để nạp dữ liệu của Thread B vào. Khi nhảy lại Thread A, CPU lại bị Cache Miss và phải đọc từ RAM (chậm hơn 100 lần). Đây là lý do kiến trúc đơn luồng Event Loop của Node.js lại có Cache Locality vượt trội.'
+          explanation: 'Khi CPU chuyển từ Thread A sang Thread B, dữ liệu của Thread A trên L1/L2 Cache trở nên vô dụng và bị đẩy ra ngoài để nạp dữ liệu của Thread B vào. Khi quay lại Thread A, CPU lại bị Cache Miss và phải đọc từ RAM (chậm hơn 100 lần). Kiến trúc đơn luồng Event Loop của Node.js giữ vững Cache Locality tối ưu trên CPU core.'
         },
         {
           id: 'c1-l1-q5',
-          question: 'Tại sao việc lưu trữ dữ liệu của request vào thuộc tính của một Singleton Service trong NestJS (ví dụ: this.currentUser = req.user) lại dẫn đến sự cố bảo mật nghiêm trọng (P0)?',
+          question: 'Tại sao việc lưu trữ dữ liệu của request vào thuộc tính của một Singleton Service trong NestJS (ví dụ: this.currentUser = req.user) lại dẫn đến sự cố bảo mật rò rỉ dữ liệu chéo (Cross-tenant Data Bleed) ngay cả trên môi trường đơn luồng của Node.js?',
           options: [
-            'Do NestJS sẽ tự động đóng kết nối cơ sở dữ liệu nếu phát hiện thuộc tính class bị biến đổi trong lúc xử lý request.',
-            'Do V8 Engine sẽ tự động chuyển tiến trình sang chế độ Read-Only và từ chối ghi nhận thêm bất kỳ request HTTP nào tiếp theo.',
-            'Do NestJS Provider mặc định có phạm vi Singleton (chia sẻ chung 1 instance trên toàn tiến trình), dữ liệu của request này sẽ ghi đè và rò rỉ sang các request của người dùng khác (Cross-tenant Data Bleed).',
-            'Do hệ điều hành Linux sẽ ngắt quyền thực thi của tiến trình Node.js vì vi phạm quy tắc phân bổ bộ nhớ Stack an toàn.'
+            'Vì đối tượng currentUser bị đưa vào phân vùng Old Generation của V8 Heap khiến bộ thu gom rác không thể giải phóng, làm sập bộ nhớ máy chủ sau vài nghìn requests.',
+            'Vì các Worker Threads chạy ngầm của Node.js cùng lúc ghi dữ liệu vào cùng một ô nhớ thanh ghi mà không có cơ chế Mutex/Lock đồng bộ.',
+            'Vì Singleton Service duy trì một instance duy nhất suốt vòng đời tiến trình; trong khi Event Loop xử lý bất đồng bộ, các điểm await làm ngắt quãng luồng xử lý của request này và cho phép request khác xen vào ghi đè lên thuộc tính dùng chung đó.',
+            'Vì NestJS IoC Container sẽ tự động nhân bản (clone) đối tượng Service mỗi khi phát hiện có sự thay đổi thuộc tính, làm mất tính toàn vẹn của Dependency Injection Tree.'
           ],
           correctIndex: 2,
-          explanation: 'Trong kiến trúc Long-Running Process của NestJS, các Service mặc định là Singleton. Mọi request đều dùng chung một instance duy nhất. Nếu lưu state của request vào thuộc tính instance, biến này sẽ tồn tại suốt vòng đời tiến trình và bị các request đồng thời khác đọc/ghi đè, dẫn đến rò rỉ dữ liệu người dùng cực kỳ nguy hiểm.'
+          explanation: 'Trong kiến trúc Long-Running Process của NestJS, các Service mặc định là Singleton. Mọi request đều dùng chung một instance duy nhất. Khi một request gặp điểm await (I/O chờ DB), Event Loop nhường quyền cho request khác. Request thứ hai ghi đè this.currentUser. Khi request một tiếp tục chạy, nó sẽ đọc dữ liệu của request hai, dẫn đến rò rỉ dữ liệu chéo cực kỳ nghiêm trọng.'
         },
         {
           id: 'c1-l1-q6',
           question: 'Cơ chế nào ở tầng nhân hệ điều hành (OS Kernel) giúp Libuv và Node.js giám sát hàng chục nghìn kết nối mạng đồng thời mà không làm tiêu hao chu kỳ CPU khi các kết nối đang rảnh rỗi (Idle)?',
           options: [
-            'Cơ chế Busy Waiting liên tục duyệt qua mảng socket trong vòng lặp while(true) với tần số 1 tỷ lần mỗi giây.',
-            'Hệ thống I/O Multiplexing hướng sự kiện (epoll trên Linux, kqueue trên macOS) cho phép luồng chính ngủ và chỉ thức giấc khi kernel thông báo có dữ liệu sẵn sàng trên socket.',
-            'Việc ép buộc mỗi card mạng phần cứng (NIC) phải tích hợp sẵn một bộ vi xử lý JavaScript V8 thu nhỏ để xử lý gói tin TCP.',
-            'Cơ chế hoán đổi bộ nhớ (RAM Paging) liên tục lưu dữ liệu của các socket rảnh rỗi vào ổ cứng SSD của máy chủ.'
+            'Sử dụng syscall select() hoặc poll() để duyệt tuần tự với độ phức tạp O(N) qua toàn bộ mảng file descriptors trong một vòng lặp liên tục ở chế độ user-space.',
+            'Sử dụng các syscall I/O Multiplexing hướng sự kiện (epoll trên Linux, kqueue trên BSD/macOS) cho phép tiến trình chuyển sang trạng thái ngủ và chỉ được kernel đánh thức khi có sự kiện mạng sẵn sàng với độ phức tạp O(1).',
+            'Sử dụng cơ chế POSIX AIO (aio_read/aio_write) ép kernel tự động tạo một luồng kernel thread riêng biệt cho từng socket để xử lý ngầm.',
+            'Sử dụng kỹ thuật Kernel Bypass (DPDK) truyền dữ liệu trực tiếp từ card mạng NIC vào không gian bộ nhớ của V8 mà không thông qua TCP/IP stack của hệ điều hành.'
           ],
           correctIndex: 1,
-          explanation: 'Node.js đạt hiệu năng C10K nhờ Libuv sử dụng các syscall I/O Multiplexing phi chặn của Kernel (epoll trên Linux, kqueue trên macOS/BSD, IOCP trên Windows). Thay vì tốn CPU thăm dò, hệ điều hành sẽ đưa tiến trình vào trạng thái ngủ và chỉ đánh thức Event Loop khi có sự kiện mạng thực sự xảy ra trên socket.'
+          explanation: 'Node.js đạt hiệu năng C10K nhờ Libuv sử dụng các syscall I/O Multiplexing phi chặn của Kernel (epoll trên Linux, kqueue trên macOS/BSD, IOCP trên Windows). Thay vì tốn CPU thăm dò O(N), hệ điều hành sẽ đưa tiến trình vào trạng thái ngủ và chỉ đánh thức Event Loop khi có sự kiện mạng thực sự xảy ra trên socket.'
         },
         {
           id: 'c1-l1-q7',
-          question: 'Khi dung lượng Old Generation của V8 Heap chạm ngưỡng giới hạn mặc định (~1.4GB trên máy chủ 64-bit), điều gì sẽ xảy ra và cờ tham số nào của Node.js giúp mở rộng giới hạn này?',
+          question: 'Khi dung lượng phân vùng Old Generation của V8 Heap chạm ngưỡng giới hạn mặc định (~1.4GB trên máy chủ 64-bit), điều gì sẽ xảy ra và cờ tham số nào của Node.js giúp mở rộng giới hạn này?',
           options: [
-            'Node.js tự động nén toàn bộ RAM sang ổ cứng và tiếp tục chạy mà không làm giảm tốc độ; điều chỉnh qua cờ --enable-swap.',
-            'Hệ thống tự động kích hoạt tiến trình con Worker Thread mới để gánh bớt RAM; điều chỉnh qua cờ --auto-fork-memory.',
-            'V8 Engine tự động xóa sạch toàn bộ mã nguồn của ứng dụng để giải phóng dung lượng; điều chỉnh qua cờ --clear-code-cache.',
-            'Tiến trình crash tức thì với lỗi "JavaScript heap out of memory"; có thể mở rộng bằng cờ --max-old-space-size=<MB>.'
+            'V8 sẽ chuyển toàn bộ object còn sống sang phân vùng To-Space của Young Generation; có thể tăng kích thước phân vùng này qua cờ --max-semi-space-size.',
+            'Node.js tự động khởi tạo thêm Worker Thread ngầm để gánh bớt các object dư thừa; có thể điều chỉnh qua cờ --experimental-worker-memory.',
+            'Hệ điều hành tự động hoán đổi phân vùng bộ nhớ này ra swap space trên ổ đĩa cứng; có thể cấu hình dung lượng swap qua cờ --max-swap-allocation.',
+            'V8 kích hoạt liên tục các chu kỳ Full GC nhưng không giải phóng được bộ nhớ, dẫn đến tiến trình crash tức thì với lỗi "JavaScript heap out of memory"; mở rộng bằng cờ --max-old-space-size=<MB>.'
           ],
           correctIndex: 3,
           explanation: 'Mặc định trên kiến trúc 64-bit, V8 giới hạn Old Generation ở mức ~1.4GB để đảm bảo thời gian tạm dừng thu gom rác (GC pause time) không vượt quá ngưỡng chấp nhận được của trình duyệt. Trên máy chủ backend, nếu cần xử lý dữ liệu lớn, ta dùng cờ --max-old-space-size=4096 (để cấp 4GB RAM) hoặc cấu hình trong môi trường container.'
@@ -240,10 +285,10 @@ export function logMemoryTelemetry(context: string) {
           id: 'c1-l1-q8',
           question: 'Ý nghĩa kỹ thuật chính xác của chỉ số Resident Set Size (RSS) khi so sánh với Heap Total trong telemetry của Node.js là gì?',
           options: [
-            'RSS là tổng dung lượng RAM vật lý thực tế mà tiến trình đang chiếm giữ (bao gồm V8 Heap, mã máy C++, Buffer, và Call Stack), trong khi Heap Total chỉ là bộ nhớ ảo do V8 quản lý.',
-            'RSS là dung lượng lưu trữ còn trống trên ổ cứng SSD của máy chủ, trong khi Heap Total là dung lượng RAM của toàn bộ hệ điều hành.',
-            'RSS là số lượng kết nối WebSocket đang hoạt động đồng thời, trong khi Heap Total là số lượng câu truy vấn SQL đang chờ thực thi.',
-            'RSS chỉ tồn tại trên hệ điều hành Windows, trong khi Heap Total chỉ tồn tại trên các bản phân phối của Linux Ubuntu và Alpine.'
+            'RSS là tổng dung lượng RAM vật lý thực tế mà hệ điều hành cấp cho toàn bộ tiến trình (gồm V8 Heap, bộ nhớ C++ malloc, Call Stack, và binary thực thi), trong khi Heap Total chỉ là tổng dung lượng bộ nhớ mà V8 đã cam kết dành riêng cho các đối tượng JavaScript.',
+            'RSS là tổng không gian địa chỉ bộ nhớ ảo (Virtual Memory) mà tiến trình yêu cầu từ kernel (gồm cả các vùng nhớ chưa map vào RAM), trong khi Heap Total là dung lượng RAM vật lý thực tế đã được cấp phát.',
+            'RSS là phần bộ nhớ dùng chung giữa tiến trình Node.js và các tiến trình cha trong Linux cgroups, trong khi Heap Total là bộ nhớ riêng tư (Private Dirty Memory) độc quyền của V8.',
+            'RSS chỉ bao gồm dung lượng của các Buffer nhị phân và Native Addons C++, trong khi Heap Total bao gồm toàn bộ mã nguồn JavaScript và Call Stack của tiến trình.'
           ],
           correctIndex: 0,
           explanation: 'RSS (Resident Set Size) là dung lượng RAM vật lý thực tế mà OS cấp phát cho toàn bộ tiến trình. Nó bao gồm V8 Heap (heapTotal/heapUsed), bộ nhớ C++ malloc (external, Buffer), Call Stack của các thread, và chính mã nhị phân thực thi của Node.js runtime. Giám sát RSS là cách duy nhất để ngăn chặn container bị OOMKilled.'
@@ -438,140 +483,159 @@ MEGAMORPHIC (Bão hòa Cache)   ──► BỎ CUỘC! Tra cứu bảng băm ch�
 | **Polymorphic** | Từ 2 đến 4 Shapes | Duyệt mảng điều kiện ngắn | Nhanh vừa phải | Chấp nhận được ở business logic |
 | **Megamorphic** | Trên 4 Shapes khác nhau | Tra cứu bảng băm động $O(N)$ | **Chậm nhất (Tụt 10-20 lần)** | Anti-pattern, cần tái cấu trúc |
       `,
-      realCodeSnippet: `// Đoạn mã đo lường thực tế sự chênh lệch giữa Monomorphic và Deoptimized Shapes
-import { performance } from 'node:perf_hooks';
+      realCodeSnippet: `// File: src/modules/clinical/transformer/monomorphic-record.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - High-Throughput Monomorphic Data Pipeline
+import { Injectable, Logger } from '@nestjs/common';
 
-interface UserEntity {
-  id?: number;
-  role?: string;
+/**
+ * Entity chuẩn Monomorphic Shape cho V8 Engine:
+ * - Mọi thuộc tính được khởi tạo trong constructor theo thứ tự nghiêm ngặt.
+ * - Các thuộc tính tùy chọn (optional) được gán null thay vì undefined hoặc bỏ qua.
+ * - Object.seal() để ngăn ngừa việc thêm động thuộc tính ngoài ý muốn làm vỡ Shape.
+ */
+export class MedicalRecordEntity {
+  public readonly id: number;
+  public readonly patientCode: string;
+  public readonly diagnosis: string;
+  public readonly notes: string | null;
+  public readonly archivedAt: Date | null;
+
+  constructor(
+    id: number,
+    patientCode: string,
+    diagnosis: string,
+    notes: string | null = null,
+    archivedAt: Date | null = null,
+  ) {
+    this.id = id;
+    this.patientCode = patientCode;
+    this.diagnosis = diagnosis;
+    this.notes = notes;
+    this.archivedAt = archivedAt;
+    Object.seal(this); // Khóa cấu trúc Shape, ép V8 giữ nguyên Monomorphic Inline Cache
+  }
 }
 
-export function runShapeBenchmark() {
-  const TOTAL = 1_000_000;
+@Injectable()
+export class MonomorphicRecordPipelineService {
+  private readonly logger = new Logger(MonomorphicRecordPipelineService.name);
 
-  // 1. Monomorphic: Thứ tự thuộc tính cố định tuyệt đối
-  const startMono = performance.now();
-  const arrMono: UserEntity[] = [];
-  for (let i = 0; i < TOTAL; i++) {
-    const u: UserEntity = {};
-    u.id = i;
-    u.role = 'DOCTOR';
-    arrMono.push(u);
-  }
-  const timeMono = performance.now() - startMono;
+  /**
+   * Pipeline xử lý 1,000,000 bản ghi streaming từ Database / Message Queue.
+   * Giữ 100% Monomorphic Inline Caching (O(1) Direct Memory Offset) cho TurboFan.
+   */
+  public sanitizeAndTransformBatch(rawRecords: Array<Record<string, unknown>>): MedicalRecordEntity[] {
+    const total = rawRecords.length;
+    const sanitized: MedicalRecordEntity[] = new Array(total);
 
-  // 2. Deopt: Thứ tự thuộc tính bị đảo lộn -> sinh ra 2 Hidden Classes khác nhau
-  const startDeopt = performance.now();
-  const arrDeopt: UserEntity[] = [];
-  for (let i = 0; i < TOTAL; i++) {
-    const u: UserEntity = {};
-    if (i % 2 === 0) {
-      u.id = i;
-      u.role = 'DOCTOR';
-    } else {
-      u.role = 'DOCTOR'; // Đảo ngược thứ tự!
-      u.id = i;
+    for (let i = 0; i < total; i++) {
+      const raw = rawRecords[i];
+      // Luôn tạo object qua constructor chuẩn để đảm bảo cùng 1 Transition Tree
+      sanitized[i] = new MedicalRecordEntity(
+        Number(raw.id) || 0,
+        String(raw.patientCode || '').trim().toUpperCase(),
+        String(raw.diagnosis || 'UNSPECIFIED'),
+        raw.notes ? String(raw.notes) : null,
+        raw.archivedAt ? new Date(String(raw.archivedAt)) : null,
+      );
     }
-    arrDeopt.push(u);
-  }
-  const timeDeopt = performance.now() - startDeopt;
 
-  console.log(\`Monomorphic Time: \${timeMono.toFixed(2)} ms\`);
-  console.log(\`Deoptimized Time: \${timeDeopt.toFixed(2)} ms (Chậm hơn \${(timeDeopt / timeMono).toFixed(1)}x!)\`);
+    return sanitized;
+  }
 }`,
       quiz: [
         {
           id: 'c1-l2-q1',
-          question: 'Tại sao việc khởi tạo các thuộc tính của cùng một đối tượng theo các thứ tự khác nhau lại khiến hiệu năng của V8 Engine bị sụt giảm nghiêm trọng?',
+          question: 'Tại sao việc gán các thuộc tính của cùng một đối tượng theo các thứ tự khác nhau (ví dụ: { a: 1, b: 2 } so với { b: 2, a: 1 }) lại khiến hiệu năng của V8 Engine bị sụt giảm nghiêm trọng?',
           options: [
-            'Nó buộc trình biên dịch TypeScript phải nạp lại toàn bộ file khai báo kiểu d.ts từ đĩa cứng trong lúc ứng dụng đang chạy.',
-            'Nó tạo ra các nhánh chuyển đổi Hidden Class khác nhau, làm bão hòa Inline Caching và ép V8 tra cứu bảng băm động O(N).',
-            'Nó làm cho bộ nhớ Stack của hệ điều hành bị phân mảnh khiến con trỏ Stack Pointer phải đảo chiều liên tục giữa các hàm.',
-            'Nó kích hoạt cơ chế khóa bảng dữ liệu của PostgreSQL do nhận thấy các trường dữ liệu JSON bị hoán đổi vị trí bộ nhớ.'
+            'Vì CPU không thể căn chỉnh (memory alignment) các trường dữ liệu theo bội số của 64-bit, gây ra hiện tượng Unaligned Memory Access ở tầng phần cứng.',
+            'Vì V8 tạo ra hai nhánh chuyển đổi Hidden Class (Shapes) hoàn toàn khác nhau từ gốc (Root Shape), dẫn đến việc phá vỡ tính đồng nhất tại các vị trí gọi hàm và làm bão hòa Inline Cache.',
+            'Vì bộ phân tích cú pháp (Parser) của V8 phải khởi tạo hai cây trừu tượng cú pháp (AST) riêng biệt, làm tăng gấp đôi dung lượng bộ nhớ dành cho Bytecode của hàm.',
+            'Vì Garbage Collector phải thiết lập thêm các rào chắn ghi nhớ (Write Barriers) giữa các thuộc tính để theo dõi con trỏ giữa Young Generation và Old Generation.'
           ],
           correctIndex: 1,
-          explanation: 'V8 tối ưu hóa việc truy cập thuộc tính bằng cách giả định các object cùng loại sẽ có cùng Hidden Class (Shape) và offset cố định. Khi khởi tạo lệch thứ tự, V8 sinh ra các Shape khác nhau, phá vỡ Inline Caching từ Monomorphic sang Megamorphic, khiến truy xuất chậm hơn nhiều lần.'
+          explanation: 'V8 tối ưu hóa việc truy cập thuộc tính bằng cách giả định các object cùng loại sẽ có cùng Hidden Class (Shape) và offset ô nhớ cố định. Khi khởi tạo lệch thứ tự, V8 rẽ nhánh cây chuyển đổi (Transition Tree), sinh ra các Shapes khác nhau, phá vỡ Monomorphic Inline Cache tại call site và đẩy về Megamorphic.'
         },
         {
           id: 'c1-l2-q2',
           question: 'Cơ chế Deoptimization (Bailout) trong V8 Engine xảy ra trong tình huống điển hình nào sau đây?',
           options: [
-            'Khi dung lượng phân vùng Old Generation vượt quá hạn mức cho phép khiến toàn bộ mã máy của tiến trình bị xóa khỏi RAM.',
-            'Khi hệ điều hành Linux gửi tín hiệu phần cứng cảnh báo quạt tản nhiệt của CPU máy chủ đang quay vượt quá tốc độ an toàn.',
-            'Khi một hàm đã được TurboFan biên dịch sang mã máy tối ưu đột ngột nhận vào tham số có kiểu dữ liệu khác với Type Feedback trước đó.',
-            'Khi một câu lệnh truy vấn bất đồng bộ await bị timeout do đường truyền mạng giữa backend và database bị đứt cáp.'
+            'Khi độ sâu của Call Stack vượt quá giới hạn an toàn của V8 khiến tiến trình phải hủy bỏ hàm đang chạy và chuyển quyền thực thi về cho hàm cha.',
+            'Khi phân vùng bộ nhớ Young Generation bị tràn, buộc trình biên dịch JIT phải dừng thực thi mã máy để chờ thuật toán Scavenge dọn dẹp xong.',
+            'Khi một hàm đã được TurboFan biên dịch sang mã máy tối ưu dựa trên giả định kiểu (Speculative Optimization) đột ngột nhận vào tham số có Hidden Class hoặc kiểu dữ liệu vi phạm giả định đó.',
+            'Khi một hàm đồng bộ thực thi quá 50ms, bộ điều phối tiến trình của Libuv buộc phải hủy tối ưu hóa để trả quyền kiểm soát cho pha Poll của Event Loop.'
           ],
           correctIndex: 2,
-          explanation: 'TurboFan tối ưu hóa dựa trên giả định kiểu (Type Speculation). Nếu một hàm cộng add(a, b) vốn chỉ nhận số nguyên đột nhiên nhận vào một Object hoặc String, giả định bị phá vỡ. TurboFan buộc phải Deoptimize: vứt bỏ mã máy và trả quyền thực thi về cho Ignition Bytecode.'
+          explanation: 'TurboFan tối ưu hóa dựa trên giả định kiểu (Type Speculation thu thập từ Ignition). Nếu một hàm cộng add(a, b) vốn chỉ nhận số nguyên đột nhiên nhận vào một Object hoặc String, giả định bị phá vỡ. TurboFan buộc phải Deoptimize (Bailout): vứt bỏ mã máy đã biên dịch và trả quyền thực thi an toàn về cho bộ thông dịch Ignition Bytecode.'
         },
         {
           id: 'c1-l2-q3',
-          question: 'Lệnh delete user.property trong JavaScript gây tác hại kiến trúc nào đối với các đối tượng cần xử lý với hiệu năng cao?',
+          question: 'Việc sử dụng lệnh delete user.property trong JavaScript gây tác hại kiến trúc nào đối với các đối tượng cần xử lý với tần suất cao trong V8 Engine?',
           options: [
-            'Nó lập tức kích hoạt chu kỳ Major GC khiến toàn bộ tiến trình Node.js bị đóng băng trong khoảng thời gian 5 giây.',
-            'Nó xóa vĩnh viễn vùng nhớ Stack của luồng chính khiến toàn bộ các biến cục bộ xung quanh bị biến thành undefined.',
-            'Nó làm vô hiệu hóa khả năng giao tiếp của Libuv với các socket mạng của hệ điều hành thông qua epoll event loop.',
-            'Nó bẻ gãy Transition Tree của Hidden Class, ép đối tượng chuyển sang Dictionary Mode và làm chậm mọi thao tác đọc ghi.'
+            'Nó tạo ra các lỗ hổng bộ nhớ cục bộ trên phân vùng Young Generation khiến thuật toán Cheney Scavenge bị rơi vào vòng lặp vô tận.',
+            'Nó chỉ xóa giá trị của thuộc tính nhưng giữ lại key trong bảng băm của V8, gây ra hiện tượng rò rỉ bộ nhớ tiềm ẩn cho tiến trình.',
+            'Nó kích hoạt một chu kỳ Major GC đồng bộ dừng toàn bộ thế giới (Stop-The-World) để sắp xếp lại cấu trúc bộ nhớ của đối tượng.',
+            'Nó bẻ gãy Transition Tree của Hidden Class, ép đối tượng chuyển từ chế độ Fast Properties sang Slow Properties (Dictionary Mode), biến mọi thao tác đọc/ghi thuộc tính thành tra cứu bảng băm chậm chạp.'
           ],
           correctIndex: 3,
-          explanation: 'Lệnh delete làm biến đổi cấu trúc Shape của đối tượng một cách đột ngột. V8 không duy trì Transition Tree cho trường hợp xóa thuộc tính mà đẩy thẳng đối tượng về Dictionary Mode (Slow Mode), biến việc đọc thuộc tính thành tra cứu Hash Table chậm chạp.'
+          explanation: 'Lệnh delete làm biến đổi cấu trúc Shape của đối tượng một cách đột ngột. V8 không duy trì Transition Tree cho trường hợp xóa thuộc tính mà đẩy thẳng đối tượng về Dictionary Mode (Slow Mode), biến việc đọc thuộc tính từ phép cộng offset O(1) thành tra cứu Hash Table chậm chạp hơn hàng chục lần.'
         },
         {
           id: 'c1-l2-q4',
-          question: 'Trạng thái Inline Caching nào sau đây mang lại hiệu năng truy xuất thuộc tính tương đương với ngôn ngữ biên dịch C++?',
+          question: 'Trạng thái Inline Caching nào sau đây mang lại hiệu năng truy xuất thuộc tính nhanh nhất, tương đương với tốc độ truy xuất ô nhớ trực tiếp (Direct Memory Access) trong ngôn ngữ C/C++?',
           options: [
-            'Monomorphic: Khi tại vị trí gọi hàm chỉ bắt gặp duy nhất một Hidden Class (Shape) cố định xuyên suốt vòng đời.',
-            'Megamorphic: Khi tại vị trí gọi hàm bắt gặp hàng chục Hidden Class khác nhau được phân bổ ngẫu nhiên từ client.',
-            'Polymorphic: Khi tại vị trí gọi hàm bắt gặp từ 2 đến 4 cấu trúc Hidden Class khác nhau trong danh sách liên kết.',
-            'Heterogeneous: Khi các thuộc tính của đối tượng được lưu trữ phân tán trên các luồng Worker Threads độc lập.'
+            'Monomorphic: Vị trí gọi hàm chỉ bắt gặp duy nhất 1 Hidden Class xuyên suốt vòng đời, cho phép CPU đọc dữ liệu trực tiếp tại offset bộ nhớ cố định mà không cần kiểm tra lại cấu trúc đối tượng.',
+            'Polymorphic: Vị trí gọi hàm bắt gặp từ 2 đến 4 Hidden Class, cho phép V8 thực hiện tra cứu song song trên các thanh ghi vector SIMD của vi xử lý.',
+            'Megamorphic: Vị trí gọi hàm bắt gặp nhiều hơn 4 Hidden Class và lưu trữ địa chỉ vào bảng băm toàn cục (Global Megamorphic Stub Cache) với thời gian tra cứu O(1).',
+            'Dictionary Mode: Các thuộc tính được chuyển vào một bảng băm riêng biệt nằm ngay cạnh header của đối tượng để loại bỏ hoàn toàn các bước kiểm tra kiểu.'
           ],
           correctIndex: 0,
-          explanation: 'Monomorphic Inline Cache là trạng thái lý tưởng nhất: V8 ghi nhớ chính xác offset bộ nhớ của thuộc tính tại điểm gọi. Ở các lần chạy tiếp theo, CPU đọc thẳng ô nhớ bằng 1 lệnh máy duy nhất (Direct Memory Access) mà không tốn bất kỳ bước kiểm tra nào.'
+          explanation: 'Monomorphic Inline Cache là trạng thái lý tưởng nhất: V8 ghi nhớ chính xác offset bộ nhớ của thuộc tính tại điểm gọi. Ở các lần chạy tiếp theo, CPU đọc thẳng ô nhớ bằng 1 lệnh máy duy nhất (Direct Memory Access) sau một lệnh kiểm tra Shape cực nhanh.'
         },
         {
           id: 'c1-l2-q5',
-          question: 'Kiến trúc thực thi hai tầng (Two-Tier Execution Pipeline) hiện đại của V8 Engine bao gồm bộ thông dịch Ignition và trình tối ưu TurboFan phối hợp với nhau theo nguyên lý nào?',
+          question: 'Kiến trúc thực thi hai tầng (Execution Pipeline) của V8 Engine kết hợp giữa bộ thông dịch Ignition và trình biên dịch tối ưu TurboFan theo cơ chế nào?',
           options: [
-            'Ignition chỉ thực thi mã nguồn viết bằng TypeScript, còn TurboFan chỉ thực thi các tệp tin cấu hình YAML của hệ thống.',
-            'Ignition sinh ra Bytecode nhanh chóng để ứng dụng khởi động tức thì và thu thập phản hồi kiểu (Type Feedback); sau đó TurboFan dùng dữ liệu này để biên dịch các hàm thường xuyên được gọi (Hot Code) thành mã máy cực nhanh.',
-            'TurboFan chạy trước để quét lỗi cú pháp của toàn bộ dự án, sau đó Ignition mới tiến hành cấp phát bộ nhớ RAM trên máy chủ.',
-            'Hai bộ phận này chạy hoàn toàn độc lập trên hai máy chủ vật lý khác nhau và đồng bộ trạng thái qua giao thức gRPC.'
+            'TurboFan biên dịch trước (AOT) toàn bộ mã nguồn sang mã máy khi ứng dụng khởi động, còn Ignition chỉ đóng vai trò thông dịch dự phòng khi phát hiện lỗi cú pháp.',
+            'Ignition thông dịch nhanh AST thành Bytecode để giảm độ trễ khởi động đồng thời gắn profiler thu thập dữ liệu kiểu (Type Feedback); TurboFan sử dụng dữ liệu này để biên dịch các hàm được gọi thường xuyên (Hot Functions) thành mã máy tối ưu cao.',
+            'Ignition chạy trên một luồng hệ điều hành riêng biệt để phân tích cú pháp mã nguồn, trong khi TurboFan chạy trên một luồng khác để đồng thời ghi trực tiếp mã máy vào bộ nhớ chia sẻ.',
+            'TurboFan kiểm tra tính tương thích của kiểu dữ liệu TypeScript trong mã nguồn rồi gửi bytecode đã xác thực về cho Ignition thực thi trực tiếp trên thanh ghi CPU.'
           ],
           correctIndex: 1,
           explanation: 'V8 sử dụng pipeline 2 tầng: Ignition dịch nhanh AST thành Bytecode nhỏ gọn để máy chủ khởi động không có độ trễ (Fast Startup). Trong quá trình chạy, Ignition gắn bộ đếm Profiler và ghi nhận kiểu dữ liệu (Type Feedback). Các hàm chạy nhiều (Hot Code) sẽ được nạp sang TurboFan để dịch thành mã máy x86/ARM tối ưu cao.'
         },
         {
           id: 'c1-l2-q6',
-          question: 'Tại sao việc tạo ra Mảng thưa (Holey Array, ví dụ: arr[100] = 1 khi mảng đang rỗng) lại làm giảm hiệu năng xử lý của V8 Engine so với Mảng đặc (Packed Array)?',
+          question: 'Tại sao việc tạo ra Mảng thưa (Holey Array, ví dụ: const arr = []; arr[100] = 1;) lại làm giảm sút nghiêm trọng tốc độ xử lý của V8 Engine so với Mảng đặc (Packed Array)?',
           options: [
-            'Vì hệ điều hành Linux sẽ khóa luồng thực thi của tiến trình trong 10ms để dọn dẹp các ô nhớ trống trên đĩa cứng.',
-            'Vì V8 tự động chuyển đổi toàn bộ mảng dữ liệu sang chuỗi ký tự nhị phân Base64 làm tiêu hao băng thông mạng nội bộ.',
-            'Vì khi gặp các ô nhớ trống (Holes), V8 bắt buộc phải duyệt ngược lên chuỗi nguyên mẫu Array.prototype để kiểm tra xem có thuộc tính nào được định nghĩa sẵn hay không, làm mất khả năng đọc trực tiếp ô nhớ.',
-            'Vì trình thu gom rác Garbage Collector sẽ lập tức kích hoạt chu kỳ Stop-The-World để xóa sổ các chỉ mục chưa được gán giá trị.'
+            'Vì V8 bắt buộc phải cấp phát toàn bộ 100 ô nhớ liên tục trên RAM vật lý ngay lập tức và điền đầy các byte 0 làm tăng đột biến dung lượng Heap.',
+            'Vì V8 tự động chuyển cấu trúc dữ liệu của mảng sang ma trận thưa nén (Compressed Sparse Row), đòi hỏi phải giải nén mỗi khi thực hiện phép lặp qua mảng.',
+            'Vì khi truy cập vào các chỉ mục trống (Holes), V8 không thể đọc ô nhớ trực tiếp mà bắt buộc phải duyệt ngược lên chuỗi nguyên mẫu (Array.prototype và Object.prototype) để kiểm tra xem có thuộc tính nào được định nghĩa hay không.',
+            'Vì các lỗ hổng trong mảng thưa kích hoạt pha Compacting của Garbage Collector liên tục để dồn các phần tử về đầu mảng.'
           ],
           correctIndex: 2,
           explanation: 'Với Packed Array (PACKED_SMI / PACKED_ELEMENTS), V8 chỉ cần truy xuất bộ nhớ theo công thức: base_address + index * element_size (cực nhanh). Nhưng với Holey Array, nếu một index không có giá trị, V8 phải kiểm tra prototype chain của Array để chắc chắn không có ai định nghĩa property trên prototype. Thao tác kiểm tra này phá vỡ tối ưu hóa truy cập mảng.'
         },
         {
           id: 'c1-l2-q7',
-          question: 'Điều gì xảy ra với Inline Cache (IC) khi một vị trí gọi hàm (call site) bắt gặp nhiều hơn 4 cấu trúc Hidden Class (Shapes) khác nhau?',
+          question: 'Điều gì xảy ra ở cấp độ kiến trúc của V8 khi một vị trí gọi hàm (call site) truy cập thuộc tính trên nhiều hơn 4 cấu trúc Hidden Class khác nhau?',
           options: [
-            'Inline Cache chuyển sang trạng thái Megamorphic (bão hòa), từ bỏ việc cache cục bộ và chuyển sang tra cứu trên bảng băm toàn cục (Global Megamorphic Stub Cache) chậm hơn rất nhiều.',
-            'V8 Engine sẽ lập tức dừng tiến trình và trả về mã lỗi 500 Internal Server Error cho toàn bộ các request tiếp theo.',
-            'Hệ thống tự động ép toàn bộ các đối tượng về cùng một kiểu dữ liệu Boolean để bảo vệ bộ nhớ cache L1 của CPU.',
-            'Trình biên dịch TurboFan tự động xóa các thuộc tính dư thừa của đối tượng để đưa số lượng Shape trở về mức 1.'
+            'Vị trí gọi hàm chuyển sang trạng thái Megamorphic (bão hòa), từ bỏ việc lưu cache cấu trúc cục bộ và buộc phải tra cứu qua một bảng băm toàn cục (Megamorphic Stub Cache), làm gia tăng chi phí thời gian và nguy cơ deoptimization.',
+            'V8 tự động giáng cấp toàn bộ các đối tượng tham gia lời gọi hàm về phân vùng Young Generation để thu gom rác dọn dẹp lại cấu trúc.',
+            'Trình biên dịch TurboFan xóa bỏ hoàn toàn mã Bytecode của hàm và chuyển về chạy lại từ cây cú pháp trừu tượng (AST) nguyên bản.',
+            'V8 tự động hợp nhất 4 Hidden Class đó thành một lớp trừu tượng duy nhất (Virtual Superclass) và chèn vào prototype của các đối tượng.'
           ],
           correctIndex: 0,
           explanation: 'V8 giới hạn Polymorphic Inline Cache ở mức tối đa 4 Shapes. Nếu vượt quá ngưỡng này (ví dụ hàm nhận hàng chục object có cấu trúc khác nhau), call site rơi vào trạng thái Megamorphic. V8 không lưu thêm shape vào IC mà chuyển sang tra cứu Global Hash Table, làm tốc độ suy giảm nghiêm trọng.'
         },
         {
           id: 'c1-l2-q8',
-          question: 'Để duy trì trạng thái Monomorphic và ngăn chặn Deoptimization trong NestJS backend, kỹ sư nên tuân thủ quy tắc lập trình nào sau đây?',
+          question: 'Để duy trì trạng thái Monomorphic Inline Cache và ngăn chặn hiện tượng Deoptimization trong các Service xử lý nghiệp vụ nặng của NestJS, kỹ sư backend nên áp dụng mẫu hình nào sau đây?',
           options: [
-            'Thường xuyên sử dụng toán tử delete để xóa các thuộc tính không cần thiết nhằm giảm dung lượng bộ nhớ của object.',
-            'Liên tục thay đổi thứ tự các trường dữ liệu trong DTO để kiểm tra tính linh hoạt của trình biên dịch TypeScript.',
-            'Chuyển đổi tất cả các đối tượng sang chuỗi JSON bằng JSON.stringify rồi parse lại trước khi truyền qua các service.',
-            'Luôn khởi tạo tất cả các thuộc tính của đối tượng trong hàm khởi tạo (constructor) theo một thứ tự cố định, và gán null/undefined cho các thuộc tính chưa có giá trị thay vì thêm động sau này.'
+            'Khởi tạo các đối tượng rỗng {} rồi thêm dần các trường dữ liệu tùy theo các nhánh rẽ điều kiện if/else để tối ưu dung lượng RAM ban đầu.',
+            'Sử dụng toán tử delete để chủ động gỡ bỏ các trường nhạy cảm (như mật khẩu, token) ra khỏi đối tượng người dùng trước khi trả về client.',
+            'Chuyển đổi đối tượng qua chuỗi JSON bằng JSON.stringify rồi parse lại trước khi truyền sang service khác để chuẩn hóa định dạng.',
+            'Luôn định nghĩa đầy đủ tất cả các trường dữ liệu trong Constructor của Class hoặc Factory Function theo một thứ tự cố định, gán giá trị mặc định (null hoặc undefined) cho các trường tùy chọn thay vì thêm động sau này.'
           ],
           correctIndex: 3,
           explanation: 'Quy tắc vàng của V8 Optimization: Luôn khởi tạo đầy đủ thuộc tính trong Constructor theo cùng một thứ tự nhất quán. Nếu một trường chưa có giá trị, hãy khởi tạo nó với null thay vì thêm động (obj.field = value) sau này. Tránh xa toán tử delete vì nó đẩy object về Dictionary Mode.'
@@ -764,28 +828,71 @@ Mở \`chrome://inspect\` trên trình duyệt và chụp **Heap Snapshot**.
 | **Major GC (Full GC)** | Hiếm hơn (khi Old Gen đạt ngưỡng) | Dài hơn (~50 - 200 mili-giây) | Old Generation (1 - 4GB) | Tri-color Mark-Sweep-Compact |
 | **Incremental Marking** | Chạy xen kẽ từng bước nhỏ với code JS | Giảm thiểu tối đa giật lag luồng chính | Old Generation | Cắt nhỏ pha Marking thành các tick |
       `,
-      realCodeSnippet: `// Đoạn mã minh họa Memory Leak qua Closure Retaining Path và giải pháp WeakRef
-export class TelemetryLeakDemo {
-  private listeners = new Map<string, Function>();
+      realCodeSnippet: `// File: src/infrastructure/streaming/sse-connection-leak-guard.service.ts
+// Trích dẫn từ kiến trúc Enterprise NestJS - SSE Connection Registry & Memory Leak Guard
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Subject, Subscription } from 'rxjs';
 
-  // ❌ NGUY CƠ LEAK: Closure giữ tham chiếu tới scope cha vô thời hạn
-  public registerLeakyHandler(id: string, hugeData: ArrayBuffer) {
-    this.listeners.set(id, () => {
-      console.log('Processed:', id, hugeData.byteLength);
+interface ClientContext {
+  userId: string;
+  tenantId: string;
+  connectedAt: number;
+}
+
+/**
+ * Guard chống Memory Leak cho các kết nối Server-Sent Events (SSE) / WebSocket:
+ * - Sử dụng FinalizationRegistry để theo dõi và dọn dẹp khi ClientContext bị GC thu hồi.
+ * - Gỡ bỏ Subscription triệt để khi connection đóng để ngăn Closure Retaining Path.
+ * - Triển khai OnModuleDestroy để giải phóng toàn bộ socket handlers khi Pod shutdown.
+ */
+@Injectable()
+export class SseConnectionLeakGuardService implements OnModuleDestroy {
+  private readonly logger = new Logger(SseConnectionLeakGuardService.name);
+  private readonly activeStreams = new Map<string, Subject<unknown>>();
+  private readonly subscriptions = new Map<string, Subscription>();
+
+  // FinalizationRegistry thông báo khi một đối tượng bị Garbage Collector thu hồi
+  private readonly cleanupRegistry = new FinalizationRegistry<string>((clientId) => {
+    this.logger.debug(\`GC đã thu hồi ClientContext của [\${clientId}], dọn dẹp stream...\`);
+    this.unregisterClient(clientId);
+  });
+
+  public registerClient(clientId: string, context: ClientContext): Subject<unknown> {
+    const stream$ = new Subject<unknown>();
+    this.activeStreams.set(clientId, stream$);
+
+    // Đăng ký theo dõi GC: Khi client context không còn tham chiếu mạnh, registry sẽ trigger
+    this.cleanupRegistry.register(context, clientId);
+
+    // Lưu subscription để chủ động hủy (unsubscribe)
+    const sub = stream$.subscribe({
+      error: () => this.unregisterClient(clientId),
+      complete: () => this.unregisterClient(clientId),
     });
+    this.subscriptions.set(clientId, sub);
+
+    return stream$;
   }
 
-  // ✅ GIẢI PHÁP CHUẨN: Dùng WeakRef để cho phép Garbage Collector thu hồi bộ nhớ
-  public registerSafeHandler(id: string, hugeData: ArrayBuffer) {
-    const weakData = new WeakRef(hugeData);
-    this.listeners.set(id, () => {
-      const data = weakData.deref();
-      if (!data) {
-        console.log('Object đã được GC thu hồi an toàn!');
-        return;
-      }
-      console.log('Processed:', id, data.byteLength);
-    });
+  public unregisterClient(clientId: string): void {
+    const sub = this.subscriptions.get(clientId);
+    if (sub) {
+      sub.unsubscribe(); // Cắt đứt hoàn toàn Closure Retaining Path
+      this.subscriptions.delete(clientId);
+    }
+
+    const stream$ = this.activeStreams.get(clientId);
+    if (stream$) {
+      stream$.complete();
+      this.activeStreams.delete(clientId);
+    }
+  }
+
+  public onModuleDestroy(): void {
+    this.logger.log('Dọn dẹp toàn bộ SSE Connections trước khi Pod shutdown...');
+    for (const clientId of this.activeStreams.keys()) {
+      this.unregisterClient(clientId);
+    }
   }
 }`,
       quiz: [
@@ -793,94 +900,94 @@ export class TelemetryLeakDemo {
           id: 'c1-l3-q1',
           question: 'Ý nghĩa kỹ thuật chính xác nhất của chỉ số Retained Size khi phân tích Heap Snapshot bằng Chrome DevTools là gì?',
           options: [
-            'Dung lượng bộ nhớ thực tế chỉ do bản thân các thuộc tính nguyên thủy trực tiếp của đối tượng đó chiếm giữ trong RAM.',
-            'Số lượng chu kỳ xung nhịp CPU mà bộ thu gom rác cần tiêu tốn để chuyển đổi đối tượng từ Young Gen sang Old Gen.',
-            'Tổng dung lượng bộ nhớ sẽ được giải phóng nếu đối tượng này bị xóa và toàn bộ cây tham chiếu độc quyền của nó bị GC thu hồi.',
-            'Dung lượng bộ nhớ đệm mà hệ điều hành Linux dành riêng để lưu trữ con trỏ Socket File Descriptor của kết nối HTTP.'
+            'Dung lượng bộ nhớ thực tế chỉ do bản thân cấu trúc và các giá trị nguyên thủy trực tiếp của đối tượng đó chiếm giữ trên Heap (không tính các đối tượng được trỏ tới).',
+            'Tổng dung lượng RAM vật lý của toàn bộ tiến trình Node.js bao gồm cả mã máy C++ và Call Stack tại thời điểm chụp snapshot.',
+            'Tổng dung lượng bộ nhớ Heap sẽ được giải phóng ngay lập tức nếu đối tượng này bị xóa bỏ và toàn bộ cây con tham chiếu độc quyền phụ thuộc vào nó (Dominator Tree) bị GC thu hồi.',
+            'Tổng dung lượng bộ nhớ của tất cả các đối tượng mà đối tượng này có thể chạm tới, kể cả các đối tượng đang được chia sẻ và tham chiếu bởi các GC Root khác.'
           ],
           correctIndex: 2,
-          explanation: 'Shallow Size là kích thước của chính đối tượng. Retained Size là tổng dung lượng của đối tượng đó cộng với toàn bộ các đối tượng phụ thuộc chỉ có thể chạm tới thông qua nó (Dominator Tree). Đây là chỉ số quan trọng nhất để phát hiện memory leak.'
+          explanation: 'Shallow Size là kích thước của chính đối tượng. Retained Size là tổng dung lượng của đối tượng đó cộng với toàn bộ các đối tượng phụ thuộc chỉ có thể chạm tới duy nhất thông qua nó (Dominator Tree). Đây là chỉ số quan trọng nhất để phát hiện memory leak vì nó phản ánh lượng RAM thực tế thu hồi được nếu loại bỏ object gốc.'
         },
         {
           id: 'c1-l3-q2',
-          question: 'Tại sao thuật toán Cheney Scavenge trong phân vùng Young Generation lại có tốc độ dọn dẹp cực nhanh chỉ mất vài mili-giây?',
+          question: 'Tại sao thuật toán Cheney Scavenge trong phân vùng Young Generation (Semi-space) lại có tốc độ dọn dẹp cực nhanh (thường chỉ mất vài mili-giây) mà không gây dừng tiến trình lâu?',
           options: [
-            'Nó chỉ sao chép các object còn sống sang To-Space và xóa trắng toàn bộ From-Space cũ bằng một thao tác tịnh tiến con trỏ.',
-            'Nó tự động chuyển toàn bộ các object bị lỗi sang ổ cứng SSD của máy chủ mà không cần duyệt cây tham chiếu của V8.',
-            'Nó vô hiệu hóa toàn bộ cơ chế bất đồng bộ của Event Loop trong suốt thời gian hệ thống thực hiện dọn dẹp rác.',
-            'Nó sử dụng các luồng phần cứng chuyên biệt của card đồ họa GPU để tính toán địa chỉ bộ nhớ song song với luồng chính.'
+            'Vì nó dựa trên Giả thuyết thế hệ (hầu hết object chết trẻ), chỉ tốn chi phí sao chép số ít object còn sống từ From-Space sang To-Space và xếp liên tục nhau, sau đó hoán đổi hai vùng nhớ và giải phóng toàn bộ From-Space bằng một thao tác con trỏ.',
+            'Vì nó duy trì một bộ đếm con trỏ tham chiếu trên từng ô nhớ của Young Generation, giải phóng ngay lập tức các object có bộ đếm về 0 mà không cần duyệt qua đồ thị bộ nhớ.',
+            'Vì nó kích hoạt 16 luồng CPU chạy song song để vừa đánh dấu (Marking) vừa quét dọn (Sweeping) trực tiếp trên toàn bộ không gian địa chỉ bộ nhớ ảo của hệ điều hành.',
+            'Vì nó chia nhỏ tiến trình thu gom thành các lát cắt thời gian 1 mili-giây xen kẽ giữa các vòng lặp Event Loop để tránh gây hiện tượng chặn luồng chính.'
           ],
           correctIndex: 0,
-          explanation: 'Dựa trên giả thuyết thế hệ, đa số object trong Young Gen đều chết. Thuật toán Scavenge chỉ tốn công sao chép số ít object còn sống sang To-Space và xếp liên tục nhau (vừa dọn rác vừa chống phân mảnh). Toàn bộ From-Space cũ bị xóa sổ ngay tức thì.'
+          explanation: 'Dựa trên giả thuyết thế hệ (Generational Hypothesis), đa số object trong Young Gen đều chết sau thời gian rất ngắn. Thuật toán Scavenge chỉ tốn công sao chép số ít object còn sống sang To-Space và xếp liên tục nhau (vừa dọn rác vừa chống phân mảnh). Toàn bộ From-Space cũ bị xóa sổ ngay tức thì chỉ bằng một thao tác đảo con trỏ.'
         },
         {
           id: 'c1-l3-q3',
-          question: 'Hiện tượng Container Node.js bị Kubernetes tiêu diệt với trạng thái OOMKilled dù chỉ số heapUsed rất thấp xảy ra do nguyên nhân nào?',
+          question: 'Hiện tượng Container Node.js chạy trên Kubernetes Pod bị tiêu diệt đột ngột với trạng thái OOMKilled dù chỉ số heapUsed giám sát được vẫn ở mức rất thấp (< 20% limit) bắt nguồn từ nguyên nhân kiến trúc nào?',
           options: [
-            'Thuật toán Mark-Sweep-Compact gặp hiện tượng bế tắc Deadlock khi dọn dẹp các đối tượng mảng lớn trong phân vùng Young Gen.',
-            'Bộ nhớ Buffer cấp phát trực tiếp qua hàm malloc ở tầng C++ ngoài V8 Heap tích tụ quá lớn làm cạn kiệt RAM vật lý của Container.',
-            'Hệ điều hành Linux phát hiện V8 Engine đang cố gắng truy cập trái phép vào các thanh ghi nội bộ của vi xử lý CPU máy chủ.',
-            'Trình biên dịch TurboFan tự động nhân đôi kích thước của mã máy Assembly sau mỗi lần thực thi cơ chế Deoptimization.'
+            'Thuật toán Mark-Sweep-Compact gặp hiện tượng bế tắc (Deadlock) giữa các luồng thu gom rác nền, khiến Kubernetes Probe hiểu lầm là tiến trình bị treo và gửi lệnh hủy Pod.',
+            'Bộ nhớ cấp phát bằng malloc ở tầng C++ ngoài V8 Heap (chẳng hạn như dữ liệu nhị phân của Buffer, Stream chưa xả, hoặc thư viện Native C++) tăng vọt làm tổng RSS vượt quá cgroup memory limit của Container.',
+            'Hiện tượng phân mảnh bộ nhớ trong Old Generation khiến V8 không thể cấp phát mảng liên tục, dù tổng dung lượng Heap còn trống nhiều.',
+            'Call Stack của các luồng trong Libuv Threadpool bị tràn do đệ quy vô hạn, khiến kernel Linux kích hoạt cơ chế bảo vệ phân trang nhớ và tiêu diệt tiến trình.'
           ],
           correctIndex: 1,
-          explanation: 'Buffer trong Node.js được cấp phát ngoài V8 Heap (nằm trong process.memoryUsage().external). Do heapUsed vẫn thấp, V8 không nhận thấy áp lực bộ nhớ và không kích hoạt Major GC kịp thời. Nhưng tổng RAM (RSS) của tiến trình đã vượt quá giới hạn của Kubernetes Pod, dẫn đến việc bị Linux OOM Killer gửi tín hiệu SIGKILL.'
+          explanation: 'Buffer trong Node.js được cấp phát ngoài V8 Heap (nằm trong process.memoryUsage().external). Do heapUsed vẫn thấp, V8 không nhận thấy áp lực bộ nhớ và không kích hoạt Major GC kịp thời. Nhưng tổng RAM (RSS) của tiến trình đã vượt quá giới hạn cgroup của Container trên Kubernetes Pod, dẫn đến việc bị Linux OOM Killer gửi tín hiệu SIGKILL.'
         },
         {
           id: 'c1-l3-q4',
-          question: 'Vai trò của pha Compacting (Thu gom dồn ô nhớ) trong thuật toán Mark-Sweep-Compact của Old Generation là gì?',
+          question: 'Vai trò kỹ thuật sống còn của pha Compacting (Dồn ô nhớ) trong thuật toán Mark-Sweep-Compact áp dụng cho phân vùng Old Generation là gì?',
           options: [
-            'Tự động nén toàn bộ mã nguồn của ứng dụng thành định dạng nhị phân gzip để tiết kiệm dung lượng lưu trữ trên đĩa cứng.',
-            'Chuyển đổi toàn bộ các biến số nguyên 64-bit sang định dạng số nguyên 32-bit nhằm tăng tốc độ tính toán của bộ xử lý ALU.',
-            'Khóa tạm thời các kết nối mạng gửi đến máy chủ để giải phóng bảng phân trang ảo của nhân hệ điều hành Linux Kernel.',
-            'Dịch chuyển các block bộ nhớ còn sống nằm sát lại với nhau để triệt tiêu hiện tượng phân mảnh bộ nhớ (Memory Fragmentation).'
+            'Nén nội dung dữ liệu của các chuỗi ký tự và buffer lớn trên Heap bằng thuật toán nén LZF/gzip để thu nhỏ footprint bộ nhớ.',
+            'Chuyển đổi các con trỏ địa chỉ 64-bit thành con trỏ nén 32-bit (Pointer Compression) nhằm giảm 50% dung lượng chiếm dụng của mảng con trỏ.',
+            'Đưa các đối tượng có tần suất truy cập thấp quay trở lại phân vùng Young Generation để chuẩn bị cho chu kỳ thu hồi tiếp theo.',
+            'Dịch chuyển các đối tượng còn sống nằm sát lại với nhau về một đầu trang bộ nhớ (Page) và cập nhật lại tất cả con trỏ tham chiếu tới chúng, nhằm triệt tiêu hiện tượng phân mảnh bộ nhớ (Memory Fragmentation).'
           ],
           correctIndex: 3,
           explanation: 'Sau nhiều lần giải phóng các object rải rác (Sweeping), bộ nhớ sẽ bị thủng lỗ chỗ (phân mảnh). Khi cần cấp phát một object lớn liên tục, hệ thống sẽ báo lỗi OOM dù tổng dung lượng trống vẫn đủ. Pha Compacting di dời các object sống lại gần nhau, tạo ra một vùng nhớ trống lớn liên tục.'
         },
         {
           id: 'c1-l3-q5',
-          question: 'Tại sao việc sử dụng WeakMap lại là giải pháp tối ưu để lưu trữ metadata hoặc cache liên quan đến các đối tượng mà không sợ gây ra rò rỉ bộ nhớ (Memory Leak)?',
+          question: 'Tại sao việc sử dụng WeakMap lại là giải pháp tối ưu để lưu trữ metadata gắn kèm các đối tượng mà hoàn toàn không gây ra nguy cơ rò rỉ bộ nhớ (Memory Leak)?',
           options: [
-            'Vì WeakMap tự động lưu toàn bộ dữ liệu lên ổ đĩa cứng SSD nên không hề chiếm dụng bộ nhớ RAM của V8 Heap.',
-            'Vì WeakMap mã hóa tất cả các giá trị thành chuỗi SHA-256 nên dung lượng của nó luôn cố định ở mức 0 byte.',
-            'Vì các khóa (keys) trong WeakMap chỉ là tham chiếu yếu (Weak Reference); khi đối tượng khóa không còn được tham chiếu ở nơi nào khác, Garbage Collector sẽ tự động thu hồi nó và xóa mục tương ứng trong WeakMap.',
-            'Vì WeakMap chỉ cho phép tồn tại tối đa 10 phần tử, nếu vượt quá sẽ tự động ném ra ngoại lệ BadRequestException.'
+            'Vì WeakMap lưu trữ toàn bộ dữ liệu ở vùng nhớ Off-heap do nhân hệ điều hành quản lý, không chịu sự chi phối hay chiếm dụng hạn mức của V8 Heap.',
+            'Vì WeakMap tích hợp sẵn cơ chế đếm thời gian sống (TTL), tự động xóa bỏ các cặp key-value sau một khoảng thời gian không có thao tác đọc/ghi.',
+            'Vì các khóa (keys) trong WeakMap chỉ được giữ dưới dạng Tham chiếu yếu (Weak Reference); Garbage Collector không coi WeakMap là một điểm neo giữ sống, khi đối tượng key không còn tham chiếu mạnh nào khác thì sẽ được GC thu hồi và tự động giải phóng luôn giá trị tương ứng.',
+            'Vì WeakMap chỉ cho phép sử dụng các giá trị nguyên thủy (number, string, symbol) làm khóa, giúp loại bỏ hoàn toàn việc tạo liên kết tham chiếu giữa các đối tượng.'
           ],
           correctIndex: 2,
           explanation: 'Trong Map thông thường, object key được giữ bằng một Strong Reference, ngăn GC thu hồi ngay cả khi toàn bộ ứng dụng không còn dùng object đó nữa. WeakMap chỉ giữ Weak Reference: GC không coi WeakMap là một root sống. Khi đối tượng key không còn tham chiếu nào khác, GC lập tức dọn dẹp nó.'
         },
         {
           id: 'c1-l3-q6',
-          question: 'Lỗi rò rỉ bộ nhớ (Memory Leak) kinh điển khi sử dụng EventEmitter trong các Service của NestJS xảy ra do cơ chế nào sau đây?',
+          question: 'Lỗi rò rỉ bộ nhớ (Memory Leak) kinh điển khi sử dụng EventEmitter trong các Service của NestJS xảy ra do cơ chế ngầm nào sau đây?',
           options: [
-            'Do EventEmitter trong Node.js chỉ có khả năng gửi tối đa 3 sự kiện trước khi tự động khóa toàn bộ tiến trình.',
-            'Do giao thức HTTP/2 không hỗ trợ các sự kiện phát ra từ EventEmitter của tầng C++ Libuv.',
-            'Do V8 Engine không cho phép các hàm callback trong JavaScript được thực thi quá 500 micro-giây.',
-            'Đăng ký event listener (emitter.on) bên trong hàm xử lý request mà quên gỡ bỏ (removeListener); hàm listener giữ tham chiếu closure tới scope của request và bị đối tượng Emitter sống lâu (Singleton) giữ chặt vĩnh viễn.'
+            'Do mỗi sự kiện phát ra từ EventEmitter đều sao chép toàn bộ payload thành một đối tượng Buffer C++ mới mà không tự động giải phóng sau khi truyền qua các listener.',
+            'Do các hàm callback của listener được đẩy liên tục vào Microtask Queue của V8 khiến Event Loop bị bế tắc và không thể chuyển sang pha tiếp theo.',
+            'Do khi vượt quá giới hạn 10 listeners mặc định, EventEmitter tự động sao lưu toàn bộ Call Stack vào bộ nhớ Heap trước khi in ra cảnh báo.',
+            'Do đăng ký listener (emitter.on) trong hàm xử lý request mà không gỡ bỏ (removeListener); hàm callback giữ closure scope của request và bị đối tượng Emitter sống lâu (Singleton) lưu giữ vĩnh viễn trong mảng nội bộ.'
           ],
           correctIndex: 3,
           explanation: 'Khi đăng ký emitter.on(\'event\', callback) trong một request handler, mỗi request lại tạo thêm 1 listener mới. Do emitter thường là một Singleton Service (sống suốt đời tiến trình), nó lưu các hàm callback này vào mảng nội bộ. Mỗi callback lại giữ tham chiếu tới toàn bộ biến của request (closure). Kết quả là RAM tăng dần đều cho tới khi sập máy chủ.'
         },
         {
           id: 'c1-l3-q7',
-          question: 'Tại sao thuật toán Mark-Sweep của V8 Engine lại giải quyết triệt để vấn đề tham chiếu vòng (Circular Reference, ví dụ: A trỏ B và B trỏ A) mà cơ chế Reference Counting trước đây bị thất bại?',
+          question: 'Tại sao thuật toán Mark-Sweep (Tracing Garbage Collection) của V8 Engine lại giải quyết triệt để vấn đề tham chiếu vòng (Circular Reference, ví dụ: Object A trỏ Object B và B trỏ ngược lại A) mà thuật toán Reference Counting trước đây bị thất bại?',
           options: [
-            'Vì V8 tự động chèn một con trỏ NULL vào giữa hai đối tượng tham chiếu vòng ngay khi chúng được khởi tạo.',
-            'Vì Mark-Sweep duyệt đồ thị từ các GC Roots (Global, Stack, CPU Registers); nếu cụm tham chiếu vòng bị ngắt kết nối khỏi GC Roots, chúng sẽ không được đánh dấu (Unmarked) và toàn bộ sẽ bị thu hồi dù trỏ lẫn nhau.',
-            'Vì hệ điều hành Linux sẽ tự động gửi tín hiệu SIGINT để cắt đứt liên kết giữa hai địa chỉ bộ nhớ RAM.',
-            'Vì JavaScript cấm hoàn toàn việc gán thuộc tính của một đối tượng bằng tham chiếu tới đối tượng khác.'
+            'Vì V8 sử dụng thuật toán Tarjan tìm thành phần liên thông mạnh (SCC) để chủ động phát hiện và bẻ gãy các chu trình tham chiếu ngay tại thời điểm gán thuộc tính.',
+            'Vì Mark-Sweep bắt đầu duyệt đồ thị từ tập hợp các GC Roots (Global Object, Call Stack, CPU Registers); nếu cụm đối tượng tham chiếu vòng bị cô lập và không có đường đi từ bất kỳ GC Root nào, chúng sẽ không được đánh dấu (Unmarked) và toàn bộ cụm sẽ bị thu hồi.',
+            'Vì V8 tự động chuyển đổi một trong hai liên kết tham chiếu vòng thành tham chiếu yếu (Weak Reference) nếu nhận thấy hai đối tượng cùng thuộc một phạm vi hàm.',
+            'Vì V8 tách hai đối tượng tham chiếu vòng sang hai phân vùng bộ nhớ vật lý độc lập để ngăn chặn việc đếm trùng lặp số lượng con trỏ.'
           ],
           correctIndex: 1,
           explanation: 'Thuật toán Reference Counting chỉ đếm số lượng con trỏ: A trỏ B (count=1), B trỏ A (count=1). Khi ngắt kết nối với ứng dụng, count vẫn là 1 nên không bao giờ được giải phóng (rò rỉ). Ngược lại, Mark-Sweep bắt đầu duyệt từ GC Roots: bất kỳ node nào không thể đi tới từ Roots đều bị coi là rác (Dead Objects) và bị quét dọn sạch sẽ.'
         },
         {
           id: 'c1-l3-q8',
-          question: 'Trong báo cáo Heap Snapshot của Chrome DevTools, chỉ số "Distance" (Khoảng cách) của một đối tượng mang ý nghĩa kỹ thuật gì?',
+          question: 'Trong báo cáo Heap Snapshot của Chrome DevTools, chỉ số "Distance" (Khoảng cách) của một đối tượng mang ý nghĩa kỹ thuật chuẩn xác nào?',
           options: [
-            'Số bước nhảy liên kết ngắn nhất (Shortest Path Hops) từ bất kỳ GC Root nào trên đồ thị bộ nhớ để chạm tới đối tượng đó; số càng nhỏ thì đối tượng càng gần Root.',
-            'Khoảng cách vật lý tính bằng milimet giữa thanh RAM của máy chủ và chip vi xử lý trung tâm CPU.',
-            'Số lượng dòng mã nguồn giữa vị trí khai báo biến và vị trí hàm return kết thúc trong file JavaScript.',
-            'Thời gian trễ mạng ping giữa máy chủ ứng dụng NestJS và hệ quản trị cơ sở dữ liệu PostgreSQL.'
+            'Chiều dài đường đi ngắn nhất (Shortest Path Hops) trên đồ thị tham chiếu từ bất kỳ GC Root nào để chạm tới đối tượng đó; chỉ số này càng nhỏ chứng tỏ đối tượng càng gần với điểm neo giữ gốc của bộ nhớ.',
+            'Khoảng cách tính bằng số byte địa chỉ bộ nhớ tương đối từ chân trang nhớ (Page Base Address) đến ô nhớ bắt đầu của đối tượng trên Heap.',
+            'Số lượng mắt xích kế thừa trên chuỗi nguyên mẫu (Prototype Chain) từ đối tượng hiện tại ngược lên tới Object.prototype.',
+            'Độ sâu của đối tượng trong Dominator Tree tính từ điểm nút lá (Leaf Node) của đồ thị bộ nhớ ngược lên nút cha trực tiếp.'
           ],
           correctIndex: 0,
           explanation: 'Distance biểu thị số bước đi ngắn nhất trên đồ thị tham chiếu từ một GC Root tới đối tượng. Distance = 1 nghĩa là đối tượng được giữ trực tiếp bởi GC Root (ví dụ biến global hoặc stack variable). Khi debug memory leak, đối tượng có Distance ngắn thường là điểm mấu chốt đang neo giữ các cụm rác lớn.'

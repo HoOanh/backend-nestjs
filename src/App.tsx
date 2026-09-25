@@ -118,17 +118,57 @@ export const App: React.FC = () => {
 
   const [tutorMode, setTutorMode] = useState<'docked' | 'floating'>(() => {
     try {
-      const saved = localStorage.getItem('esmiles_tutor_mode');
+      const saved = localStorage.getItem('arc_tutor_mode');
       if (saved === 'docked' || saved === 'floating') return saved;
     } catch {}
     return 'floating';
   });
 
+  const [dockedTutorWidth, setDockedTutorWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('arc_tutor_dock_width');
+      const parsed = saved ? parseInt(saved, 10) : 440;
+      return !isNaN(parsed) && parsed >= 320 && parsed <= 850 ? parsed : 440;
+    } catch {
+      return 440;
+    }
+  });
+
+  const handleResizeDockStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = dockedTutorWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = startX - moveEvent.clientX; // drag left expands width
+      const nextWidth = Math.max(320, Math.min(850, startWidth + deltaX));
+      setDockedTutorWidth(nextWidth);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setDockedTutorWidth((current) => {
+        try {
+          localStorage.setItem('arc_tutor_dock_width', String(current));
+        } catch {}
+        return current;
+      });
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   const handleToggleTutor = () => {
     setIsTutorOpen((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem('esmiles_tutor_open', String(next));
+        localStorage.setItem('arc_tutor_open', String(next));
       } catch {}
       return next;
     });
@@ -137,7 +177,7 @@ export const App: React.FC = () => {
   const handleSwitchTutorMode = (newMode: 'docked' | 'floating') => {
     setTutorMode(newMode);
     try {
-      localStorage.setItem('esmiles_tutor_mode', newMode);
+      localStorage.setItem('arc_tutor_mode', newMode);
     } catch {}
   };
 
@@ -392,7 +432,7 @@ export const App: React.FC = () => {
   };
 
   const handleFinalExamSubmitted = async (score: number, passed: boolean, studentName: string) => {
-    const studentDisplayName = studentName || activeUser?.name || 'Kỹ Sư eSmiles';
+    const studentDisplayName = studentName || activeUser?.name || 'Kỹ Sư Arc Irobot';
     if (activeUser) {
       const res = await apiClient.submitFinalExam(activeUser.id, studentDisplayName, score, passed);
       setState((prev) => ({
@@ -483,7 +523,6 @@ export const App: React.FC = () => {
         userRole={activeUser?.role}
         bypassLock={effectiveBypass}
         isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={handleToggleSidebar}
         onSelectLesson={handleSelectLesson}
         onSelectSprintExam={handleSelectSprintExam}
         onSelectFinalExam={handleSelectFinalExam}
@@ -552,8 +591,6 @@ export const App: React.FC = () => {
                     {activeTab === 'theory' && (
                       <TheoryTab
                         lesson={currentLesson}
-                        isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
-                        onMarkCleared={() => handleLessonCleared(currentLesson.id)}
                         onNextTab={() => handleTabChange('quiz')}
                         onOpenTutor={() => setIsTutorOpen(true)}
                       />
@@ -606,7 +643,7 @@ export const App: React.FC = () => {
                 {!finalExamUnlockStatus.unlocked && !state.finalExam?.passed ? (
                   <LockedContentNotice
                     type="final-exam"
-                    title="Kỳ Thi Tốt Nghiệp Toàn Khóa eSmiles Academy"
+                    title="Kỳ Thi Tốt Nghiệp Toàn Khóa Arc Irobot Academy"
                     missingSprints={finalExamUnlockStatus.missingSprints}
                     onNavigateToAvailable={handleNavigateToAvailable}
                     isAdmin={isEffectiveAdmin}
@@ -624,13 +661,18 @@ export const App: React.FC = () => {
             )}
           </section>
 
-          {/* DOCKED TUTOR CO-PILOT SIDEBAR (Side-by-side mode) */}
+          {/* DOCKED TUTOR CO-PILOT SIDEBAR (Side-by-side mode with drag-resizing) */}
           {isTutorOpen && tutorMode === 'docked' && currentLesson && route.type === 'lesson' && (
-            <aside className="docked-tutor-sidebar">
+            <aside className="docked-tutor-sidebar" style={{ width: `${dockedTutorWidth}px` }}>
+              <div
+                className="docked-resizer-handle"
+                onMouseDown={handleResizeDockStart}
+                title="Kéo để thay đổi kích thước khung chat"
+              >
+                <div className="resizer-visual-bar" />
+              </div>
               <TutorChat
                 lesson={currentLesson}
-                isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
-                onMarkCleared={() => handleLessonCleared(currentLesson.id)}
                 mode="docked"
                 onSwitchMode={() => handleSwitchTutorMode('floating')}
                 onClose={() => setIsTutorOpen(false)}
@@ -644,8 +686,6 @@ export const App: React.FC = () => {
           <div className="floating-tutor-window">
             <TutorChat
               lesson={currentLesson}
-              isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
-              onMarkCleared={() => handleLessonCleared(currentLesson.id)}
               mode="floating"
               onSwitchMode={() => handleSwitchTutorMode('docked')}
               onClose={() => setIsTutorOpen(false)}
@@ -653,18 +693,17 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* FLOATING ACTION BUTTON (FAB) Trigger khi đang đóng */}
-        {!isTutorOpen && currentLesson && route.type === 'lesson' && (
+        {/* FLOATING ACTION BUTTON (FAB) Trigger khi đang đóng - Compact Circle + Tooltip */}
+        {!isTutorOpen && !isHistoryModalOpen && currentLesson && route.type === 'lesson' && (
           <button
             className="floating-tutor-trigger-btn"
             onClick={() => setIsTutorOpen(true)}
-            title="Hỏi Tutor AI về bài học (Ctrl+J)"
-            aria-label="Mở Tutor AI Co-Pilot"
+            aria-label="Mở Tutor AI Co-Pilot (Ctrl+J)"
           >
             <span className="fab-pulse-ring" />
-            <span className="fab-icon">🤖</span>
-            <span className="fab-label">Hỏi Tutor AI</span>
-            <span className="fab-shortcut">Ctrl+J</span>
+            <img src="/logo.png" alt="Arc Irobot AI" className="fab-logo-img" />
+            <span className="fab-status-dot" />
+            <span className="fab-tooltip">Hỏi Tutor AI (Ctrl+J)</span>
           </button>
         )}
       </main>

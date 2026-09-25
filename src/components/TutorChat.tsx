@@ -22,12 +22,15 @@ const MODEL_OPTIONS = [
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  image?: {
+    data: string;
+    mimeType: string;
+    fileName?: string;
+  };
 }
 
 interface TutorChatProps {
   lesson: Lesson;
-  isLessonCleared: boolean;
-  onMarkCleared: () => void;
   mode?: 'docked' | 'floating' | 'inline';
   onSwitchMode?: (newMode: 'docked' | 'floating') => void;
   onClose?: () => void;
@@ -122,8 +125,6 @@ export function formatChatMarkdown(text: string): string {
 
 export const TutorChat: React.FC<TutorChatProps> = ({
   lesson,
-  isLessonCleared,
-  onMarkCleared,
   mode = 'inline',
   onSwitchMode,
   onClose
@@ -131,16 +132,18 @@ export const TutorChat: React.FC<TutorChatProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: `Em là tutor của bài “${lesson.title}”. ĐẠI CA đang vướng đoạn nào thì hỏi thẳng đoạn đó — em sẽ giải thích theo đúng nội dung bài, code mẫu và mental model cần nắm.`
+      content: `Em là tutor của bài “${lesson.title}”. ĐẠI CA đang vướng đoạn nào hoặc có ảnh chụp sơ đồ / code lỗi nào thì gửi lên — em sẽ phân tích và giải thích tận tường theo đúng bản chất.`
     }
   ]);
   const [input, setInput] = useState('');
+  const [selectedImage, setSelectedImage] = useState<{ file: File; base64: string; mimeType: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>(MODEL_OPTIONS[0].id);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMessages([
@@ -196,13 +199,68 @@ export const TutorChat: React.FC<TutorChatProps> = ({
     }
   };
 
-  const sendMessage = async (questionOverride?: string) => {
-    const question = (questionOverride ?? input).trim();
-    if (!question || isLoading) return;
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Vui lòng chỉ chọn tệp hình ảnh (PNG, JPG, WEBP, GIF).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Kích thước ảnh tối đa 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setSelectedImage({ file, base64, mimeType: file.type });
+      setError('');
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
 
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user' as const, content: question }];
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = e.target?.result as string;
+            setSelectedImage({ file, base64, mimeType: file.type });
+            setError('');
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    }
+  };
+
+  const sendMessage = async (questionOverride?: string) => {
+    const rawQuestion = (questionOverride ?? input).trim();
+    if ((!rawQuestion && !selectedImage) || isLoading) return;
+
+    const question = rawQuestion || (selectedImage ? 'ĐẠI CA phân tích giúp em hình ảnh này nhé.' : '');
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: question,
+      image: selectedImage
+        ? {
+            data: selectedImage.base64,
+            mimeType: selectedImage.mimeType,
+            fileName: selectedImage.file.name
+          }
+        : undefined
+    };
+
+    const nextMessages: ChatMessage[] = [...messages, userMessage];
     setMessages([...nextMessages, { role: 'assistant', content: '' }]);
     setInput('');
+    setSelectedImage(null);
     setError('');
     setIsLoading(true);
 
@@ -356,88 +414,81 @@ export const TutorChat: React.FC<TutorChatProps> = ({
           aria-hidden="true"
         />
       )}
-      <section className={`tutor-card tutor-mode-${mode} ${isExpanded ? 'is-expanded' : ''}`} aria-label="Tutor AI theo bài học">
+      <section className={`tutor-card tutor-mode-${mode} ${isExpanded ? 'is-expanded' : ''}`} aria-label="Arc AI Co-Pilot">
+        {/* Sleek Compact Header */}
         <div className="tutor-header">
-          <div className="tutor-header-left">
-            <div className="tutor-agent-icon">✦</div>
-            <div className="tutor-header-text">
-              <div className="tutor-header-title-row">
-                <h3>Hỏi Tutor AI về bài học</h3>
-                <span className="tutor-kicker-badge">
-                  {mode === 'docked' ? 'CO-PILOT DOCKED' : mode === 'floating' ? 'FLOATING AGENT' : 'GEMINI LEARNING AGENT'}
-                </span>
+          <div className="tutor-header-brand">
+            <div className="tutor-logo-box">
+              <img src="/logo.png" alt="Arc Irobot" className="tutor-logo-img" />
+            </div>
+            <div className="tutor-brand-info">
+              <div className="tutor-title-row">
+                <h4 className="tutor-main-heading">Arc AI Co-Pilot</h4>
+                <span className="tutor-live-dot" title="Sẵn sàng" />
               </div>
-              <p className="tutor-desc">Hỏi trực tiếp chỗ ĐẠI CA chưa clear — Tutor giải thích đúng code mẫu & mental model của bài.</p>
+              <span className="tutor-sub-heading">Hỗ trợ bài học & phân tích kiến trúc</span>
             </div>
           </div>
-          <div className="tutor-header-tools">
-            <span className="tutor-status"><span className="status-dot" /> Sẵn sàng</span>
 
-            {/* Switch Mode Button (Docked <-> Floating) */}
+          <div className="tutor-header-actions">
             {onSwitchMode && mode === 'docked' && (
               <button
                 type="button"
-                className="tutor-tool-btn"
+                className="tutor-btn-icon"
                 onClick={() => onSwitchMode('floating')}
-                title="Chuyển sang cửa sổ nổi tự do"
-                aria-label="Chuyển sang cửa sổ nổi"
+                title="Chuyển sang cửa sổ nổi"
+                aria-label="Cửa sổ nổi"
               >
-                <span>⧉ Nổi</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="8" y="8" width="12" height="12" rx="2" />
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
               </button>
             )}
 
             {onSwitchMode && mode === 'floating' && (
               <button
                 type="button"
-                className="tutor-tool-btn"
+                className="tutor-btn-icon"
                 onClick={() => onSwitchMode('docked')}
-                title="Ghim cố định bên phải bài học"
-                aria-label="Ghim cố định bên phải"
+                title="Ghim cố định bên phải (Dock)"
+                aria-label="Ghim dock"
               >
-                <span>◨ Ghim Dock</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="15" y1="3" x2="15" y2="21" />
+                </svg>
               </button>
             )}
 
-            {/* Expand / Minimize Button for inline/floating */}
             {mode !== 'docked' && (
               <button
                 type="button"
-                className={`tutor-expand-btn ${isExpanded ? 'active' : ''}`}
+                className="tutor-btn-icon"
                 onClick={() => setIsExpanded((prev) => !prev)}
-                title={isExpanded ? 'Thu nhỏ cửa sổ chat (Esc)' : 'Phóng to toàn màn hình'}
-                aria-label={isExpanded ? 'Thu nhỏ' : 'Phóng to'}
+                title={isExpanded ? 'Thu nhỏ (Esc)' : 'Toàn màn hình'}
+                aria-label={isExpanded ? 'Thu nhỏ' : 'Toàn màn hình'}
               >
                 {isExpanded ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="4 14 10 14 10 20" />
-                      <polyline points="20 10 14 10 14 4" />
-                      <line x1="14" y1="10" x2="21" y2="3" />
-                      <line x1="3" y1="21" x2="10" y2="14" />
-                    </svg>
-                    <span>Thu nhỏ</span>
-                  </>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 14 10 14 10 20" />
+                    <polyline points="20 10 14 10 14 4" />
+                  </svg>
                 ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="15 3 21 3 21 9" />
-                      <polyline points="9 21 3 21 3 15" />
-                      <line x1="21" y1="3" x2="14" y2="10" />
-                      <line x1="3" y1="21" x2="10" y2="14" />
-                    </svg>
-                    <span>Phóng to</span>
-                  </>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                  </svg>
                 )}
               </button>
             )}
 
-            {/* Close Button when docked or floating */}
             {onClose && (
               <button
                 type="button"
-                className="tutor-close-btn"
+                className="tutor-btn-icon btn-close"
                 onClick={onClose}
-                title="Đóng khung chat AI"
+                title="Đóng chat"
                 aria-label="Đóng chat"
               >
                 ✕
@@ -449,18 +500,37 @@ export const TutorChat: React.FC<TutorChatProps> = ({
         <div className="tutor-messages" ref={messagesContainerRef} onClick={handleChatContainerClick}>
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`tutor-message ${message.role}`}>
-              <span className="tutor-avatar">{message.role === 'assistant' ? '✦' : 'ĐC'}</span>
-              <div
-                className="tutor-bubble"
-                dangerouslySetInnerHTML={{ __html: formatChatMarkdown(message.content) }}
-              />
+              <div className="tutor-avatar">
+                {message.role === 'assistant' ? (
+                  <img src="/logo.png" alt="Arc" className="tutor-avatar-img" />
+                ) : (
+                  'ĐC'
+                )}
+              </div>
+              <div className="tutor-bubble-wrap">
+                {message.image?.data && (
+                  <div className="tutor-message-image-box">
+                    <img
+                      src={message.image.data}
+                      alt={message.image.fileName || 'Ảnh đính kèm'}
+                      className="tutor-message-image"
+                    />
+                  </div>
+                )}
+                {message.content && (
+                  <div
+                    className="tutor-bubble"
+                    dangerouslySetInnerHTML={{ __html: formatChatMarkdown(message.content) }}
+                  />
+                )}
+              </div>
             </div>
           ))}
 
           {/* Quick prompt chips khi mới mở hội thoại */}
           {messages.length === 1 && !isLoading && (
             <div className="tutor-quick-prompts">
-              <span className="quick-prompt-label">Gợi ý hỏi nhanh cho bài học:</span>
+              <span className="quick-prompt-label">Gợi ý câu hỏi nhanh:</span>
               <div className="quick-prompt-chips">
                 <button
                   type="button"
@@ -488,24 +558,64 @@ export const TutorChat: React.FC<TutorChatProps> = ({
           )}
 
           {isLoading && !messages[messages.length - 1]?.content && (
-            <div className="tutor-typing">Tutor đang suy nghĩ<span> ···</span></div>
+            <div className="tutor-typing">Arc AI đang phân tích dữ liệu<span> ···</span></div>
           )}
         </div>
 
         {error && <div className="tutor-error">⚠️ {error}</div>}
 
+        {/* Hidden File Input for Image Upload */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          onChange={handleImageSelect}
+        />
+
         <form className="tutor-form" onSubmit={handleSubmit}>
+          {/* Image Preview Bar */}
+          {selectedImage && (
+            <div className="tutor-image-preview-bar">
+              <div className="preview-chip">
+                <img src={selectedImage.base64} alt="Preview" className="preview-thumb" />
+                <span className="preview-filename">{selectedImage.file.name}</span>
+                <span className="preview-filesize">({(selectedImage.file.size / 1024).toFixed(1)} KB)</span>
+                <button
+                  type="button"
+                  className="preview-clear-btn"
+                  onClick={() => setSelectedImage(null)}
+                  title="Gỡ ảnh"
+                  aria-label="Gỡ ảnh"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Ví dụ: Vì sao Service Singleton có thể làm rò dữ liệu giữa 2 request?"
+            onPaste={handlePaste}
+            placeholder={selectedImage ? "Nhập câu hỏi về hình ảnh này (hoặc bấm gửi để AI tự động phân tích)..." : "Hỏi kiến trúc, code mẫu hoặc dán / bấm ＋ để gửi ảnh sơ đồ..."}
             rows={2}
             disabled={isLoading}
           />
+
           <div className="tutor-composer-footer">
             <div className="tutor-composer-left">
-              <button className="composer-icon-button" type="button" aria-label="Thêm tài liệu" title="Thêm tài liệu">＋</button>
+              <button
+                className={`composer-icon-button ${selectedImage ? 'has-file' : ''}`}
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Đính kèm hình ảnh sơ đồ hoặc lỗi"
+                title="Đính kèm hình ảnh (PNG, JPG, WEBP, GIF)"
+              >
+                ＋
+              </button>
+
               <div className="model-menu-wrap">
                 <button
                   className="model-trigger"
@@ -542,30 +652,21 @@ export const TutorChat: React.FC<TutorChatProps> = ({
                 )}
               </div>
             </div>
+
             <div className="tutor-composer-right">
-              <span className="composer-shortcut">Enter gửi · Shift+Enter xuống dòng</span>
+              <span className="composer-shortcut">Enter gửi</span>
               <button className="composer-icon-button composer-mic" type="button" aria-label="Ghi âm" title="Ghi âm">♩</button>
-              <button className="tutor-send-button" type="submit" disabled={isLoading || !input.trim()} aria-label="Gửi câu hỏi">
+              <button
+                className="tutor-send-button"
+                type="submit"
+                disabled={isLoading || (!input.trim() && !selectedImage)}
+                aria-label="Gửi câu hỏi"
+              >
                 {isLoading ? '…' : '➜'}
               </button>
             </div>
           </div>
         </form>
-
-        <div className={`tutor-clear ${isLessonCleared ? 'cleared' : ''}`}>
-          <div className="tutor-clear-info">
-            <span className="tutor-clear-icon">{isLessonCleared ? '✅' : '💡'}</span>
-            <div>
-              <strong>{isLessonCleared ? 'Đã nắm vững lý thuyết bài này ✓' : 'Chưa clear phần nào? Trao đổi tiếp với AI Tutor nhé.'}</strong>
-              <span>{isLessonCleared ? 'ĐẠI CA có thể chuyển sang tab Trắc Nghiệm Ôn Luyện để làm bài kiểm tra.' : 'Khi đã hiểu bản chất, bấm xác nhận để ghi nhận tiến độ bài học.'}</span>
-            </div>
-          </div>
-          {!isLessonCleared && (
-            <button className="btn btn-success tutor-clear-btn" type="button" onClick={onMarkCleared}>
-              Em đã clear bài này ✓
-            </button>
-          )}
-        </div>
       </section>
     </>
   );

@@ -20,7 +20,6 @@ interface SidebarProps {
   userRole?: string;
   bypassLock?: boolean;
   isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
   onSelectLesson: (lessonId: string) => void;
   onSelectSprintExam: (sprintId: number) => void;
   onSelectFinalExam: () => void;
@@ -39,7 +38,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userRole,
   bypassLock = false,
   isCollapsed = false,
-  onToggleCollapse,
   onSelectLesson,
   onSelectSprintExam,
   onSelectFinalExam
@@ -55,24 +53,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className={`app-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="brand-logo">
-          <div className="logo-badge">🦷</div>
+          <div className="logo-badge-img-wrap">
+            <img src="/logo.png" alt="Arc Irobot" className="brand-logo-img" />
+          </div>
           <div className="brand-info">
-            <h1>eSmiles Academy</h1>
+            <h1>Arc Irobot Academy</h1>
             <span>React • NestJS 11 • Prisma 7</span>
           </div>
         </div>
-        {onToggleCollapse && (
-          <button
-            className="sidebar-collapse-trigger"
-            onClick={onToggleCollapse}
-            title="Thu gọn sidebar để mở rộng bài học (Ctrl+B)"
-            aria-label="Thu gọn sidebar"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-        )}
       </div>
 
       <div className="sidebar-stats">
@@ -191,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title={
             !finalExamStatus.unlocked
               ? `🔒 Cần hoàn thành ${finalExamStatus.passedSprintsCount}/${finalExamStatus.totalSprints} kỳ thi để mở khóa tốt nghiệp.`
-              : '🎓 Kỳ thi tốt nghiệp toàn khóa eSmiles Academy'
+              : '🎓 Kỳ thi tốt nghiệp toàn khóa Arc Irobot Academy'
           }
         >
           <span style={{ fontSize: '22px' }}>

@@ -36,13 +36,24 @@ interface WorkerRequest {
 
 const WORKER_SOURCE = `
 const logs = [];
-const originalConsoleLog = console.log;
-console.log = (...args) => {
+const capture = (prefix, args) => {
   try {
-    logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+    const formatted = args.map(a => {
+      if (typeof a === 'undefined') return 'undefined';
+      if (a === null) return 'null';
+      if (typeof a === 'object') {
+        try { return JSON.stringify(a); } catch (_) { return String(a); }
+      }
+      return String(a);
+    }).join(' ');
+    logs.push(prefix ? prefix + ' ' + formatted : formatted);
   } catch (_) {}
-  originalConsoleLog(...args);
 };
+console.log = (...args) => { capture('', args); };
+console.info = (...args) => { capture('[INFO]', args); };
+console.warn = (...args) => { capture('[WARN]', args); };
+console.error = (...args) => { capture('[ERROR]', args); };
+console.debug = (...args) => { capture('[DEBUG]', args); };
 
 const revive = (value) => {
   if (Array.isArray(value)) return value.map(revive);

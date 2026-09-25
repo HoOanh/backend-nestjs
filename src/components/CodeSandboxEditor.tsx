@@ -110,6 +110,23 @@ const BASE_SUGGESTIONS: SuggestionItem[] = [
   { label: 'length', kind: 'method' }
 ];
 
+export interface CodeSolutionTab {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface SubmissionHistoryRecord {
+  id: string;
+  timestamp: number;
+  action: 'run' | 'submit';
+  passed: boolean;
+  passedCount: number;
+  totalCount: number;
+  solutionName: string;
+  code: string;
+}
+
 export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   challenge,
   value,
@@ -124,20 +141,49 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   onPassed,
   className
 }) => {
-  const [internalCode, setInternalCode] = useState<string>(() => {
-    if (value !== undefined) return value;
+  // 1. Multi Solutions Tabs State
+  const [solutions, setSolutions] = useState<CodeSolutionTab[]>(() => {
     if (storageKey) {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) return saved;
+      try {
+        const savedMulti = localStorage.getItem(`${storageKey}_solutions`);
+        if (savedMulti) {
+          const parsed = JSON.parse(savedMulti);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+        const savedLegacy = localStorage.getItem(storageKey);
+        if (savedLegacy) {
+          return [{ id: 'sol-1', name: fileName, code: savedLegacy }];
+        }
+      } catch {}
     }
-    return challenge.starterCode;
+    return [{ id: 'sol-1', name: fileName, code: value !== undefined ? value : challenge.starterCode }];
   });
 
-  const code = value !== undefined ? value : internalCode;
+  const [activeSolutionId, setActiveSolutionId] = useState<string>(() => solutions[0]?.id || 'sol-1');
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabName, setEditingTabName] = useState<string>('');
+
+  // 2. Submission / Run History State
+  const [history, setHistory] = useState<SubmissionHistoryRecord[]>(() => {
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem(`${storageKey}_history`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
+  const [viewHistoryRecord, setViewHistoryRecord] = useState<SubmissionHistoryRecord | null>(null);
+
+  const currentSolution = solutions.find((s) => s.id === activeSolutionId) || solutions[0];
+  const code = value !== undefined ? value : (currentSolution?.code ?? challenge.starterCode);
 
   const [isRunning, setIsRunning] = useState(false);
   const [testOutcome, setTestOutcome] = useState<TestOutcome | null>(null);
-  const [activeTab, setActiveTab] = useState<'tests' | 'console'>('tests');
+  const [activeTab, setActiveTab] = useState<'tests' | 'console' | 'history'>('tests');
 
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
@@ -151,8 +197,21 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
 
   useEffect(() => {
     if (value === undefined && storageKey) {
-      const saved = localStorage.getItem(storageKey);
-      setInternalCode(saved || challenge.starterCode);
+      try {
+        const savedMulti = localStorage.getItem(`${storageKey}_solutions`);
+        if (savedMulti) {
+          const parsed = JSON.parse(savedMulti);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSolutions(parsed);
+            setActiveSolutionId(parsed[0].id);
+            return;
+          }
+        }
+        const saved = localStorage.getItem(storageKey);
+        setSolutions([{ id: 'sol-1', name: fileName, code: saved || challenge.starterCode }]);
+      } catch {
+        setSolutions([{ id: 'sol-1', name: fileName, code: challenge.starterCode }]);
+      }
     }
     setTestOutcome(null);
     setSuggestions([]);
@@ -204,15 +263,26 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
     }
   };
 
+  const updateCurrentSolutionCode = (newCode: string) => {
+    setSolutions((prev) => {
+      const next = prev.map((s) => (s.id === activeSolutionId ? { ...s, code: newCode } : s));
+      if (storageKey) {
+        try {
+          localStorage.setItem(`${storageKey}_solutions`, JSON.stringify(next));
+          localStorage.setItem(storageKey, newCode);
+        } catch {}
+      }
+      return next;
+    });
+    if (onChange) onChange(newCode);
+  };
+
   const applySuggestion = (item: SuggestionItem) => {
     if (!cursorWordRange || !textareaRef.current) return;
     const textToInsert = item.insertText || item.label;
     const newCode = code.slice(0, cursorWordRange.start) + textToInsert + code.slice(cursorWordRange.end);
 
-    setInternalCode(newCode);
-    if (onChange) onChange(newCode);
-    if (storageKey) localStorage.setItem(storageKey, newCode);
-
+    updateCurrentSolutionCode(newCode);
     setSuggestions([]);
 
     const newPos = cursorWordRange.start + textToInsert.length;
@@ -226,10 +296,75 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newCode = e.target.value;
-    setInternalCode(newCode);
-    if (onChange) onChange(newCode);
-    if (storageKey) localStorage.setItem(storageKey, newCode);
+    updateCurrentSolutionCode(newCode);
     updateSuggestions(newCode, e.target.selectionStart || 0);
+  };
+
+  // Solutions Tabs Operations
+  const handleAddSolution = () => {
+    const newId = `sol-${Date.now()}`;
+    const newName = `solution-${solutions.length + 1}.ts`;
+    const newSolution: CodeSolutionTab = {
+      id: newId,
+      name: newName,
+      code: code // duplicate current solution code
+    };
+    const nextSolutions = [...solutions, newSolution];
+    setSolutions(nextSolutions);
+    setActiveSolutionId(newId);
+    if (storageKey) {
+      try {
+        localStorage.setItem(`${storageKey}_solutions`, JSON.stringify(nextSolutions));
+      } catch {}
+    }
+  };
+
+  const startRenamingTab = (tab: CodeSolutionTab, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingTabId(tab.id);
+    setEditingTabName(tab.name);
+  };
+
+  const handleSaveTabName = (id: string) => {
+    const trimmed = editingTabName.trim();
+    if (!trimmed) {
+      setEditingTabId(null);
+      return;
+    }
+    const finalName = trimmed.endsWith('.ts') ? trimmed : `${trimmed}.ts`;
+    setSolutions((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, name: finalName } : s));
+      if (storageKey) {
+        try {
+          localStorage.setItem(`${storageKey}_solutions`, JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+    setEditingTabId(null);
+  };
+
+  const handleDeleteTab = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (solutions.length <= 1) return;
+    const tabToDelete = solutions.find((s) => s.id === id);
+    if (window.confirm(`Đại ca có chắc muốn xóa "${tabToDelete?.name || 'solution này'}" không?`)) {
+      const next = solutions.filter((s) => s.id !== id);
+      setSolutions(next);
+      if (activeSolutionId === id) {
+        setActiveSolutionId(next[0].id);
+      }
+      if (storageKey) {
+        try {
+          localStorage.setItem(`${storageKey}_solutions`, JSON.stringify(next));
+        } catch {}
+      }
+    }
+  };
+
+  const handleRestoreHistory = (record: SubmissionHistoryRecord) => {
+    updateCurrentSolutionCode(record.code);
+    setViewHistoryRecord(null);
   };
 
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -272,9 +407,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
       const start = e.currentTarget.selectionStart;
       const end = e.currentTarget.selectionEnd;
       const newCode = code.substring(0, start) + '  ' + code.substring(end);
-      setInternalCode(newCode);
-      if (onChange) onChange(newCode);
-      if (storageKey) localStorage.setItem(storageKey, newCode);
+      updateCurrentSolutionCode(newCode);
 
       setTimeout(() => {
         if (textareaRef.current) {
@@ -295,9 +428,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
       e.preventDefault();
       const insert = '\n' + indent + extraIndent;
       const newCode = code.substring(0, start) + insert + code.substring(start);
-      setInternalCode(newCode);
-      if (onChange) onChange(newCode);
-      if (storageKey) localStorage.setItem(storageKey, newCode);
+      updateCurrentSolutionCode(newCode);
 
       setTimeout(() => {
         if (textareaRef.current) {
@@ -314,9 +445,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   };
 
   const handleReset = () => {
-    setInternalCode(challenge.starterCode);
-    if (onChange) onChange(challenge.starterCode);
-    if (storageKey) localStorage.setItem(storageKey, challenge.starterCode);
+    updateCurrentSolutionCode(challenge.starterCode);
     setTestOutcome(null);
     setSuggestions([]);
   };
@@ -333,6 +462,27 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
       setTestOutcome(outcome);
       if (onTestOutcome) onTestOutcome(outcome);
 
+      // Append to submission history
+      const newRecord: SubmissionHistoryRecord = {
+        id: `sub-${Date.now()}`,
+        timestamp: Date.now(),
+        action: includeHidden ? 'submit' : 'run',
+        passed: outcome.passed,
+        passedCount: outcome.passedCount,
+        totalCount: outcome.total,
+        solutionName: currentSolution.name,
+        code: code
+      };
+      setHistory((prev) => {
+        const next = [newRecord, ...prev].slice(0, 20);
+        if (storageKey) {
+          try {
+            localStorage.setItem(`${storageKey}_history`, JSON.stringify(next));
+          } catch {}
+        }
+        return next;
+      });
+
       if (outcome.passed && includeHidden && onPassed) {
         onPassed();
       }
@@ -347,6 +497,27 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
       };
       setTestOutcome(errOutcome);
       if (onTestOutcome) onTestOutcome(errOutcome);
+
+      // Record failure in history
+      const newRecord: SubmissionHistoryRecord = {
+        id: `sub-${Date.now()}`,
+        timestamp: Date.now(),
+        action: includeHidden ? 'submit' : 'run',
+        passed: false,
+        passedCount: 0,
+        totalCount: challenge.testCases.length,
+        solutionName: currentSolution.name,
+        code: code
+      };
+      setHistory((prev) => {
+        const next = [newRecord, ...prev].slice(0, 20);
+        if (storageKey) {
+          try {
+            localStorage.setItem(`${storageKey}_history`, JSON.stringify(next));
+          } catch {}
+        }
+        return next;
+      });
     } finally {
       setIsRunning(false);
     }
@@ -381,13 +552,62 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             <span className="dot dot-green" />
           </div>
           <div className="vs-editor-tabs">
-            <div className="vs-tab active">
-              <span className="vs-tab-badge">TS</span>
-              <span className="vs-tab-title">{fileName}</span>
-            </div>
+            {solutions.map((sol) => (
+              <div
+                key={sol.id}
+                className={`vs-tab ${sol.id === activeSolutionId ? 'active' : ''}`}
+                onClick={() => setActiveSolutionId(sol.id)}
+                onDoubleClick={(e) => startRenamingTab(sol, e)}
+                title="Nhấp đúp hoặc bấm icon ✏️ để đổi tên tab"
+              >
+                <span className="vs-tab-badge">TS</span>
+                {editingTabId === sol.id ? (
+                  <input
+                    type="text"
+                    className="vs-tab-rename-input"
+                    value={editingTabName}
+                    autoFocus
+                    onChange={(e) => setEditingTabName(e.target.value)}
+                    onBlur={() => handleSaveTabName(sol.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveTabName(sol.id);
+                      if (e.key === 'Escape') setEditingTabId(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className="vs-tab-title">{sol.name}</span>
+                )}
+                
+                <span
+                  className="vs-tab-action-icon edit"
+                  onClick={(e) => startRenamingTab(sol, e)}
+                  title="Đổi tên solution"
+                >
+                  ✏️
+                </span>
+                {solutions.length > 1 && (
+                  <span
+                    className="vs-tab-action-icon close"
+                    onClick={(e) => handleDeleteTab(sol.id, e)}
+                    title="Xóa solution này"
+                  >
+                    ✕
+                  </span>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="vs-tab-add-btn"
+              onClick={handleAddSolution}
+              title="Thêm Solution Mới (+)"
+            >
+              ＋
+            </button>
           </div>
           <div className="vs-editor-actions">
-            <span className="vs-breadcrumb-text">{breadcrumb}</span>
+            <span className="vs-breadcrumb-text">{filePath || `src > solutions > ${currentSolution.name}`}</span>
             <span className="vs-save-badge">● Tự động lưu</span>
           </div>
         </div>
@@ -466,7 +686,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             <span className="shortcut-hint">Ctrl + Enter: Chạy thử</span>
           </div>
           <div className="sandbox-footer-actions">
-            <button className="btn btn-secondary btn-sm" onClick={handleReset} title="Khôi phục code ban đầu">
+            <button className="btn btn-secondary btn-sm" onClick={handleReset} title="Khôi phục code ban đầu của solution này">
               ↺ Khôi phục
             </button>
             <button
@@ -488,32 +708,44 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
       </div>
 
       {/* Terminal / Test Output Panel */}
-      {testOutcome && (
+      {(testOutcome || history.length > 0) && (
         <div className="test-results-panel">
           <div className="terminal-header">
             <div className="terminal-tabs">
-              <button
-                type="button"
-                className={`terminal-tab ${activeTab === 'tests' ? 'active' : ''}`}
-                onClick={() => setActiveTab('tests')}
-              >
-                TEST CASES ({testOutcome.passedCount}/{testOutcome.total})
-              </button>
+              {testOutcome && (
+                <button
+                  type="button"
+                  className={`terminal-tab ${activeTab === 'tests' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('tests')}
+                >
+                  TEST CASES ({testOutcome.passedCount}/{testOutcome.total})
+                </button>
+              )}
               <button
                 type="button"
                 className={`terminal-tab ${activeTab === 'console' ? 'active' : ''}`}
                 onClick={() => setActiveTab('console')}
               >
-                CONSOLE LOGS ({allConsoleLogs.length})
+                CONSOLE LOGS {allConsoleLogs.length > 0 ? `(${allConsoleLogs.length})` : '(0)'}
+                {allConsoleLogs.length > 0 && <span className="console-tab-indicator" />}
+              </button>
+              <button
+                type="button"
+                className={`terminal-tab ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => setActiveTab('history')}
+              >
+                📜 LỊCH SỬ LÀM BÀI ({history.length})
               </button>
             </div>
-            <div className="terminal-status-info">
-              {testOutcome.passed ? (
-                <span className="terminal-badge pass">PASS ({testOutcome.passedCount}/{testOutcome.total})</span>
-              ) : (
-                <span className="terminal-badge fail">FAIL ({testOutcome.passedCount}/{testOutcome.total})</span>
-              )}
-            </div>
+            {testOutcome && (
+              <div className="terminal-status-info">
+                {testOutcome.passed ? (
+                  <span className="terminal-badge pass">PASS ({testOutcome.passedCount}/{testOutcome.total})</span>
+                ) : (
+                  <span className="terminal-badge fail">FAIL ({testOutcome.passedCount}/{testOutcome.total})</span>
+                )}
+              </div>
+            )}
           </div>
 
           {activeTab === 'console' ? (
@@ -528,18 +760,78 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="console-empty-hint">Không có log nào được ghi lại từ `console.log()` trong code.</div>
+                <div className="console-empty-hint">
+                  Không có log nào được ghi lại từ `console.log()` / `console.error()` trong code của lần chạy gần nhất.
+                </div>
               )}
             </div>
-          ) : testOutcome.syntaxError ? (
+          ) : activeTab === 'history' ? (
+            <div className="terminal-body history-view">
+              {history.length > 0 ? (
+                <div className="history-records-list">
+                  {history.map((rec) => (
+                    <div key={rec.id} className="history-record-card">
+                      <div className="history-record-header">
+                        <div className="history-record-title">
+                          <span className={`record-badge ${rec.action === 'submit' ? 'submit' : 'run'}`}>
+                            {rec.action === 'submit' ? '🚀 Nộp Bài' : '▶️ Chạy Thử'}
+                          </span>
+                          <span className={`record-result ${rec.passed ? 'pass' : 'fail'}`}>
+                            {rec.passed ? `PASSED (${rec.passedCount}/${rec.totalCount})` : `FAILED (${rec.passedCount}/${rec.totalCount})`}
+                          </span>
+                          <span className="record-sol-name">📄 {rec.solutionName}</span>
+                        </div>
+                        <div className="history-record-time">
+                          {new Date(rec.timestamp).toLocaleTimeString('vi-VN')} {new Date(rec.timestamp).toLocaleDateString('vi-VN')}
+                        </div>
+                      </div>
+
+                      <div className="history-record-actions">
+                        <button
+                          type="button"
+                          className="btn-history-action restore"
+                          onClick={() => handleRestoreHistory(rec)}
+                          title="Khôi phục phiên bản code này vào trình soạn thảo"
+                        >
+                          ↺ Khôi Phục Code Này
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-history-action view"
+                          onClick={() => setViewHistoryRecord(viewHistoryRecord?.id === rec.id ? null : rec)}
+                        >
+                          {viewHistoryRecord?.id === rec.id ? 'Ẩn Code' : '👁️ Xem Code'}
+                        </button>
+                      </div>
+
+                      {viewHistoryRecord?.id === rec.id && (
+                        <div className="history-code-preview">
+                          <pre><code>{rec.code}</code></pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="console-empty-hint">Chưa có lịch sử làm bài nào. Hãy bấm "Chạy Thử" hoặc "Nộp Bài" để ghi nhận!</div>
+              )}
+            </div>
+          ) : testOutcome?.syntaxError ? (
             <div className="terminal-body">
               <div className="test-summary-badge fail">❌ Lỗi Cú Pháp / Thực Thi Runtime</div>
               <div className="test-case-error">
                 {testOutcome.syntaxError}
               </div>
             </div>
-          ) : (
+          ) : testOutcome ? (
             <div className="terminal-body">
+              {allConsoleLogs.length > 0 && (
+                <div className="terminal-log-hint" onClick={() => setActiveTab('console')}>
+                  <span>💡 Code đã xuất ra {allConsoleLogs.length} dòng log qua console.</span>
+                  <span className="btn-link-view-log">Xem Console Logs →</span>
+                </div>
+              )}
+
               <div className="test-cases-list">
                 {testOutcome.results.map((res, idx) => (
                   <div key={idx} className={`test-case-row ${res.passed ? 'pass-row' : 'fail-row'}`}>
@@ -575,7 +867,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

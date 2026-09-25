@@ -28,8 +28,9 @@ export const AdminAuthScreen: React.FC<AdminAuthScreenProps> = ({ onLoginSuccess
         return;
       }
       onLoginSuccess(res.user);
-    } catch (err: any) {
-      setError(err.message || 'Đăng nhập quản trị thất bại');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Đăng nhập quản trị thất bại';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -39,9 +40,12 @@ export const AdminAuthScreen: React.FC<AdminAuthScreenProps> = ({ onLoginSuccess
     <div className="auth-portal-page admin-theme">
       <div className="auth-portal-card admin-card-auth">
         <div className="auth-portal-header">
+          <div className="auth-brand-logo-wrap">
+            <img src="/logo.png" alt="Arc Irobot Logo" className="auth-brand-logo" />
+          </div>
           <div className="admin-portal-badge">👑 SYSTEM CMS</div>
-          <h2>Cổng Quản Trị eSmiles Academy</h2>
-          <p>Khu vực bảo mật dành riêng cho Quản trị viên và Ban đào tạo.</p>
+          <h2>Cổng Quản Trị Arc Irobot Academy</h2>
+          <p>Khu vực bảo mật dành riêng cho Quản trị viên và Ban đào tạo Core Architecture.</p>
         </div>
 
         {error && <div className="auth-alert error">⚠️ {error}</div>}
@@ -52,7 +56,7 @@ export const AdminAuthScreen: React.FC<AdminAuthScreenProps> = ({ onLoginSuccess
             <label>Email Quản Trị</label>
             <input
               type="email"
-              placeholder="admin@esmiles.vn"
+              placeholder="admin@arc-irobot.tech"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

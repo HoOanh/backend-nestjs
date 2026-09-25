@@ -222,9 +222,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
           <div className="admin-brand-box">
-            <span className="brand-icon">👑</span>
+            <img src="/logo.png" alt="Arc Irobot Logo" className="admin-brand-logo-img" />
             <div>
-              <h1 className="brand-title">eSmiles Admin</h1>
+              <h1 className="brand-title">Arc Irobot Admin</h1>
               <span className="brand-sub">Quản Trị Hệ Thống Academy (SQLite)</span>
             </div>
           </div>
@@ -292,7 +292,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <header className="admin-topbar">
           <div className="admin-topbar-left">
             <h2 className="admin-page-title">
-              {activeMenu === 'overview' && '📊 Dashboard Tổng Quan eSmiles Academy'}
+              {activeMenu === 'overview' && '📊 Dashboard Tổng Quan Arc Irobot Academy'}
               {activeMenu === 'users' && '👥 Quản Lý Tài Khoản Học Viên & Phân Quyền'}
               {activeMenu === 'plans' && '💳 Quản Lý Gói Khóa Học & Doanh Thu'}
               {activeMenu === 'curriculum' && '📚 Quản Lý 6 Sprints & 22+ Bài Học Chuyên Sâu'}
@@ -604,8 +604,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeMenu === 'curriculum' && (
             <div className="admin-tab-pane">
               <div className="curriculum-overview-header">
-                <h3>Cấu Trúc Giáo Trình eSmiles Backend Academy</h3>
-                <p>Khóa học gồm 6 Sprints theo chuẩn kiến trúc eSmiles CMS, Prisma 7 và NestJS 11.</p>
+                <h3>Cấu Trúc Giáo Trình Arc Irobot Academy</h3>
+                <p>Khóa học gồm 6 Sprints theo chuẩn kiến trúc Arc Irobot, Prisma 7 và NestJS 11.</p>
               </div>
 
               <div className="sprints-admin-list">
@@ -649,7 +649,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span className="ai-icon">🤖</span>
                     <div>
                       <h3>Google Gemini AI Tutor Engine</h3>
-                      <p>Hệ thống gia sư kỹ thuật giải thích code real-world cho học viên eSmiles</p>
+                      <p>Hệ thống gia sư kỹ thuật giải thích code real-world cho học viên Arc Irobot</p>
                     </div>
                   </div>
                   <span className="ai-connected-badge">● API Sẵn Sàng (14 Models)</span>
@@ -680,7 +680,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="ai-prompt-preview">
                   <label>System Prompt Đang Áp Dụng Cho Tutor:</label>
                   <pre>
-{`Em là một tutor kỹ thuật của eSmiles Backend Academy.
+{`Em là một tutor kỹ thuật của Arc Irobot Academy.
 Nhiệm vụ: giúp học viên hiểu thật chắc bài học hiện tại trước khi làm trắc nghiệm.
 Quy tắc bắt buộc:
 1. Chỉ dùng thông tin trong LESSON_CONTEXT và suy luận trực tiếp từ đó.

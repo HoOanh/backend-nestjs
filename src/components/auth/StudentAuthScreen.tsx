@@ -5,7 +5,25 @@ import { apiClient } from '../../services/apiClient.ts';
 // force majeure: Google GIS SDK types not available
 declare global {
   interface Window {
-    google?: any;
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+          }) => void;
+        };
+        oauth2?: {
+          initTokenClient: (config: {
+            client_id: string;
+            scope: string;
+            callback: (response: { access_token?: string; error?: string }) => void;
+          }) => {
+            requestAccessToken: (options?: { prompt?: string }) => void;
+          };
+        };
+      };
+    };
   }
 }
 
@@ -14,7 +32,7 @@ interface StudentAuthScreenProps {
 }
 
 // Google OAuth 2.0 Client ID (supports standard env variable)
-const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = (import.meta as unknown as { env?: { VITE_GOOGLE_CLIENT_ID?: string } }).env?.VITE_GOOGLE_CLIENT_ID;
 
 export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuccess }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
@@ -34,7 +52,7 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
       if (window.google?.accounts?.id) {
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: async (response: any) => {
+          callback: async (response) => {
             if (response.credential) {
               setIsGoogleLoading(true);
               try {
@@ -44,8 +62,9 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
                 } else {
                   onLoginSuccess(res.user);
                 }
-              } catch (err: any) {
-                setError(err.message || 'Lỗi xác thực Google ID Token');
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : 'Lỗi xác thực Google ID Token';
+                setError(msg);
               } finally {
                 setIsGoogleLoading(false);
               }
@@ -72,7 +91,7 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
         const tokenClient = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: 'openid email profile',
-          callback: async (tokenResponse: any) => {
+          callback: async (tokenResponse) => {
             if (tokenResponse?.error) {
               setError('Đã hủy đăng nhập Google hoặc phát sinh lỗi OAuth.');
               setIsGoogleLoading(false);
@@ -88,8 +107,9 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
                 } else {
                   onLoginSuccess(res.user);
                 }
-              } catch (apiErr: any) {
-                setError(apiErr.message || 'Lỗi đồng bộ tài khoản Google với SQLite');
+              } catch (apiErr: unknown) {
+                const msg = apiErr instanceof Error ? apiErr.message : 'Lỗi đồng bộ tài khoản Google';
+                setError(msg);
               } finally {
                 setIsGoogleLoading(false);
               }
@@ -143,8 +163,9 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
           // Cross-origin reading until redirected back
         }
       }, 500);
-    } catch (err: any) {
-      setError(err.message || 'Không thể mở cửa sổ xác thực Google');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể mở cửa sổ xác thực Google';
+      setError(msg);
       setIsGoogleLoading(false);
     }
   };
@@ -166,8 +187,9 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
       }
 
       onLoginSuccess(res.user);
-    } catch (err: any) {
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email & mật khẩu!');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Đăng nhập thất bại. Vui lòng kiểm tra lại email & mật khẩu!';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -195,8 +217,9 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
         planId
       });
       onLoginSuccess(res.user);
-    } catch (err: any) {
-      setError(err.message || 'Đăng ký tài khoản thất bại');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Đăng ký tài khoản thất bại';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -206,9 +229,11 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
     <div className="auth-portal-page">
       <div className="auth-portal-card">
         <div className="auth-portal-header">
-          <div className="portal-logo-badge">🦷</div>
-          <h2>eSmiles Backend Academy</h2>
-          <p>Cổng Học Tập Master NestJS 11 & Prisma 7 Cho Kỹ Sư Frontend</p>
+          <div className="auth-brand-logo-wrap">
+            <img src="/logo.png" alt="Arc Irobot Logo" className="auth-brand-logo" />
+          </div>
+          <h2>Arc Irobot Academy</h2>
+          <p>Học Viện Đào Tạo Core Backend & AI Architecture Thực Chiến</p>
         </div>
 
         {/* Real Google OAuth Button (Triggers Authentic Google Popup) */}
@@ -327,7 +352,7 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
             </div>
             <div className="form-group">
               <label>Gói Khóa Học Muốn Học</label>
-              <select value={planId} onChange={(e) => setPlanId(e.target.value as any)}>
+              <select value={planId} onChange={(e) => setPlanId(e.target.value as 'free' | 'pro' | 'enterprise')}>
                 <option value="pro">⭐ Gói Pro Master (Trọn gói 6 Sprints + AI 24/7)</option>
                 <option value="free">Trải nghiệm Miễn Phí (Sprint 1)</option>
                 <option value="enterprise">🏢 Doanh Nghiệp (Nhóm Kỹ Sư)</option>

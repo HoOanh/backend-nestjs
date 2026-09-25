@@ -198,7 +198,7 @@ function seedInitialData(): void {
         'Truy cập Sprint 0 (Mental Model & Event Loop)',
         'Thực hành Code Sandbox tương tác',
         'Khảo thí trắc nghiệm cơ bản',
-        'Cộng đồng hỗ trợ eSmiles Open'
+        'Cộng đồng kỹ sư Arc Irobot Open'
       ]),
       is_popular: 0,
       is_active: 1
@@ -214,7 +214,7 @@ function seedInitialData(): void {
         'Master Prisma 7, High-Concurrency & Multi-Tenancy Scoping',
         'AI Gia Sư 1-1 (Gemini 2.5 Flash) hướng dẫn giải bài tập',
         'Tham gia 4 kỳ thi Sprint + Thi Tốt Nghiệp Toàn Khóa',
-        'Cấp Chứng Chỉ Tốt Nghiệp Danh Dự eSmiles Academy có mã tra cứu'
+        'Cấp Chứng Chỉ Tốt Nghiệp Danh Dự Arc Irobot Academy có mã tra cứu'
       ]),
       is_popular: 1,
       is_active: 1
@@ -241,7 +241,7 @@ function seedInitialData(): void {
 seedInitialData();
 
 function bootstrapAdmin(): void {
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@esmiles.vn';
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@arc-irobot.tech';
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026!';
 
   if (ADMIN_EMAIL && ADMIN_PASSWORD) {

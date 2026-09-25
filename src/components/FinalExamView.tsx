@@ -198,7 +198,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
       questions: activeQuestions,
       codes,
       codeOutcomes: outcomes,
-      studentName: studentName.trim() || 'Học Viên eSmiles',
+      studentName: studentName.trim() || 'Kỹ Sư Arc Irobot',
       submittedAt: new Date().toISOString()
     };
 
@@ -236,7 +236,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
       setActiveTab('review');
     }
 
-    onFinalExamSubmitted(finalScore, passed, studentName.trim() || 'Học Viên eSmiles');
+    onFinalExamSubmitted(finalScore, passed, studentName.trim() || 'Kỹ Sư Arc Irobot');
   };
 
   const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.finalScore)) : (finalResult?.score || 0);
@@ -250,7 +250,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
         score: reviewData.finalScore,
         passed: true,
         studentName: reviewData.studentName,
-        certificateId: `ESMILES-CERT-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        certificateId: `ARC-CERT-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
         completedAt: reviewData.submittedAt
       }
     : null;
@@ -471,7 +471,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                 </h3>
                 <p>
                   {reviewData.passed
-                    ? `Đại ca đã hoàn thành toàn bộ khóa học với số điểm ${reviewData.finalScore}% (vượt chuẩn ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}. Chứng chỉ tốt nghiệp danh dự eSmiles đã sẵn sàng trong Tab "Chứng Chỉ"!`
+                    ? `Đại ca đã hoàn thành toàn bộ khóa học với số điểm ${reviewData.finalScore}% (vượt chuẩn ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}. Chứng chỉ tốt nghiệp danh dự Arc Irobot đã sẵn sàng trong Tab "Chứng Chỉ"!`
                     : `Điểm số đạt được: ${reviewData.finalScore}% (yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết lỗi bên dưới và bấm nút "Thi Lại Đề Mới" để nâng cao điểm số nhé!`}
                 </p>
                 <div className="score-breakdown-row">

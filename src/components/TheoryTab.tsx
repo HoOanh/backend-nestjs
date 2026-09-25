@@ -6,8 +6,6 @@ import { renderSmartMindMapHtml } from './MindMapVisualizer.tsx';
 
 interface TheoryTabProps {
   lesson: Lesson;
-  isLessonCleared: boolean;
-  onMarkCleared: () => void;
   onNextTab: () => void;
   onOpenTutor?: () => void;
 }
@@ -183,8 +181,6 @@ function extractFilenameFromCode(code: string): string {
 
 export const TheoryTab: React.FC<TheoryTabProps> = ({
   lesson,
-  isLessonCleared,
-  onMarkCleared,
   onNextTab,
   onOpenTutor
 }) => {
@@ -200,7 +196,7 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
       </div>
 
       <div className="real-source-callout">
-        <div className="callout-title">📂 Trích Dẫn Mã Nguồn Thực Tế Trong Dự Án eSmiles:</div>
+        <div className="callout-title">📂 Trích Dẫn Mã Nguồn Thực Tế Trong Dự Án Arc Irobot:</div>
         <div style={{ marginTop: '12px' }}>
           <CodeViewer
             code={lesson.realCodeSnippet}
@@ -213,10 +209,12 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
       {/* AI Tutor Assistant Callout Banner */}
       <div className="theory-tutor-banner">
         <div className="tutor-banner-left">
-          <div className="tutor-banner-avatar">🤖</div>
+          <div className="tutor-banner-avatar">
+            <img src="/logo.png" alt="Arc Irobot" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+          </div>
           <div className="tutor-banner-info">
-            <h4>Hỏi Đáp Trực Tiếp Cùng Tutor AI Co-Pilot</h4>
-            <p>ĐẠI CA đang vướng mắc phần kiến trúc hay logic code nào? Hãy mở khung chat nổi hoặc ghim dock bên cạnh để vừa học vừa tương tác ngay lập tức.</p>
+            <h4>Đồng Hành Cùng Arc AI Co-Pilot</h4>
+            <p>ĐẠI CA đang vướng mắc phần kiến trúc hay logic code nào? Hãy mở khung chat nổi hoặc ghim dock bên cạnh để vừa học vừa tương tác hoặc gửi ảnh phân tích ngay lập tức.</p>
           </div>
         </div>
         <div className="tutor-banner-actions">
@@ -224,13 +222,6 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
             <button className="btn btn-tutor-callout" onClick={onOpenTutor} type="button">
               ✦ Mở AI Tutor Co-Pilot
             </button>
-          )}
-          {!isLessonCleared ? (
-            <button className="btn btn-success" onClick={onMarkCleared} type="button">
-              Em đã clear bài này ✓
-            </button>
-          ) : (
-            <span className="badge-cleared-tick">✅ Đã nắm vững lý thuyết</span>
           )}
         </div>
       </div>

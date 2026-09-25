@@ -193,7 +193,7 @@ export class UserRegistrationService {
 
   async registerUser(email: string): Promise<void> {
     // Logic tạo tài khoản trong DB...
-    await this.notifier.send(email, 'Chào mừng bạn gia nhập eSmiles!');
+    await this.notifier.send(email, 'Chào mừng bạn gia nhập Arc Irobot!');
   }
 }
 `,

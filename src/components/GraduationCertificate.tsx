@@ -14,21 +14,23 @@ export const GraduationCertificate: React.FC<GraduationCertificateProps> = ({ re
   return (
     <div>
       <div className="certificate-container" id="printable-cert">
-        <div className="cert-watermark">🦷</div>
+        <div className="cert-watermark">
+          <img src="/logo.png" alt="Arc Irobot" style={{ width: '220px', height: 'auto', opacity: 0.12 }} />
+        </div>
         <div className="cert-header">CHỨNG CHỈ TỐT NGHIỆP XUẤT SẮC</div>
-        <h2 className="cert-title">eSmiles Backend Master Engineer</h2>
+        <h2 className="cert-title">Arc Irobot Backend Master Engineer</h2>
         <div className="cert-recipient-label">Chứng nhận cấp cho Kỹ sư:</div>
         <div className="cert-student-name">{result.studentName || 'Đại Ca Kỹ Sư'}</div>
         <p className="cert-body-text">
           Đã hoàn thành xuất sắc toàn bộ <strong>6 Sprint</strong> đào tạo chuyên sâu về kiến trúc{' '}
           <strong>NestJS 11, Prisma 7 Multi-tenancy, Dynamic CASL Permissions, Queue BullMQ & Tooling Bruno</strong>{' '}
-          trên mã nguồn thực tế của hệ thống Nha Khoa Số eSmiles.
+          trên mã nguồn thực tế của hệ sinh thái phần mềm Arc Irobot.
         </p>
         <div className="cert-footer-row">
           <div>
             <div className="cert-seal">🏅</div>
             <div style={{ fontWeight: 700, color: '#f8fafc' }}>
-              eSmiles Core Architecture Committee
+              Arc Irobot Core Architecture Committee
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>

@@ -13,6 +13,10 @@ interface TopbarProps {
   isAdminBypass?: boolean;
   onToggleAdminBypass?: () => void;
   onNavigateToAdmin?: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
+  isTutorOpen?: boolean;
+  onToggleTutor?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -26,7 +30,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   onLogout,
   isAdminBypass = false,
   onToggleAdminBypass,
-  onNavigateToAdmin
+  onNavigateToAdmin,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
+  isTutorOpen = false,
+  onToggleTutor
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isAdmin = currentUser?.role === 'admin';
@@ -34,10 +42,36 @@ export const Topbar: React.FC<TopbarProps> = ({
   return (
     <header className="main-top-bar">
       <div className="top-bar-left">
+        {onToggleSidebar && (
+          <button
+            className={`sidebar-toggle-btn ${isSidebarCollapsed ? 'is-collapsed' : ''}`}
+            onClick={onToggleSidebar}
+            title={isSidebarCollapsed ? 'Mở danh mục bài học (Ctrl+B)' : 'Ẩn danh mục bài học để mở rộng màn hình (Ctrl+B)'}
+            aria-label="Đóng mở thanh điều hướng"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
+          </button>
+        )}
         <span className="tag-badge">{tag}</span>
         <h2 className="top-bar-title" title={title}>{title}</h2>
       </div>
       <div className="top-bar-right">
+        {/* AI Tutor Toggle Button on Topbar */}
+        {onToggleTutor && (
+          <button
+            className={`topbar-tutor-btn ${isTutorOpen ? 'active' : ''}`}
+            onClick={onToggleTutor}
+            title={isTutorOpen ? 'Đang mở Tutor AI Co-Pilot (Ctrl+J)' : 'Mở Tutor AI Co-Pilot hỗ trợ học tập (Ctrl+J)'}
+            aria-label="Hỏi AI Tutor"
+          >
+            <span className="tutor-btn-sparkle">✦</span>
+            <span>Tutor AI</span>
+            {isTutorOpen && <span className="tutor-btn-active-dot" />}
+          </button>
+        )}
         {/* Admin Bypass Toggle Button */}
         {isAdmin && onToggleAdminBypass && (
           <button

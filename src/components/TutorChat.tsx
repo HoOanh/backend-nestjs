@@ -28,6 +28,9 @@ interface TutorChatProps {
   lesson: Lesson;
   isLessonCleared: boolean;
   onMarkCleared: () => void;
+  mode?: 'docked' | 'floating' | 'inline';
+  onSwitchMode?: (newMode: 'docked' | 'floating') => void;
+  onClose?: () => void;
 }
 
 function healStreamingMarkdown(text: string): string {
@@ -120,7 +123,10 @@ export function formatChatMarkdown(text: string): string {
 export const TutorChat: React.FC<TutorChatProps> = ({
   lesson,
   isLessonCleared,
-  onMarkCleared
+  onMarkCleared,
+  mode = 'inline',
+  onSwitchMode,
+  onClose
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -343,56 +349,100 @@ export const TutorChat: React.FC<TutorChatProps> = ({
 
   return (
     <>
-      {isExpanded && (
+      {isExpanded && mode === 'inline' && (
         <div
           className="tutor-modal-backdrop"
           onClick={() => setIsExpanded(false)}
           aria-hidden="true"
         />
       )}
-      <section className={`tutor-card ${isExpanded ? 'is-expanded' : ''}`} aria-label="Tutor AI theo bài học">
+      <section className={`tutor-card tutor-mode-${mode} ${isExpanded ? 'is-expanded' : ''}`} aria-label="Tutor AI theo bài học">
         <div className="tutor-header">
           <div className="tutor-header-left">
             <div className="tutor-agent-icon">✦</div>
             <div className="tutor-header-text">
               <div className="tutor-header-title-row">
                 <h3>Hỏi Tutor AI về bài học</h3>
-                <span className="tutor-kicker-badge">GEMINI LEARNING AGENT</span>
+                <span className="tutor-kicker-badge">
+                  {mode === 'docked' ? 'CO-PILOT DOCKED' : mode === 'floating' ? 'FLOATING AGENT' : 'GEMINI LEARNING AGENT'}
+                </span>
               </div>
               <p className="tutor-desc">Hỏi trực tiếp chỗ ĐẠI CA chưa clear — Tutor giải thích đúng code mẫu & mental model của bài.</p>
             </div>
           </div>
           <div className="tutor-header-tools">
             <span className="tutor-status"><span className="status-dot" /> Sẵn sàng</span>
-            <button
-              type="button"
-              className={`tutor-expand-btn ${isExpanded ? 'active' : ''}`}
-              onClick={() => setIsExpanded((prev) => !prev)}
-              title={isExpanded ? 'Thu nhỏ cửa sổ chat (Esc)' : 'Phóng to toàn màn hình'}
-              aria-label={isExpanded ? 'Thu nhỏ' : 'Phóng to'}
-            >
-              {isExpanded ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 14 10 14 10 20" />
-                    <polyline points="20 10 14 10 14 4" />
-                    <line x1="14" y1="10" x2="21" y2="3" />
-                    <line x1="3" y1="21" x2="10" y2="14" />
-                  </svg>
-                  <span>Thu nhỏ</span>
-                </>
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 3 21 3 21 9" />
-                    <polyline points="9 21 3 21 3 15" />
-                    <line x1="21" y1="3" x2="14" y2="10" />
-                    <line x1="3" y1="21" x2="10" y2="14" />
-                  </svg>
-                  <span>Phóng to</span>
-                </>
-              )}
-            </button>
+
+            {/* Switch Mode Button (Docked <-> Floating) */}
+            {onSwitchMode && mode === 'docked' && (
+              <button
+                type="button"
+                className="tutor-tool-btn"
+                onClick={() => onSwitchMode('floating')}
+                title="Chuyển sang cửa sổ nổi tự do"
+                aria-label="Chuyển sang cửa sổ nổi"
+              >
+                <span>⧉ Nổi</span>
+              </button>
+            )}
+
+            {onSwitchMode && mode === 'floating' && (
+              <button
+                type="button"
+                className="tutor-tool-btn"
+                onClick={() => onSwitchMode('docked')}
+                title="Ghim cố định bên phải bài học"
+                aria-label="Ghim cố định bên phải"
+              >
+                <span>◨ Ghim Dock</span>
+              </button>
+            )}
+
+            {/* Expand / Minimize Button for inline/floating */}
+            {mode !== 'docked' && (
+              <button
+                type="button"
+                className={`tutor-expand-btn ${isExpanded ? 'active' : ''}`}
+                onClick={() => setIsExpanded((prev) => !prev)}
+                title={isExpanded ? 'Thu nhỏ cửa sổ chat (Esc)' : 'Phóng to toàn màn hình'}
+                aria-label={isExpanded ? 'Thu nhỏ' : 'Phóng to'}
+              >
+                {isExpanded ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="4 14 10 14 10 20" />
+                      <polyline points="20 10 14 10 14 4" />
+                      <line x1="14" y1="10" x2="21" y2="3" />
+                      <line x1="3" y1="21" x2="10" y2="14" />
+                    </svg>
+                    <span>Thu nhỏ</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 3 21 3 21 9" />
+                      <polyline points="9 21 3 21 3 15" />
+                      <line x1="21" y1="3" x2="14" y2="10" />
+                      <line x1="3" y1="21" x2="10" y2="14" />
+                    </svg>
+                    <span>Phóng to</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Close Button when docked or floating */}
+            {onClose && (
+              <button
+                type="button"
+                className="tutor-close-btn"
+                onClick={onClose}
+                title="Đóng khung chat AI"
+                aria-label="Đóng chat"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
@@ -406,6 +456,37 @@ export const TutorChat: React.FC<TutorChatProps> = ({
               />
             </div>
           ))}
+
+          {/* Quick prompt chips khi mới mở hội thoại */}
+          {messages.length === 1 && !isLoading && (
+            <div className="tutor-quick-prompts">
+              <span className="quick-prompt-label">Gợi ý hỏi nhanh cho bài học:</span>
+              <div className="quick-prompt-chips">
+                <button
+                  type="button"
+                  className="quick-chip"
+                  onClick={() => void sendMessage('ĐẠI CA tóm tắt giúp em 3 luận điểm cốt lõi nhất của bài này và ứng dụng thực tế trong NestJS.')}
+                >
+                  📝 Tóm tắt 3 luận điểm cốt lõi
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip"
+                  onClick={() => void sendMessage('Đoạn sơ đồ kiến trúc trong bài giải thích cơ chế gì? Vì sao lại thiết kế như vậy?')}
+                >
+                  🏗️ Giải thích sơ đồ kiến trúc
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip"
+                  onClick={() => void sendMessage('Đoạn code mẫu trong bài có điểm gì đặc biệt cần lưu ý về hiệu năng và chống rò rỉ bộ nhớ?')}
+                >
+                  ⚙️ Phân tích code mẫu & hiệu năng
+                </button>
+              </div>
+            </div>
+          )}
+
           {isLoading && !messages[messages.length - 1]?.content && (
             <div className="tutor-typing">Tutor đang suy nghĩ<span> ···</span></div>
           )}

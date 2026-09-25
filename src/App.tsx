@@ -7,6 +7,7 @@ import { Topbar } from './components/Topbar.tsx';
 import { TheoryTab } from './components/TheoryTab.tsx';
 import { QuizTab } from './components/QuizTab.tsx';
 import { CodeSandboxTab } from './components/CodeSandboxTab.tsx';
+import { TutorChat } from './components/TutorChat.tsx';
 import { SprintExamView } from './components/SprintExamView.tsx';
 import { FinalExamView } from './components/FinalExamView.tsx';
 import { LockedContentNotice } from './components/LockedContentNotice.tsx';
@@ -86,6 +87,74 @@ export const App: React.FC = () => {
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
+
+  // Sidebar Collapsed State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('esmiles_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('esmiles_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // AI Tutor Co-Pilot State (Floating vs Docked)
+  const [isTutorOpen, setIsTutorOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('esmiles_tutor_open') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [tutorMode, setTutorMode] = useState<'docked' | 'floating'>(() => {
+    try {
+      const saved = localStorage.getItem('esmiles_tutor_mode');
+      if (saved === 'docked' || saved === 'floating') return saved;
+    } catch {}
+    return 'floating';
+  });
+
+  const handleToggleTutor = () => {
+    setIsTutorOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('esmiles_tutor_open', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleSwitchTutorMode = (newMode: 'docked' | 'floating') => {
+    setTutorMode(newMode);
+    try {
+      localStorage.setItem('esmiles_tutor_mode', newMode);
+    } catch {}
+  };
+
+  // Global Keyboard Shortcuts (Ctrl+B / Cmd+B for Sidebar, Ctrl+J / Cmd+J for AI Tutor)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        handleToggleSidebar();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        handleToggleTutor();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Learning Progress State
   const [state, setState] = useState<AppState>(() => {
@@ -400,7 +469,7 @@ export const App: React.FC = () => {
   );
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
         curriculum={CURRICULUM}
         sprintExams={SPRINT_EXAMS}
@@ -413,6 +482,8 @@ export const App: React.FC = () => {
         progressPercent={progressPercent}
         userRole={activeUser?.role}
         bypassLock={effectiveBypass}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
         onSelectLesson={handleSelectLesson}
         onSelectSprintExam={handleSelectSprintExam}
         onSelectFinalExam={handleSelectFinalExam}
@@ -431,121 +502,171 @@ export const App: React.FC = () => {
           isAdminBypass={effectiveBypass}
           onToggleAdminBypass={isEffectiveAdmin ? handleToggleAdminBypass : undefined}
           onNavigateToAdmin={isEffectiveAdmin ? () => navigate('/admin') : undefined}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={handleToggleSidebar}
+          isTutorOpen={isTutorOpen}
+          onToggleTutor={handleToggleTutor}
         />
 
-        <section className="content-viewport" ref={contentViewportRef}>
-          {/* 1. LESSON ROUTE */}
-          {route.type === 'lesson' && currentLesson && (
-            <>
-              {!lessonUnlockStatus.unlocked ? (
-                <LockedContentNotice
-                  type="lesson"
-                  title={currentLesson.title}
-                  requiredPreviousLesson={lessonUnlockStatus.requiredPreviousLesson}
-                  onNavigateToAvailable={handleNavigateToAvailable}
-                  isAdmin={isEffectiveAdmin}
-                  onBypassLock={handleToggleAdminBypass}
-                />
-              ) : (
-                <div>
-                  <div className="lesson-tabs">
-                    <button
-                      className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
-                      onClick={() => handleTabChange('theory')}
-                    >
-                      📖 Lý Thuyết & Code Mẫu
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
-                      onClick={() => handleTabChange('quiz')}
-                    >
-                      📝 Trắc Nghiệm Ôn Luyện{' '}
-                      <span className="tab-badge">{currentLesson.quiz.length}</span>
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
-                      onClick={() => handleTabChange('code')}
-                    >
-                      💻 Bài Tập Code Sandbox{' '}
-                      <span className="tab-badge">
-                        {currentLesson.codeChallenge.testCases.length} Tests
-                      </span>
-                    </button>
+        <div className={`workspace-layout ${isTutorOpen && tutorMode === 'docked' && route.type === 'lesson' ? 'has-docked-tutor' : ''}`}>
+          <section className="content-viewport" ref={contentViewportRef}>
+            {/* 1. LESSON ROUTE */}
+            {route.type === 'lesson' && currentLesson && (
+              <>
+                {!lessonUnlockStatus.unlocked ? (
+                  <LockedContentNotice
+                    type="lesson"
+                    title={currentLesson.title}
+                    requiredPreviousLesson={lessonUnlockStatus.requiredPreviousLesson}
+                    onNavigateToAvailable={handleNavigateToAvailable}
+                    isAdmin={isEffectiveAdmin}
+                    onBypassLock={handleToggleAdminBypass}
+                  />
+                ) : (
+                  <div>
+                    <div className="lesson-tabs">
+                      <button
+                        className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('theory')}
+                      >
+                        📖 Lý Thuyết & Code Mẫu
+                      </button>
+                      <button
+                        className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('quiz')}
+                      >
+                        📝 Trắc Nghiệm Ôn Luyện{' '}
+                        <span className="tab-badge">{currentLesson.quiz.length}</span>
+                      </button>
+                      <button
+                        className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('code')}
+                      >
+                        💻 Bài Tập Code Sandbox{' '}
+                        <span className="tab-badge">
+                          {currentLesson.codeChallenge.testCases.length} Tests
+                        </span>
+                      </button>
+                    </div>
+
+                    {activeTab === 'theory' && (
+                      <TheoryTab
+                        lesson={currentLesson}
+                        isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
+                        onMarkCleared={() => handleLessonCleared(currentLesson.id)}
+                        onNextTab={() => handleTabChange('quiz')}
+                        onOpenTutor={() => setIsTutorOpen(true)}
+                      />
+                    )}
+
+                    {activeTab === 'quiz' && (
+                      <QuizTab
+                        lesson={currentLesson}
+                        onPrevTab={() => handleTabChange('theory')}
+                        onNextTab={() => handleTabChange('code')}
+                      />
+                    )}
+
+                    {activeTab === 'code' && (
+                      <CodeSandboxTab
+                        lesson={currentLesson}
+                        onLessonCompleted={handleLessonCompleted}
+                      />
+                    )}
                   </div>
+                )}
+              </>
+            )}
 
-                  {activeTab === 'theory' && (
-                    <TheoryTab
-                      lesson={currentLesson}
-                      isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
-                      onMarkCleared={() => handleLessonCleared(currentLesson.id)}
-                      onNextTab={() => handleTabChange('quiz')}
-                    />
-                  )}
+            {/* 2. SPRINT EXAM ROUTE */}
+            {route.type === 'sprint-exam' && currentSprintExam && (
+              <>
+                {!sprintExamUnlockStatus.unlocked ? (
+                  <LockedContentNotice
+                    type="sprint-exam"
+                    title={currentSprintExam.title}
+                    missingLessons={sprintExamUnlockStatus.missingLessons}
+                    onNavigateToAvailable={handleNavigateToAvailable}
+                    isAdmin={isEffectiveAdmin}
+                    onBypassLock={handleToggleAdminBypass}
+                  />
+                ) : (
+                  <SprintExamView
+                    exam={currentSprintExam}
+                    existingScore={state.sprintExamScores[currentSprintExam.sprintId]}
+                    onExamSubmitted={handleSprintExamSubmitted}
+                  />
+                )}
+              </>
+            )}
 
-                  {activeTab === 'quiz' && (
-                    <QuizTab
-                      lesson={currentLesson}
-                      onPrevTab={() => handleTabChange('theory')}
-                      onNextTab={() => handleTabChange('code')}
-                    />
-                  )}
+            {/* 3. FINAL EXAM ROUTE */}
+            {route.type === 'final-exam' && (
+              <>
+                {!finalExamUnlockStatus.unlocked && !state.finalExam?.passed ? (
+                  <LockedContentNotice
+                    type="final-exam"
+                    title="Kỳ Thi Tốt Nghiệp Toàn Khóa eSmiles Academy"
+                    missingSprints={finalExamUnlockStatus.missingSprints}
+                    onNavigateToAvailable={handleNavigateToAvailable}
+                    isAdmin={isEffectiveAdmin}
+                    onBypassLock={handleToggleAdminBypass}
+                  />
+                ) : (
+                  <FinalExamView
+                    exam={FINAL_EXAM}
+                    finalResult={state.finalExam}
+                    onFinalExamSubmitted={handleFinalExamSubmitted}
+                    onRetakeFinalExam={handleRetakeFinalExam}
+                  />
+                )}
+              </>
+            )}
+          </section>
 
-                  {activeTab === 'code' && (
-                    <CodeSandboxTab
-                      lesson={currentLesson}
-                      onLessonCompleted={handleLessonCompleted}
-                    />
-                  )}
-                </div>
-              )}
-            </>
+          {/* DOCKED TUTOR CO-PILOT SIDEBAR (Side-by-side mode) */}
+          {isTutorOpen && tutorMode === 'docked' && currentLesson && route.type === 'lesson' && (
+            <aside className="docked-tutor-sidebar">
+              <TutorChat
+                lesson={currentLesson}
+                isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
+                onMarkCleared={() => handleLessonCleared(currentLesson.id)}
+                mode="docked"
+                onSwitchMode={() => handleSwitchTutorMode('floating')}
+                onClose={() => setIsTutorOpen(false)}
+              />
+            </aside>
           )}
+        </div>
 
-          {/* 2. SPRINT EXAM ROUTE */}
-          {route.type === 'sprint-exam' && currentSprintExam && (
-            <>
-              {!sprintExamUnlockStatus.unlocked ? (
-                <LockedContentNotice
-                  type="sprint-exam"
-                  title={currentSprintExam.title}
-                  missingLessons={sprintExamUnlockStatus.missingLessons}
-                  onNavigateToAvailable={handleNavigateToAvailable}
-                  isAdmin={isEffectiveAdmin}
-                  onBypassLock={handleToggleAdminBypass}
-                />
-              ) : (
-                <SprintExamView
-                  exam={currentSprintExam}
-                  existingScore={state.sprintExamScores[currentSprintExam.sprintId]}
-                  onExamSubmitted={handleSprintExamSubmitted}
-                />
-              )}
-            </>
-          )}
+        {/* FLOATING TUTOR WINDOW (Floating mode) */}
+        {isTutorOpen && tutorMode === 'floating' && currentLesson && route.type === 'lesson' && (
+          <div className="floating-tutor-window">
+            <TutorChat
+              lesson={currentLesson}
+              isLessonCleared={Boolean(state.clearedLessons?.[currentLesson.id])}
+              onMarkCleared={() => handleLessonCleared(currentLesson.id)}
+              mode="floating"
+              onSwitchMode={() => handleSwitchTutorMode('docked')}
+              onClose={() => setIsTutorOpen(false)}
+            />
+          </div>
+        )}
 
-          {/* 3. FINAL EXAM ROUTE */}
-          {route.type === 'final-exam' && (
-            <>
-              {!finalExamUnlockStatus.unlocked && !state.finalExam?.passed ? (
-                <LockedContentNotice
-                  type="final-exam"
-                  title="Kỳ Thi Tốt Nghiệp Toàn Khóa eSmiles Academy"
-                  missingSprints={finalExamUnlockStatus.missingSprints}
-                  onNavigateToAvailable={handleNavigateToAvailable}
-                  isAdmin={isEffectiveAdmin}
-                  onBypassLock={handleToggleAdminBypass}
-                />
-              ) : (
-                <FinalExamView
-                  exam={FINAL_EXAM}
-                  finalResult={state.finalExam}
-                  onFinalExamSubmitted={handleFinalExamSubmitted}
-                  onRetakeFinalExam={handleRetakeFinalExam}
-                />
-              )}
-            </>
-          )}
-        </section>
+        {/* FLOATING ACTION BUTTON (FAB) Trigger khi đang đóng */}
+        {!isTutorOpen && currentLesson && route.type === 'lesson' && (
+          <button
+            className="floating-tutor-trigger-btn"
+            onClick={() => setIsTutorOpen(true)}
+            title="Hỏi Tutor AI về bài học (Ctrl+J)"
+            aria-label="Mở Tutor AI Co-Pilot"
+          >
+            <span className="fab-pulse-ring" />
+            <span className="fab-icon">🤖</span>
+            <span className="fab-label">Hỏi Tutor AI</span>
+            <span className="fab-shortcut">Ctrl+J</span>
+          </button>
+        )}
       </main>
 
       {/* Student Learning History Modal */}

@@ -109,11 +109,46 @@ body {
   flex-direction: column;
   height: 100%;
   z-index: 20;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.app-sidebar.collapsed,
+.app-container.sidebar-collapsed .app-sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  border-right: none !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .sidebar-header {
   padding: 20px;
   border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-collapse-trigger {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-trigger:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
 }
 
 .brand-logo {
@@ -325,6 +360,75 @@ body {
   gap: 12px;
   min-width: 0;
   flex: 1;
+}
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.sidebar-toggle-btn.is-collapsed {
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--accent-primary);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.topbar-tutor-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.topbar-tutor-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: #6366f1;
+  transform: translateY(-1px);
+}
+
+.topbar-tutor-btn.active {
+  background: linear-gradient(135deg, #0284c7, #6366f1);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+}
+
+.tutor-btn-sparkle {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.tutor-btn-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
 }
 
 .tag-badge {
@@ -8109,6 +8213,335 @@ body {
 
 .ai-live-content-markdown li {
   margin-bottom: 6px;
+}
+
+/* ==========================================================================
+   🤖 HYBRID AI TUTOR CO-PILOT WIDGET & WORKSPACE DOCKED SPLIT LAYOUT
+   ========================================================================== */
+
+/* 1. Workspace Layout (Container chứa Content Viewport & Docked Sidebar) */
+.workspace-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.workspace-layout .content-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  transition: all 0.25s ease;
+}
+
+/* 2. Docked Tutor Sidebar (Ghim cố định bên phải) */
+.docked-tutor-sidebar {
+  width: 440px;
+  min-width: 380px;
+  max-width: 520px;
+  height: 100%;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  z-index: 15;
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.05);
+  animation: tutorSlideFromRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tutorSlideFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 3. Floating Tutor Window (Cửa sổ nổi góc dưới phải) */
+.floating-tutor-window {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  width: 440px;
+  height: 640px;
+  max-width: calc(100vw - 36px);
+  max-height: calc(100vh - 80px);
+  z-index: 1200;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.2), 0 2px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  animation: tutorSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tutorSlideUp {
+  from {
+    transform: translateY(30px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 4. Floating Action Button (FAB) Trigger khi đang đóng */
+.floating-tutor-trigger-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0284c7, #6366f1);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13.5px;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.22s ease;
+  user-select: none;
+}
+
+.floating-tutor-trigger-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 12px 30px rgba(2, 132, 199, 0.45);
+}
+
+.floating-tutor-trigger-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.fab-icon {
+  font-size: 18px;
+}
+
+.fab-label {
+  letter-spacing: 0.2px;
+}
+
+.fab-shortcut {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 6px;
+  opacity: 0.9;
+}
+
+.fab-pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid rgba(99, 102, 241, 0.6);
+  animation: fabPulse 2.5s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  pointer-events: none;
+}
+
+@keyframes fabPulse {
+  0% { transform: scale(0.98); opacity: 0.8; }
+  50% { transform: scale(1.08); opacity: 0; }
+  100% { transform: scale(0.98); opacity: 0; }
+}
+
+/* 5. Tùy biến TutorCard theo từng Mode */
+.tutor-card.tutor-mode-docked,
+.tutor-card.tutor-mode-floating {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tutor-card.tutor-mode-docked .tutor-messages,
+.tutor-card.tutor-mode-floating .tutor-messages {
+  flex: 1;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.tutor-tool-btn,
+.tutor-close-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tutor-tool-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+.tutor-close-btn {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.tutor-close-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* 6. Quick Prompt Chips */
+.tutor-quick-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: var(--bg-surface-subtle);
+  border: 1px dashed var(--border-subtle);
+  border-radius: 12px;
+}
+
+.quick-prompt-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quick-prompt-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quick-chip {
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.quick-chip:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateX(2px);
+}
+
+/* 7. Theory Tab Tutor Banner */
+.theory-tutor-banner {
+  margin-top: 28px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.06), rgba(99, 102, 241, 0.08));
+  border: 1.5px solid rgba(99, 102, 241, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+[data-theme='light'] .theory-tutor-banner {
+  background: linear-gradient(135deg, #f0f9ff, #eef2ff);
+  border-color: #c7d2fe;
+}
+
+.tutor-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.tutor-banner-avatar {
+  font-size: 32px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0284c7, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.3);
+  flex-shrink: 0;
+}
+
+.tutor-banner-info h4 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tutor-banner-info p {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.tutor-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-tutor-callout {
+  background: linear-gradient(135deg, #0284c7, #6366f1);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-tutor-callout:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+}
+
+.badge-cleared-tick {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-success);
+  background: rgba(22, 163, 74, 0.12);
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(22, 163, 74, 0.3);
 }
 
 

@@ -19,6 +19,8 @@ interface SidebarProps {
   progressPercent: number;
   userRole?: string;
   bypassLock?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   onSelectLesson: (lessonId: string) => void;
   onSelectSprintExam: (sprintId: number) => void;
   onSelectFinalExam: () => void;
@@ -36,6 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   progressPercent,
   userRole,
   bypassLock = false,
+  isCollapsed = false,
+  onToggleCollapse,
   onSelectLesson,
   onSelectSprintExam,
   onSelectFinalExam
@@ -48,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <aside className="app-sidebar">
+    <aside className={`app-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="brand-logo">
           <div className="logo-badge">🦷</div>
@@ -57,6 +61,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>React • NestJS 11 • Prisma 7</span>
           </div>
         </div>
+        {onToggleCollapse && (
+          <button
+            className="sidebar-collapse-trigger"
+            onClick={onToggleCollapse}
+            title="Thu gọn sidebar để mở rộng bài học (Ctrl+B)"
+            aria-label="Thu gọn sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="sidebar-stats">

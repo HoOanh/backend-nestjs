@@ -7,7 +7,7 @@ import { renderCleanBlueprint } from './renderCleanBlueprint.ts';
  */
 export function renderLayeredStack(text: string, title?: string): string {
   const displayTitle = title || 'BẢN ĐỒ TẦNG BẬC HỆ THỐNG (SYSTEM TAXONOMY MAP)';
-  const uniqueId = 'tax_' + Math.random().toString(36).substring(2, 9);
+  const uniqueId = 'tax_system_taxonomy_map';
 
   // Trường hợp đặc thù Sơ đồ 1 của Chapter 1 (Hardware / Kernel / Libuv / V8 Engine / NestJS)
   if (text.includes('HARDWARE LAYER') || text.includes('TẦNG VẬT LÝ')) {
@@ -23,28 +23,10 @@ export function renderLayeredStack(text: string, title?: string): string {
             </div>
           </div>
           <div class="arch-view-switcher">
-            <button class="arch-tab-btn active" onclick="
-              const board = document.getElementById('${uniqueId}');
-              board.querySelector('.arch-stack-container').style.display = 'flex';
-              board.querySelector('.arch-radial-container').style.display = 'none';
-              board.querySelectorAll('.arch-tab-btn').forEach(b => b.classList.remove('active'));
-              this.classList.add('active');
-            ">
+            <button type="button" class="arch-tab-btn active" data-tab-target="stack">
               🏗️ Kiến Trúc Phân Tầng (Stack)
             </button>
-            <button class="arch-tab-btn" onclick="
-              const board = document.getElementById('${uniqueId}');
-              if (board) {
-                board.querySelector('.arch-stack-container').style.display = 'none';
-                board.querySelector('.arch-radial-container').style.display = 'flex';
-                board.querySelectorAll('.arch-tab-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                if (window.initMindMapControllers) {
-                  window.initMindMapControllers(board);
-                }
-                window.dispatchEvent(new CustomEvent('mindmap:tab-switch', { detail: { boardId: '${uniqueId}' } }));
-              }
-            ">
+            <button type="button" class="arch-tab-btn" data-tab-target="radial">
               🧠 Sơ Đồ Tư Duy (Mindmap)
             </button>
           </div>

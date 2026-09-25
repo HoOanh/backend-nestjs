@@ -6566,6 +6566,342 @@ body {
   background: #f8fafc;
 }
 
+/* 💾 5. Memory Architecture & RSS Layout Widget */
+.badge-memory {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+}
+
+.badge-flow {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.28);
+}
+
+.memory-rss-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.memory-rss-banner {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(14, 165, 233, 0.08));
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+[data-theme='light'] .memory-rss-banner {
+  background: linear-gradient(135deg, #faf5ff, #f0f9ff);
+  border: 1px solid #e9d5ff;
+}
+
+.rss-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.rss-tag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #a855f7;
+  color: #ffffff;
+  font-family: var(--font-mono);
+}
+
+.rss-desc {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rss-banner-right code {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+[data-theme='light'] .rss-banner-right code {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+.memory-zones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 20px;
+}
+
+.memory-zone-card {
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.25s ease;
+}
+
+[data-theme='light'] .memory-zone-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.memory-zone-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.07);
+}
+
+.zone-heap {
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+[data-theme='light'] .zone-heap {
+  border-color: #d8b4fe;
+}
+
+.zone-stack {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme='light'] .zone-stack {
+  border-color: #fde68a;
+}
+
+.zone-external {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme='light'] .zone-external {
+  border-color: #bbf7d0;
+}
+
+.zone-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.zone-icon {
+  font-size: 20px;
+}
+
+.zone-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+.zone-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.zone-sub-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zone-sub-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-theme='light'] .zone-sub-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.sub-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sub-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.pill-fast {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.pill-heavy {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.sub-algo {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+}
+
+.sub-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.zone-features-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zone-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.zone-feature-item strong {
+  color: var(--text-primary);
+}
+
+.feat-icon {
+  font-size: 13px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.zone-stat-badge {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+  margin-top: auto;
+}
+
+.stat-stack {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+[data-theme='light'] .stat-stack {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.stat-external {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+[data-theme='light'] .stat-external {
+  background: #f0fdf4;
+  color: #047857;
+}
+
+/* ⚡ 6. Execution Pipeline Flow Styles */
+.flow-steps-track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.flow-step-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.flow-step-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+  transition: all 0.2s ease;
+}
+
+[data-theme='light'] .flow-step-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.flow-step-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.flow-step-number {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+  background: rgba(14, 165, 233, 0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.flow-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flow-step-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.flow-step-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.flow-step-arrow {
+  color: var(--accent-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+
 
 
 

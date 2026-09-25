@@ -65,7 +65,7 @@ Khi đại ca kiểm tra \`process.memoryUsage()\`, hệ điều hành cấp ph�
 └──────────────┴─────────────┴─────────────────────────────┴────────────────────┘
 \`\`\`
 
-1. **Stack Memory:** Quản lý theo cơ chế LIFO (Last In First Out). Lưu trữ các biến nguyên thủy (Primitives), con trỏ tham chiếu trỏ sang Heap và các khung hàm (Call Frames). Cấp phát và thu hồi tức thì theo con trỏ Stack Pointer của CPU ($0\%$ GC overhead).
+1. **Stack Memory:** Quản lý theo cơ chế LIFO (Last In First Out). Lưu trữ các biến nguyên thủy (Primitives), con trỏ tham chiếu trỏ sang Heap và các khung hàm (Call Frames). Cấp phát và thu hồi tức thì theo con trỏ Stack Pointer của CPU (0% GC overhead).
 2. **Heap Memory:** Vùng nhớ cấp phát động chứa Objects, Arrays, Closures và Class Instances. Được kiểm soát và thu gom rác tự động bởi V8 Garbage Collector.
 3. **C++ Non-Heap (External Memory):** Vùng nhớ cấp phát ngoài V8 Heap thông qua hàm \`malloc()\` trực tiếp tại tầng C++ của Node.js (dành cho Buffer đọc file, socket network, khóa crypto).
 

@@ -80,7 +80,7 @@ function formatMarkdown(text: string): string {
   const codeBlocks: string[] = [];
 
   // 1. Extract fenced code blocks first and format diagrams vs code
-  let processed = text.replace(/```(\w*)\r?\n([\s\S]*?)```/g, (_, lang, code) => {
+  let processed = text.replace(/```(\w*)\r?\n([\s\S]*?)```/g, (match, lang, code, offset, fullText) => {
     const isDiagram =
       lang === 'diagram' ||
       lang === 'ascii' ||
@@ -92,7 +92,18 @@ function formatMarkdown(text: string): string {
 
     const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
     if (isDiagram) {
-      codeBlocks.push(renderSmartMindMapHtml(code));
+      // Trích xuất tiêu đề sơ đồ từ heading gần nhất trước code block
+      const precedingText = (fullText as string).slice(Math.max(0, offset - 400), offset);
+      const prevLines = precedingText.trim().split('\n').filter((l) => l.trim().length > 0);
+      let detectedTitle = '';
+      for (let i = prevLines.length - 1; i >= 0; i--) {
+        const line = prevLines[i].trim();
+        if (line.startsWith('#')) {
+          detectedTitle = line.replace(/^#+\s*/, '').trim();
+          break;
+        }
+      }
+      codeBlocks.push(renderSmartMindMapHtml(code, detectedTitle));
     } else {
       const rawLang = lang || 'typescript';
       codeBlocks.push(renderEditorHtml(code, rawLang));

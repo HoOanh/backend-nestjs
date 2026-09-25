@@ -4,6 +4,7 @@ import { CodeEvaluator, type TestOutcome } from '../services/codeEvaluator.ts';
 import { generateRandomExamQuestions, type RandomizedQuestion } from '../utils/examRandomizer.ts';
 import { CodeSandboxEditor } from './CodeSandboxEditor.tsx';
 import { FormattedText } from './FormattedText.tsx';
+import { SprintAIReviewCard } from './SprintAIReviewCard.tsx';
 
 interface SprintExamViewProps {
   exam: SprintExam;
@@ -309,6 +310,14 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
               </div>
             </div>
           </div>
+
+          {/* AI TUTOR ENGINEERING REVIEW CARD */}
+          <SprintAIReviewCard
+            sprintId={exam.sprintId}
+            examTitle={exam.title}
+            reviewData={reviewData}
+            passingScore={exam.passingScore}
+          />
 
           {/* SECTION 1: QUIZ REVIEW */}
           <div className="review-section">

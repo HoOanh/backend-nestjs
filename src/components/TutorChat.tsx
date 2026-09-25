@@ -472,12 +472,15 @@ export const TutorChat: React.FC<TutorChatProps> = ({
         </form>
 
         <div className={`tutor-clear ${isLessonCleared ? 'cleared' : ''}`}>
-          <div>
-            <strong>{isLessonCleared ? 'Đã clear bài này ✓' : 'Chưa clear? Hỏi tiếp tutor nhé.'}</strong>
-            <span>{isLessonCleared ? 'ĐẠI CA có thể chuyển sang phần trắc nghiệm.' : 'Khi đã nắm được, xác nhận để mở khóa trắc nghiệm.'}</span>
+          <div className="tutor-clear-info">
+            <span className="tutor-clear-icon">{isLessonCleared ? '✅' : '💡'}</span>
+            <div>
+              <strong>{isLessonCleared ? 'Đã nắm vững lý thuyết bài này ✓' : 'Chưa clear phần nào? Trao đổi tiếp với AI Tutor nhé.'}</strong>
+              <span>{isLessonCleared ? 'ĐẠI CA có thể chuyển sang tab Trắc Nghiệm Ôn Luyện để làm bài kiểm tra.' : 'Khi đã hiểu bản chất, bấm xác nhận để ghi nhận tiến độ bài học.'}</span>
+            </div>
           </div>
           {!isLessonCleared && (
-            <button className="btn btn-success" type="button" onClick={onMarkCleared}>
+            <button className="btn btn-success tutor-clear-btn" type="button" onClick={onMarkCleared}>
               Em đã clear bài này ✓
             </button>
           )}

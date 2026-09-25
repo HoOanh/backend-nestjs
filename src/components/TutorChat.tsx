@@ -34,6 +34,8 @@ interface TutorChatProps {
   mode?: 'docked' | 'floating' | 'inline';
   onSwitchMode?: (newMode: 'docked' | 'floating') => void;
   onClose?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 function healStreamingMarkdown(text: string): string {
@@ -127,7 +129,9 @@ export const TutorChat: React.FC<TutorChatProps> = ({
   lesson,
   mode = 'inline',
   onSwitchMode,
-  onClose
+  onClose,
+  isExpanded: externalIsExpanded,
+  onToggleExpand
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -141,9 +145,18 @@ export const TutorChat: React.FC<TutorChatProps> = ({
   const [error, setError] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>(MODEL_OPTIONS[0].id);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const isExpanded = externalIsExpanded !== undefined ? externalIsExpanded : internalExpanded;
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleExpand = () => {
+    if (onToggleExpand) {
+      onToggleExpand();
+    } else {
+      setInternalExpanded((prev) => !prev);
+    }
+  };
 
   useEffect(() => {
     setMessages([
@@ -166,7 +179,11 @@ export const TutorChat: React.FC<TutorChatProps> = ({
     if (!isExpanded) return;
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsExpanded(false);
+        if (onToggleExpand && externalIsExpanded) {
+          onToggleExpand();
+        } else {
+          setInternalExpanded(false);
+        }
       }
     };
     document.body.style.overflow = 'hidden';
@@ -175,7 +192,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isExpanded]);
+  }, [isExpanded, onToggleExpand, externalIsExpanded]);
 
   const handleChatContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
@@ -410,7 +427,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({
       {isExpanded && mode === 'inline' && (
         <div
           className="tutor-modal-backdrop"
-          onClick={() => setIsExpanded(false)}
+          onClick={toggleExpand}
           aria-hidden="true"
         />
       )}
@@ -461,11 +478,11 @@ export const TutorChat: React.FC<TutorChatProps> = ({
               </button>
             )}
 
-            {mode !== 'docked' && (
+            {mode !== 'inline' && (
               <button
                 type="button"
                 className="tutor-btn-icon"
-                onClick={() => setIsExpanded((prev) => !prev)}
+                onClick={toggleExpand}
                 title={isExpanded ? 'Thu nhỏ (Esc)' : 'Toàn màn hình'}
                 aria-label={isExpanded ? 'Thu nhỏ' : 'Toàn màn hình'}
               >

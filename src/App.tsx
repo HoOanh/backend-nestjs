@@ -124,6 +124,8 @@ export const App: React.FC = () => {
     return 'floating';
   });
 
+  const [isTutorExpanded, setIsTutorExpanded] = useState<boolean>(false);
+
   const [dockedTutorWidth, setDockedTutorWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('arc_tutor_dock_width');
@@ -662,7 +664,7 @@ export const App: React.FC = () => {
           </section>
 
           {/* DOCKED TUTOR CO-PILOT SIDEBAR (Side-by-side mode with drag-resizing) */}
-          {isTutorOpen && tutorMode === 'docked' && currentLesson && route.type === 'lesson' && (
+          {isTutorOpen && !isTutorExpanded && tutorMode === 'docked' && currentLesson && route.type === 'lesson' && (
             <aside className="docked-tutor-sidebar" style={{ width: `${dockedTutorWidth}px` }}>
               <div
                 className="docked-resizer-handle"
@@ -674,22 +676,59 @@ export const App: React.FC = () => {
               <TutorChat
                 lesson={currentLesson}
                 mode="docked"
+                isExpanded={false}
+                onToggleExpand={() => setIsTutorExpanded(true)}
                 onSwitchMode={() => handleSwitchTutorMode('floating')}
-                onClose={() => setIsTutorOpen(false)}
+                onClose={() => {
+                  setIsTutorExpanded(false);
+                  setIsTutorOpen(false);
+                }}
               />
             </aside>
           )}
         </div>
 
         {/* FLOATING TUTOR WINDOW (Floating mode) */}
-        {isTutorOpen && tutorMode === 'floating' && currentLesson && route.type === 'lesson' && (
+        {isTutorOpen && !isTutorExpanded && tutorMode === 'floating' && currentLesson && route.type === 'lesson' && (
           <div className="floating-tutor-window">
             <TutorChat
               lesson={currentLesson}
               mode="floating"
+              isExpanded={false}
+              onToggleExpand={() => setIsTutorExpanded(true)}
               onSwitchMode={() => handleSwitchTutorMode('docked')}
-              onClose={() => setIsTutorOpen(false)}
+              onClose={() => {
+                setIsTutorExpanded(false);
+                setIsTutorOpen(false);
+              }}
             />
+          </div>
+        )}
+
+        {/* FULLSCREEN EXPANDED TUTOR MODAL (Toàn màn hình căn giữa có backdrop tối) */}
+        {isTutorOpen && isTutorExpanded && currentLesson && route.type === 'lesson' && (
+          <div className="tutor-modal-overlay">
+            <div
+              className="tutor-modal-backdrop"
+              onClick={() => setIsTutorExpanded(false)}
+              aria-label="Đóng toàn màn hình"
+            />
+            <div className="floating-tutor-window is-expanded">
+              <TutorChat
+                lesson={currentLesson}
+                mode="floating"
+                isExpanded={true}
+                onToggleExpand={() => setIsTutorExpanded(false)}
+                onSwitchMode={(mode) => {
+                  setIsTutorExpanded(false);
+                  handleSwitchTutorMode(mode);
+                }}
+                onClose={() => {
+                  setIsTutorExpanded(false);
+                  setIsTutorOpen(false);
+                }}
+              />
+            </div>
           </div>
         )}
 

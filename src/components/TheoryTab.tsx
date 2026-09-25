@@ -210,7 +210,7 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
       <div className="theory-tutor-banner">
         <div className="tutor-banner-left">
           <div className="tutor-banner-avatar">
-            <img src="/logo.png" alt="Arc Irobot" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+            <img src="/logo.png" alt="Arc Irobot" style={{ width: '44px', height: '44px', objectFit: 'contain' }} />
           </div>
           <div className="tutor-banner-info">
             <h4>Đồng Hành Cùng Arc AI Co-Pilot</h4>

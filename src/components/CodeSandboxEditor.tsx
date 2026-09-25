@@ -344,22 +344,27 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
     setEditingTabId(null);
   };
 
-  const handleDeleteTab = (id: string, e: React.MouseEvent) => {
+  const [tabToDeleteId, setTabToDeleteId] = useState<string | null>(null);
+
+  const handlePromptDeleteTab = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (solutions.length <= 1) return;
-    const tabToDelete = solutions.find((s) => s.id === id);
-    if (window.confirm(`Đại ca có chắc muốn xóa "${tabToDelete?.name || 'solution này'}" không?`)) {
-      const next = solutions.filter((s) => s.id !== id);
-      setSolutions(next);
-      if (activeSolutionId === id) {
-        setActiveSolutionId(next[0].id);
-      }
-      if (storageKey) {
-        try {
-          localStorage.setItem(`${storageKey}_solutions`, JSON.stringify(next));
-        } catch {}
-      }
+    setTabToDeleteId((prev) => (prev === id ? null : id));
+  };
+
+  const handleConfirmDeleteTab = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const next = solutions.filter((s) => s.id !== id);
+    setSolutions(next);
+    if (activeSolutionId === id) {
+      setActiveSolutionId(next[0].id);
     }
+    if (storageKey) {
+      try {
+        localStorage.setItem(`${storageKey}_solutions`, JSON.stringify(next));
+      } catch {}
+    }
+    setTabToDeleteId(null);
   };
 
   const handleRestoreHistory = (record: SubmissionHistoryRecord) => {
@@ -589,11 +594,39 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                 {solutions.length > 1 && (
                   <span
                     className="vs-tab-action-icon close"
-                    onClick={(e) => handleDeleteTab(sol.id, e)}
+                    onClick={(e) => handlePromptDeleteTab(sol.id, e)}
                     title="Xóa solution này"
                   >
                     ✕
                   </span>
+                )}
+
+                {/* Modern Inline Popconfirm */}
+                {tabToDeleteId === sol.id && (
+                  <div className="vs-tab-popconfirm" onClick={(e) => e.stopPropagation()}>
+                    <div className="popconfirm-arrow" />
+                    <div className="popconfirm-header">
+                      <span className="popconfirm-icon">⚠️</span>
+                      <span className="popconfirm-title">Xóa <strong>{sol.name}</strong>?</span>
+                    </div>
+                    <p className="popconfirm-desc">Mã nguồn của solution này sẽ không thể khôi phục lại.</p>
+                    <div className="popconfirm-actions">
+                      <button
+                        type="button"
+                        className="popconfirm-btn cancel"
+                        onClick={() => setTabToDeleteId(null)}
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        className="popconfirm-btn delete"
+                        onClick={(e) => handleConfirmDeleteTab(sol.id, e)}
+                      >
+                        Xác nhận xóa
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}

@@ -520,123 +520,247 @@ export function renderLayeredStack(text: string, title?: string): string {
           </div>
         </div>
 
-        <!-- VIEW 2: SƠ ĐỒ TƯ DUY TỎA NHÁNH (RADIAL CONCEPT MINDMAP - KHÔNG CÓ TÊN NGƯỜI) -->
+        <!-- VIEW 2: SƠ ĐỒ TƯ DUY TỎA NHÁNH CHUẨN MINDMAPS.COM (ORGANIC MINDMAP CANVAS) -->
         <div class="arch-radial-container" style="display: none;">
-          <div class="clean-radial-layout">
-            <!-- CÁNH TRÁI: HARDWARE & OS LAYER -->
-            <div class="radial-wing wing-left">
-              <!-- Nhánh 1: Tầng Vật Lý -->
-              <div class="radial-branch-group branch-violet">
-                <div class="radial-branch-title">
-                  <span class="b-icon">⚙️</span>
-                  <div>
-                    <strong>TẦNG VẬT LÝ & PHẦN CỨNG</strong>
-                    <span>Latency 1 - 100ns</span>
-                  </div>
-                </div>
-                <div class="radial-leaves-column">
-                  <div class="radial-leaf">
-                    <span class="l-bullet">⚡</span>
-                    <div><strong>CPU Cores & Cache:</strong> 1-10ns clock</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">🧠</span>
-                    <div><strong>RAM Bus DDR4/DDR5:</strong> ~50-100ns</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">💾</span>
-                    <div><strong>NVMe SSD & NIC:</strong> 10-100μs I/O</div>
-                  </div>
-                </div>
+          <div class="mindmap-canvas-container">
+            <div class="mindmap-toolbar-row">
+              <div class="mindmap-legend">
+                <span class="legend-chip chip-blue"><span class="chip-dot"></span> Phần Cứng (Hardware)</span>
+                <span class="legend-chip chip-green"><span class="chip-dot"></span> Linux Kernel</span>
+                <span class="legend-chip chip-sky"><span class="chip-dot"></span> Libuv Event Loop</span>
+                <span class="legend-chip chip-rose"><span class="chip-dot"></span> V8 Engine & RSS</span>
               </div>
-
-              <!-- Nhánh 2: Tầng Linux Kernel -->
-              <div class="radial-branch-group branch-emerald">
-                <div class="radial-branch-title">
-                  <span class="b-icon">🐧</span>
-                  <div>
-                    <strong>TẦNG NHÂN LINUX OS KERNEL</strong>
-                    <span>Kernel Syscalls O(1)</span>
-                  </div>
-                </div>
-                <div class="radial-leaves-column">
-                  <div class="radial-leaf">
-                    <span class="l-bullet">📑</span>
-                    <div><strong>File Descriptor Table:</strong> Socket [FD: 12]</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">📥</span>
-                    <div><strong>Kernel TCP Buffers:</strong> Receive/Send Queue</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">🎯</span>
-                    <div><strong>Epoll / Kqueue:</strong> Giám sát 10K+ sockets O(1)</div>
-                  </div>
-                </div>
+              <div class="mindmap-tip-text">
+                ✨ <em>Chuẩn tư duy Mindmaps.com: Trực quan hóa 3 cấp độ từ Phần cứng vật lý đến Runtime Node.js</em>
               </div>
             </div>
 
-            <!-- TÂM TRUNG TÂM SƠ ĐỒ TƯ DUY -->
-            <div class="radial-hub-center">
-              <div class="radial-hub-circle">
-                <span class="hub-center-icon">🧠</span>
-                <div class="hub-main-text">RUNTIME TAXONOMY</div>
-                <div class="hub-sub-text">HỆ QUẢN TRỊ TOÀN CẢNH</div>
-                <div class="hub-tag">CORE ARCHITECTURE</div>
-              </div>
-            </div>
+            <div class="mindmap-svg-viewport">
+              <svg class="mindmap-master-svg" viewBox="0 0 1640 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <!-- Gradients for Stems -->
+                  <linearGradient id="stem-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#38bdf8" />
+                    <stop offset="100%" stop-color="#3b82f6" />
+                  </linearGradient>
+                  <linearGradient id="stem-green" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#34d399" />
+                    <stop offset="100%" stop-color="#16a34a" />
+                  </linearGradient>
+                  <linearGradient id="stem-sky" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#38bdf8" />
+                    <stop offset="100%" stop-color="#0284c7" />
+                  </linearGradient>
+                  <linearGradient id="stem-rose" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#fb7185" />
+                    <stop offset="100%" stop-color="#e11d48" />
+                  </linearGradient>
+                  <linearGradient id="hub-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#14b8a6" />
+                    <stop offset="100%" stop-color="#0d9488" />
+                  </linearGradient>
 
-            <!-- CÁNH PHẢI: RUNTIME INTERNALS & APPLICATION -->
-            <div class="radial-wing wing-right">
-              <!-- Nhánh 3: Libuv Internals -->
-              <div class="radial-branch-group branch-amber">
-                <div class="radial-branch-title">
-                  <span class="b-icon">🔄</span>
-                  <div>
-                    <strong>RUNTIME LIBUV INTERNALS</strong>
-                    <span>Non-blocking Event Loop</span>
-                  </div>
-                </div>
-                <div class="radial-leaves-column">
-                  <div class="radial-leaf">
-                    <span class="l-bullet">⚡</span>
-                    <div><strong>Libuv Event Loop:</strong> 1 Main Thread duy nhất</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">🧵</span>
-                    <div><strong>Worker Threadpool:</strong> 4 Threads (fs, crypto)</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">🌉</span>
-                    <div><strong>Libuv C-Bindings:</strong> Cầu nối Syscalls vào JS</div>
-                  </div>
-                </div>
-              </div>
+                  <!-- Drop Shadows -->
+                  <filter id="card-shadow" x="-10%" y="-10%" width="125%" height="125%">
+                    <feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity="0.12" />
+                  </filter>
+                  <filter id="hub-shadow" x="-10%" y="-10%" width="125%" height="125%">
+                    <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0d9488" flood-opacity="0.35" />
+                  </filter>
+                </defs>
 
-              <!-- Nhánh 4: V8 Engine & Memory -->
-              <div class="radial-branch-group branch-crimson">
-                <div class="radial-branch-title">
-                  <span class="b-icon">🚀</span>
-                  <div>
-                    <strong>V8 ENGINE & BỘ NHỚ RSS</strong>
-                    <span>Call Stack & GC Heap</span>
-                  </div>
-                </div>
-                <div class="radial-leaves-column">
-                  <div class="radial-leaf">
-                    <span class="l-bullet">🥞</span>
-                    <div><strong>V8 Stack Space:</strong> Call Frames (0% GC overhead)</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">🌱</span>
-                    <div><strong>Young & Old Gen Heap:</strong> Scavenge & Mark-Sweep</div>
-                  </div>
-                  <div class="radial-leaf">
-                    <span class="l-bullet">⚙️</span>
-                    <div><strong>C++ Buffers Malloc:</strong> Quản trị ngoài V8 Heap</div>
-                  </div>
-                </div>
-              </div>
+                <!-- =================== 1. CENTER HUB =================== -->
+                <g class="mindmap-hub" transform="translate(820, 350)">
+                  <rect x="-120" y="-35" width="240" height="70" rx="20" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-opacity="0.35" stroke-dasharray="4 4" />
+                  <rect x="-110" y="-28" width="220" height="56" rx="16" fill="url(#hub-bg)" filter="url(#hub-shadow)" />
+                  <text x="0" y="-3" text-anchor="middle" class="hub-svg-title">Runtime Taxonomy</text>
+                  <text x="0" y="16" text-anchor="middle" class="hub-svg-sub">HỆ QUẢN TRỊ TOÀN CẢNH</text>
+                </g>
+
+                <!-- =================== 2. BRANCH 1: PHẦN CỨNG & VẬT LÝ (TOP-LEFT) =================== -->
+                <g class="mindmap-branch branch-blue">
+                  <!-- Main Stem from Hub to Card -->
+                  <path d="M 710 336 C 645 336, 640 160, 610 160" stroke="#3b82f6" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+
+                  <!-- Main Category Card: Phần Cứng (510 to 610, y: 115 to 205) -->
+                  <g class="branch-card-group" transform="translate(560, 160)">
+                    <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-blue" filter="url(#card-shadow)" />
+                    <text x="0" y="-10" text-anchor="middle" font-size="28">⚙️</text>
+                    <text x="0" y="18" text-anchor="middle" class="card-svg-title">Phần Cứng</text>
+                    <text x="0" y="32" text-anchor="middle" class="card-svg-sub">1 - 100ns</text>
+                  </g>
+
+                  <!-- Fork connector from Card to 2 Sub-branches -->
+                  <path d="M 510 160 L 480 160" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="480" cy="160" r="4.5" class="fork-joint-circle circle-blue" />
+
+                  <!-- Sub-branch 1A (UP): CPU & Cache -->
+                  <path d="M 480 160 C 455 160, 445 95, 420 95" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="420" cy="95" r="4" class="sub-joint-circle circle-blue" />
+                  <text x="408" y="99" text-anchor="end" class="sub-cat-title">CPU & Bộ Nhớ</text>
+
+                  <!-- Fork from CPU & Cache to 2 Leaves -->
+                  <path d="M 315 95 L 295 95" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="295" cy="95" r="3.5" class="leaf-joint-circle circle-blue" />
+                  <path d="M 295 95 C 280 95, 270 65, 250 65" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="240" y="69" text-anchor="end" class="leaf-svg-text">CPU Cores & Cache (1-10ns clock)</text>
+
+                  <path d="M 295 95 C 280 95, 270 125, 250 125" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="240" y="129" text-anchor="end" class="leaf-svg-text">RAM Bus DDR4/DDR5 (~50-100ns)</text>
+
+                  <!-- Sub-branch 1B (DOWN): Thiết Bị I/O -->
+                  <path d="M 480 160 C 455 160, 445 225, 420 225" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="420" cy="225" r="4" class="sub-joint-circle circle-blue" />
+                  <text x="408" y="229" text-anchor="end" class="sub-cat-title">Thiết Bị I/O</text>
+
+                  <!-- Fork from Thiết Bị I/O to 2 Leaves -->
+                  <path d="M 315 225 L 295 225" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="295" cy="225" r="3.5" class="leaf-joint-circle circle-blue" />
+                  <path d="M 295 225 C 280 225, 270 195, 250 195" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="240" y="199" text-anchor="end" class="leaf-svg-text">NVMe SSD PCIe 4.0 (10-100μs I/O)</text>
+
+                  <path d="M 295 225 C 280 225, 270 255, 250 255" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="240" y="259" text-anchor="end" class="leaf-svg-text">Card Mạng NIC 10Gbps (RX/TX Queue)</text>
+                </g>
+
+                <!-- =================== 3. BRANCH 2: LINUX OS KERNEL (BOTTOM-LEFT) =================== -->
+                <g class="mindmap-branch branch-green">
+                  <!-- Main Stem from Hub to Card -->
+                  <path d="M 710 364 C 645 364, 640 540, 610 540" stroke="#16a34a" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+
+                  <!-- Main Category Card: Linux Kernel (510 to 610, y: 495 to 585) -->
+                  <g class="branch-card-group" transform="translate(560, 540)">
+                    <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-green" filter="url(#card-shadow)" />
+                    <text x="0" y="-10" text-anchor="middle" font-size="28">🐧</text>
+                    <text x="0" y="18" text-anchor="middle" class="card-svg-title">Linux Kernel</text>
+                    <text x="0" y="32" text-anchor="middle" class="card-svg-sub">Syscalls O(1)</text>
+                  </g>
+
+                  <!-- Fork connector from Card to 2 Sub-branches -->
+                  <path d="M 510 540 L 480 540" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="480" cy="540" r="4.5" class="fork-joint-circle circle-green" />
+
+                  <!-- Sub-branch 2A (UP): Socket & Queue -->
+                  <path d="M 480 540 C 455 540, 445 475, 420 475" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="420" cy="475" r="4" class="sub-joint-circle circle-green" />
+                  <text x="408" y="479" text-anchor="end" class="sub-cat-title">Socket & Queue</text>
+
+                  <!-- Fork to 2 Leaves -->
+                  <path d="M 300 475 L 280 475" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="280" cy="475" r="3.5" class="leaf-joint-circle circle-green" />
+                  <path d="M 280 475 C 265 475, 255 445, 235 445" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="225" y="449" text-anchor="end" class="leaf-svg-text">File Descriptor Table [FD: 12]</text>
+
+                  <path d="M 280 475 C 265 475, 255 505, 235 505" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="225" y="509" text-anchor="end" class="leaf-svg-text">Kernel TCP Buffers (Receive/Send)</text>
+
+                  <!-- Sub-branch 2B (DOWN): Multiplexing -->
+                  <path d="M 480 540 C 455 540, 445 605, 420 605" stroke="#16a34a" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="420" cy="605" r="4" class="sub-joint-circle circle-green" />
+                  <text x="408" y="609" text-anchor="end" class="sub-cat-title">Multiplexing</text>
+
+                  <!-- Fork to 2 Leaves -->
+                  <path d="M 300 605 L 280 605" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="280" cy="605" r="3.5" class="leaf-joint-circle circle-green" />
+                  <path d="M 280 605 C 265 605, 255 575, 235 575" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="225" y="579" text-anchor="end" class="leaf-svg-text">Epoll / Kqueue (10K+ Sockets O(1))</text>
+
+                  <path d="M 280 605 C 265 605, 255 635, 235 635" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="225" y="639" text-anchor="end" class="leaf-svg-text">Virtual Memory & Page Tables (RSS)</text>
+                </g>
+
+                <!-- =================== 4. BRANCH 3: LIBUV INTERNALS (TOP-RIGHT) =================== -->
+                <g class="mindmap-branch branch-sky">
+                  <!-- Main Stem from Hub to Card -->
+                  <path d="M 930 336 C 995 336, 1000 160, 1030 160" stroke="#0284c7" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+
+                  <!-- Main Category Card: Libuv Core (1030 to 1130, y: 115 to 205) -->
+                  <g class="branch-card-group" transform="translate(1080, 160)">
+                    <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-sky" filter="url(#card-shadow)" />
+                    <text x="0" y="-10" text-anchor="middle" font-size="28">🔄</text>
+                    <text x="0" y="18" text-anchor="middle" class="card-svg-title">Libuv Core</text>
+                    <text x="0" y="32" text-anchor="middle" class="card-svg-sub">Async I/O Loop</text>
+                  </g>
+
+                  <!-- Fork connector from Card to 2 Sub-branches -->
+                  <path d="M 1130 160 L 1160 160" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1160" cy="160" r="4.5" class="fork-joint-circle circle-sky" />
+
+                  <!-- Sub-branch 3A (UP): Event Loop -->
+                  <path d="M 1160 160 C 1185 160, 1195 95, 1220 95" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1220" cy="95" r="4" class="sub-joint-circle circle-sky" />
+                  <text x="1232" y="99" text-anchor="start" class="sub-cat-title">Event Loop</text>
+
+                  <!-- Fork to 2 Leaves -->
+                  <path d="M 1325 95 L 1345 95" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1345" cy="95" r="3.5" class="leaf-joint-circle circle-sky" />
+                  <path d="M 1345 95 C 1360 95, 1370 65, 1390 65" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="69" text-anchor="start" class="leaf-svg-text">1 Main Thread duy nhất tuần hoàn 6 pha</text>
+
+                  <path d="M 1345 95 C 1360 95, 1370 125, 1390 125" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="129" text-anchor="start" class="leaf-svg-text">Libuv C-Bindings cầu nối Syscalls vào JS</text>
+
+                  <!-- Sub-branch 3B (DOWN): Threadpool -->
+                  <path d="M 1160 160 C 1185 160, 1195 225, 1220 225" stroke="#0284c7" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1220" cy="225" r="4" class="sub-joint-circle circle-sky" />
+                  <text x="1232" y="229" text-anchor="start" class="sub-cat-title">Threadpool</text>
+
+                  <!-- Fork to 2 Leaves -->
+                  <path d="M 1325 225 L 1345 225" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1345" cy="225" r="3.5" class="leaf-joint-circle circle-sky" />
+                  <path d="M 1345 225 C 1360 225, 1370 195, 1390 195" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="199" text-anchor="start" class="leaf-svg-text">4 Worker Threads (fs file, crypto băm)</text>
+
+                  <path d="M 1345 225 C 1360 225, 1370 255, 1390 255" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="259" text-anchor="start" class="leaf-svg-text">Chặn blocking I/O gây đóng băng Main Loop</text>
+                </g>
+
+                <!-- =================== 5. BRANCH 4: V8 ENGINE & RSS MEMORY (BOTTOM-RIGHT) =================== -->
+                <g class="mindmap-branch branch-rose">
+                  <!-- Main Stem from Hub to Card -->
+                  <path d="M 930 364 C 995 364, 1000 540, 1030 540" stroke="#f43f5e" stroke-width="5" stroke-linecap="round" fill="none" class="branch-stem" />
+
+                  <!-- Main Category Card: V8 & Bộ Nhớ (1030 to 1130, y: 495 to 585) -->
+                  <g class="branch-card-group" transform="translate(1080, 540)">
+                    <rect x="-50" y="-45" width="100" height="90" rx="16" class="node-card-bg card-border-rose" filter="url(#card-shadow)" />
+                    <text x="0" y="-10" text-anchor="middle" font-size="28">🚀</text>
+                    <text x="0" y="18" text-anchor="middle" class="card-svg-title">V8 & Bộ Nhớ</text>
+                    <text x="0" y="32" text-anchor="middle" class="card-svg-sub">GC Heap & RSS</text>
+                  </g>
+
+                  <!-- Fork connector from Card to 2 Sub-branches -->
+                  <path d="M 1130 540 L 1160 540" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1160" cy="540" r="4.5" class="fork-joint-circle circle-rose" />
+
+                  <!-- Sub-branch 4A (UP): Bộ Nhớ V8 -->
+                  <path d="M 1160 540 C 1185 540, 1195 475, 1220 475" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1220" cy="475" r="4" class="sub-joint-circle circle-rose" />
+                  <text x="1232" y="479" text-anchor="start" class="sub-cat-title">Bộ Nhớ V8</text>
+
+                  <!-- Fork to 2 Leaves -->
+                  <path d="M 1325 475 L 1345 475" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1345" cy="475" r="3.5" class="leaf-joint-circle circle-rose" />
+                  <path d="M 1345 475 C 1360 475, 1370 445, 1390 445" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="449" text-anchor="start" class="leaf-svg-text">V8 Stack: Call Frames (0% GC overhead)</text>
+
+                  <path d="M 1345 475 C 1360 475, 1370 505, 1390 505" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="509" text-anchor="start" class="leaf-svg-text">Young & Old Gen Heap: Scavenge & Mark-Sweep</text>
+
+                  <!-- Sub-branch 4B (DOWN): Bộ Nhớ C++ -->
+                  <path d="M 1160 540 C 1185 540, 1195 605, 1220 605" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" fill="none" />
+                  <circle cx="1220" cy="605" r="4" class="sub-joint-circle circle-rose" />
+                  <text x="1232" y="609" text-anchor="start" class="sub-cat-title">Bộ Nhớ C++</text>
+
+                  <!-- Fork to 2 Leaves -->
+                  <path d="M 1325 605 L 1345 605" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <circle cx="1345" cy="605" r="3.5" class="leaf-joint-circle circle-rose" />
+                  <path d="M 1345 605 C 1360 605, 1370 575, 1390 575" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="579" text-anchor="start" class="leaf-svg-text">C++ Buffers malloc() quản trị ngoài V8 Heap</text>
+
+                  <path d="M 1345 605 C 1360 605, 1370 635, 1390 635" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <text x="1400" y="639" text-anchor="start" class="leaf-svg-text">Resident Set Size (RSS) tổng tiêu thụ bộ nhớ</text>
+                </g>
+              </svg>
             </div>
           </div>
         </div>

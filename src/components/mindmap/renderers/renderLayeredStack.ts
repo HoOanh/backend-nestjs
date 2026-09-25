@@ -23,10 +23,10 @@ export function renderLayeredStack(text: string, title?: string): string {
             </div>
           </div>
           <div class="arch-view-switcher">
-            <button type="button" class="arch-tab-btn active" data-tab-target="stack">
+            <button type="button" class="arch-tab-btn active" data-tab-target="stack" onclick="window.__switchArchTab && window.__switchArchTab(this, 'stack')">
               🏗️ Kiến Trúc Phân Tầng (Stack)
             </button>
-            <button type="button" class="arch-tab-btn" data-tab-target="radial">
+            <button type="button" class="arch-tab-btn" data-tab-target="radial" onclick="window.__switchArchTab && window.__switchArchTab(this, 'radial')">
               🧠 Sơ Đồ Tư Duy (Mindmap)
             </button>
           </div>

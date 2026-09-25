@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './StudentAuthScreen.css';
 import { UserProfile } from '../../types/user.ts';
 import { apiClient } from '../../services/apiClient.ts';
 

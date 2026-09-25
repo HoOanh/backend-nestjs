@@ -1,0 +1,192 @@
+/* ==========================================================================
+   🔒 LOCKED CONTENT & PROGRESS GATING STYLES
+   ========================================================================== */
+
+.lesson-nav-item.locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.lesson-nav-item.locked:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--text-muted);
+}
+
+.sprint-exam-item.locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+  border-color: rgba(148, 163, 184, 0.2);
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.04);
+}
+
+.sprint-exam-item.locked:hover {
+  background: rgba(148, 163, 184, 0.06);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.final-graduation-nav.locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+  border-color: rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.05);
+  color: var(--text-muted);
+}
+
+.final-graduation-nav.locked:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.tab-btn.locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+  color: var(--text-muted);
+}
+
+.tab-btn.locked:hover {
+  border-bottom-color: transparent;
+  color: var(--text-muted);
+}
+
+/* Locked Card Notice View */
+.locked-content-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 40px 20px;
+}
+
+.locked-card {
+  max-width: 580px;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.3s ease;
+}
+
+.locked-icon-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  margin: 0 auto 16px;
+}
+
+.locked-badge-label {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.locked-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.locked-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.locked-requirements-list {
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.locked-req-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.locked-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-preview-pill {
+  margin-top: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.admin-mode-toggle-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  transition: all 0.2s ease;
+}
+
+.admin-mode-toggle-btn.active {
+  background: #f59e0b;
+  color: #000;
+  border-color: #f59e0b;
+}
+
+.user-role-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.user-role-badge.admin {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.user-role-badge.instructor {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.user-role-badge.student {
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}

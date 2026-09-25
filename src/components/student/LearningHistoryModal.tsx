@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './LearningHistoryModal.css';
 import { UserProfile, LearningHistoryRecord } from '../../types/user.ts';
 import { apiClient } from '../../services/apiClient.ts';
 

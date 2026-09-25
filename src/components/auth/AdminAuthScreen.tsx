@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './AdminAuthScreen.css';
 import { UserProfile } from '../../types/user.ts';
 import { apiClient } from '../../services/apiClient.ts';
 

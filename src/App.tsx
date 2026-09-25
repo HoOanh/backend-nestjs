@@ -1,305 +1,110 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { CURRICULUM } from './data/curriculum.ts';
 import { SPRINT_EXAMS } from './data/sprintExams.ts';
 import { FINAL_EXAM } from './data/finalExam.ts';
-import { Sidebar } from './components/Sidebar.tsx';
-import { Topbar } from './components/Topbar.tsx';
-import { TheoryTab } from './components/TheoryTab.tsx';
-import { QuizTab } from './components/QuizTab.tsx';
-import { CodeSandboxTab } from './components/CodeSandboxTab.tsx';
-import { TutorChat } from './components/TutorChat.tsx';
-import { SprintExamView } from './components/SprintExamView.tsx';
-import { FinalExamView } from './components/FinalExamView.tsx';
-import { LockedContentNotice } from './components/LockedContentNotice.tsx';
-import { StudentAuthScreen } from './components/auth/StudentAuthScreen.tsx';
-import { AdminAuthScreen } from './components/auth/AdminAuthScreen.tsx';
-import { AdminDashboard } from './components/admin/AdminDashboard.tsx';
-import { LearningHistoryModal } from './components/student/LearningHistoryModal.tsx';
-import { UserProfile, UserProgressState } from './types/user.ts';
-import { apiClient } from './services/apiClient.ts';
-import { useAppRouter } from './utils/router.ts';
-import { getModKey } from './utils/platform.ts';
 import {
+  Sidebar,
+  Topbar,
+  TheoryTab,
+  QuizTab,
+  CodeSandboxTab,
+  TutorChat,
+  SprintExamView,
+  FinalExamView,
+  LockedContentNotice,
+  StudentAuthScreen,
+  AdminAuthScreen,
+  AdminDashboard,
+  LearningHistoryModal
+} from './components/index.ts';
+import {
+  useTheme,
+  useSidebarLayout,
+  useTutorLayout,
+  useAuthSession,
+  useLearningProgress
+} from './hooks/index.ts';
+import {
+  useAppRouter,
+  getModKey,
   checkLessonUnlockStatus,
   checkSprintExamUnlockStatus,
   checkFinalExamUnlockStatus,
   getFirstIncompleteLessonId
-} from './utils/progressGuard.ts';
-
-const THEME_STORAGE_KEY = 'esmiles_backend_academy_theme';
-const ADMIN_BYPASS_STORAGE_KEY = 'esmiles_admin_bypass_lock';
-
-type AppState = UserProgressState;
+} from './utils/index.ts';
+import type { LessonActiveTab, ViewType } from './types/index.ts';
 
 export const App: React.FC = () => {
   const contentViewportRef = useRef<HTMLElement | null>(null);
   const { route, navigate } = useAppRouter();
-
-  const [studentUser, setStudentUser] = useState<UserProfile | null>(() => {
-    const stored = apiClient.getStoredUser();
-    return stored && stored.role !== 'admin' ? stored : null;
-  });
-  const [adminUser, setAdminUser] = useState<UserProfile | null>(() => {
-    const stored = apiClient.getStoredUser();
-    return stored && stored.role === 'admin' ? stored : null;
-  });
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
-    const stored = apiClient.getStoredUser();
-    const token = apiClient.getToken();
-    return !stored && Boolean(token);
-  });
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // Admin Bypass Lock Mode (allow previewing all lessons & exams for verification)
-  const [adminBypassLock, setAdminBypassLock] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(ADMIN_BYPASS_STORAGE_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
+  // Custom Hooks
+  const { theme, toggleTheme } = useTheme();
+  const { isSidebarCollapsed, toggleSidebar, adminBypassLock, toggleAdminBypass } = useSidebarLayout();
+  const {
+    studentUser,
+    setStudentUser,
+    adminUser,
+    setAdminUser,
+    isAuthChecking,
+    activeUser,
+    isEffectiveAdmin,
+    logoutStudent,
+    logoutAdmin
+  } = useAuthSession();
 
-  const handleToggleAdminBypass = () => {
-    setAdminBypassLock((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(ADMIN_BYPASS_STORAGE_KEY, String(next));
-      } catch {}
-      return next;
-    });
-  };
+  const {
+    state,
+    setState,
+    totalLessons,
+    completedCount,
+    progressPercent,
+    handleLessonCompleted,
+    handleLessonCleared,
+    handleSprintExamSubmitted,
+    handleFinalExamSubmitted,
+    handleRetakeFinalExam
+  } = useLearningProgress(studentUser);
 
-  // Theme State
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    try {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      if (saved === 'light' || saved === 'dark') return saved;
-    } catch (e) {}
-    return 'light';
-  });
+  const {
+    isTutorOpen,
+    setIsTutorOpen,
+    tutorMode,
+    switchTutorMode,
+    isTutorExpanded,
+    setIsTutorExpanded,
+    dockedTutorWidth,
+    handleResizeDockStart,
+    toggleTutor
+  } = useTutorLayout();
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch (e) {}
-  }, [theme]);
-
-  const handleToggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
-  // Sidebar Collapsed State
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('esmiles_sidebar_collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const handleToggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('esmiles_sidebar_collapsed', String(next));
-      } catch {}
-      return next;
-    });
-  };
-
-  // AI Tutor Co-Pilot State (Floating vs Docked)
-  const [isTutorOpen, setIsTutorOpen] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('esmiles_tutor_open') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const [tutorMode, setTutorMode] = useState<'docked' | 'floating'>(() => {
-    try {
-      const saved = localStorage.getItem('arc_tutor_mode');
-      if (saved === 'docked' || saved === 'floating') return saved;
-    } catch {}
-    return 'floating';
-  });
-
-  const [isTutorExpanded, setIsTutorExpanded] = useState<boolean>(false);
-
-  const [dockedTutorWidth, setDockedTutorWidth] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('arc_tutor_dock_width');
-      const parsed = saved ? parseInt(saved, 10) : 440;
-      return !isNaN(parsed) && parsed >= 320 && parsed <= 850 ? parsed : 440;
-    } catch {
-      return 440;
-    }
-  });
-
-  const handleResizeDockStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = dockedTutorWidth;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = startX - moveEvent.clientX; // drag left expands width
-      const nextWidth = Math.max(320, Math.min(850, startWidth + deltaX));
-      setDockedTutorWidth(nextWidth);
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      setDockedTutorWidth((current) => {
-        try {
-          localStorage.setItem('arc_tutor_dock_width', String(current));
-        } catch {}
-        return current;
-      });
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const handleToggleTutor = () => {
-    setIsTutorOpen((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('arc_tutor_open', String(next));
-      } catch {}
-      return next;
-    });
-  };
-
-  const handleSwitchTutorMode = (newMode: 'docked' | 'floating') => {
-    setTutorMode(newMode);
-    try {
-      localStorage.setItem('arc_tutor_mode', newMode);
-    } catch {}
-  };
-
-  // Global Keyboard Shortcuts (Ctrl+B / Cmd+B for Sidebar, Ctrl+J / Cmd+J for AI Tutor)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        handleToggleSidebar();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        handleToggleTutor();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Learning Progress State
-  const [state, setState] = useState<AppState>(() => {
-    const storedUser = apiClient.getStoredUser();
-    if (storedUser?.id) {
-      try {
-        const local = localStorage.getItem(`esmiles_progress_${storedUser.id}`);
-        if (local) return JSON.parse(local);
-      } catch {}
-    }
-    return {
-      currentLessonId: 'lesson-1',
-      completedLessons: {},
-      sprintExamScores: {},
-      finalExam: null,
-      streakDays: 1,
-      lastActiveDate: new Date().toISOString().split('T')[0],
-      clearedLessons: {}
-    };
-  });
-
-  // Verify Real Session Token with SQLite Backend on Boot
-  useEffect(() => {
-    async function verifyAuth() {
-      const stored = apiClient.getStoredUser();
-      const token = apiClient.getToken();
-      if (!token && !stored) {
-        setIsAuthChecking(false);
-        return;
-      }
-
-      try {
-        const user = await apiClient.getMe();
-        if (user) {
-          if (user.role === 'admin') {
-            setAdminUser(user);
-            setStudentUser(null);
-          } else {
-            setStudentUser(user);
-            setAdminUser(null);
-          }
-        } else {
-          if (!apiClient.getToken()) {
-            setStudentUser(null);
-            setAdminUser(null);
-          }
-        }
-      } catch (e) {
-        console.error('Session verify notice:', e);
-      } finally {
-        setIsAuthChecking(false);
-      }
-    }
-    void verifyAuth();
-  }, []);
-
-  // Load user progress from SQLite Backend when studentUser logs in
-  useEffect(() => {
-    if (studentUser?.id && studentUser.role !== 'admin') {
-      void apiClient.getProgress(studentUser.id).then((savedProgress) => {
-        if (savedProgress) {
-          setState(savedProgress);
-        }
-      });
-    }
-  }, [studentUser?.id, studentUser?.role]);
-
-  // Save Progress to SQLite DB
-  useEffect(() => {
-    if (studentUser?.id && studentUser.role !== 'admin') {
-      void apiClient.saveProgress(studentUser.id, state);
-    }
-  }, [state, studentUser?.id, studentUser?.role]);
-
-  // Active User profile (student or admin)
-  const activeUser = studentUser || adminUser;
-  const isEffectiveAdmin = adminUser?.role === 'admin' || studentUser?.role === 'admin';
   const effectiveBypass = isEffectiveAdmin && adminBypassLock;
 
-  // Resolve current active lesson from route
+  // Active Lesson Resolution
   const currentLessonId = route.type === 'lesson' ? route.lessonId : state.currentLessonId || 'lesson-1';
   const currentLesson = useMemo(() => {
     for (const sprint of CURRICULUM) {
-      const l = sprint.lessons.find((item) => item.id === currentLessonId);
-      if (l) return l;
+      const lesson = sprint.lessons.find((item) => item.id === currentLessonId);
+      if (lesson) return lesson;
     }
     return CURRICULUM[0]?.lessons[0] || null;
   }, [currentLessonId]);
 
-  // Resolve active sprint exam from route
+  // Active Sprint Exam Resolution
   const activeSprintExamId = route.type === 'sprint-exam' ? route.sprintId : 0;
   const currentSprintExam = useMemo(() => {
     return SPRINT_EXAMS.find((e) => e.sprintId === activeSprintExamId);
   }, [activeSprintExamId]);
 
-  // Reset viewport scroll to top when changing route or tab
+  // Reset scroll to top on route change
   useEffect(() => {
     if (contentViewportRef.current) {
       contentViewportRef.current.scrollTop = 0;
     }
   }, [route]);
 
+  // 1. Loading Session Gate
   if (isAuthChecking) {
     return (
       <div className="auth-portal-page">
@@ -311,9 +116,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // ==========================================
-  // 👑 ROUTE: ADMIN CMS (/admin)
-  // ==========================================
+  // 2. Admin CMS Route (/admin, /admin-login)
   if (route.type === 'admin' || route.type === 'admin-login') {
     if (!adminUser || adminUser.role !== 'admin') {
       return (
@@ -330,19 +133,16 @@ export const App: React.FC = () => {
       <AdminDashboard
         currentUser={adminUser}
         theme={theme}
-        onToggleTheme={handleToggleTheme}
+        onToggleTheme={toggleTheme}
         onLogout={async () => {
-          await apiClient.logout();
-          setAdminUser(null);
+          await logoutAdmin();
           navigate('/admin/login');
         }}
       />
     );
   }
 
-  // ==========================================
-  // 🎓 ROUTE: AUTH (Student Login / Register)
-  // ==========================================
+  // 3. Student Auth Gate (Login / Register)
   if (!studentUser && !adminUser) {
     return (
       <StudentAuthScreen
@@ -360,13 +160,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // ==========================================
-  // 📚 STUDENT LMS MAIN VIEW (Multi-Route)
-  // ==========================================
-  const totalLessons = CURRICULUM.reduce((acc, sp) => acc + sp.lessons.length, 0);
-  const completedCount = Object.keys(state.completedLessons).length;
-  const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-
+  // Navigation handlers
   const handleSelectLesson = (lessonId: string) => {
     setState((prev) => ({ ...prev, currentLessonId: lessonId }));
     navigate(`/lessons/${lessonId}?tab=theory`);
@@ -380,94 +174,16 @@ export const App: React.FC = () => {
     navigate('/final-exam');
   };
 
-  const handleLessonCompleted = (lessonId: string) => {
-    setState((prev) => ({
-      ...prev,
-      completedLessons: {
-        ...prev.completedLessons,
-        [lessonId]: { completedAt: new Date().toISOString() }
-      }
-    }));
-
-    if (currentLesson && activeUser) {
-      void apiClient.addHistory({
-        userId: activeUser.id,
-        lessonId,
-        lessonTitle: currentLesson.title,
-        action: 'code_passed',
-        details: 'Đã hoàn thành xuất sắc bài tập Code Sandbox'
-      });
-    }
-  };
-
-  const handleLessonCleared = (lessonId: string) => {
-    setState((prev) => ({
-      ...prev,
-      clearedLessons: {
-        ...prev.clearedLessons,
-        [lessonId]: true
-      }
-    }));
-
-    if (currentLesson && activeUser) {
-      void apiClient.addHistory({
-        userId: activeUser.id,
-        lessonId,
-        lessonTitle: currentLesson.title,
-        action: 'theory_read',
-        details: 'Đã đọc hiểu lý thuyết & code mẫu'
-      });
-    }
-  };
-
-  const handleSprintExamSubmitted = async (sprintId: number, score: number, passed: boolean) => {
-    setState((prev) => ({
-      ...prev,
-      sprintExamScores: {
-        ...prev.sprintExamScores,
-        [sprintId]: { score, passed, completedAt: new Date().toISOString() }
-      }
-    }));
-
-    if (activeUser) {
-      await apiClient.submitSprintExam(activeUser.id, sprintId, score, passed);
-    }
-  };
-
-  const handleFinalExamSubmitted = async (score: number, passed: boolean, studentName: string) => {
-    const studentDisplayName = studentName || activeUser?.name || 'Kỹ Sư Arc Irobot';
-    if (activeUser) {
-      const res = await apiClient.submitFinalExam(activeUser.id, studentDisplayName, score, passed);
-      setState((prev) => ({
-        ...prev,
-        finalExam: res.finalResult
-      }));
-    }
-  };
-
-  const handleRetakeFinalExam = () => {
-    setState((prev) => ({
-      ...prev,
-      finalExam: null
-    }));
-  };
-
-  const handleStudentLogout = async () => {
-    await apiClient.logout();
-    setStudentUser(null);
-    setAdminUser(null);
-    navigate('/login');
-  };
-
   const handleNavigateToAvailable = () => {
     const nextLessonId = getFirstIncompleteLessonId(state.completedLessons);
     navigate(`/lessons/${nextLessonId}?tab=theory`);
   };
 
-  // Determine Topbar Tag & Title based on Route
+  // Topbar presentation
   let topTag = 'LÝ THUYẾT & THỰC HÀNH';
   let topTitle = currentLesson?.title || '';
-  const currentViewType = route.type === 'sprint-exam' ? 'sprint-exam' : route.type === 'final-exam' ? 'final-exam' : 'lesson';
+  const currentViewType: ViewType =
+    route.type === 'sprint-exam' ? 'sprint-exam' : route.type === 'final-exam' ? 'final-exam' : 'lesson';
 
   if (route.type === 'sprint-exam') {
     topTag = 'KỲ THI SPRINT';
@@ -477,17 +193,14 @@ export const App: React.FC = () => {
     topTitle = 'Khảo Thí Cấp Bằng Master Backend NestJS';
   }
 
-  // Active Lesson Tab
-  const activeTab: 'theory' | 'quiz' | 'code' = route.type === 'lesson' ? route.tab : 'theory';
-  const handleTabChange = (tab: 'theory' | 'quiz' | 'code') => {
+  const activeTab: LessonActiveTab = route.type === 'lesson' ? route.tab : 'theory';
+  const handleTabChange = (tab: LessonActiveTab) => {
     if (currentLesson) {
       navigate(`/lessons/${currentLesson.id}?tab=${tab}`);
     }
   };
 
-  // ==========================================
-  // PROGRESS GATING & LOCK VERIFICATION
-  // ==========================================
+  // Content Unlock Statuses
   const lessonUnlockStatus = currentLesson
     ? checkLessonUnlockStatus(
         currentLesson.id,
@@ -537,22 +250,40 @@ export const App: React.FC = () => {
           title={topTitle}
           streakDays={state.streakDays}
           theme={theme}
-          onToggleTheme={handleToggleTheme}
-          currentUser={activeUser || { id: '', name: 'Học Viên', email: '', role: 'student', authProvider: 'email', planId: 'free', createdAt: '', lastLoginAt: '' }}
+          onToggleTheme={toggleTheme}
+          currentUser={
+            activeUser || {
+              id: '',
+              name: 'Học Viên',
+              email: '',
+              role: 'student',
+              authProvider: 'email',
+              planId: 'free',
+              createdAt: '',
+              lastLoginAt: ''
+            }
+          }
           onOpenHistory={() => setIsHistoryModalOpen(true)}
-          onLogout={handleStudentLogout}
+          onLogout={async () => {
+            await logoutStudent();
+            navigate('/login');
+          }}
           isAdminBypass={effectiveBypass}
-          onToggleAdminBypass={isEffectiveAdmin ? handleToggleAdminBypass : undefined}
+          onToggleAdminBypass={isEffectiveAdmin ? toggleAdminBypass : undefined}
           onNavigateToAdmin={isEffectiveAdmin ? () => navigate('/admin') : undefined}
           isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={handleToggleSidebar}
+          onToggleSidebar={toggleSidebar}
           isTutorOpen={isTutorOpen}
-          onToggleTutor={handleToggleTutor}
+          onToggleTutor={toggleTutor}
         />
 
-        <div className={`workspace-layout ${isTutorOpen && tutorMode === 'docked' && route.type === 'lesson' ? 'has-docked-tutor' : ''}`}>
+        <div
+          className={`workspace-layout ${
+            isTutorOpen && tutorMode === 'docked' && route.type === 'lesson' ? 'has-docked-tutor' : ''
+          }`}
+        >
           <section className="content-viewport" ref={contentViewportRef}>
-            {/* 1. LESSON ROUTE */}
+            {/* 1. LESSON VIEW */}
             {route.type === 'lesson' && currentLesson && (
               <>
                 {!lessonUnlockStatus.unlocked ? (
@@ -562,7 +293,7 @@ export const App: React.FC = () => {
                     requiredPreviousLesson={lessonUnlockStatus.requiredPreviousLesson}
                     onNavigateToAvailable={handleNavigateToAvailable}
                     isAdmin={isEffectiveAdmin}
-                    onBypassLock={handleToggleAdminBypass}
+                    onBypassLock={toggleAdminBypass}
                   />
                 ) : (
                   <div>
@@ -610,7 +341,7 @@ export const App: React.FC = () => {
                     {activeTab === 'code' && (
                       <CodeSandboxTab
                         lesson={currentLesson}
-                        onLessonCompleted={handleLessonCompleted}
+                        onLessonCompleted={(id) => handleLessonCompleted(id, currentLesson.title)}
                       />
                     )}
                   </div>
@@ -618,7 +349,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {/* 2. SPRINT EXAM ROUTE */}
+            {/* 2. SPRINT EXAM VIEW */}
             {route.type === 'sprint-exam' && currentSprintExam && (
               <>
                 {!sprintExamUnlockStatus.unlocked ? (
@@ -628,7 +359,7 @@ export const App: React.FC = () => {
                     missingLessons={sprintExamUnlockStatus.missingLessons}
                     onNavigateToAvailable={handleNavigateToAvailable}
                     isAdmin={isEffectiveAdmin}
-                    onBypassLock={handleToggleAdminBypass}
+                    onBypassLock={toggleAdminBypass}
                   />
                 ) : (
                   <SprintExamView
@@ -640,7 +371,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {/* 3. FINAL EXAM ROUTE */}
+            {/* 3. FINAL EXAM VIEW */}
             {route.type === 'final-exam' && (
               <>
                 {!finalExamUnlockStatus.unlocked && !state.finalExam?.passed ? (
@@ -650,7 +381,7 @@ export const App: React.FC = () => {
                     missingSprints={finalExamUnlockStatus.missingSprints}
                     onNavigateToAvailable={handleNavigateToAvailable}
                     isAdmin={isEffectiveAdmin}
-                    onBypassLock={handleToggleAdminBypass}
+                    onBypassLock={toggleAdminBypass}
                   />
                 ) : (
                   <FinalExamView
@@ -664,7 +395,7 @@ export const App: React.FC = () => {
             )}
           </section>
 
-          {/* DOCKED TUTOR CO-PILOT SIDEBAR (Side-by-side mode with drag-resizing) */}
+          {/* DOCKED TUTOR CO-PILOT */}
           {isTutorOpen && !isTutorExpanded && tutorMode === 'docked' && currentLesson && route.type === 'lesson' && (
             <aside className="docked-tutor-sidebar" style={{ width: `${dockedTutorWidth}px` }}>
               <div
@@ -679,7 +410,7 @@ export const App: React.FC = () => {
                 mode="docked"
                 isExpanded={false}
                 onToggleExpand={() => setIsTutorExpanded(true)}
-                onSwitchMode={() => handleSwitchTutorMode('floating')}
+                onSwitchMode={() => switchTutorMode('floating')}
                 onClose={() => {
                   setIsTutorExpanded(false);
                   setIsTutorOpen(false);
@@ -689,7 +420,7 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        {/* FLOATING TUTOR WINDOW (Floating mode) */}
+        {/* FLOATING TUTOR WINDOW */}
         {isTutorOpen && !isTutorExpanded && tutorMode === 'floating' && currentLesson && route.type === 'lesson' && (
           <div className="floating-tutor-window">
             <TutorChat
@@ -697,7 +428,7 @@ export const App: React.FC = () => {
               mode="floating"
               isExpanded={false}
               onToggleExpand={() => setIsTutorExpanded(true)}
-              onSwitchMode={() => handleSwitchTutorMode('docked')}
+              onSwitchMode={() => switchTutorMode('docked')}
               onClose={() => {
                 setIsTutorExpanded(false);
                 setIsTutorOpen(false);
@@ -706,7 +437,7 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* FULLSCREEN EXPANDED TUTOR MODAL (Toàn màn hình căn giữa có backdrop tối) */}
+        {/* FULLSCREEN EXPANDED TUTOR MODAL */}
         {isTutorOpen && isTutorExpanded && currentLesson && route.type === 'lesson' && (
           <div className="tutor-modal-overlay">
             <div
@@ -722,7 +453,7 @@ export const App: React.FC = () => {
                 onToggleExpand={() => setIsTutorExpanded(false)}
                 onSwitchMode={(mode) => {
                   setIsTutorExpanded(false);
-                  handleSwitchTutorMode(mode);
+                  switchTutorMode(mode);
                 }}
                 onClose={() => {
                   setIsTutorExpanded(false);
@@ -733,7 +464,7 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* FLOATING ACTION BUTTON (FAB) Trigger khi đang đóng - Compact Circle + Tooltip */}
+        {/* FLOATING ACTION BUTTON (FAB) Trigger */}
         {!isTutorOpen && !isHistoryModalOpen && currentLesson && route.type === 'lesson' && (
           <button
             className="floating-tutor-trigger-btn"
@@ -752,7 +483,18 @@ export const App: React.FC = () => {
       <LearningHistoryModal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
-        currentUser={activeUser || { id: '', name: 'Học Viên', email: '', role: 'student', authProvider: 'email', planId: 'free', createdAt: '', lastLoginAt: '' }}
+        currentUser={
+          activeUser || {
+            id: '',
+            name: 'Học Viên',
+            email: '',
+            role: 'student',
+            authProvider: 'email',
+            planId: 'free',
+            createdAt: '',
+            lastLoginAt: ''
+          }
+        }
         completedCount={completedCount}
         totalLessons={totalLessons}
         progressPercent={progressPercent}

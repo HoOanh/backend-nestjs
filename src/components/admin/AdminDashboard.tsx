@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './AdminDashboard.css';
 import { UserProfile, CoursePlan, LearningHistoryRecord } from '../../types/user.ts';
 import { apiClient } from '../../services/apiClient.ts';
 import { CURRICULUM } from '../../data/curriculum.ts';

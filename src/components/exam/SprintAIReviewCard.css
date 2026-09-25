@@ -1,0 +1,254 @@
+/* ==========================================================================
+   Sprint Exam AI Review Card (AI Tutor Engineering Review)
+   ========================================================================== */
+
+.sprint-ai-review-wrapper {
+  background: var(--bg-surface);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 30px rgba(14, 165, 233, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+[data-theme='light'] .sprint-ai-review-wrapper {
+  background: #ffffff;
+  border-color: #bae6fd;
+  box-shadow: 0 8px 30px rgba(14, 165, 233, 0.06);
+}
+
+.sprint-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ai-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ai-bot-avatar {
+  font-size: 32px;
+  background: rgba(14, 165, 233, 0.12);
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  flex-shrink: 0;
+}
+
+.sprint-ai-header h3 {
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+  letter-spacing: 0.3px;
+}
+
+.ai-sub-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ai-level-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 800;
+  border: 1px solid;
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+/* Synthesis Grid */
+.ai-synthesis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.ai-synthesis-card {
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-theme='light'] .ai-synthesis-card {
+  background: #f8fafc;
+}
+
+.ai-synthesis-card.strength-card {
+  border-left: 3px solid #10b981;
+}
+
+.ai-synthesis-card.risk-card {
+  border-left: 3px solid #f59e0b;
+}
+
+.ai-synthesis-card.roadmap-card {
+  border-left: 3px solid var(--accent-primary);
+}
+
+.synthesis-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.synthesis-card-title .icon {
+  font-size: 16px;
+}
+
+.synthesis-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.synthesis-list li::marker {
+  color: var(--accent-primary);
+}
+
+/* Live Consultation */
+.ai-live-consultation-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-consult-btn {
+  align-self: flex-start;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: none;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-consult-btn:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+  transform: translateY(-1px);
+}
+
+.ai-live-output-card {
+  background: var(--bg-app);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-theme='light'] .ai-live-output-card {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.ai-live-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.btn-text-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-text-close:hover {
+  color: var(--text-primary);
+}
+
+.ai-live-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  padding: 12px 0;
+}
+
+.ai-live-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  color: #ef4444;
+  font-size: 13px;
+}
+
+.ai-live-content-markdown {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+
+.ai-live-content-markdown h3,
+.ai-live-content-markdown h4,
+.ai-live-content-markdown h5 {
+  color: var(--text-primary);
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.ai-live-content-markdown ul,
+.ai-live-content-markdown ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.ai-live-content-markdown li {
+  margin-bottom: 6px;
+}

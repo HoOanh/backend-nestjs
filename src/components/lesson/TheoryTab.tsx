@@ -180,6 +180,13 @@ function extractFilenameFromCode(code: string): string {
   return 'reference.service.ts';
 }
 
+function getYouTubeEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(regExp);
+  return match ? `https://www.youtube-nocookie.com/embed/${match[1]}?rel=0` : null;
+}
+
 export const TheoryTab: React.FC<TheoryTabProps> = ({
   lesson,
   onNextTab,
@@ -187,6 +194,7 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
 }) => {
   const referenceFilename = extractFilenameFromCode(lesson.realCodeSnippet || '');
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const embedUrl = getYouTubeEmbedUrl(lesson.videoUrl);
 
   React.useEffect(() => {
     if (!contentRef.current) return;
@@ -198,6 +206,33 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
 
   return (
     <div>
+      {embedUrl && (
+        <div className="theory-video-player-card">
+          <div className="theory-video-header">
+            <div className="video-badge-group">
+              <span className="video-badge">🎬 VIDEO BÀI GIẢNG ĐẶC BIỆT</span>
+              <span className="video-author">Tác giả: Trần Quốc Huy (Wecommit) • 1h38m</span>
+            </div>
+            <a
+              href={lesson.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="video-external-link"
+            >
+              Mở trên YouTube ↗
+            </a>
+          </div>
+          <div className="theory-video-responsive">
+            <iframe
+              src={embedUrl}
+              title={lesson.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
+
       <div className="theory-card">
         <div
           ref={contentRef}

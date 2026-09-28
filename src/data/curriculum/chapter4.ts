@@ -379,8 +379,392 @@ export class UserNotificationService {
       }
     },
     {
+      id: 'c4-l1b',
+      title: 'Bài 02: Chuyên Đề Toàn Diện: Hiểu Toàn Bộ PostgreSQL Trong 1h30p (Kiến Trúc, SQL & Tối Ưu Hóa)',
+      duration: '98 phút',
+      tag: 'PostgreSQL Architecture & Video Masterclass',
+      videoUrl: 'https://www.youtube.com/watch?v=OUlLQK_gN8k',
+      theory: `
+# 🎬 CHUYÊN ĐỀ VIDEO MASTERCLASS: TOÀN BỘ KIẾN TRÚC & TỐI ƯU POSTGRESQL TRONG 1H30P
+
+Chào mừng ĐẠI CA đến với chuyên đề video đặc biệt được giảng dạy bởi chuyên gia **Trần Quốc Huy (Wecommit)**. Video tổng hợp toàn bộ các khía cạnh sống còn của PostgreSQL từ nền tảng đến mức độ Enterprise Production: Triết lý thiết kế, Kiến trúc phân tầng Logic & Vật lý, Cơ chế bộ nhớ Shared Memory & Background Processes, Kỹ thuật viết SQL & Tối ưu hóa truy vấn chuyên sâu với \`EXPLAIN ANALYZE\`, và Chiến lược Sao lưu / Phục hồi dữ liệu thảm họa (Disaster Recovery).
+
+---
+
+### ⏱️ BẢNG MỤC LỤC & TIMESTAMPS VIDEO BÀI GIẢNG
+
+| Thời điểm | Chương | Nội dung trọng tâm |
+| :--- | :--- | :--- |
+| **00:00:00** | 1. Tổng Quan & Triết Lý | PostgreSQL là gì, lịch sử hình thành và vị thế áp đảo trong Enterprise Backend |
+| **00:03:03** | 2. Cài Đặt & Môi Trường | Download, cài đặt, tạo Database, User Role và thiết lập thông số kết nối |
+| **00:07:40** | 3. Kiến Trúc PostgreSQL | **3.1 Kiến trúc Logic** (Cluster, DB, Schema, Table, Tablespace) & **3.2 Kiến trúc Vật lý** (Shared Buffers, WAL, Processes) |
+| **00:36:04** | 4. Làm Việc Với SQL | **4.1 SQL Nền tảng** (DDL/DML, Constraints) & **4.2 Tối ưu hóa truy vấn** (B-Tree, GIN, EXPLAIN ANALYZE) |
+| **01:18:04** | 5. Sao Lưu & Phục Hồi | Logical Backup (\`pg_dump\`), Physical Backup và Khôi phục điểm thời gian (Point-In-Time-Recovery - PITR) |
+| **01:16:03** | 6. Công Cụ Quản Trị | Làm chủ giao diện dòng lệnh \`psql\`, DBeaver và pgAdmin 4 |
+| **01:26:29** | 7. Sơ Đồ Tư Duy Toàn Diện | Mindmap hệ thống hóa toàn bộ luồng dữ liệu từ Client -> RAM -> Disk |
+| **01:36:50** | 8. Lộ Trình Mở Rộng | Định hướng nâng cấp kỹ năng High Availability, Replication & Partitioning |
+
+---
+
+# 1. BỐI CẢNH & VỊ THẾ CỦA POSTGRESQL TRONG KIẾN TRÚC ENTERPRISE BACKEND
+
+Trong kỷ nguyên của Microservices và Cloud-Native, PostgreSQL đã vượt lên thành chuẩn mực cơ sở dữ liệu quan hệ (RDBMS) hàng đầu nhờ các đặc tính:
+* **Object-Relational DBMS:** Không chỉ giới hạn trong bảng quan hệ truyền thống, PostgreSQL hỗ trợ native các kiểu dữ liệu hiện đại như \`JSONB\` (cho phép truy vấn chỉ mục như NoSQL Document Store), \`UUID\`, \`Array\`, \`HSTORE\`, và hỗ trợ địa không gian với extension \`PostGIS\`.
+* **Tuân thủ chuẩn ACID nghiêm ngặt:** Sử dụng Multi-Version Concurrency Control (MVCC) giúp các thao tác đọc (Reader) không bao giờ bị khóa bởi thao tác ghi (Writer) và ngược lại (\`Readers do not block Writers, Writers do not block Readers\`).
+* **Tính mở rộng (Extensibility):** Hỗ trợ viết custom procedural language (PL/pgSQL, PL/Python, PL/V8), custom index types và Foreign Data Wrappers (FDW).
+
+---
+
+# 2. PHÂN TÍCH KIẾN TRÚC LOGIC (LOGICAL ARCHITECTURE)
+
+Hệ thống phân cấp tổ chức dữ liệu logic trong PostgreSQL được phân định rõ ràng qua 5 tầng:
+1. **Database Cluster:** Không phải là một cụm nhiều server phân tán mà là **một tập hợp các cơ sở dữ liệu** được quản lý bởi duy nhất một tiến trình PostgreSQL Server instance chạy trên một cổng mạng (mặc định \`5432\`) và lưu trữ trong cùng một thư mục dữ liệu (\`PGDATA\`).
+2. **Database:** Không gian lưu trữ độc lập logic bên trong Cluster. Các database hoàn toàn cô lập với nhau; một câu truy vấn SQL không thể trực tiếp JOIN hai bảng nằm ở hai database khác nhau nếu không dùng FDW.
+3. **Schema:** Vùng không gian tên (Namespace) bên trong một Database. Mỗi database mặc định có schema \`public\`. Doanh nghiệp thường chia schema theo nghiệp vụ (\`billing\`, \`auth\`, \`inventory\`) để phân quyền chi tiết.
+4. **Tables / Views / Sequences:** Các đối tượng dữ liệu cụ thể nằm trong Schema.
+5. **Tablespace:** Cầu nối giữa tổ chức logic và phần cứng vật lý. Tablespace cho phép Database Administrator (DBA) chỉ định bảng hoặc index nào sẽ được lưu trên ổ cứng SSD/NVMe tốc độ cao, và bảng nhật ký (Audit Log) nào sẽ nằm trên ổ HDD dung lượng lớn giá rẻ.
+
+---
+
+# 3. GIẢI PHẪU KIẾN TRÚC VẬT LÝ, BỘ NHỚ VÀ TIẾN TRÌNH NỀN (PHYSICAL & PROCESS ARCHITECTURE)
+
+Khi một Client kết nối tới PostgreSQL và thực hiện truy vấn, dữ liệu luân chuyển qua các vùng bộ nhớ và tiến trình nền chuyên biệt:
+
+### 3.1 Cấu Trúc Bộ Nhớ (Memory Architecture)
+* **Shared Memory Pool (Bộ nhớ dùng chung):**
+  - **\`shared_buffers\`:** Vùng nhớ RAM quan trọng nhất. Lưu trữ bộ đệm các trang dữ liệu (Data Pages, kích thước mặc định **8KB**). Mọi thao tác SELECT hoặc UPDATE đều phải nạp Page từ đĩa vào \`shared_buffers\` trước khi xử lý. Trong môi trường Production, \`shared_buffers\` thường được cấp phát từ $25\\%$ đến $40\\%$ tổng dung lượng RAM của server.
+  - **\`wal_buffers\`:** Bộ đệm lưu trữ các bản ghi Write-Ahead Logging trước khi được đẩy xuống đĩa.
+* **Local Process Memory (Bộ nhớ riêng của từng kết nối):**
+  - **\`work_mem\`:** Dung lượng RAM cấp phát cho mỗi thao tác sắp xếp (\`ORDER BY\`, \`DISTINCT\`) hoặc bảng băm (\`Hash Join\`, \`Hash Aggregate\`). Nếu một câu query phức tạp vượt quá \`work_mem\`, PostgreSQL sẽ ghi dữ liệu tạm ra đĩa (Spill to Disk / Temp Files), khiến độ trễ tăng vọt từ vài mili-giây lên hàng chục giây.
+  - **\`maintenance_work_mem\`:** Bộ nhớ dùng cho các tác vụ bảo trì nặng như \`VACUUM\`, \`CREATE INDEX\`, \`ALTER TABLE ADD FOREIGN KEY\`.
+
+### 3.2 Các Tiến Trình Nền Cốt Lõi (Background Processes)
+* **Postmaster Process:** Tiến trình cha (Daemon) quản lý toàn bộ hệ thống. Lắng nghe yêu cầu kết nối từ client, xác thực mật khẩu và \`fork()\` một tiến trình con (Backend Worker Process) phục vụ riêng cho kết nối đó.
+* **Background Writer (\`bgwriter\`):** Chạy ngầm liên tục theo thuật toán Clock Sweep, tìm các trang dữ liệu bị sửa đổi (Dirty Pages) trong \`shared_buffers\` và đẩy từ từ xuống đĩa. Mục tiêu: Giữ cho \`shared_buffers\` luôn có sẵn các trang trống sạch (Clean Buffers) để các Backend Worker không bị nghẽn chờ ghi đĩa.
+* **Checkpointer Process:** Tiến trình tạo điểm chốt an toàn định kỳ. Checkpointer ép buộc toàn bộ Dirty Pages trong \`shared_buffers\` phải được đồng bộ xuống đĩa cứng, ghi bản ghi Checkpoint vào WAL và cập nhật file \`pg_control\`. Nhờ đó, nếu server bị sập nguồn, quá trình khôi phục chỉ cần quét WAL từ điểm Checkpoint gần nhất thay vì quét từ đầu.
+* **WAL Writer Process:** Đẩy các bản ghi giao dịch từ \`wal_buffers\` xuống tệp WAL vật lý (dung lượng 16MB mỗi file trong thư mục \`pg_wal\`), đảm bảo nguyên tắc Durability trong chuẩn ACID.
+* **Autovacuum Daemon (Launcher & Workers):** Dọn dẹp các dòng dữ liệu chết (Dead Tuples) sinh ra do cơ chế MVCC khi thực hiện \`UPDATE\` hoặc \`DELETE\`, đồng thời cập nhật thống kê (\`ANALYZE\`) để bộ lập kế hoạch truy vấn (Query Optimizer) tính toán chi phí chính xác.
+
+---
+
+# 4. KỸ THUẬT TỐI ƯU HÓA TRUY VẤN VÀ CƠ CHẾ INDEXING (QUERY OPTIMIZER & INDEX STRATEGIES)
+
+Để tối ưu hóa một câu truy vấn chậm, Kỹ sư Backend cần đọc hiểu bản đồ thực thi qua lệnh:
+\`\`\`sql
+EXPLAIN (ANALYZE, BUFFERS, COSTS, VERBOSE)
+SELECT * FROM orders WHERE user_id = 12045 AND status = 'COMPLETED';
+\`\`\`
+
+### 4.1 Ba Kiểu Quét Dữ Liệu Căn Bản
+1. **Sequential Scan (Seq Scan):** Đọc tuần tự toàn bộ các Page 8KB của bảng từ đầu đến cuối. Rất hiệu quả với bảng nhỏ hoặc khi câu query lấy ra hơn $20\\% - 30\\%$ tổng số dòng của bảng. Tuy nhiên trên bảng hàng triệu dòng, Seq Scan gây thảm họa I/O đĩa.
+2. **Index Scan:** Duyệt cây B-Tree của Index để tìm con trỏ vật lý (\`TID = (Block, Offset)\`), sau đó nhảy trực tiếp vào Page chứa Heap Tuple trên đĩa để lấy toàn bộ dữ liệu dòng. Tối ưu khi câu query chỉ lọc ra vài dòng dữ liệu cụ thể.
+3. **Bitmap Index Scan & Bitmap Heap Scan:** Giai đoạn 1 quét Index và dựng một bản đồ bit (Bitmap) trong RAM đánh dấu các trang dữ liệu thỏa điều kiện; Giai đoạn 2 đọc các trang dữ liệu theo thứ tự tuần tự trên đĩa vật lý, tránh tình trạng giật đầu đọc ngẫu nhiên (Random Disk I/O).
+
+### 4.2 Các Loại Index Quan Trọng
+* **B-Tree (Mặc định):** Đa năng cho so sánh bằng (\`=\`), khoảng (\`<\`, \`>\`, \`BETWEEN\`), tiền tố (\`LIKE 'hoang%'\`) và sắp xếp (\`ORDER BY\`).
+* **GIN (Generalized Inverted Index):** Chỉ mục đảo ngược. Cực kỳ tối ưu cho các kiểu dữ liệu mảng (\`ARRAY\`), chuỗi tìm kiếm toàn văn (Full-Text Search \`tsvector\`), và đặc biệt là cột **\`JSONB\`** (\`WHERE metadata @> '{"role": "ADMIN"}'\`).
+* **BRIN (Block Range Index):** Chỉ lưu giá trị Min/Max của từng cụm trang dữ liệu (mặc định 128 block). Dung lượng Index siêu nhỏ (vài Kilobyte thay vì hàng Gigabyte), cực kỳ lý tưởng cho các bảng lịch sử, log giao dịch được thêm liên tục theo thời gian (Time-series data).
+
+---
+
+# 5. CHIẾN LƯỢC SAO LƯU & KHÔI PHỤC THẢM HỌA (DISASTER RECOVERY & PITR)
+
+* **Logical Backup (\`pg_dump\`):** Xuất toàn bộ lệnh DDL và DML ra file text/tar. Dễ sử dụng, có thể nạp lại vào phiên bản PostgreSQL khác, nhưng chậm chạp khi cơ sở dữ liệu đạt quy mô hàng trăm Gigabyte.
+* **Continuous Archiving & Point-In-Time-Recovery (PITR):**
+  - Chụp một bản sao vật lý đầy đủ ban đầu (\`pg_basebackup\`).
+  - Bật tính năng lưu trữ liên tục các tệp Write-Ahead Log (\`archive_mode = on\`, \`archive_command\` đẩy các file WAL 16MB sang Amazon S3 / Google Cloud Storage).
+  - Khi có sự cố (ví dụ lúc 10:15:30 một lập trình viên vô tình chạy lệnh \`DROP TABLE users\`), ta có thể khôi phục lại bản Base Backup và replay WAL đến chính xác thời điểm **10:15:29.999**, loại bỏ hoàn toàn sự cố mà không mất mát bất kỳ giao dịch hợp lệ nào!
+
+---
+
+# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (POSTGRESQL ARCHITECTURE MIND MAP)
+
+\`\`\`diagram
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        POSTGRESQL ENTERPRISE ARCHITECTURE MAP                          │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1. CLIENT LAYER                                                                        │
+│    ├── Connection Protocols (psql, DBeaver, NestJS TypeORM / Prisma Pool)              │
+│    └── Connection Handshake via TCP Socket (Port 5432)                                 │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 2. POSTMASTER & MEMORY SUBSYSTEM                                                       │
+│    ├── Postmaster Daemon: Lắng nghe, xác thực & fork Backend Worker cho từng Client   │
+│    ├── Shared Buffers (RAM Pool): Đệm lưu các Data Pages 8KB (25% - 40% RAM)           │
+│    ├── WAL Buffers: Bộ nhớ đệm tạm thời cho nhật ký Write-Ahead Log                   │
+│    └── Local Memory (work_mem cho Sort/Hash, maintenance_work_mem cho Vacuum/Index)   │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 3. BACKGROUND PROCESSES ORCHESTRATION                                                  │
+│    ├── Background Writer (bgwriter): Quét Clock Sweep đẩy dirty pages từ từ xuống đĩa │
+│    ├── Checkpointer: Ghi chốt an toàn ACID, flush toàn bộ dirty pages & cập nhật WAL   │
+│    ├── WAL Writer: Định kỳ xả WAL Buffers xuống file WAL đĩa cứng                      │
+│    └── Autovacuum: Thu gom rác Dead Tuples của MVCC, chống Table Bloat & ANALYZE      │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 4. STORAGE & OPTIMIZATION LAYER                                                        │
+│    ├── Storage Pages: Cấu trúc Slotted Page 8KB (Header -> Item IDs -> Heap Tuples)    │
+│    ├── WAL Files: Thư mục pg_wal (từng block 16MB cố định, hỗ trợ PITR khôi phục)      │
+│    └── Index Engines: B-Tree (bằng/khoảng), GIN (JSONB/Search), BRIN (Time-series)     │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+\`\`\`
+      `,
+      realCodeSnippet: `// Trích từ dự án thực tế: database-engine.service.ts
+// Hiện thực kết nối PostgreSQL cấp cao với Connection Pool, Logging Slow Query & Buffer Cache Hit Ratio
+
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Pool, PoolClient, QueryResult } from 'pg';
+
+export interface QueryAnalysisResult {
+  executionPlan: string[];
+  totalCost: number;
+  actualDurationMs: number;
+  bufferHitRatio: number;
+}
+
+@Injectable()
+export class PostgreSqlEngineService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PostgreSqlEngineService.name);
+  private pool!: Pool;
+
+  async onModuleInit(): Promise<void> {
+    this.pool = new Pool({
+      host: process.env.DB_HOST || 'localhost',
+      port: Number(process.env.DB_PORT) || 5432,
+      database: process.env.DB_NAME || 'arc_irobot_production',
+      user: process.env.DB_USER || 'arc_admin',
+      password: process.env.DB_PASSWORD || 'secret',
+      max: 20, // Kích thước tối đa của Connection Pool
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+      statement_timeout: 10000 // Chống query chạy vô hạn làm nghẽn Database
+    });
+
+    this.pool.on('error', (err: Error) => {
+      this.logger.error('Sự cố bất ngờ trên PostgreSQL Connection Pool:', err.stack);
+    });
+
+    const client = await this.pool.connect();
+    try {
+      const res = await client.query('SELECT version(), current_setting(\\'shared_buffers\\') AS shared_buffers;');
+      this.logger.log(\`✅ Kết nối thành công PostgreSQL. Thông tin: \${res.rows[0].version} | Shared Buffers: \${res.rows[0].shared_buffers}\`);
+    } finally {
+      client.release();
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.pool.end();
+    this.logger.log('Đã đóng an toàn toàn bộ kết nối PostgreSQL Pool.');
+  }
+
+  /**
+   * Chạy EXPLAIN (ANALYZE, BUFFERS) để phân tích chi phí và hiệu năng truy vấn thực tế
+   */
+  async explainAnalyzeQuery(sql: string, params: unknown[] = []): Promise<QueryAnalysisResult> {
+    const start = performance.now();
+    const explainSql = \`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) \${sql}\`;
+    const res = await this.pool.query(explainSql, params);
+    const duration = performance.now() - start;
+
+    const planData = res.rows[0]['QUERY PLAN'][0];
+    const totalCost = planData.Plan['Total Cost'];
+    const executionTime = planData['Execution Time'];
+
+    // Đo lường tỷ lệ Buffer Cache Hit của toàn bộ Database
+    const cacheRatioRes = await this.pool.query(\`
+      SELECT round(100.0 * sum(heap_blks_hit) / nullif(sum(heap_blks_hit + heap_blks_read), 0), 2) AS buffer_hit_ratio
+      FROM pg_statio_user_tables;
+    \`);
+
+    const hitRatio = Number(cacheRatioRes.rows[0]?.buffer_hit_ratio || 0);
+
+    return {
+      executionPlan: [JSON.stringify(planData, null, 2)],
+      totalCost,
+      actualDurationMs: executionTime || duration,
+      bufferHitRatio: hitRatio
+    };
+  }
+}`,
+      quiz: [
+        {
+          id: 'c4-l1b-q1',
+          question: 'Vùng bộ nhớ shared_buffers trong PostgreSQL đóng vai trò gì trong kiến trúc hệ thống?',
+          options: [
+            'Lưu trữ mã nguồn của các Stored Procedures và Views',
+            'Lưu bộ nhớ đệm (Cache) cho các trang dữ liệu (8KB Data Pages) dùng chung giữa tất cả tiến trình kết nối',
+            'Chứa thông tin đăng nhập và danh sách quyền hạn của người dùng hệ thống',
+            'Lưu trữ các tệp backup tự động do pg_dump tạo ra'
+          ],
+          correctIndex: 1,
+          explanation: 'shared_buffers là vùng RAM quan trọng nhất của PostgreSQL, đóng vai trò làm bộ nhớ đệm dùng chung cho các data block 8KB. Mọi thao tác đọc hay ghi dữ liệu đều phải tương tác với shared_buffers trước khi được đẩy xuống đĩa cứng.'
+        },
+        {
+          id: 'c4-l1b-q2',
+          question: 'Điểm khác biệt cốt lõi giữa tiến trình Background Writer (bgwriter) và Checkpointer là gì?',
+          options: [
+            'bgwriter ghi nhận WAL, còn Checkpointer dọn dẹp các dead tuples',
+            'bgwriter thầm lặng quét đẩy dần các dirty pages để giữ sẵn trang trống sạch trong RAM; Checkpointer tạo điểm chốt định kỳ flush toàn bộ dirty pages xuống đĩa phục vụ an toàn khôi phục',
+            'bgwriter chỉ chạy trên bản quyền thương mại, còn Checkpointer là tiến trình mã nguồn mở',
+            'bgwriter xử lý các câu lệnh INSERT, còn Checkpointer xử lý các câu lệnh SELECT'
+          ],
+          correctIndex: 1,
+          explanation: 'bgwriter chạy liên tục nhằm giữ cho shared_buffers luôn có sẵn clean buffers để client không bị gián đoạn I/O khi cần nạp trang mới. Trong khi đó, Checkpointer tạo điểm kiểm tra định kỳ bằng cách đồng bộ toàn bộ dirty pages xuống đĩa và ghi checkpoint vào WAL, giúp giảm thiểu thời gian phục hồi hệ thống khi gặp sự cố sập nguồn.'
+        },
+        {
+          id: 'c4-l1b-q3',
+          question: 'Khi nào Query Planner của PostgreSQL sẽ cố tình chọn Sequential Scan (Seq Scan) thay vì Index Scan dù cột tìm kiếm đã có B-Tree Index?',
+          options: [
+            'Khi bảng dữ liệu có kích thước quá nhỏ (vài trang dữ liệu) hoặc khi điều kiện lọc trả về một tỷ lệ lớn dòng dữ liệu của bảng',
+            'Khi câu lệnh SQL được gửi từ ứng dụng viết bằng NestJS',
+            'Khi database đang được cấu hình ở chế độ Read-Only',
+            'Khi bảng dữ liệu có chứa ít nhất một cột kiểu boolean'
+          ],
+          correctIndex: 0,
+          explanation: 'Duyệt Index Scan đòi hỏi phải đọc qua Index trước rồi mới nhảy ngẫu nhiên (Random I/O) vào Heap Page để lấy dữ liệu. Nếu bảng quá nhỏ (vài chục dòng) hoặc câu query trả về tỷ lệ lớn (>20-30%) tổng số bản ghi, chi phí đọc tuần tự liên tục (Sequential I/O) từ đầu đến cuối bảng sẽ rẻ và nhanh hơn rất nhiều so với việc nhảy ngẫu nhiên qua lại giữa Index và Table.'
+        },
+        {
+          id: 'c4-l1b-q4',
+          question: 'Để thực hiện khôi phục dữ liệu về đúng một thời điểm chính xác trong quá khứ (Point-In-Time-Recovery - PITR), hệ thống bắt buộc phải duy trì những thành phần nào?',
+          options: [
+            'Bản export file JSON của toàn bộ bảng dữ liệu',
+            'Một bản sao lưu vật lý nền tảng (Base Backup) kết hợp với chuỗi lưu trữ liên tục các tệp Write-Ahead Log (WAL Archiving)',
+            'Chỉ cần lưu trữ các câu lệnh DDL trong thư mục git',
+            'Bản ghi log của web server Nginx'
+          ],
+          correctIndex: 1,
+          explanation: 'Cơ chế PITR yêu cầu một bản Base Backup vật lý làm mốc khởi đầu, sau đó phát lại (Replay) chuỗi các tệp nhật ký WAL liên tục cho tới đúng thời điểm (Timestamp hoặc Transaction ID) mong muốn trước khi xảy ra thảm họa.'
+        },
+        {
+          id: 'c4-l1b-q5',
+          question: 'Kích thước mặc định của một khối/trang dữ liệu (Page / Block) trong cấu trúc lưu trữ của PostgreSQL là bao nhiêu?',
+          options: [
+            '4 KB',
+            '8 KB',
+            '16 KB',
+            '64 KB'
+          ],
+          correctIndex: 1,
+          explanation: 'Kích thước chuẩn của một Data Page trong PostgreSQL là 8KB. Mọi bảng và index đều được chia thành các khối 8KB này.'
+        },
+        {
+          id: 'c4-l1b-q6',
+          question: 'Vì sao cơ chế MVCC của PostgreSQL lại đòi hỏi tiến trình Autovacuum phải hoạt động định kỳ?',
+          options: [
+            'Để định dạng lại ổ đĩa cứng tránh bị phân mảnh sector',
+            'Vì thao tác UPDATE và DELETE không xóa ngay dữ liệu cũ trên đĩa mà để lại các Dead Tuples; Autovacuum giúp thu hồi không gian trống và cập nhật thống kê Optimizer',
+            'Để mã hóa lại toàn bộ mật khẩu người dùng trong cơ sở dữ liệu',
+            'Để nén các tệp video nhúng trong cơ sở dữ liệu'
+          ],
+          correctIndex: 1,
+          explanation: 'Do kiến trúc MVCC, UPDATE thực chất là đánh dấu dòng cũ hết hiệu lực và INSERT dòng mới; DELETE chỉ đánh dấu dead tuple. Autovacuum thu gom các dòng chết này để các thao tác chèn mới có thể tái sử dụng không gian trống, tránh hiện tượng Table Bloat (phình to kích thước bảng) và chạy ANALYZE cập nhật thống kê.'
+        },
+        {
+          id: 'c4-l1b-q7',
+          question: 'Khi thiết kế bảng có cột kiểu JSONB và thường xuyên truy vấn theo các thuộc tính lồng bên trong JSON, loại Index nào mang lại hiệu năng cao nhất?',
+          options: [
+            'B-Tree Index trên toàn bộ cột',
+            'GIN (Generalized Inverted Index)',
+            'Hash Index',
+            'BRIN Index'
+          ],
+          correctIndex: 1,
+          explanation: 'GIN (Generalized Inverted Index) là cấu trúc chỉ mục đảo ngược, phân rã từng key và value bên trong tài liệu JSONB thành các mục từ riêng biệt, cho phép tìm kiếm cực nhanh với các toán tử `@>`, `?`, `?&`.'
+        },
+        {
+          id: 'c4-l1b-q8',
+          question: 'Trong kết quả của lệnh EXPLAIN (ANALYZE, BUFFERS), thông số "Buffers: shared hit" phản ánh điều gì?',
+          options: [
+            'Số lượng trang dữ liệu phải đọc trực tiếp từ ổ cứng cơ học',
+            'Số lượng trang dữ liệu đã được tìm thấy ngay lập tức trong bộ nhớ đệm RAM (shared_buffers) mà không phải đọc từ đĩa',
+            'Số lượng câu lệnh SQL đang chờ được giải phóng',
+            'Số lượng người dùng đang đồng thời truy cập vào bảng'
+          ],
+          correctIndex: 1,
+          explanation: '"shared hit" biểu thị số lượng block 8KB đã có sẵn trong shared_buffers tại RAM. Con số này càng cao so với "shared read" thì câu query càng tối ưu về mặt I/O.'
+        }
+      ],
+      codeChallenge: {
+        id: 'c4-l1b-c1',
+        title: 'Xây Dựng PostgreSQL Query Plan Analyzer (Seq Scan vs Index Scan Detector)',
+        description: 'Hiện thực hàm \`evaluatePostgreSqlPlan(nodes: Array<{ nodeType: string; relationName?: string; totalCost: number; actualRows: number }>, costThreshold: number): { hasSeqScanOnLargeTable: boolean; maxCost: number; warnings: string[] }\`. Quy tắc: 1. \`maxCost\` là giá trị \`totalCost\` lớn nhất trong các node (nếu mảng rỗng thì \`maxCost: 0\`). 2. Nếu node có \`nodeType === "Seq Scan"\` và \`actualRows >= 1000\`: đặt \`hasSeqScanOnLargeTable = true\` và đẩy cảnh báo \`"WARNING_SEQ_SCAN: " + (node.relationName || "unknown")\` vào mảng \`warnings\`. 3. Nếu \`totalCost > costThreshold\`: đẩy cảnh báo \`"WARNING_HIGH_COST: " + node.totalCost\` vào \`warnings\`. 4. Nếu \`nodes\` rỗng hoặc không phải mảng, trả về \`{ hasSeqScanOnLargeTable: false, maxCost: 0, warnings: [] }\`.',
+        starterCode: `export function evaluatePostgreSqlPlan(
+  nodes: Array<{ nodeType: string; relationName?: string; totalCost: number; actualRows: number }>,
+  costThreshold: number
+): { hasSeqScanOnLargeTable: boolean; maxCost: number; warnings: string[] } {
+  // TODO: Hiện thực kiểm tra và đánh giá PostgreSQL Query Plan
+  return { hasSeqScanOnLargeTable: false, maxCost: 0, warnings: [] };
+}`,
+        solution: `export function evaluatePostgreSqlPlan(
+  nodes: Array<{ nodeType: string; relationName?: string; totalCost: number; actualRows: number }>,
+  costThreshold: number
+): { hasSeqScanOnLargeTable: boolean; maxCost: number; warnings: string[] } {
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    return { hasSeqScanOnLargeTable: false, maxCost: 0, warnings: [] };
+  }
+
+  let hasSeqScanOnLargeTable = false;
+  let maxCost = 0;
+  const warnings: string[] = [];
+
+  for (const node of nodes) {
+    if (typeof node.totalCost === 'number' && node.totalCost > maxCost) {
+      maxCost = node.totalCost;
+    }
+    if (node.nodeType === 'Seq Scan' && typeof node.actualRows === 'number' && node.actualRows >= 1000) {
+      hasSeqScanOnLargeTable = true;
+      warnings.push(\`WARNING_SEQ_SCAN: \${node.relationName || 'unknown'}\`);
+    }
+    if (typeof node.totalCost === 'number' && node.totalCost > costThreshold) {
+      warnings.push(\`WARNING_HIGH_COST: \${node.totalCost}\`);
+    }
+  }
+
+  return { hasSeqScanOnLargeTable, maxCost, warnings };
+}`,
+        testCases: [
+          {
+            name: 'Case 1 (Visible): Phát hiện Seq Scan trên bảng lớn và Cost vượt ngưỡng',
+            input: [[{ nodeType: 'Seq Scan', relationName: 'users', totalCost: 1500, actualRows: 5000 }], 1000],
+            expected: { hasSeqScanOnLargeTable: true, maxCost: 1500, warnings: ['WARNING_SEQ_SCAN: users', 'WARNING_HIGH_COST: 1500'] },
+            hidden: false
+          },
+          {
+            name: 'Case 2 (Visible): Index Scan trên bảng lớn -> An toàn không cảnh báo Seq Scan',
+            input: [[{ nodeType: 'Index Scan', relationName: 'orders', totalCost: 120, actualRows: 5000 }], 500],
+            expected: { hasSeqScanOnLargeTable: false, maxCost: 120, warnings: [] },
+            hidden: false
+          },
+          {
+            name: 'Case 3 (Visible): Danh sách node rỗng -> Trả về mặc định',
+            input: [[], 500],
+            expected: { hasSeqScanOnLargeTable: false, maxCost: 0, warnings: [] },
+            hidden: false
+          },
+          {
+            name: 'Case 4 (Hidden): Seq Scan trên bảng nhỏ (< 1000 rows) -> Hợp lý, không cảnh báo Seq Scan',
+            input: [[{ nodeType: 'Seq Scan', relationName: 'categories', totalCost: 45, actualRows: 50 }], 500],
+            expected: { hasSeqScanOnLargeTable: false, maxCost: 45, warnings: [] },
+            hidden: true
+          },
+          {
+            name: 'Case 5 (Hidden): Hỗn hợp nhiều node với maxCost và nhiều cảnh báo theo thứ tự',
+            input: [[
+              { nodeType: 'Index Scan', relationName: 'users', totalCost: 80, actualRows: 10 },
+              { nodeType: 'Seq Scan', relationName: 'logs', totalCost: 3500, actualRows: 12000 },
+              { nodeType: 'Hash Join', totalCost: 4200, actualRows: 12000 }
+            ], 3000],
+            expected: {
+              hasSeqScanOnLargeTable: true,
+              maxCost: 4200,
+              warnings: ['WARNING_SEQ_SCAN: logs', 'WARNING_HIGH_COST: 3500', 'WARNING_HIGH_COST: 4200']
+            },
+            hidden: true
+          }
+        ]
+      }
+    },
+    {
       id: 'c4-l2',
-      title: 'Bài 02: NestJS Request Lifecycle Pipeline: Middleware -> Guard -> Interceptor -> Pipe -> Filter',
+      title: 'Bài 03: NestJS Request Lifecycle Pipeline: Middleware -> Guard -> Interceptor -> Pipe -> Filter',
       duration: '60 phút',
       tag: 'Execution Pipeline & Filters',
       theory: `
@@ -739,7 +1123,7 @@ export class ResponseTransformInterceptor<T>
     },
     {
       id: 'c4-l3',
-      title: 'Bài 03: Đồ Thị DAG, Circular Dependency (forwardRef) & Hiểm Họa Hiệu Năng Scope.REQUEST',
+      title: 'Bài 04: Đồ Thị DAG, Circular Dependency (forwardRef) & Hiểm Họa Hiệu Năng Scope.REQUEST',
       duration: '60 phút',
       tag: 'DAG Graph & Scopes Danger',
       theory: `

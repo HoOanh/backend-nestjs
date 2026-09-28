@@ -3,7 +3,6 @@ import './Sidebar.css';
 import type { Sprint, Lesson } from '../../data/curriculum.ts';
 import type { SprintExam } from '../../data/sprintExams.ts';
 import {
-  checkLessonUnlockStatus,
   checkSprintExamUnlockStatus,
   checkFinalExamUnlockStatus
 } from '../../utils/progressGuard.ts';
@@ -106,36 +105,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 const isCompleted = !!completedLessons[lesson.id];
                 const isActive =
                   activeView === 'lesson' && currentLesson?.id === lesson.id;
-                const lessonStatus = checkLessonUnlockStatus(
-                  lesson.id,
-                  completedLessons,
-                  userRole,
-                  bypassLock,
-                  curriculum
-                );
-                const isLocked = !lessonStatus.unlocked;
 
                 return (
                   <div
                     key={lesson.id}
-                    className={`lesson-nav-item ${isActive ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
+                    className={`lesson-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => onSelectLesson(lesson.id)}
-                    title={
-                      isLocked
-                        ? `🔒 Bài học đang khóa. Cần hoàn thành: ${lessonStatus.requiredPreviousLesson?.title}`
-                        : lesson.title
-                    }
+                    title={lesson.title}
                   >
                     <span className="status-icon">
-                      {isLocked ? '🔒' : isCompleted ? '✅' : isActive ? '🔵' : '⚪'}
+                      {isCompleted ? '✅' : isActive ? '🔵' : '⚪'}
                     </span>
                     <span
                       style={{
                         flex: 1,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        opacity: isLocked ? 0.6 : 1
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {lesson.title}

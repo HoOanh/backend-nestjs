@@ -56,34 +56,16 @@ export function getFirstIncompleteLessonId(
 
 /**
  * Check if a lesson is unlocked for the current student
+ * Mọi bài học luôn được mở khóa, không còn yêu cầu phải học bài trước đó.
  */
 export function checkLessonUnlockStatus(
-  lessonId: string,
-  completedLessons: Record<string, { completedAt: string }> = {},
-  userRole?: string,
-  bypassLock = false,
-  curriculum: Sprint[] = CURRICULUM
+  _lessonId?: string,
+  _completedLessons: Record<string, { completedAt: string }> = {},
+  _userRole?: string,
+  _bypassLock = false,
+  _curriculum: Sprint[] = CURRICULUM
 ): { unlocked: boolean; requiredPreviousLesson: Lesson | null } {
-  // Admins and instructors can view all in preview mode
-  if (userRole === 'admin' || userRole === 'instructor' || bypassLock) {
-    return { unlocked: true, requiredPreviousLesson: null };
-  }
-
-  const all = getAllLessonsInOrder(curriculum);
-  const targetIdx = all.findIndex((l) => l.id === lessonId);
-
-  // Lesson 1 is always unlocked
-  if (targetIdx <= 0) {
-    return { unlocked: true, requiredPreviousLesson: null };
-  }
-
-  const prevLesson = all[targetIdx - 1];
-  const isPrevCompleted = Boolean(completedLessons[prevLesson.id]);
-
-  return {
-    unlocked: isPrevCompleted,
-    requiredPreviousLesson: isPrevCompleted ? null : prevLesson
-  };
+  return { unlocked: true, requiredPreviousLesson: null };
 }
 
 /**

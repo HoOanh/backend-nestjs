@@ -28,6 +28,7 @@ export interface Lesson {
   title: string;
   duration: string;
   tag: string;
+  videoUrl?: string;
   theory: string;
   realCodeSnippet: string;
   quiz: QuizQuestion[];

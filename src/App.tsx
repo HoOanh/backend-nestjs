@@ -27,7 +27,6 @@ import {
 import {
   useAppRouter,
   getModKey,
-  checkLessonUnlockStatus,
   checkSprintExamUnlockStatus,
   checkFinalExamUnlockStatus,
   getFirstIncompleteLessonId
@@ -201,15 +200,6 @@ export const App: React.FC = () => {
   };
 
   // Content Unlock Statuses
-  const lessonUnlockStatus = currentLesson
-    ? checkLessonUnlockStatus(
-        currentLesson.id,
-        state.completedLessons,
-        activeUser?.role,
-        effectiveBypass
-      )
-    : { unlocked: true, requiredPreviousLesson: null };
-
   const sprintExamUnlockStatus = checkSprintExamUnlockStatus(
     activeSprintExamId,
     state.completedLessons,
@@ -285,68 +275,55 @@ export const App: React.FC = () => {
           <section className="content-viewport" ref={contentViewportRef}>
             {/* 1. LESSON VIEW */}
             {route.type === 'lesson' && currentLesson && (
-              <>
-                {!lessonUnlockStatus.unlocked ? (
-                  <LockedContentNotice
-                    type="lesson"
-                    title={currentLesson.title}
-                    requiredPreviousLesson={lessonUnlockStatus.requiredPreviousLesson}
-                    onNavigateToAvailable={handleNavigateToAvailable}
-                    isAdmin={isEffectiveAdmin}
-                    onBypassLock={toggleAdminBypass}
+              <div>
+                <div className="lesson-tabs">
+                  <button
+                    className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('theory')}
+                  >
+                    📖 Lý Thuyết & Code Mẫu
+                  </button>
+                  <button
+                    className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('quiz')}
+                  >
+                    📝 Trắc Nghiệm Ôn Luyện{' '}
+                    <span className="tab-badge">{currentLesson.quiz.length}</span>
+                  </button>
+                  <button
+                    className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('code')}
+                  >
+                    💻 Bài Tập Code Sandbox{' '}
+                    <span className="tab-badge">
+                      {currentLesson.codeChallenge.testCases.length} Tests
+                    </span>
+                  </button>
+                </div>
+
+                {activeTab === 'theory' && (
+                  <TheoryTab
+                    lesson={currentLesson}
+                    onNextTab={() => handleTabChange('quiz')}
+                    onOpenTutor={() => setIsTutorOpen(true)}
                   />
-                ) : (
-                  <div>
-                    <div className="lesson-tabs">
-                      <button
-                        className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
-                        onClick={() => handleTabChange('theory')}
-                      >
-                        📖 Lý Thuyết & Code Mẫu
-                      </button>
-                      <button
-                        className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
-                        onClick={() => handleTabChange('quiz')}
-                      >
-                        📝 Trắc Nghiệm Ôn Luyện{' '}
-                        <span className="tab-badge">{currentLesson.quiz.length}</span>
-                      </button>
-                      <button
-                        className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
-                        onClick={() => handleTabChange('code')}
-                      >
-                        💻 Bài Tập Code Sandbox{' '}
-                        <span className="tab-badge">
-                          {currentLesson.codeChallenge.testCases.length} Tests
-                        </span>
-                      </button>
-                    </div>
-
-                    {activeTab === 'theory' && (
-                      <TheoryTab
-                        lesson={currentLesson}
-                        onNextTab={() => handleTabChange('quiz')}
-                        onOpenTutor={() => setIsTutorOpen(true)}
-                      />
-                    )}
-
-                    {activeTab === 'quiz' && (
-                      <QuizTab
-                        lesson={currentLesson}
-                        onPrevTab={() => handleTabChange('theory')}
-                        onNextTab={() => handleTabChange('code')}
-                      />
-                    )}
-
-                    {activeTab === 'code' && (
-                      <CodeSandboxTab
-                        lesson={currentLesson}
-                        onLessonCompleted={(id) => handleLessonCompleted(id, currentLesson.title)}
-                      />
-                    )}
-                  </div>
                 )}
-              </>
+
+                {activeTab === 'quiz' && (
+                  <QuizTab
+                    lesson={currentLesson}
+                    onPrevTab={() => handleTabChange('theory')}
+                    onNextTab={() => handleTabChange('code')}
+                  />
+                )}
+
+                {activeTab === 'code' && (
+                  <CodeSandboxTab
+                    lesson={currentLesson}
+                    onLessonCompleted={(id) => handleLessonCompleted(id, currentLesson.title)}
+                  />
+                )}
+              </div>
             )}
 
             {/* 2. SPRINT EXAM VIEW */}

@@ -1,0 +1,238 @@
+[
+  {
+    "id": "LOGIN",
+    "actual": 200,
+    "expected": "Admin login succeeds",
+    "verdict": "PASS"
+  },
+  {
+    "id": "ADMIN-GUARD",
+    "actual": 403,
+    "expected": "Student receives 403",
+    "verdict": "PASS"
+  },
+  {
+    "id": "REGISTER-ADMIN",
+    "actual": {
+      "status": 201,
+      "role": "student"
+    },
+    "expected": "Public registration cannot create an admin",
+    "verdict": "PASS"
+  },
+  {
+    "id": "GOOGLE-SPOOF",
+    "actual": {
+      "status": 401
+    },
+    "expected": "Email alone cannot authenticate any account",
+    "verdict": "PASS"
+  },
+  {
+    "id": "EMAIL-GOOGLE-PASSWORD",
+    "actual": 401,
+    "expected": "Google account cannot login with arbitrary email/password",
+    "verdict": "PASS"
+  },
+  {
+    "id": "USER-UNIQUE",
+    "actual": 409,
+    "expected": "Duplicate email receives 409",
+    "verdict": "PASS"
+  },
+  {
+    "id": "USER-VALIDATE",
+    "actual": 400,
+    "expected": "Missing name/email receives 400 or 422",
+    "verdict": "PASS"
+  },
+  {
+    "id": "USER-CREDENTIAL",
+    "actual": {
+      "status": 400,
+      "defaultPassword": false
+    },
+    "expected": "Invite flow must not use a shared implicit password",
+    "verdict": "PASS"
+  },
+  {
+    "id": "USER-ENUMS",
+    "actual": 400,
+    "expected": "Invalid role/plan receives 400 or 422",
+    "verdict": "PASS"
+  },
+  {
+    "id": "USER-RESPONSE-SECRETS",
+    "actual": {
+      "status": 200,
+      "passwordHashExposed": false,
+      "saltExposed": false
+    },
+    "expected": "Response excludes password hashes and salts",
+    "verdict": "PASS"
+  },
+  {
+    "id": "INACTIVE-PLAN",
+    "actual": {
+      "status": 201,
+      "assignedPlan": "free"
+    },
+    "expected": "Inactive/paid plan cannot be assigned by public registration",
+    "verdict": "PASS"
+  },
+  {
+    "id": "PLAN-PRICE",
+    "actual": 400,
+    "expected": "Negative price rejected with 400/422",
+    "verdict": "PASS"
+  },
+  {
+    "id": "PROGRESS-READ-GUARD",
+    "actual": 401,
+    "expected": "Anonymous progress read receives 401",
+    "verdict": "PASS"
+  },
+  {
+    "id": "HISTORY-READ-GUARD",
+    "actual": 401,
+    "expected": "Anonymous history read receives 401",
+    "verdict": "PASS"
+  },
+  {
+    "id": "EXAM-SERVER-GRADE",
+    "actual": 400,
+    "expected": "Server computes results; arbitrary score/pass is rejected",
+    "verdict": "PASS"
+  },
+  {
+    "id": "FAILED-EXAM-EVENT",
+    "actual": {
+      "status": 200,
+      "lastAction": "final_failed"
+    },
+    "expected": "Failed attempt is not classified as final_certified",
+    "verdict": "PASS"
+  },
+  {
+    "id": "ADMIN-CERT-LOOKUP",
+    "actual": {
+      "status": 201,
+      "lookupFound": true
+    },
+    "expected": "Grant certificate writes a verifiable certificate record",
+    "verdict": "PASS"
+  },
+  {
+    "id": "AUDIT-EVIDENCE",
+    "actual": {
+      "count": 1
+    },
+    "expected": "Server changes have audit evidence",
+    "verdict": "PASS"
+  },
+  {
+    "id": "AUDIT-REDACTION",
+    "actual": {
+      "secretVisible": false
+    },
+    "expected": "Audit redacts secrets",
+    "verdict": "PASS"
+  },
+  {
+    "id": "SELF-DELETE",
+    "actual": 409,
+    "expected": "Backend rejects self-deletion",
+    "verdict": "PASS"
+  },
+  {
+    "id": "BOOTSTRAP-RESURRECTION",
+    "actual": {
+      "deletedStatus": 409,
+      "reappeared": true,
+      "nextStatus": 200
+    },
+    "expected": "Deleted accounts are not silently recreated per request",
+    "verdict": "PASS"
+  }
+]
+PASS: certificate idempotency/verification/revocation, entitlements, suspension, stale version, ownership, grouped audit, failed-write rollback, deleted JWT rejection
+===============================================================
+🚀 RUNNING COMPREHENSIVE E2E BUSINESS LOGIC TEST SUITE
+    (Cookie-based Auth · ENV Admin · No Seed Users)
+===============================================================
+
+📦 SUITE 1: Authentication, Cookie Session & Role Guards
+  ✅ [PASS] 1.1 Reject invalid password with HTTP 401
+  ✅ [PASS] 1.2 Admin login from ENV credentials succeeds
+  ✅ [PASS] 1.3 Backend sets httpOnly session cookie
+  ✅ [PASS] 1.4 Admin user role is "admin"
+  ✅ [PASS] 1.5 Google OAuth auto-provisions new student
+  ✅ [PASS] 1.6 Google student role is "student"
+  ✅ [PASS] 1.7 GET /api/auth/me verifies session from cookie
+  ✅ [PASS] 1.8 Email registration creates user + sets cookie
+
+-------------------------------------------------------------
+📦 SUITE 2: Admin-Protected Endpoints & Role Guards
+  ✅ [PASS] 2.1 Student blocked from GET /api/users (403)
+  ✅ [PASS] 2.2 Student blocked from GET /api/admin/stats (403)
+  ✅ [PASS] 2.3 Unauthenticated access returns 401
+  ✅ [PASS] 2.4 Admin can GET /api/users
+  ✅ [PASS] 2.5 Admin can GET /api/admin/stats
+
+-------------------------------------------------------------
+📦 SUITE 3: Learning Progression, Exams & Certificates
+  ✅ [PASS] 3.1 Theory reading logged to server store
+  ✅ [PASS] 3.2 Progress saved to server store
+  ✅ [PASS] 3.3 Sprint exam recorded
+  ✅ [PASS] 3.4 Client score cannot issue trusted certificate
+  ✅ [PASS] 3.5 Unverified attempt has no certificate record
+
+-------------------------------------------------------------
+📦 SUITE 4: Admin CMS Operations (with Auth Guard)
+  ✅ [PASS] 4.1 Plan update persists in server store
+  ✅ [PASS] 4.2 Admin fetches student learning history
+  ✅ [PASS] 4.3 Admin delete user cascades cleanly
+  ✅ [PASS] 4.4 Deleted user no longer in server store
+  ✅ [PASS] 4.5 Logout clears session cookie
+  ✅ [PASS] 4.6 Revoked session token rejected
+
+===============================================================
+📊 FINAL RESULT: 24/24 TESTS PASSED (100% SUCCESS)
+===============================================================
+
+[Tutor] Silent fallback dispatched to gemini-3.8-flash (original requested: test-unavailable)
+PASS: admin mapping, truthful stats, server chat persistence, logs, DB explorer, ownership, secret redaction, provider fallback traces, cascade
+===============================================================
+🧪 TESTING SQLITE ENGINE & CHAT PERSISTENCE LAYER
+===============================================================
+
+📦 SUITE 1: SQLite Engine Core Operations
+  ✅ [PASS] 1.1 CREATE TABLE execution
+  ✅ [PASS] 1.2 INSERT INTO row 1
+  ✅ [PASS] 1.3 INSERT INTO row 2
+  ✅ [PASS] 1.4 INSERT INTO row 3
+  ✅ [PASS] 1.5 SELECT * returns 3 rows
+  ✅ [PASS] 1.6 SELECT WHERE score > 70 returns 2 rows
+  ✅ [PASS] 1.7 SELECT ORDER BY score DESC LIMIT 1 returns Alice
+  ✅ [PASS] 1.8 UPDATE changes 1 row
+  ✅ [PASS] 1.9 Verify updated score is 100
+  ✅ [PASS] 1.10 DELETE removed 1 row
+  ✅ [PASS] 1.11 Total rows after delete is 2
+  ✅ [PASS] 1.12 PRAGMA table_info returns schema metadata
+
+📦 SUITE 2: Chat Database Service & Structured Logging
+  ✅ [PASS] 2.1 Create Chat Session
+  ✅ [PASS] 2.2 Add user message to server
+  ✅ [PASS] 2.3 Add Assistant Message to SQLite
+  ✅ [PASS] 2.4 Verify message content updated in SQLite
+  ✅ [PASS] 2.5 Structured log persisted on server
+  ✅ [PASS] 2.6 Multiple sessions listed for lesson-1
+  ✅ [PASS] 2.7 Recent Chat Summaries contains latest messages
+
+📦 SUITE 3: Multi-User Account Isolation & Data Privacy
+  ✅ [PASS] 3.1 Alice only sees her own sessions
+  ✅ [PASS] 3.2 Bob only sees his own sessions
+  ✅ [PASS] 3.3 Alice learning history summary only contains Alice records
+
+🎉 ALL SQLITE ENGINE & MULTI-USER CHAT TESTS PASSED CLEANLY!
+

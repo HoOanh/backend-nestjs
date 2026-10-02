@@ -1,5 +1,5 @@
 /**
- * eSmiles Backend Academy - Sprint Checkpoint Exams (6 Sprints)
+ * Arc Irobot Academy - Sprint Checkpoint Exams (6 Sprints)
  * Evaluates student comprehension after each Sprint
  */
 
@@ -149,7 +149,7 @@ window.SPRINT_EXAMS = [
     questions: [
       {
         id: 's2-q1',
-        question: 'Nguyên tắc vàng nào bắt buộc phải tuân theo khi viết mọi hàm query trong tầng Service của eSmiles?',
+        question: 'Nguyên tắc vàng nào bắt buộc phải tuân theo khi viết mọi hàm query trong tầng Service của Arc Irobot?',
         options: [
           'Luôn luôn ép điều kiện where: { unitId } để cô lập dữ liệu phòng khám',
           'Luôn luôn trả về kiểu any',
@@ -216,7 +216,7 @@ window.SPRINT_EXAMS = [
     questions: [
       {
         id: 's3-q1',
-        question: 'Cấu trúc chuẩn của một mã quyền (Permission) trong hệ thống eSmiles gồm 3 phần là gì?',
+        question: 'Cấu trúc chuẩn của một mã quyền (Permission) trong hệ thống Arc Irobot gồm 3 phần là gì?',
         options: [
           'module:resource:action',
           'ROLE:ADMIN:USER',
@@ -224,7 +224,7 @@ window.SPRINT_EXAMS = [
           'URL:CONTROLLER:METHOD'
         ],
         correctIndex: 0,
-        explanation: 'eSmiles áp dụng định dạng chuẩn module:resource:action (vd: inventory:category:create).'
+        explanation: 'Arc Irobot áp dụng định dạng chuẩn module:resource:action (vd: inventory:category:create).'
       },
       {
         id: 's3-q2',
@@ -334,7 +334,7 @@ window.SPRINT_EXAMS = [
     questions: [
       {
         id: 's5-q1',
-        question: 'Công cụ nào trong dự án eSmiles được dùng để lưu trữ và chạy thử nghiệm trực tiếp các API request được track trong Git?',
+        question: 'Công cụ nào trong dự án Arc Irobot được dùng để lưu trữ và chạy thử nghiệm trực tiếp các API request được track trong Git?',
         options: [
           'Bruno (.bru)',
           'Postman Cloud',
@@ -342,7 +342,7 @@ window.SPRINT_EXAMS = [
           'Excel'
         ],
         correctIndex: 0,
-        explanation: 'eSmiles sử dụng Bruno (.bru) lưu trực tiếp trong thư mục bruno/ của repo Git.'
+        explanation: 'Arc Irobot sử dụng Bruno (.bru) lưu trực tiếp trong thư mục bruno/ của repo Git.'
       },
       {
         id: 's5-q2',

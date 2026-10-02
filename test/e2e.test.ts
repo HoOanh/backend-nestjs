@@ -1,4 +1,17 @@
-import { handleApiRequest, verifyPassword, hashPassword } from '../api/index.ts';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const originalDirectory = process.cwd();
+const testDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'arc-e2e-'));
+process.chdir(testDirectory);
+process.env.ADMIN_EMAIL = 'admin@e2e.invalid';
+process.env.ADMIN_PASSWORD = 'E2e-unique-admin-password';
+delete process.env.ARC_STORE_PATH;
+delete process.env.VERCEL;
+delete process.env.AWS_LAMBDA_FUNCTION_NAME;
+const { handleApiRequest, verifyPassword, hashPassword, dbService } =
+  await import('../api/index.ts');
 
 interface MockResponse {
   statusCode: number;
@@ -30,15 +43,19 @@ function createMockResponse(): MockResponse {
 
 function extractCookieToken(res: MockResponse): string | null {
   const setCookie = res.headers['set-cookie'] || '';
-  const match = setCookie.match(/esmiles_session=([^;]+)/);
+  const match = setCookie.match(/arc_session=([^;]+)/);
   return match ? match[1] : null;
 }
 
 async function runE2ETests() {
-  console.log('===============================================================');
+  console.log(
+    '==============================================================='
+  );
   console.log('🚀 RUNNING COMPREHENSIVE E2E BUSINESS LOGIC TEST SUITE');
   console.log('    (Cookie-based Auth · ENV Admin · No Seed Users)');
-  console.log('===============================================================\n');
+  console.log(
+    '===============================================================\n'
+  );
 
   let passedTests = 0;
   let totalTests = 0;
@@ -49,11 +66,13 @@ async function runE2ETests() {
       passedTests++;
       console.log(`  ✅ [PASS] ${testName}`);
     } else {
-      console.error(`  ❌ [FAIL] ${testName} - ${details || 'Assertion failed'}`);
+      console.error(
+        `  ❌ [FAIL] ${testName} - ${details || 'Assertion failed'}`
+      );
     }
   }
 
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@esmiles.vn';
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@arc-irobot.tech';
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026!';
 
   // -------------------------------------------------------------
@@ -64,7 +83,11 @@ async function runE2ETests() {
   // 1.1: Wrong password rejection
   let res = createMockResponse();
   await handleApiRequest(
-    { method: 'POST', url: '/api/auth/login', body: { email: ADMIN_EMAIL, password: 'wrongpassword' } },
+    {
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { email: ADMIN_EMAIL, password: 'wrongpassword' }
+    },
     res
   );
   assert('1.1 Reject invalid password with HTTP 401', res.statusCode === 401);
@@ -72,50 +95,102 @@ async function runE2ETests() {
   // 1.2: Admin login from ENV credentials + cookie set
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'POST', url: '/api/auth/login', body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } },
+    {
+      method: 'POST',
+      url: '/api/auth/login',
+      body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+    },
     res
   );
   const adminCookieToken = extractCookieToken(res);
   const adminResponseData = res.data as Record<string, unknown>;
-  const adminUser = adminResponseData?.user as Record<string, unknown> | undefined;
-  assert('1.2 Admin login from ENV credentials succeeds', res.statusCode === 200 && Boolean(adminCookieToken));
-  assert('1.3 Backend sets httpOnly session cookie', Boolean(res.headers['set-cookie']?.includes('HttpOnly')));
+  const adminUser = adminResponseData?.user as
+    Record<string, unknown> | undefined;
+  assert(
+    '1.2 Admin login from ENV credentials succeeds',
+    res.statusCode === 200 && Boolean(adminCookieToken)
+  );
+  assert(
+    '1.3 Backend sets httpOnly session cookie',
+    Boolean(res.headers['set-cookie']?.includes('HttpOnly'))
+  );
   assert('1.4 Admin user role is "admin"', adminUser?.role === 'admin');
 
   // 1.5: Google OAuth auto-provision (new student)
   const testGoogleEmail = `testgoogle_${Date.now()}@gmail.com`;
   res = createMockResponse();
-  await handleApiRequest(
-    {
-      method: 'POST', url: '/api/auth/google',
-      body: { email: testGoogleEmail, name: 'Test Google Student', avatar: 'https://lh3.google.com/photo', googleId: `gid_${Date.now()}` }
-    },
-    res
-  );
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    if (String(input) === 'https://www.googleapis.com/oauth2/v3/userinfo')
+      return new Response(
+        JSON.stringify({
+          email: testGoogleEmail,
+          name: 'Test Google Student',
+          sub: 'fixture-google-id',
+          email_verified: true
+        }),
+        { status: 200 }
+      );
+    throw new Error('Unexpected network access in isolated E2E');
+  }) as typeof fetch;
+  try {
+    await handleApiRequest(
+      {
+        method: 'POST',
+        url: '/api/auth/google',
+        body: { accessToken: 'fixture-verified-provider-token' }
+      },
+      res
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   const studentCookieToken = extractCookieToken(res);
   const studentResponseData = res.data as Record<string, unknown>;
-  const studentUser = studentResponseData?.user as Record<string, unknown> | undefined;
+  const studentUser = studentResponseData?.user as
+    Record<string, unknown> | undefined;
   const studentUserId = studentUser?.id as string;
-  assert('1.5 Google OAuth auto-provisions new student', res.statusCode === 200 && Boolean(studentCookieToken));
-  assert('1.6 Google student role is "student"', studentUser?.role === 'student');
+  assert(
+    '1.5 Google OAuth auto-provisions new student',
+    res.statusCode === 200 && Boolean(studentCookieToken)
+  );
+  assert(
+    '1.6 Google student role is "student"',
+    studentUser?.role === 'student'
+  );
+  dbService.updateUser(studentUserId, { data_origin: 'test' });
 
   // 1.7: Session verification via cookie
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'GET', url: '/api/auth/me', headers: { cookie: `esmiles_session=${studentCookieToken}` } },
+    {
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: `arc_session=${studentCookieToken}` }
+    },
     res
   );
   const meData = res.data as Record<string, unknown>;
   const meUser = meData?.user as Record<string, unknown> | undefined;
-  assert('1.7 GET /api/auth/me verifies session from cookie', res.statusCode === 200 && meUser?.email === testGoogleEmail);
+  assert(
+    '1.7 GET /api/auth/me verifies session from cookie',
+    res.statusCode === 200 && meUser?.email === testGoogleEmail
+  );
 
   // 1.8: Email registration (new student)
-  const testRegEmail = `testreg_${Date.now()}@esmiles.vn`;
+  const testRegEmail = `testreg_${Date.now()}@arc-irobot.tech`;
   res = createMockResponse();
   await handleApiRequest(
     {
-      method: 'POST', url: '/api/auth/register',
-      body: { name: 'Kỹ Sư E2E Test', email: testRegEmail, password: 'SecurePass123!', role: 'student', planId: 'pro' }
+      method: 'POST',
+      url: '/api/auth/register',
+      body: {
+        name: 'Kỹ Sư E2E Test',
+        email: testRegEmail,
+        password: 'SecurePass123!',
+        role: 'student',
+        planId: 'pro'
+      }
     },
     res
   );
@@ -123,9 +198,15 @@ async function runE2ETests() {
   const regResponseData = res.data as Record<string, unknown>;
   const regUser = regResponseData?.user as Record<string, unknown> | undefined;
   const registeredUserId = regUser?.id as string;
-  assert('1.8 Email registration creates user + sets cookie', res.statusCode === 201 && Boolean(regCookieToken));
+  assert(
+    '1.8 Email registration creates user + sets cookie',
+    res.statusCode === 201 && Boolean(regCookieToken)
+  );
+  dbService.updateUser(registeredUserId, { data_origin: 'test' });
 
-  console.log('\n-------------------------------------------------------------');
+  console.log(
+    '\n-------------------------------------------------------------'
+  );
   // -------------------------------------------------------------
   // SUITE 2: ADMIN-PROTECTED ENDPOINTS
   // -------------------------------------------------------------
@@ -134,18 +215,32 @@ async function runE2ETests() {
   // 2.1: Student cannot access admin endpoints
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'GET', url: '/api/users', headers: { cookie: `esmiles_session=${studentCookieToken}` } },
+    {
+      method: 'GET',
+      url: '/api/users',
+      headers: { cookie: `arc_session=${studentCookieToken}` }
+    },
     res
   );
-  assert('2.1 Student blocked from GET /api/users (403)', res.statusCode === 403);
+  assert(
+    '2.1 Student blocked from GET /api/users (403)',
+    res.statusCode === 403
+  );
 
   // 2.2: Student cannot access admin stats
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'GET', url: '/api/admin/stats', headers: { cookie: `esmiles_session=${studentCookieToken}` } },
+    {
+      method: 'GET',
+      url: '/api/admin/stats',
+      headers: { cookie: `arc_session=${studentCookieToken}` }
+    },
     res
   );
-  assert('2.2 Student blocked from GET /api/admin/stats (403)', res.statusCode === 403);
+  assert(
+    '2.2 Student blocked from GET /api/admin/stats (403)',
+    res.statusCode === 403
+  );
 
   // 2.3: Unauthenticated access blocked
   res = createMockResponse();
@@ -158,24 +253,40 @@ async function runE2ETests() {
   // 2.4: Admin can access users list
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'GET', url: '/api/users', headers: { cookie: `esmiles_session=${adminCookieToken}` } },
+    {
+      method: 'GET',
+      url: '/api/users',
+      headers: { cookie: `arc_session=${adminCookieToken}` }
+    },
     res
   );
   const usersData = res.data as Record<string, unknown>;
   const usersList = usersData?.users as Array<Record<string, unknown>>;
-  assert('2.4 Admin can GET /api/users', res.statusCode === 200 && usersList.length >= 2);
+  assert(
+    '2.4 Admin can GET /api/users',
+    res.statusCode === 200 && usersList.length >= 2
+  );
 
   // 2.5: Admin can access stats
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'GET', url: '/api/admin/stats', headers: { cookie: `esmiles_session=${adminCookieToken}` } },
+    {
+      method: 'GET',
+      url: '/api/admin/stats',
+      headers: { cookie: `arc_session=${adminCookieToken}` }
+    },
     res
   );
   const statsData = res.data as Record<string, unknown>;
   const stats = statsData?.stats as Record<string, unknown>;
-  assert('2.5 Admin can GET /api/admin/stats', res.statusCode === 200 && (stats?.totalUsers as number) >= 2);
+  assert(
+    '2.5 Admin can GET /api/admin/stats',
+    res.statusCode === 200 && (stats?.totalUsers as number) === 0
+  );
 
-  console.log('\n-------------------------------------------------------------');
+  console.log(
+    '\n-------------------------------------------------------------'
+  );
   // -------------------------------------------------------------
   // SUITE 3: LEARNING PROGRESSION & EXAMS
   // -------------------------------------------------------------
@@ -185,24 +296,38 @@ async function runE2ETests() {
   res = createMockResponse();
   await handleApiRequest(
     {
-      method: 'POST', url: '/api/history',
-      body: { userId: studentUserId, lessonId: 'lesson-1', lessonTitle: 'Bài 01: Core Architecture', action: 'theory_read', details: 'Hoàn thành đọc lý thuyết' }
+      method: 'POST',
+      url: '/api/history',
+      headers: { cookie: `arc_session=${studentCookieToken}` },
+      body: {
+        userId: studentUserId,
+        lessonId: 'lesson-1',
+        lessonTitle: 'Bài 01: Core Architecture',
+        action: 'theory_read',
+        details: 'Hoàn thành đọc lý thuyết'
+      }
     },
     res
   );
-  assert('3.1 Theory reading logged to SQLite', res.statusCode === 201);
+  assert('3.1 Theory reading logged to server store', res.statusCode === 201);
 
   // 3.2: Save progress
   res = createMockResponse();
   await handleApiRequest(
     {
-      method: 'POST', url: '/api/progress',
+      method: 'POST',
+      url: '/api/progress',
+      headers: { cookie: `arc_session=${studentCookieToken}` },
       body: {
         userId: studentUserId,
         progress: {
           currentLessonId: 'lesson-2',
-          completedLessons: { 'lesson-1': { completedAt: new Date().toISOString() } },
-          sprintExamScores: {}, finalExam: null, streakDays: 2,
+          completedLessons: {
+            'lesson-1': { completedAt: new Date().toISOString() }
+          },
+          sprintExamScores: {},
+          finalExam: null,
+          streakDays: 2,
           lastActiveDate: new Date().toISOString().split('T')[0],
           clearedLessons: { 'lesson-1': true }
         }
@@ -210,12 +335,17 @@ async function runE2ETests() {
     },
     res
   );
-  assert('3.2 Progress saved to SQLite', res.statusCode === 200);
+  assert('3.2 Progress saved to server store', res.statusCode === 200);
 
   // 3.3: Sprint exam submission
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'POST', url: '/api/exams/submit-sprint', body: { userId: studentUserId, sprintId: 1, score: 95, passed: true } },
+    {
+      method: 'POST',
+      url: '/api/exams/submit-sprint',
+      headers: { cookie: `arc_session=${studentCookieToken}` },
+      body: { userId: studentUserId, sprintId: 1, score: 95, passed: true }
+    },
     res
   );
   assert('3.3 Sprint exam recorded', res.statusCode === 200);
@@ -223,18 +353,38 @@ async function runE2ETests() {
   // 3.4: Final exam + certificate
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'POST', url: '/api/exams/submit-final', body: { userId: studentUserId, studentName: 'Test Google Student', score: 98, passed: true } },
+    {
+      method: 'POST',
+      url: '/api/exams/submit-final',
+      headers: { cookie: `arc_session=${studentCookieToken}` },
+      body: {
+        userId: studentUserId,
+        studentName: 'Test Google Student',
+        score: 98,
+        passed: true
+      }
+    },
     res
   );
   const finalData = res.data as Record<string, unknown>;
   const certCode = finalData?.certificateCode as string;
-  assert('3.4 Final exam issues certificate code', res.statusCode === 200 && certCode?.startsWith('ESM-'));
+  assert(
+    '3.4 Client score cannot issue trusted certificate',
+    res.statusCode === 200 &&
+      certCode === '' &&
+      !(finalData.finalResult as Record<string, unknown>).passed
+  );
 
   // 3.5: Certificate verification
   const certRecord = dbService.getCertificateByCode(certCode);
-  assert('3.5 Certificate verified in SQLite', Boolean(certRecord) && certRecord?.student_name === 'Test Google Student');
+  assert(
+    '3.5 Unverified attempt has no certificate record',
+    certRecord === null
+  );
 
-  console.log('\n-------------------------------------------------------------');
+  console.log(
+    '\n-------------------------------------------------------------'
+  );
   // -------------------------------------------------------------
   // SUITE 4: ADMIN CMS OPERATIONS
   // -------------------------------------------------------------
@@ -243,49 +393,87 @@ async function runE2ETests() {
   // 4.1: Admin updates plan
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'PATCH', url: '/api/plans/pro', body: { price: 990000, isActive: true } },
+    {
+      method: 'PATCH',
+      url: '/api/plans/pro',
+      headers: { cookie: `arc_session=${adminCookieToken}` },
+      body: { price: 990000, isActive: true }
+    },
     res
   );
   const planData = res.data as Record<string, unknown>;
   const plan = planData?.plan as Record<string, unknown>;
-  assert('4.1 Plan update persists in SQLite', res.statusCode === 200 && plan?.price === 990000);
+  assert(
+    '4.1 Plan update persists in server store',
+    res.statusCode === 200 && plan?.price === 990000
+  );
 
   // 4.2: Admin fetches audit logs
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'GET', url: `/api/history?userId=${studentUserId}` },
+    {
+      method: 'GET',
+      url: `/api/history?userId=${studentUserId}`,
+      headers: { cookie: `arc_session=${adminCookieToken}` }
+    },
     res
   );
   const histData = res.data as Record<string, unknown>;
   const history = histData?.history as Array<Record<string, unknown>>;
-  assert('4.2 Admin fetches student audit logs', res.statusCode === 200 && history.length >= 3);
+  assert(
+    '4.2 Admin fetches student learning history',
+    res.statusCode === 200 && history.length >= 3
+  );
 
   // 4.3: Admin deletes user (with auth)
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'DELETE', url: `/api/users/${registeredUserId}`, headers: { cookie: `esmiles_session=${adminCookieToken}` } },
+    {
+      method: 'DELETE',
+      url: `/api/users/${registeredUserId}`,
+      headers: { cookie: `arc_session=${adminCookieToken}` }
+    },
     res
   );
   assert('4.3 Admin delete user cascades cleanly', res.statusCode === 200);
 
   const deletedUser = dbService.getUserById(registeredUserId);
-  assert('4.4 Deleted user no longer in SQLite', deletedUser === null);
+  assert('4.4 Deleted user no longer in server store', deletedUser === null);
 
   // 4.5: Logout clears cookie
   res = createMockResponse();
   await handleApiRequest(
-    { method: 'POST', url: '/api/auth/logout', headers: { cookie: `esmiles_session=${studentCookieToken}` } },
+    {
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { cookie: `arc_session=${studentCookieToken}` }
+    },
     res
   );
-  assert('4.5 Logout clears session cookie', res.statusCode === 200 && res.headers['set-cookie']?.includes('Max-Age=0'));
+  assert(
+    '4.5 Logout clears session cookie',
+    res.statusCode === 200 && res.headers['set-cookie']?.includes('Max-Age=0')
+  );
 
   // 4.6: Revoked session rejected
   const expiredCheck = dbService.getSessionByToken(studentCookieToken || '');
   assert('4.6 Revoked session token rejected', expiredCheck === null);
 
-  console.log('\n===============================================================');
-  console.log(`📊 FINAL RESULT: ${passedTests}/${totalTests} TESTS PASSED (${passedTests === totalTests ? '100% SUCCESS' : 'FAILURES DETECTED'})`);
-  console.log('===============================================================\n');
+  console.log(
+    '\n==============================================================='
+  );
+  console.log(
+    `📊 FINAL RESULT: ${passedTests}/${totalTests} TESTS PASSED (${passedTests === totalTests ? '100% SUCCESS' : 'FAILURES DETECTED'})`
+  );
+  console.log(
+    '===============================================================\n'
+  );
+  if (passedTests !== totalTests) process.exitCode = 1;
 }
 
-void runE2ETests();
+try {
+  await runE2ETests();
+} finally {
+  process.chdir(originalDirectory);
+  fs.rmSync(testDirectory, { recursive: true, force: true });
+}

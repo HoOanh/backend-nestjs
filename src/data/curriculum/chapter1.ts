@@ -139,7 +139,7 @@ Client 3 ──┘           │                         Main Thread lập tức
 | **Rủi ro sập hệ thống** | Hết RAM khi số lượng kết nối tăng | Dễ dính Race Condition bộ nhớ chia sẻ | **Bị nghẽn toàn bộ nếu dính vòng lặp CPU** |
       `,
       realCodeSnippet: `// File: src/health/health.controller.ts
-// Trích dẫn từ dự án thực tế Esmiles Backend - Probe Giám Sát Hạ Tầng & Kết Nối Mạng TCP
+// Trích dẫn từ dự án thực tế Arc Irobot Backend - Probe Giám Sát Hạ Tầng & Kết Nối Mạng TCP
 import { Controller, Get, Inject, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';

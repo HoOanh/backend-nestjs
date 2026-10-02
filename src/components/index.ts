@@ -4,6 +4,5 @@ export * from './lesson/index.ts';
 export * from './exam/index.ts';
 export * from './chat/index.ts';
 export * from './auth/index.ts';
-export * from './admin/index.ts';
 export * from './student/index.ts';
 export * from './mindmap/index.ts';

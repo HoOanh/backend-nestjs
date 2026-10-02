@@ -1,5 +1,5 @@
 /**
- * eSmiles Backend Academy - Master Curriculum (22 Comprehensive Lessons across 6 Sprints)
+ * Arc Irobot Academy - Master Curriculum (22 Comprehensive Lessons across 6 Sprints)
  * Specifically crafted for Frontend (React/Next.js) developers transitioning to Backend NestJS
  */
 
@@ -25,7 +25,7 @@ Trong React, đại ca thoải mái dùng biến toàn cục hoặc Zustand stor
 Nhưng trên Backend NestJS, **một biến Singleton Service được chia sẻ cho TOÀN BỘ NGƯỜI DÙNG**.
 > **Tuyệt đối KHÔNG BAO GIỜ** lưu thông tin cá nhân của một user (\`this.currentUser = ...\`) vào biến thuộc tính của Service! Làm như vậy sẽ khiến User B nhìn thấy dữ liệu của User A!
 
-### 3. Vòng đời Request trong eSmiles:
+### 3. Vòng đời Request trong Arc Irobot:
 Mọi request gửi từ React (ví dụ: \`useQuery(['categories'], () => fetch('/api/i/v1/inventory/categories'))\`) sẽ đi qua:
 \`Middleware (Helmet/CORS/Pino)\` $\\rightarrow$ \`Guards (Auth/Permission)\` $\\rightarrow$ \`Interceptors\` $\\rightarrow$ \`Pipes (Validate DTO)\` $\\rightarrow$ \`Controller & Service\` $\\rightarrow$ \`Prisma (PostgreSQL)\`.
         `,
@@ -155,7 +155,7 @@ Mỗi khi Frontend gọi API, trình duyệt gửi một gói tin HTTP:
 Trình duyệt chặn không cho Frontend tại \`http://localhost:5173\` gọi tới Backend \`http://localhost:3000\` trừ khi Backend gửi header:
 \`Access-Control-Allow-Origin: http://localhost:5173\` và \`Access-Control-Allow-Credentials: true\`.
         `,
-        realCodeSnippet: `// Cấu hình CORS và Security Headers trong eSmiles app-setup.ts
+        realCodeSnippet: `// Cấu hình CORS và Security Headers trong Arc Irobot app-setup.ts
 export function configureApp(app: NestExpressApplication, config: ConfigService<AppEnv, true>) {
   app.set('trust proxy', 1);
   app.use(helmet({ contentSecurityPolicy: false }));
@@ -376,11 +376,11 @@ export class InventoryCategoryController {
 - **REQUEST-SCOPED:** Khởi tạo instance mới cho MỖI request HTTP $\\rightarrow$ Chậm hơn, tốn RAM, chỉ dùng khi thật sự cần thiết.
 - **TRANSIENT:** Khởi tạo instance mới mỗi khi được inject.
 
-### 2. Quy tắc thiết kế Service trong eSmiles:
+### 2. Quy tắc thiết kế Service trong Arc Irobot:
 - Service không phụ thuộc vào HTTP request/response (\`@Req()\`, \`@Res()\`).
 - Nhận tham số rõ ràng: \`async list(unitId: string, query: Dto)\`.
         `,
-        realCodeSnippet: `// Trích Service chuẩn mực trong eSmiles
+        realCodeSnippet: `// Trích Service chuẩn mực trong Arc Irobot
 @Injectable()
 export class InventoryCategoryService {
   constructor(private readonly prisma: PrismaService) {}
@@ -455,7 +455,7 @@ export class InventoryCategoryService {
 - Sử dụng \`class-transformer\` để ép kiểu: \`@Type(() => Number)\`.
 - Sử dụng \`@nestjs/swagger\` để tự động sinh tài liệu API: \`@ApiProperty({ description, example })\`.
         `,
-        realCodeSnippet: `// Trích DTO chuẩn từ eSmiles
+        realCodeSnippet: `// Trích DTO chuẩn từ Arc Irobot
 export class CreateInventoryCategoryDto {
   @ApiProperty({ description: 'Mã phân loại', example: 'VTTH' })
   @IsString()
@@ -595,7 +595,7 @@ model InventoryCategory {
         duration: '35 phút',
         tag: 'Prisma ORM',
         theory: `
-### 1. Prisma 7 Multi-file Schema trong eSmiles
+### 1. Prisma 7 Multi-file Schema trong Arc Irobot
 Dự án chia nhỏ schema vào thư mục \`prisma/schema/\`:
 - \`tenancy.prisma\`, \`identity.prisma\`, \`inventory.prisma\`, \`scheduling.prisma\`.
 
@@ -606,7 +606,7 @@ pnpm prisma:migrate   # Tạo migration mới cho DB dev
 pnpm db:seed:core     # Nạp dữ liệu seed ban đầu
 \`\`\`
         `,
-        realCodeSnippet: `// Trích cấu hình prisma.config.ts trong eSmiles
+        realCodeSnippet: `// Trích cấu hình prisma.config.ts trong Arc Irobot
 export default {
   earlyAccess: true,
   schema: 'prisma/schema',
@@ -661,7 +661,7 @@ for (const appt of appointments) {
 }
 \`\`\`
 
-### 2. Cách giải quyết chuẩn trong eSmiles:
+### 2. Cách giải quyết chuẩn trong Arc Irobot:
 - **Cách 1 (Prisma Include/Select):** \`findMany({ include: { doctor: true } })\` $\\rightarrow$ Prisma tự sinh câu JOIN hoặc 2 câu query tối ưu.
 - **Cách 2 (Batch ID Resolution):** Lấy danh sách \`doctorIds\` duy nhất, gọi 1 câu \`doctor.findMany({ where: { id: { in: doctorIds } } })\` rồi map vào kết quả.
         `,
@@ -679,7 +679,7 @@ export async function resolveDoctorNames(prisma: PrismaService, unitId: string, 
         quiz: [
           {
             id: 'q10-1',
-            question: 'Tại sao DTO trả về cho Frontend trong eSmiles KHÔNG nên chỉ trả ID trần (vd: doctorId) mà phải kèm tên hiển thị (doctorName)?',
+            question: 'Tại sao DTO trả về cho Frontend trong Arc Irobot KHÔNG nên chỉ trả ID trần (vd: doctorId) mà phải kèm tên hiển thị (doctorName)?',
             options: [
               'Để tránh đẩy bài toán N+1 request sang phía Frontend (Frontend phải gọi thêm 100 API lookup để dịch ID ra tên)',
               'Vì ID chiếm ít dung lượng',
@@ -729,7 +729,7 @@ export async function resolveDoctorNames(prisma: PrismaService, unitId: string, 
 Khi 2 bệnh nhân cùng đặt Lịch hẹn tại Ghế 1 lúc 09:00:00:
 - Sử dụng **Prisma Interactive Transaction (\`$transaction\`)** kết hợp kiểm tra trạng thái trước khi ghi để đảm bảo chỉ 1 người thành công.
         `,
-        realCodeSnippet: `// Trích Transaction an toàn trong eSmiles
+        realCodeSnippet: `// Trích Transaction an toàn trong Arc Irobot
 async transferStock(unitId: string, fromWarehouseId: string, toWarehouseId: string, itemId: string, quantity: number) {
   return this.prisma.$transaction(async (tx) => {
     // 1. Trừ kho nguồn (kiểm tra tồn kho đủ)
@@ -797,7 +797,7 @@ async transferStock(unitId: string, fromWarehouseId: string, toWarehouseId: stri
         duration: '35 phút',
         tag: 'Multi-Tenancy',
         theory: `
-### 1. Kiến trúc Đa Chi Nhánh (Multi-tenancy) eSmiles
+### 1. Kiến trúc Đa Chi Nhánh (Multi-tenancy) Arc Irobot
 - **Group (Tập đoàn):** Cấp quản lý cao nhất.
 - **Unit (Pháp nhân / Phòng khám):** Đơn vị cô lập dữ liệu chính (Khách hàng, Kho, Bác sĩ, Tiền bạc).
 - **Branch (Chi nhánh trực thuộc):** Địa điểm phục vụ khám chữa bệnh.
@@ -867,7 +867,7 @@ async detail(unitId: string, id: string): Promise<InventoryCategoryDto> {
         tag: 'Error Handling',
         theory: `
 ### 1. Tại sao không nên viết try/catch bừa bãi trong Service?
-Trong eSmiles, mọi lỗi Prisma (P2002 Unique, P2003 Foreign Key, P2025 Not Found) được để tự do rò rỉ ra ngoài và được **AllExceptionsFilter** toàn cục bắt và map tự động:
+Trong Arc Irobot, mọi lỗi Prisma (P2002 Unique, P2003 Foreign Key, P2025 Not Found) được để tự do rò rỉ ra ngoài và được **AllExceptionsFilter** toàn cục bắt và map tự động:
 - Unique Violation (P2002) $\\rightarrow$ **409 Conflict** (\`DUPLICATE_VALUE\`).
 - Foreign Key Restrict (P2003) $\\rightarrow$ **409 Conflict** (\`FOREIGN_KEY_RESTRICT\`).
 - Record Not Found (P2025) $\\rightarrow$ **404 Not Found** (\`NOT_FOUND\`).
@@ -924,7 +924,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         theory: `
 ### 1. Bảo mật Mật khẩu: Tại sao dùng Argon2?
 - Tuyệt đối KHÔNG BAO GIỜ lưu mật khẩu dạng plain text hoặc mã hóa bằng MD5/SHA256 (dễ bị bẻ khóa bằng Rainbow Table).
-- eSmiles sử dụng thuật toán **Argon2** (chuẩn bảo mật hàng đầu thế giới chống tấn công GPU/ASIC).
+- Arc Irobot sử dụng thuật toán **Argon2** (chuẩn bảo mật hàng đầu thế giới chống tấn công GPU/ASIC).
 
 ### 2. Cơ chế Token Hybrid:
 - **Access Token:** Mang payload JWT (\`sub\`, \`unitId\`, \`roles\`), sống ngắn (15-30 phút).
@@ -1240,7 +1240,7 @@ Khi có bệnh nhân check-in tại quầy Lễ tân, màn hình Bác sĩ cần 
 - Khi phát tín hiệu: \`server.to("unit:" + unitId).emit("PATIENT_CHECKED_IN", data)\`.
 - Sử dụng **Redis Adapter** để đồng bộ sự kiện giữa nhiều instance server chạy song song.
         `,
-        realCodeSnippet: `// Trích WebSocket Gateway eSmiles
+        realCodeSnippet: `// Trích WebSocket Gateway Arc Irobot
 @WebSocketGateway({ cors: true, namespace: '/realtime' })
 export class ClinicGateway {
   @WebSocketServer() server!: Server;
@@ -1252,7 +1252,7 @@ export class ClinicGateway {
         quiz: [
           {
             id: 'q19-1',
-            question: 'Tại sao cần phân chia WebSocket Rooms theo UnitId trong hệ thống eSmiles?',
+            question: 'Tại sao cần phân chia WebSocket Rooms theo UnitId trong hệ thống Arc Irobot?',
             options: [
               'Để đảm bảo Multi-tenancy: Chỉ các bác sĩ thuộc đúng phòng khám đó mới nhận được thông báo của phòng khám mình',
               'Vì Socket.IO bắt buộc',
@@ -1362,7 +1362,7 @@ update(@ActiveUnitId() unitId: string, @Param('id') id: string, @Body() dto: Upd
         tag: 'API Tooling',
         theory: `
 ### 1. Bruno - Bề mặt API sống track trong Git
-- Thay vì dùng Postman Cloud dễ bị lệch tài liệu, eSmiles lưu mọi API request thành file text \`.bru\` trong thư mục \`bruno/\`.
+- Thay vì dùng Postman Cloud dễ bị lệch tài liệu, Arc Irobot lưu mọi API request thành file text \`.bru\` trong thư mục \`bruno/\`.
 - Mọi Pull Request sửa đổi API **bắt buộc** phải cập nhật file \`.bru\` tương ứng.
 
 ### 2. Kiểm tra tính đầy đủ:

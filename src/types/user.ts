@@ -1,4 +1,8 @@
 export interface UserProfile {
+  isTestAccount?: boolean;
+  status?: "active" | "suspended";
+  version?: number;
+  dataOrigin?: "real" | "test";
   id: string;
   name: string;
   email: string;
@@ -53,7 +57,7 @@ export interface UserProgressState {
 
 export interface AdminStats {
   totalUsers: number;
-  totalRevenue: number;
+  totalRevenue: number | null;
   certifiedStudents: number;
   totalActivityLogs: number;
 }

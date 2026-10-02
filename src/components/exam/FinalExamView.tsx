@@ -55,8 +55,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
   onFinalExamSubmitted,
   onRetakeFinalExam
 }) => {
-  const STORAGE_FINAL_REVIEW_KEY = 'esmiles_final_exam_review';
-  const STORAGE_FINAL_ATTEMPTS_KEY = 'esmiles_final_exam_attempts';
+  const STORAGE_FINAL_REVIEW_KEY = 'arc_final_exam_review';
+  const STORAGE_FINAL_ATTEMPTS_KEY = 'arc_final_exam_attempts';
 
   const loadSavedReview = (): FinalExamReviewData | null => {
     try {
@@ -263,6 +263,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
         <div className="exam-info">
           <h2>🏆 {exam.title}</h2>
           <FormattedText content={exam.description} />
+          <p role="note">Kết quả luyện tập được chấm trong trình duyệt, chờ xác minh trên server. Điểm này chưa tự cấp chứng chỉ tốt nghiệp.</p>
           <div className="exam-badges-row">
             <span className="exam-pill">
               📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc <strong>{exam.questionCountToPick || 15} câu</strong>)

@@ -1,12 +1,12 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import tutorHandler from './api/tutor';
-import { handleApiRequest } from './api/index';
 
 function localBackendApi(): Plugin {
   return {
     name: 'local-backend-api',
-    configureServer(server) {
+    async configureServer(server) {
+      const [{ default: tutorHandler }, { handleApiRequest }] =
+        await Promise.all([import('./api/tutor.ts'), import('./api/index.ts')]);
       server.middlewares.use(async (request, response, next) => {
         const url = request.url || '';
         if (!url.startsWith('/api/')) {
@@ -32,7 +32,11 @@ function localBackendApi(): Plugin {
             } catch {
               response.statusCode = 400;
               response.setHeader('Content-Type', 'application/json');
-              response.end(JSON.stringify({ error: 'Request body không phải JSON hợp lệ.' }));
+              response.end(
+                JSON.stringify({
+                  error: 'Request body không phải JSON hợp lệ.'
+                })
+              );
               return;
             }
 
@@ -67,7 +71,14 @@ function localBackendApi(): Plugin {
             };
 
             await tutorHandler(
-              { method: request.method, body, headers: request.headers as Record<string, string | string[] | undefined> },
+              {
+                method: request.method,
+                body,
+                headers: request.headers as Record<
+                  string,
+                  string | string[] | undefined
+                >
+              },
               resAdapter
             );
           });
@@ -91,13 +102,21 @@ function localBackendApi(): Plugin {
 
           let statusCode = 200;
           await handleApiRequest(
-            { method: request.method, url: request.url, body, headers: request.headers as Record<string, string | string[] | undefined> },
+            {
+              method: request.method,
+              url: request.url,
+              body,
+              headers: request.headers as Record<
+                string,
+                string | string[] | undefined
+              >
+            },
             {
               status(code: number) {
                 statusCode = code;
                 return this;
               },
-              json(payload: any) {
+              json(payload: unknown) {
                 response.statusCode = statusCode;
                 response.setHeader('Content-Type', 'application/json');
                 response.end(JSON.stringify(payload));
@@ -116,9 +135,9 @@ function localBackendApi(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  process.env.GEMINI_API_KEY ||= env.GEMINI_API_KEY;
-  process.env.ADMIN_EMAIL ||= env.ADMIN_EMAIL;
-  process.env.ADMIN_PASSWORD ||= env.ADMIN_PASSWORD;
+  process.env.GEMINI_API_KEY = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  process.env.ADMIN_EMAIL = env.ADMIN_EMAIL || process.env.ADMIN_EMAIL;
+  process.env.ADMIN_PASSWORD = env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
   return {
     plugins: [react(), localBackendApi()],

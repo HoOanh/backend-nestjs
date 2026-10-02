@@ -1,18 +1,18 @@
 /**
- * eSmiles Backend Academy - State Manager
+ * Arc Irobot Academy - State Manager
  * Persists learner progress, quiz scores, code submissions and certificates
  */
 
-const STORAGE_KEY = 'esmiles_backend_academy_state_v1';
+const STORAGE_KEY = 'arc_irobot_backend_academy_state_v1';
 
 window.AppState = {
   data: {
-    userName: 'Kỹ Sư Backend eSmiles',
+    userName: 'Kỹ Sư Backend Arc Irobot',
     currentSprintId: 1,
     currentLessonId: 'lesson-1',
     completedLessons: {}, // { 'lesson-1': { quizScore: 100, codePassed: true, completedAt: '...' } }
     sprintExamScores: {}, // { 1: { score: 100, passed: true, completedAt: '...' } }
-    finalExam: null,      // { score: 95, passed: true, completedAt: '...', certificateId: 'ESM-2026-...' }
+    finalExam: null,      // { score: 95, passed: true, completedAt: '...', certificateId: 'ARC-2026-...' }
     codeDrafts: {},       // { 'lesson-1': 'code...' }
     streakDays: 1,
     lastActiveDate: new Date().toISOString().split('T')[0]

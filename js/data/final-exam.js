@@ -1,18 +1,18 @@
 /**
- * eSmiles Backend Academy - Final Comprehensive Certification Exam
+ * Arc Irobot Academy - Final Comprehensive Certification Exam
  * Final assessment covering all 4 pillars of the backend architecture
  */
 
 window.FINAL_EXAM = {
   id: 'final-graduation-exam',
-  title: 'Kỳ Thi Đánh Giá Tốt Nghiệp Toàn Khóa: eSmiles Backend Master Certification',
-  description: 'Bài thi tổng hợp 4 trụ cột kiến trúc backend eSmiles (NestJS Core, Prisma 7 Multi-Tenancy, CASL Authz, Queue & Tooling). Đạt từ 80% trở lên để nhận Chứng chỉ Tốt Nghiệp Kỹ Sư Backend eSmiles.',
+  title: 'Kỳ Thi Đánh Giá Tốt Nghiệp Toàn Khóa: Arc Irobot Backend Master Certification',
+  description: 'Bài thi tổng hợp 4 trụ cột kiến trúc backend Arc Irobot (NestJS Core, Prisma 7 Multi-Tenancy, CASL Authz, Queue & Tooling). Đạt từ 80% trở lên để nhận Chứng chỉ Tốt Nghiệp Kỹ Sư Backend Arc Irobot.',
   timeLimitMinutes: 45,
   passingScore: 80,
   questions: [
     {
       id: 'fe-1',
-      question: 'Trong kiến trúc đa chi nhánh của eSmiles, cấp nào là đơn vị cô lập dữ liệu chính (Data Isolation Unit) cho Bệnh nhân, Kho và Doanh thu?',
+      question: 'Trong kiến trúc đa chi nhánh của Arc Irobot, cấp nào là đơn vị cô lập dữ liệu chính (Data Isolation Unit) cho Bệnh nhân, Kho và Doanh thu?',
       options: [
         'Group (Tập đoàn)',
         'Unit (Pháp nhân / Phòng khám)',
@@ -36,7 +36,7 @@ window.FINAL_EXAM = {
     },
     {
       id: 'fe-3',
-      question: 'Tại sao dự án eSmiles cấm viết trực tiếp các khối try/catch lặp đi lặp lại trong Service để bắt mã lỗi Prisma?',
+      question: 'Tại sao dự án Arc Irobot cấm viết trực tiếp các khối try/catch lặp đi lặp lại trong Service để bắt mã lỗi Prisma?',
       options: [
         'Vì JavaScript không hỗ trợ try/catch',
         'Vì hệ thống đã có AllExceptionsFilter toàn cục tự động map các mã lỗi vi phạm khóa chính/ngoại (P2002, P2003, P2025) thành mã HTTP 409, 404 chuẩn hóa',
@@ -72,7 +72,7 @@ window.FINAL_EXAM = {
     },
     {
       id: 'fe-6',
-      question: 'Decorator nào trong eSmiles giúp phân vùng API cho nhân viên nội bộ phòng khám với tiền tố `/api/i/v1/`?',
+      question: 'Decorator nào trong Arc Irobot giúp phân vùng API cho nhân viên nội bộ phòng khám với tiền tố `/api/i/v1/`?',
       options: [
         '@PlatformAdminController()',
         '@InternalController()',
@@ -96,7 +96,7 @@ window.FINAL_EXAM = {
     },
     {
       id: 'fe-8',
-      question: 'Công cụ nào lưu trữ các request API dưới dạng file `.bru` thuần text trực tiếp trong Git repo eSmiles?',
+      question: 'Công cụ nào lưu trữ các request API dưới dạng file `.bru` thuần text trực tiếp trong Git repo Arc Irobot?',
       options: [
         'Postman',
         'Bruno',

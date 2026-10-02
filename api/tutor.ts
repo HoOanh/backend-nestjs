@@ -1,3 +1,6 @@
+import { recordTutorTrace, authorizeTutorRequest } from './index.ts';
+import { DEFAULT_MODEL, SYSTEM_PROMPT } from './tutor-config.ts';
+
 interface TutorMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -26,8 +29,6 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
-
 function sanitizeModel(model?: string): string {
   if (model && /^[a-zA-Z0-9.\-_]+$/.test(model)) {
     return model;
@@ -36,6 +37,7 @@ function sanitizeModel(model?: string): string {
 }
 
 interface TutorRequestBody {
+  sessionId?: string;
   lesson?: {
     title?: string;
     tag?: string;
@@ -47,40 +49,82 @@ interface TutorRequestBody {
   stream?: boolean;
 }
 
-const SYSTEM_PROMPT = `Em là một tutor kỹ thuật của Arc Irobot Academy.
-Nhiệm vụ: giúp học viên hiểu thật chắc bài học hiện tại trước khi làm trắc nghiệm.
-Quy tắc bắt buộc:
-1. Chỉ dùng thông tin trong LESSON_CONTEXT và suy luận trực tiếp từ đó. Không bịa API, quy ước hoặc kiến thức không có căn cứ.
-2. Trả lời bằng tiếng Việt, xưng "em", gọi người học là "ĐẠI CA". Giọng rõ, thẳng, kỹ thuật.
-3. Nếu câu hỏi chưa rõ, hỏi lại đúng một câu ngắn. Nếu hỏi ngoài bài, nói rõ giới hạn rồi liên hệ nó với khái niệm gần nhất trong bài.
-4. Khi giải thích code hoặc hình ảnh sơ đồ người học gửi lên, đi từ vấn đề -> cơ chế -> ví dụ -> kết luận ngắn. Dùng markdown gọn và chuẩn (headings ###, bold **, bullet lists -, code blocks \`\`\`ts).
-5. Không đưa đáp án trắc nghiệm nếu người học chưa hỏi; ưu tiên giải thích để người học tự suy luận.
-6. Nếu người học hỏi một đoạn cụ thể hoặc gửi ảnh sơ đồ/lỗi, tập trung phân tích đúng phần đó, không lan man.`;
-
-export default async function handler(request: VercelRequest, response: VercelResponse) {
+export default async function handler(
+  request: VercelRequest,
+  response: VercelResponse
+) {
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  const traceBody = (request.body || {}) as TutorRequestBody;
+  const denied = authorizeTutorRequest(request.headers, traceBody.sessionId);
+  if (denied)
+    return response
+      .status(denied)
+      .json({
+        error:
+          denied === 401
+            ? 'Chưa đăng nhập'
+            : 'Không có quyền sử dụng phiên chat này'
+      });
+  const trace = (
+    level: 'INFO' | 'WARN' | 'ERROR',
+    event: string,
+    metadata: Record<string, unknown>
+  ) =>
+    recordTutorTrace(
+      request.headers,
+      traceBody.sessionId,
+      level,
+      event,
+      metadata
+    );
+  const startedAt = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return response.status(500).json({ error: 'Thiếu GEMINI_API_KEY trên server.' });
+    trace('ERROR', 'AI_CONFIGURATION_ERROR', { reason: 'Missing API key' });
+    return response
+      .status(500)
+      .json({ error: 'Thiếu GEMINI_API_KEY trên server.' });
   }
 
   const body = (request.body || {}) as TutorRequestBody;
   const lesson = body.lesson;
-  const messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+  const rawMessages = Array.isArray(body.messages)
+    ? body.messages.slice(-16)
+    : [];
   const model = sanitizeModel(body.model);
-  const isStream = body.stream !== false && typeof response.write === 'function';
+  const isStream =
+    body.stream !== false && typeof response.write === 'function';
 
-  if (!lesson?.title || messages.length === 0) {
-    return response.status(400).json({ error: 'Dữ liệu bài học hoặc hội thoại không hợp lệ.' });
+  if (!lesson?.title || rawMessages.length === 0) {
+    return response
+      .status(400)
+      .json({ error: 'Dữ liệu bài học hoặc hội thoại không hợp lệ.' });
   }
 
-  const contents = messages.map((message) => {
+  // 1. Build sanitized Gemini multi-turn contents
+  // Gemini requires:
+  // - First turn MUST be 'user'
+  // - Turns MUST alternate between 'user' and 'model'
+  // - Consecutive same-role turns must be combined into one
+  const contents: Array<{
+    role: 'user' | 'model';
+    parts: Array<{
+      text?: string;
+      inlineData?: { mimeType: string; data: string };
+    }>;
+  }> = [];
+
+  for (const message of rawMessages) {
     const role = message.role === 'assistant' ? 'model' : 'user';
-    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
-    if (message.content) {
+    const parts: Array<{
+      text?: string;
+      inlineData?: { mimeType: string; data: string };
+    }> = [];
+
+    if (message.content && message.content.trim()) {
       parts.push({ text: message.content });
     }
     if (message.image?.data && message.image?.mimeType) {
@@ -92,39 +136,119 @@ export default async function handler(request: VercelRequest, response: VercelRe
         }
       });
     }
-    if (parts.length === 0) {
-      parts.push({ text: '' });
+
+    if (parts.length === 0) continue;
+
+    if (contents.length === 0) {
+      // First turn must be user; skip introductory assistant greetings
+      if (role !== 'user') continue;
+      contents.push({ role, parts });
+    } else {
+      const prev = contents[contents.length - 1];
+      if (prev.role === role) {
+        // Merge consecutive turns with the same role
+        prev.parts.push(...parts);
+      } else {
+        contents.push({ role, parts });
+      }
     }
-    return { role, parts };
-  });
+  }
+
+  if (contents.length === 0) {
+    return response
+      .status(400)
+      .json({ error: 'Không tìm thấy câu hỏi hợp lệ từ học viên.' });
+  }
   const prompt = `${SYSTEM_PROMPT}\n\nLESSON_CONTEXT:\nTitle: ${lesson.title}\nTag: ${lesson.tag || ''}\n\n${lesson.theory || ''}\n\nREAL_CODE:\n${lesson.realCodeSnippet || ''}`;
 
+  const FALLBACK_MODELS = [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'antigravity',
+    'gemini-2.5-flash-lite',
+    'gemma-4-31b'
+  ];
+  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
+
+  let currentActiveModel = model;
+  let activeGeminiResponse: Response | null = null;
+  let lastErrorMsg = '';
+
   try {
-    const endpoint = isStream
-      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`
-      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-    const geminiResponse = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: prompt }] },
-        contents,
-        generationConfig: { temperature: 0.25, maxOutputTokens: 2048 }
-      })
-    });
-
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      let errorMsg = `Gemini trả về lỗi HTTP ${geminiResponse.status}.`;
+    for (let i = 0; i < modelChain.length; i++) {
+      const candidate = modelChain[i];
       try {
-        const errorJson = JSON.parse(errorText) as { error?: { message?: string } };
-        if (errorJson.error?.message) {
-          errorMsg = errorJson.error.message;
+        const endpoint = isStream
+          ? `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`
+          : `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+        const candidateResponse = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: prompt }] },
+            contents,
+            generationConfig: { temperature: 0.25, maxOutputTokens: 2048 }
+          })
+        });
+
+        if (candidateResponse.ok) {
+          trace('INFO', 'AI_PROVIDER_ACCEPTED', {
+            requestedModel: model,
+            actualModel: candidate,
+            status: candidateResponse.status
+          });
+          currentActiveModel = candidate;
+          activeGeminiResponse = candidateResponse;
+          if (candidate !== model) {
+            console.info(
+              `[Tutor] Silent fallback dispatched to ${candidate} (original requested: ${model})`
+            );
+          }
+          break;
         }
-      } catch {}
-      return response.status(geminiResponse.status || 502).json({ error: errorMsg });
+
+        const errorText = await candidateResponse.text();
+        let parsedMsg = `HTTP ${candidateResponse.status}`;
+        try {
+          const errorJson = JSON.parse(errorText) as {
+            error?: { message?: string };
+          };
+          if (errorJson.error?.message) {
+            parsedMsg = errorJson.error.message;
+          }
+        } catch {}
+        trace('WARN', 'AI_PROVIDER_REJECTED', {
+          model: candidate,
+          status: candidateResponse.status
+        });
+        lastErrorMsg = `[${candidate}] HTTP ${candidateResponse.status}: ${parsedMsg}`;
+        console.warn(
+          `Gemini model ${candidate} failed (${candidateResponse.status}): ${parsedMsg}. Trying next 3.x fallback...`
+        );
+      } catch (subErr) {
+        lastErrorMsg =
+          subErr instanceof Error ? subErr.message : 'Network error';
+        trace('WARN', 'AI_PROVIDER_NETWORK_ERROR', { model: candidate });
+        console.warn(`Failed to connect to ${candidate}:`, subErr);
+      }
     }
+
+    if (!activeGeminiResponse) {
+      trace('ERROR', 'AI_REQUEST_FAILED', {
+        requestedModel: model,
+        durationMs: Date.now() - startedAt
+      });
+      return response.status(503).json({
+        error: `Máy chủ AI Google đang quá tải tạm thời (${lastErrorMsg}). ĐẠI CA vui lòng thử lại sau giây lát.`
+      });
+    }
+
+    const geminiResponse = activeGeminiResponse;
 
     if (isStream) {
       if (typeof response.setHeader === 'function') {
@@ -137,7 +261,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
         response.writeHead(200, {
           'Content-Type': 'text/event-stream; charset=utf-8',
           'Cache-Control': 'no-cache, no-transform',
-          'Connection': 'keep-alive',
+          Connection: 'keep-alive',
           'X-Accel-Buffering': 'no'
         });
       }
@@ -166,9 +290,13 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
           try {
             const parsed = JSON.parse(jsonStr) as {
-              candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+              candidates?: Array<{
+                content?: { parts?: Array<{ text?: string }> };
+              }>;
             };
-            const text = parsed.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('');
+            const text = parsed.candidates?.[0]?.content?.parts
+              ?.map((p) => p.text || '')
+              .join('');
             if (text && response.write) {
               response.write(`data: ${JSON.stringify({ text })}\n\n`);
             }
@@ -182,9 +310,13 @@ export default async function handler(request: VercelRequest, response: VercelRe
         const jsonStr = buffer.trim().replace(/^data:\s*/, '');
         try {
           const parsed = JSON.parse(jsonStr) as {
-            candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+            candidates?: Array<{
+              content?: { parts?: Array<{ text?: string }> };
+            }>;
           };
-          const text = parsed.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('');
+          const text = parsed.candidates?.[0]?.content?.parts
+            ?.map((p) => p.text || '')
+            .join('');
           if (text && response.write) {
             response.write(`data: ${JSON.stringify({ text })}\n\n`);
           }
@@ -192,6 +324,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
       }
 
       if (response.write) {
+        trace('INFO', 'AI_STREAM_COMPLETE', {
+          actualModel: currentActiveModel,
+          durationMs: Date.now() - startedAt
+        });
         response.write('data: [DONE]\n\n');
       }
       if (typeof response.end === 'function') {
@@ -209,15 +345,38 @@ export default async function handler(request: VercelRequest, response: VercelRe
     try {
       if (responseText.trim()) data = JSON.parse(responseText) as typeof data;
     } catch {
-      return response.status(502).json({ error: `Gemini trả về dữ liệu không hợp lệ (HTTP ${geminiResponse.status}).` });
+      return response
+        .status(502)
+        .json({
+          error: `Gemini trả về dữ liệu không hợp lệ (HTTP ${geminiResponse.status}).`
+        });
     }
-    const reply = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim();
+    const reply = data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || '')
+      .join('')
+      .trim();
     if (!reply) {
-      return response.status(502).json({ error: data.error?.message || `Gemini không trả được câu trả lời (HTTP ${geminiResponse.status}).` });
+      return response
+        .status(502)
+        .json({
+          error:
+            data.error?.message ||
+            `Gemini không trả được câu trả lời (HTTP ${geminiResponse.status}).`
+        });
     }
+    trace('INFO', 'AI_RESPONSE_COMPLETE', {
+      actualModel: currentActiveModel,
+      durationMs: Date.now() - startedAt,
+      responseLength: reply.length
+    });
     return response.status(200).json({ reply });
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : 'Không kết nối được tới Gemini.';
+    trace('ERROR', 'AI_REQUEST_ERROR', {
+      actualModel: currentActiveModel,
+      durationMs: Date.now() - startedAt
+    });
+    const errorMsg =
+      err instanceof Error ? err.message : 'Không kết nối được tới Gemini.';
     if (isStream && typeof response.write === 'function') {
       response.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
       if (typeof response.end === 'function') response.end();

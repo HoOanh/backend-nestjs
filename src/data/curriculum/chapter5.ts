@@ -473,7 +473,7 @@ INCLUDE (full_name, phone_number);
 * Hai cột \`full_name\` và \`phone_number\` được đính kèm trực tiếp vào Leaf Page của Index nhưng **không tham gia vào việc sắp xếp cây**.
 * Khi chạy:
 \`\`\`sql
-SELECT full_name, phone_number FROM users WHERE email = 'oanh@esmiles.vn';
+SELECT full_name, phone_number FROM users WHERE email = 'oanh@arc-irobot.tech';
 \`\`\`
 Database đọc thẳng dữ liệu từ Leaf Node của Index và trả về luôn cho Client!
 Nó kích hoạt trạng thái thần thánh: **\`Index Only Scan\` ($0\\text{ Heap Lookups}$)**, nhanh gấp 10 lần Index thông thường!

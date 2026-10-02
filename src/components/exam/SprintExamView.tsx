@@ -41,8 +41,8 @@ export interface SprintExamAttempt {
 }
 
 export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingScore, onExamSubmitted }) => {
-  const STORAGE_REVIEW_KEY = `esmiles_sprint_exam_review_${exam.sprintId}`;
-  const STORAGE_ATTEMPTS_KEY = `esmiles_sprint_exam_attempts_${exam.sprintId}`;
+  const STORAGE_REVIEW_KEY = `arc_sprint_exam_review_${exam.sprintId}`;
+  const STORAGE_ATTEMPTS_KEY = `arc_sprint_exam_attempts_${exam.sprintId}`;
 
   // Read saved data from LocalStorage
   const loadSavedReview = (): ExamReviewData | null => {
@@ -216,6 +216,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
             <h2>🎯 {exam.title}</h2>
           </div>
           <FormattedText content={exam.description} />
+          <p role="note">Kết quả luyện tập được chấm trong trình duyệt, chờ xác minh trên server. Điểm này chưa tự cấp chứng chỉ tốt nghiệp.</p>
           <div className="exam-badges-row">
             <span className="exam-pill">
               📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc ngẫu nhiên <strong>{exam.questionCountToPick || 10} câu</strong>)

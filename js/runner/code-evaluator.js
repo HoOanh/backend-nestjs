@@ -1,5 +1,5 @@
 /**
- * eSmiles Backend Academy - Interactive Code Evaluator & Test Runner
+ * Arc Irobot Academy - Interactive Code Evaluator & Test Runner
  * Evaluates JavaScript/TypeScript student code against public & hidden test cases
  */
 

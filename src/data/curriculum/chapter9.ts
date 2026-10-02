@@ -195,8 +195,8 @@ export class EnterpriseAuthCryptoService {
     return jwt.sign(payload, this.rsaPrivateKey, {
       algorithm: 'RS256',
       expiresIn: '15m',
-      issuer: 'https://auth.esmiles.vn',
-      audience: 'https://api.esmiles.vn',
+      issuer: 'https://auth.arc-irobot.tech',
+      audience: 'https://api.arc-irobot.tech',
     });
   }
 
@@ -207,8 +207,8 @@ export class EnterpriseAuthCryptoService {
     try {
       const decoded = jwt.verify(token, this.rsaPublicKey, {
         algorithms: ['RS256'], // Ép buộc chỉ chấp nhận RS256, cấm HS256 và none!
-        issuer: 'https://auth.esmiles.vn',
-        audience: 'https://api.esmiles.vn',
+        issuer: 'https://auth.arc-irobot.tech',
+        audience: 'https://api.arc-irobot.tech',
       });
       return decoded as VerifiedTokenClaims;
     } catch (err: unknown) {
@@ -1039,10 +1039,10 @@ export class EnterpriseSecuritySanitizationService {
           {
             name: 'Lọc bỏ trường isAdmin và balance bị hacker chèn trộm',
             input: [
-              { fullName: 'Ho Oanh', email: 'oanh@esmiles.vn', isAdmin: true, balance: 1000000 },
+              { fullName: 'Ho Oanh', email: 'oanh@arc-irobot.tech', isAdmin: true, balance: 1000000 },
               ['fullName', 'email']
             ],
-            expected: { fullName: 'Ho Oanh', email: 'oanh@esmiles.vn' }
+            expected: { fullName: 'Ho Oanh', email: 'oanh@arc-irobot.tech' }
           },
           {
             name: 'Giữ nguyên khi payload chỉ chứa các trường hợp lệ',

@@ -8,7 +8,16 @@ export type AppRoute =
   | { type: 'admin-login' }
   | { type: 'auth'; mode: 'login' | 'register' };
 
-const ROUTE_CHANGE_EVENT = 'esmiles_route_change';
+export function adminReturnTo(search: string): string {
+  const candidate = new URLSearchParams(search).get('returnTo') || '';
+  return /^\/admin(?:\/(?:overview|users|certificates|plans|curriculum|logs|trace|ai|database))?(?:\?[^\r\n]*)?$/.test(
+    candidate
+  ) && !candidate.includes('\\')
+    ? candidate
+    : '/admin';
+}
+
+const ROUTE_CHANGE_EVENT = 'arc_route_change';
 
 /**
  * Parse pathname and search string into strongly-typed AppRoute
@@ -21,7 +30,7 @@ export function parseLocation(pathname: string, search: string): AppRoute {
   if (cleanPath === '/admin/login') {
     return { type: 'admin-login' };
   }
-  if (cleanPath.startsWith('/admin')) {
+  if (cleanPath === '/admin' || cleanPath.startsWith('/admin/')) {
     const sub = cleanPath.replace('/admin', '').replace(/^\//, '');
     return { type: 'admin', subPath: sub || undefined };
   }
@@ -40,26 +49,34 @@ export function parseLocation(pathname: string, search: string): AppRoute {
   }
 
   // 4. Sprint Exam Routes: /sprint-exam/:sprintId or /sprints/:sprintId/exam
-  const sprintExamMatch = cleanPath.match(/^\/(?:sprint-exam|sprints)\/(\d+)(?:\/exam)?$/);
+  const sprintExamMatch = cleanPath.match(
+    /^\/(?:sprint-exam|sprints)\/(\d+)(?:\/exam)?$/
+  );
   if (sprintExamMatch) {
     const sId = parseInt(sprintExamMatch[1], 10);
     return { type: 'sprint-exam', sprintId: isNaN(sId) ? 0 : sId };
   }
 
   // 5. Lesson Routes: /lessons/:lessonId or /lesson/:lessonId
-  const lessonMatch = cleanPath.match(/^\/(?:lessons|lesson)\/([a-zA-Z0-9_-]+)$/);
+  const lessonMatch = cleanPath.match(
+    /^\/(?:lessons|lesson)\/([a-zA-Z0-9_-]+)$/
+  );
   if (lessonMatch) {
     const lessonId = lessonMatch[1];
     const rawTab = searchParams.get('tab');
     const tab: 'theory' | 'quiz' | 'code' =
-      rawTab === 'quiz' || rawTab === 'code' || rawTab === 'theory' ? rawTab : 'theory';
+      rawTab === 'quiz' || rawTab === 'code' || rawTab === 'theory'
+        ? rawTab
+        : 'theory';
     return { type: 'lesson', lessonId, tab };
   }
 
   // 6. Default Root: First lesson
   const rawTab = searchParams.get('tab');
   const tab: 'theory' | 'quiz' | 'code' =
-    rawTab === 'quiz' || rawTab === 'code' || rawTab === 'theory' ? rawTab : 'theory';
+    rawTab === 'quiz' || rawTab === 'code' || rawTab === 'theory'
+      ? rawTab
+      : 'theory';
   return { type: 'lesson', lessonId: 'lesson-1', tab };
 }
 
@@ -106,7 +123,9 @@ export function useAppRouter() {
 
   useEffect(() => {
     const handleLocationChange = () => {
-      setCurrentRoute(parseLocation(window.location.pathname, window.location.search));
+      setCurrentRoute(
+        parseLocation(window.location.pathname, window.location.search)
+      );
     };
 
     window.addEventListener('popstate', handleLocationChange);

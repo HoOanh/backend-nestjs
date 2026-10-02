@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "esmiles-backend-academy",
+      "name": "arc-irobot-backend-academy",
       "dependencies": {
         "react": "^19.0.0",
         "react-dom": "^19.0.0",

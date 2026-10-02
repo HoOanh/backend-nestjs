@@ -1,6 +1,6 @@
 # KẾ HOẠCH & LỘ TRÌNH ĐÀO TẠO MASTER BACKEND NESTJS CHO LẬP TRÌNH VIÊN FRONTEND (REACT / NEXT.JS)
 
-> **Mục tiêu:** Đào tạo lập trình viên Frontend (React/Next.js) chuyển sang làm chủ hoàn toàn Backend NestJS, kiến trúc hệ thống, Database PostgreSQL, Redis, Queue và bảo mật thực tế trên codebase `esmiles-backend-v2`.
+> **Mục tiêu:** Đào tạo lập trình viên Frontend (React/Next.js) chuyển sang làm chủ hoàn toàn Backend NestJS, kiến trúc hệ thống, Database PostgreSQL, Redis, Queue và bảo mật thực tế trên codebase `arc-irobot-backend-v2`.
 
 ---
 
@@ -70,7 +70,7 @@ learn-backend/
 
 ### Chạy trực tiếp trên máy (Local):
 ```bash
-cd /Users/oanhho/Documents/TienPhong/esmiles/learn-backend
+cd /Users/oanhho/Documents/TienPhong/arc-irobot/learn-backend
 # Mở trực tiếp trình duyệt
 open index.html
 # Hoặc chạy bất kỳ static server nào

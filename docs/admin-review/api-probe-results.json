@@ -1,0 +1,160 @@
+{
+  "date": "2026-10-01",
+  "environment": "isolated temporary store; synthetic accounts",
+  "results": [
+    {
+      "id": "LOGIN",
+      "actual": 200,
+      "expected": "Admin login succeeds",
+      "verdict": "PASS"
+    },
+    {
+      "id": "ADMIN-GUARD",
+      "actual": 403,
+      "expected": "Student receives 403",
+      "verdict": "PASS"
+    },
+    {
+      "id": "REGISTER-ADMIN",
+      "actual": {
+        "status": 201,
+        "role": "admin"
+      },
+      "expected": "Public registration cannot create an admin",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "GOOGLE-SPOOF",
+      "actual": {
+        "status": 200,
+        "role": "admin"
+      },
+      "expected": "Email alone cannot authenticate any account",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "EMAIL-GOOGLE-PASSWORD",
+      "actual": 200,
+      "expected": "Google account cannot login with arbitrary email/password",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "USER-UNIQUE",
+      "actual": 201,
+      "expected": "Duplicate email receives 409",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "USER-VALIDATE",
+      "actual": 201,
+      "expected": "Missing name/email receives 400 or 422",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "USER-CREDENTIAL",
+      "actual": {
+        "defaultPassword": true
+      },
+      "expected": "Invite flow must not use a shared implicit password",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "USER-ENUMS",
+      "actual": 200,
+      "expected": "Invalid role/plan receives 400 or 422",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "USER-RESPONSE-SECRETS",
+      "actual": {
+        "status": 200,
+        "passwordHashExposed": true,
+        "saltExposed": true
+      },
+      "expected": "Response excludes password hashes and salts",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "INACTIVE-PLAN",
+      "actual": {
+        "status": 201,
+        "assignedPlan": "pro"
+      },
+      "expected": "Inactive/paid plan cannot be assigned by public registration",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "PLAN-PRICE",
+      "actual": 200,
+      "expected": "Negative price rejected with 400/422",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "PROGRESS-READ-GUARD",
+      "actual": 200,
+      "expected": "Anonymous progress read receives 401",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "HISTORY-READ-GUARD",
+      "actual": 200,
+      "expected": "Anonymous history read receives 401",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "EXAM-SERVER-GRADE",
+      "actual": 200,
+      "expected": "Server computes results; arbitrary score/pass is rejected",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "FAILED-EXAM-EVENT",
+      "actual": {
+        "status": 200,
+        "lastAction": "final_certified"
+      },
+      "expected": "Failed attempt is not classified as final_certified",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "ADMIN-CERT-LOOKUP",
+      "actual": {
+        "lookupFound": false
+      },
+      "expected": "Grant certificate writes a verifiable certificate record",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "AUDIT-EVIDENCE",
+      "actual": {
+        "count": 2
+      },
+      "expected": "Server changes have audit evidence",
+      "verdict": "PASS"
+    },
+    {
+      "id": "AUDIT-REDACTION",
+      "actual": {
+        "secretVisible": false
+      },
+      "expected": "Audit redacts secrets",
+      "verdict": "PASS"
+    },
+    {
+      "id": "SELF-DELETE",
+      "actual": 200,
+      "expected": "Backend rejects self-deletion",
+      "verdict": "FAIL"
+    },
+    {
+      "id": "BOOTSTRAP-RESURRECTION",
+      "actual": {
+        "deletedStatus": 200,
+        "reappeared": true,
+        "nextStatus": 200
+      },
+      "expected": "Deleted accounts are not silently recreated per request",
+      "verdict": "FAIL"
+    }
+  ]
+}

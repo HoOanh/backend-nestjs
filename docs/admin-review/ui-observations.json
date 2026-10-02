@@ -1,0 +1,94 @@
+{
+  "environment": "http://localhost:5173; actual admin login with user-provided account",
+  "theme": "restored to light",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "coverage": "8 sections both themes"
+    },
+    {
+      "width": 881,
+      "height": 1029,
+      "coverage": "overview light default viewport"
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "coverage": "overview dark spot check"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "coverage": "database dark spot check"
+    }
+  ],
+  "computed_css": {
+    "audit_light": {
+      "foreground": "#0f172a",
+      "background": "#0b1120",
+      "contrast_ratio": 1.05
+    },
+    "database_light": {
+      "foreground": "#cbd5e1",
+      "background": "#f1f5f9",
+      "contrast_ratio": 1.36
+    },
+    "refresh_button": {
+      "height_px": 19.5,
+      "padding_px": 0
+    }
+  },
+  "responsive": {
+    "mobile_sidebar_width": 260,
+    "mobile_main_width": 130,
+    "mobile_menu_toggle_count": 0
+  },
+  "modal": {
+    "role_dialog_count": 0,
+    "initial_focus": "edit button outside modal",
+    "label_for_attributes": false,
+    "escape_closes": false
+  },
+  "routing": {
+    "reload_database": "PASS",
+    "unknown_route": "shows overview without 404",
+    "login_return_to": "loses requested /admin/database and goes to /admin"
+  },
+  "audit": {
+    "failure_filter_empty": "PASS",
+    "request_filter_two_rows": "PASS",
+    "before_after_expands": "PASS"
+  },
+  "legacy_browser_data": "query returns missing table on fresh browser",
+  "baseline_regression": "existing E2E 24/24 PASS, adminData PASS, sqliteChat PASS, build PASS",
+  "api_probe_summary": {
+    "criteria": 21,
+    "pass": 4,
+    "fail": 17
+  },
+  "evidence_files": [
+    "ai-1440-dark.jpg",
+    "ai-light.jpg",
+    "audit-1440-dark.jpg",
+    "audit-1440-light.jpg",
+    "audit-detail-dark.jpg",
+    "curriculum-1440-dark.jpg",
+    "curriculum-light.jpg",
+    "database-1440-dark.jpg",
+    "database-1440-light.jpg",
+    "database-390-dark.jpg",
+    "learning-history-1440-dark.jpg",
+    "learning-history-light.jpg",
+    "login-error-light.jpg",
+    "overview-1024-dark.jpg",
+    "overview-1440-dark.jpg",
+    "overview-1440-light.jpg",
+    "overview-881-light.jpg",
+    "plans-1440-dark.jpg",
+    "plans-light.jpg",
+    "user-edit-modal.jpg",
+    "users-1440-dark.jpg",
+    "users-empty-search.jpg"
+  ]
+}

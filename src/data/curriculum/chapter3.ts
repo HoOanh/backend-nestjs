@@ -897,7 +897,7 @@ Trong an ninh ứng dụng web, sự hiểu lầm về vai trò của CORS (Cros
 
 # 2. GIAO THỨC CORS PREFLIGHT & CÁC HEADER SINH TỬ
 
-Khi một trang web tại \`https://app.esmiles.vn\` gọi API tới \`https://api.esmiles.vn\`:
+Khi một trang web tại \`https://app.arc-irobot.tech\` gọi API tới \`https://api.arc-irobot.tech\`:
 Trình duyệt phân loại request thành 2 nhóm:
 
 \`\`\`diagram
@@ -919,12 +919,12 @@ Trình duyệt phân loại request thành 2 nhóm:
 [ TRÌNH DUYỆT (BROWSER) ]                                  [ SERVER BACKEND ]
           │                                                        │
           ├─ 1. OPTIONS /api/orders ──────────────────────────────►│
-          │     Origin: https://app.esmiles.vn                     │
+          │     Origin: https://app.arc-irobot.tech                │
           │     Access-Control-Request-Method: POST                │
           │     Access-Control-Request-Headers: authorization,json │
           │                                                        │
           │◄─ 2. Trả về Headers cho phép: ─────────────────────────┤
-          │     Access-Control-Allow-Origin: https://app.esmiles.vn│
+          │     Access-Control-Allow-Origin: https://app.arc-irobot.tech│
           │     Access-Control-Allow-Methods: POST, GET, OPTIONS   │
           │     Access-Control-Allow-Headers: authorization,json   │
           │     Access-Control-Max-Age: 86400 (Cache 24 giờ)       │
@@ -985,7 +985,7 @@ res.cookie('refreshToken', token, {
 
 ### 🔄 Sơ đồ 2: Dòng Chảy Kiểm Duyệt CORS Tại Trình Duyệt (Browser Decision Flowchart)
 \`\`\`diagram
-Client thực hiện gọi fetch('https://api.esmiles.vn/data')
+Client thực hiện gọi fetch('https://api.arc-irobot.tech/data')
    │
    ▼
 Có phải cùng Origin (Protocol + Domain + Port) không?
@@ -1224,32 +1224,32 @@ export class SecurityConfigurationService {
         testCases: [
           {
             name: 'Case 1 (Visible): Cho phép origin nằm trong whitelist',
-            input: ['https://app.esmiles.vn', ['https://app.esmiles.vn', 'https://admin.esmiles.vn']],
-            expected: { isAllowed: true, allowOriginHeader: 'https://app.esmiles.vn' },
+            input: ['https://app.arc-irobot.tech', ['https://app.arc-irobot.tech', 'https://admin.arc-irobot.tech']],
+            expected: { isAllowed: true, allowOriginHeader: 'https://app.arc-irobot.tech' },
             hidden: false
           },
           {
             name: 'Case 2 (Visible): Chặn origin lạ không nằm trong whitelist',
-            input: ['https://evil-hacker.com', ['https://app.esmiles.vn']],
+            input: ['https://evil-hacker.com', ['https://app.arc-irobot.tech']],
             expected: { isAllowed: false, allowOriginHeader: '' },
             hidden: false
           },
           {
             name: 'Case 3 (Visible): Cho phép request không có origin header (gọi server-to-server nội bộ)',
-            input: [undefined, ['https://app.esmiles.vn']],
+            input: [undefined, ['https://app.arc-irobot.tech']],
             expected: { isAllowed: true, allowOriginHeader: '' },
             hidden: false
           },
           {
             name: 'Case 4 (Hidden): whitelist rỗng -> Chặn tất cả các request có origin',
-            input: ['https://app.esmiles.vn', []],
+            input: ['https://app.arc-irobot.tech', []],
             expected: { isAllowed: false, allowOriginHeader: '' },
             hidden: true
           },
           {
             name: 'Case 5 (Hidden): Khớp chính xác origin của admin',
-            input: ['https://admin.esmiles.vn', ['https://app.esmiles.vn', 'https://admin.esmiles.vn']],
-            expected: { isAllowed: true, allowOriginHeader: 'https://admin.esmiles.vn' },
+            input: ['https://admin.arc-irobot.tech', ['https://app.arc-irobot.tech', 'https://admin.arc-irobot.tech']],
+            expected: { isAllowed: true, allowOriginHeader: 'https://admin.arc-irobot.tech' },
             hidden: true
           }
         ]

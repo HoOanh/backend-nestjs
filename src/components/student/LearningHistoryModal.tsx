@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './LearningHistoryModal.css';
 import { UserProfile, LearningHistoryRecord } from '../../types/user.ts';
 import { apiClient } from '../../services/apiClient.ts';
+import { chatDbService } from '../../services/db/chatDbService.ts';
 
 interface LearningHistoryModalProps {
   isOpen: boolean;
@@ -25,10 +26,23 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
   finalExam
 }) => {
   const [history, setHistory] = useState<LearningHistoryRecord[]>([]);
+  const [aiChatSummaries, setAiChatSummaries] = useState<
+    Array<{
+      sessionId: string;
+      lessonId: string;
+      title: string;
+      messageCount: number;
+      lastMessageAt: string;
+      lastMessage?: string;
+    }>
+  >([]);
 
   useEffect(() => {
-    if (isOpen && currentUser?.id) {
-      void apiClient.getHistory(currentUser.id).then(setHistory);
+    if (isOpen) {
+      if (currentUser?.id) {
+        void apiClient.getHistory(currentUser.id).then(setHistory);
+      }
+      void chatDbService.getRecentChatSummary(currentUser?.id).then(setAiChatSummaries);
     }
   }, [isOpen, currentUser?.id]);
 
@@ -37,7 +51,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
   // Helper to read local attempt counts
   const getSprintAttemptCount = (sprintId: number): number => {
     try {
-      const saved = localStorage.getItem(`esmiles_sprint_exam_attempts_${sprintId}`);
+      const saved = localStorage.getItem(`arc_sprint_exam_attempts_${sprintId}`);
       if (saved) {
         const arr = JSON.parse(saved) as unknown[];
         return Array.isArray(arr) ? arr.length : 0;
@@ -48,7 +62,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
 
   const getFinalAttemptCount = (): number => {
     try {
-      const saved = localStorage.getItem('esmiles_final_exam_attempts');
+      const saved = localStorage.getItem('arc_final_exam_attempts');
       if (saved) {
         const arr = JSON.parse(saved) as unknown[];
         return Array.isArray(arr) ? arr.length : 0;
@@ -182,6 +196,47 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* AI Tutor Chat Conversations */}
+        <div className="history-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0 }}>🤖 Lịch Sử Hỏi Đáp AI Tutor</h4>
+            <span style={{ fontSize: '12px', color: '#0ea5e9', fontWeight: 600 }}>
+              {aiChatSummaries.length} phiên trao đổi
+            </span>
+          </div>
+          <div className="history-timeline-box" style={{ maxHeight: '240px' }}>
+            {aiChatSummaries.length === 0 ? (
+              <div className="empty-history">
+                <p>Chưa có đoạn hội thoại nào với AI Tutor. Khi học các bài học, hãy mở Arc AI Co-Pilot để đặt câu hỏi và trao đổi bài học nhé!</p>
+              </div>
+            ) : (
+              <div className="timeline-items">
+                {aiChatSummaries.map((ses) => (
+                  <div key={ses.sessionId} className="timeline-row">
+                    <div className="timeline-time" style={{ minWidth: '90px' }}>
+                      {new Date(ses.lastMessageAt).toLocaleDateString('vi-VN')}
+                    </div>
+                    <div className="timeline-dot" style={{ background: '#0ea5e9' }} />
+                    <div className="timeline-content" style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{ses.title}</strong>
+                        <span style={{ fontSize: '11px', background: 'rgba(14, 165, 233, 0.15)', color: '#0284c7', padding: '2px 8px', borderRadius: '4px', flexShrink: 0 }}>
+                          {ses.messageCount} tin nhắn · {ses.lessonId}
+                        </span>
+                      </div>
+                      {ses.lastMessage && (
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          💬 {ses.lastMessage.replace(/^>\s*💡[^\n]*\n*/, '').replace(/💡[^\n]*\n*/, '').trim()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

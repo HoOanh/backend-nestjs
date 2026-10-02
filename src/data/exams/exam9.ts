@@ -46,7 +46,7 @@ export function detectMaliciousInput(inputString: string): {
   testCases: [
     {
       name: 'Chuỗi đầu vào an toàn bình thường',
-      input: ['admin@esmiles.vn'],
+      input: ['admin@arc-irobot.tech'],
       expected: { isSuspicious: false, detectedPatterns: [] }
     },
     {

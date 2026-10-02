@@ -21,7 +21,7 @@ interface SavedQuizResult {
 }
 
 export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }) => {
-  const STORAGE_KEY = `esmiles_quiz_result_${lesson.id}`;
+  const STORAGE_KEY = `arc_quiz_result_${lesson.id}`;
 
   const [activeQuestions, setActiveQuestions] = useState<RandomizedQuestion[]>([]);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});

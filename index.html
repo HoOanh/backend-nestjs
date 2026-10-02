@@ -11,6 +11,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Google Identity Services (GIS) Official SDK -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Theme init: chạy synchronous trước khi render để tránh flash dark→light -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('arc_backend_academy_theme');
+          document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

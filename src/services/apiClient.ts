@@ -1,8 +1,9 @@
 import { UserProfile, CoursePlan, LearningHistoryRecord, UserProgressState, FinalExamResult, AdminStats } from '../types/user.ts';
+import { STORAGE_KEYS } from '../constants/storage.ts';
 
 const API_BASE = '/api';
-const TOKEN_KEY = 'esmiles_auth_token';
-const USER_KEY = 'esmiles_user_profile';
+const TOKEN_KEY = STORAGE_KEYS.TOKEN;
+const USER_KEY = STORAGE_KEYS.USER;
 
 function getStoredToken(): string | null {
   try {
@@ -12,7 +13,7 @@ function getStoredToken(): string | null {
   }
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
@@ -40,12 +41,17 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   }
 
   if (!res.ok) {
-    throw new Error(data.error || `HTTP ${res.status}: Lỗi máy chủ`);
+    const requestId = res.headers.get('X-Request-ID');
+    throw new Error(`${data.error || `HTTP ${res.status}: Lỗi máy chủ`}${requestId ? ` [request: ${requestId}]` : ''}`);
   }
   return data as T;
 }
 
 interface RawUserPayload {
+  isTestAccount?: boolean;
+  status?: "active" | "suspended";
+  version?: number;
+  dataOrigin?: "real" | "test";
   id?: string;
   name?: string;
   email?: string;
@@ -78,6 +84,8 @@ function mapUserResponse(u?: RawUserPayload | null): UserProfile {
     };
   }
   return {
+    isTestAccount: u.isTestAccount,
+    status: u.status, version: u.version, dataOrigin: u.dataOrigin,
     id: u.id || '',
     name: u.name || 'Học Viên',
     email: u.email || '',
@@ -244,23 +252,25 @@ export const apiClient = {
     } catch {
       // Fallback to local storage if offline
       try {
-        const local = localStorage.getItem(`esmiles_progress_${userId}`);
+        const local = localStorage.getItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${userId}`);
         if (local) return JSON.parse(local) as UserProgressState;
       } catch {}
       return null;
     }
   },
 
-  async saveProgress(userId: string, progress: UserProgressState): Promise<void> {
+  async saveProgress(userId: string, progress: UserProgressState, options: { requireServer?: boolean } = {}): Promise<void> {
     try {
-      localStorage.setItem(`esmiles_progress_${userId}`, JSON.stringify(progress));
+      localStorage.setItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${userId}`, JSON.stringify(progress));
     } catch {}
     try {
       await apiFetch('/progress', {
         method: 'POST',
         body: JSON.stringify({ userId, progress })
       });
-    } catch {}
+    } catch (error) {
+      if (options.requireServer) throw error;
+    }
   },
 
   // 9. EXAMS
@@ -295,11 +305,7 @@ export const apiClient = {
 
   // 11. STATS
   async getAdminStats(): Promise<AdminStats | null> {
-    try {
-      const data = await apiFetch<{ success: boolean; stats: AdminStats }>('/admin/stats');
-      return data.stats || null;
-    } catch {
-      return null;
-    }
+    const data = await apiFetch<{ success: boolean; stats: AdminStats }>('/admin/stats');
+    return data.stats;
   }
 };

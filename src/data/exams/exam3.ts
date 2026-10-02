@@ -52,7 +52,7 @@ export function validateSecurityHeaders(
     {
       name: 'Bảo mật hoàn hảo với origin cụ thể và cookie có đầy đủ cờ',
       input: [
-        { 'access-control-allow-origin': 'https://app.esmiles.vn', 'access-control-allow-credentials': 'true' },
+        { 'access-control-allow-origin': 'https://app.arc-irobot.tech', 'access-control-allow-credentials': 'true' },
         [{ name: 'refreshToken', httpOnly: true, secure: true, sameSite: 'strict' }]
       ],
       expected: { isSecure: true, issues: [] }

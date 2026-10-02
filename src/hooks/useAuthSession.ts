@@ -16,7 +16,7 @@ export function useAuthSession() {
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
     const stored = apiClient.getStoredUser();
     const token = apiClient.getToken();
-    return !stored && Boolean(token);
+    return Boolean(stored || token);
   });
 
   useEffect(() => {
@@ -39,10 +39,8 @@ export function useAuthSession() {
             setAdminUser(null);
           }
         } else {
-          if (!apiClient.getToken()) {
-            setStudentUser(null);
-            setAdminUser(null);
-          }
+          setStudentUser(null);
+          setAdminUser(null);
         }
       } catch (e) {
         console.error('Session verify notice:', e);
@@ -54,7 +52,8 @@ export function useAuthSession() {
   }, []);
 
   const activeUser = studentUser || adminUser;
-  const isEffectiveAdmin = adminUser?.role === 'admin' || studentUser?.role === 'admin';
+  const isEffectiveAdmin =
+    adminUser?.role === 'admin' || studentUser?.role === 'admin';
 
   const logoutStudent = async () => {
     await apiClient.logout();

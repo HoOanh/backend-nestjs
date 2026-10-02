@@ -1,5 +1,5 @@
 /**
- * eSmiles Backend Academy - Main Application Coordinator
+ * Arc Irobot Academy - Main Application Coordinator
  * Handles routing, interactive tabs, quiz evaluation, code test runner, exam timers & certificates
  */
 
@@ -167,7 +167,7 @@ const App = {
         </div>
 
         <div class="real-source-callout">
-          <div class="callout-title">📂 Trích Dẫn Mã Nguồn Thực Tế Trong Dự Án eSmiles:</div>
+          <div class="callout-title">📂 Trích Dẫn Mã Nguồn Thực Tế Trong Dự Án Arc Irobot:</div>
           <div class="code-block-wrapper" style="margin-top: 10px;">
             <div class="code-block-header">
               <span>NestJS Real-world Reference</span>
@@ -550,16 +550,16 @@ const App = {
         <div class="certificate-container" id="printable-cert">
           <div class="cert-watermark">🦷</div>
           <div class="cert-header">CHỨNG CHỈ TỐT NGHIỆP XUẤT SẮC</div>
-          <h2 class="cert-title">eSmiles Backend Master Engineer</h2>
+          <h2 class="cert-title">Arc Irobot Backend Master Engineer</h2>
           <div class="cert-recipient-label">Chứng nhận cấp cho Kỹ sư:</div>
           <div class="cert-student-name">${this.escapeHtml(finalResult.studentName || 'Đại Ca Kỹ Sư')}</div>
           <p class="cert-body-text">
-            Đã hoàn thành xuất sắc toàn bộ 4 Sprint đào tạo chuyên sâu về kiến trúc <strong>NestJS 11, Prisma 7 Multi-tenancy, Dynamic CASL Permissions, Queue BullMQ & Tooling Bruno</strong> trên mã nguồn thực tế của hệ thống Nha Khoa Số eSmiles.
+            Đã hoàn thành xuất sắc toàn bộ 4 Sprint đào tạo chuyên sâu về kiến trúc <strong>NestJS 11, Prisma 7 Multi-tenancy, Dynamic CASL Permissions, Queue BullMQ & Tooling Bruno</strong> trên mã nguồn thực tế của hệ sinh thái phần mềm Arc Irobot.
           </p>
           <div class="cert-footer-row">
             <div>
               <div class="cert-seal">🏅</div>
-              <div style="font-weight: 700; color: #f8fafc;">eSmiles Core Architecture Committee</div>
+              <div style="font-weight: 700; color: #f8fafc;">Arc Irobot Core Architecture Committee</div>
             </div>
             <div style="text-align: right;">
               <div class="cert-meta-item">Chứng chỉ số: ${finalResult.certificateId}</div>
@@ -674,7 +674,7 @@ const App = {
       window.AppState.saveFinalExamResult(finalScore, true, studentName);
       this.updateStats();
       this.renderSidebar();
-      alert(`🎉 CHÚC MỪNG ĐẠI CA ĐÃ TỐT NGHIỆP KHÓA HỌC eSmiles BACKEND MASTER!\n\nĐiểm số: ${finalScore}%\nHệ thống đang cấp Chứng chỉ Tốt nghiệp...`);
+      alert(`🎉 CHÚC MỪNG ĐẠI CA ĐÃ TỐT NGHIỆP KHÓA HỌC Arc Irobot BACKEND MASTER!\n\nĐiểm số: ${finalScore}%\nHệ thống đang cấp Chứng chỉ Tốt nghiệp...`);
       this.renderFinalExamView();
     } else {
       alert(`❌ CHƯA ĐẠT TỐT NGHIỆP!\n\nĐiểm của đại ca: ${finalScore}% (Yêu cầu tối thiểu ${exam.passingScore}%).\nĐại ca có thể xem lại bài học và thi lại bất kỳ lúc nào.`);

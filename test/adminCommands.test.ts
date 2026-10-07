@@ -21,7 +21,7 @@ try {
   assert.equal(adminReturnTo('?returnTo=%2F%2Fevil.invalid'), '/admin');
   assert.notEqual(parseLocation('/administrator', '').type, 'admin');
   const { handleApiRequest, dbService, signJwt } =
-    await import('../api/index.ts');
+    await import('../server/index.ts');
   const call = async (
     url: string,
     method = 'GET',

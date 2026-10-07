@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && tsc -p tsconfig.api.json && node scripts/build-api.mjs && vite build",
     "preview": "vite preview",
     "test:admin": "bun test/adminReview.probe.ts && bun test/adminCommands.test.ts && bun test/e2e.test.ts && bun test/adminData.test.ts && bun test/sqliteChat.test.ts && bun test/dataOperations.test.ts",
     "store:review": "bun scripts/review-store.ts"
@@ -19,6 +19,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.28.2",
     "typescript": "^5.7.3",
     "vite": "^6.0.7"
   }

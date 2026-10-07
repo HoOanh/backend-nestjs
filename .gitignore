@@ -1,5 +1,7 @@
 node_modules/
 dist/
+api/index.js
+api/tutor.js
 .DS_Store
 .vercel/
 *.local

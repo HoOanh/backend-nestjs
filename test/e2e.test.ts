@@ -11,7 +11,7 @@ delete process.env.ARC_STORE_PATH;
 delete process.env.VERCEL;
 delete process.env.AWS_LAMBDA_FUNCTION_NAME;
 const { handleApiRequest, verifyPassword, hashPassword, dbService } =
-  await import('../api/index.ts');
+  await import('../server/index.ts');
 
 interface MockResponse {
   statusCode: number;

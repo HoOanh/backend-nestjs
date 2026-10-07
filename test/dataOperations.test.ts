@@ -12,7 +12,7 @@ delete process.env.VERCEL;
 delete process.env.AWS_LAMBDA_FUNCTION_NAME;
 try {
   const { handleApiRequest, dbService, signJwt } =
-    await import('../api/index.ts');
+    await import('../server/index.ts');
   const token = signJwt(dbService.getUserByEmail(process.env.ADMIN_EMAIL)!);
   const call = async (
     method: string,

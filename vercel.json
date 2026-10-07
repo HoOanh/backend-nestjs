@@ -3,16 +3,16 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "functions": {
-    "api/tutor.ts": {
+    "api/tutor.js": {
       "maxDuration": 30
     },
-    "api/index.ts": {
+    "api/index.js": {
       "maxDuration": 15
     }
   },
   "routes": [
-    { "src": "/api/tutor", "dest": "/api/tutor.ts" },
-    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "src": "/api/tutor", "dest": "/api/tutor.js" },
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

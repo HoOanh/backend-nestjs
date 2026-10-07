@@ -15,7 +15,7 @@ const results: Result[] = [];
 const record = (id: string, actual: unknown, expected: string, passes: boolean) => results.push({ id, actual, expected, verdict: passes ? 'PASS' : 'FAIL' });
 
 try {
-  const { handleApiRequest, dbService, signJwt, verifyPassword } = await import('../api/index.ts');
+  const { handleApiRequest, dbService, signJwt, verifyPassword } = await import('../server/index.ts');
   const call = async (url: string, method = 'GET', body?: unknown, token?: string) => {
     let status = 200;
     let data: Record<string, unknown> = {};

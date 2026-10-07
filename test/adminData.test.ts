@@ -12,7 +12,7 @@ delete process.env.VERCEL;
 delete process.env.AWS_LAMBDA_FUNCTION_NAME;
 
 try {
-  const { handleApiRequest, dbService, signJwt } = await import('../api/index.ts');
+  const { handleApiRequest, dbService, signJwt } = await import('../server/index.ts');
   const call = async (url: string, method = 'GET', body?: unknown, token?: string) => {
     let status = 200;
     let data: Record<string, unknown> = {};
@@ -94,7 +94,7 @@ try {
   assert.ok(allAudit.length > auditCount);
   assert.ok(!JSON.stringify(allAudit).includes('Test-password-2026'));
   assert.ok(!allAudit.some((log) => (log.after as Record<string, unknown> | null)?.name === 'Should not persist'));
-  const { default: tutorHandler } = await import('../api/tutor.ts');
+  const { default: tutorHandler } = await import('../server/tutor.ts');
   const originalFetch = globalThis.fetch;
   const originalKey = process.env.GEMINI_API_KEY;
   process.env.GEMINI_API_KEY = 'test-key';

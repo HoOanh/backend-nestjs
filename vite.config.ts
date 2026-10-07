@@ -6,7 +6,7 @@ function localBackendApi(): Plugin {
     name: 'local-backend-api',
     async configureServer(server) {
       const [{ default: tutorHandler }, { handleApiRequest }] =
-        await Promise.all([import('./api/tutor.ts'), import('./api/index.ts')]);
+        await Promise.all([import('./server/tutor.ts'), import('./server/index.ts')]);
       server.middlewares.use(async (request, response, next) => {
         const url = request.url || '';
         if (!url.startsWith('/api/')) {

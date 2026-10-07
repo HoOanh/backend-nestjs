@@ -95,7 +95,7 @@ async function runSqliteChatTests() {
   const pragmaRes = await sqliteEngine.execute('PRAGMA table_info(test_users)');
   assert('1.12 PRAGMA table_info returns schema metadata', pragmaRes.rowCount >= 4);
 
-  const { handleApiRequest, dbService, signJwt } = await import('../api/index.ts');
+  const { handleApiRequest, dbService, signJwt } = await import('../server/index.ts');
   const tokens = new Map<string, string>();
   for (const id of ['user-test', 'user_alice', 'user_bob']) {
     tokens.set(id, signJwt(dbService.createUser({ id, name: id, email: `${id}@test.local`, role: 'student', auth_provider: 'email', plan_id: 'free' })));

@@ -3,31 +3,12 @@ import { apiClient } from '../services/apiClient.ts';
 import type { UserProfile } from '../types/user.ts';
 
 export function useAuthSession() {
-  const [studentUser, setStudentUser] = useState<UserProfile | null>(() => {
-    const stored = apiClient.getStoredUser();
-    return stored && stored.role !== 'admin' ? stored : null;
-  });
-
-  const [adminUser, setAdminUser] = useState<UserProfile | null>(() => {
-    const stored = apiClient.getStoredUser();
-    return stored && stored.role === 'admin' ? stored : null;
-  });
-
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
-    const stored = apiClient.getStoredUser();
-    const token = apiClient.getToken();
-    return Boolean(stored || token);
-  });
+  const [studentUser, setStudentUser] = useState<UserProfile | null>(null);
+  const [adminUser, setAdminUser] = useState<UserProfile | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
     async function verifyAuth() {
-      const stored = apiClient.getStoredUser();
-      const token = apiClient.getToken();
-      if (!token && !stored) {
-        setIsAuthChecking(false);
-        return;
-      }
-
       try {
         const user = await apiClient.getMe();
         if (user) {

@@ -2213,7 +2213,6 @@ async function handleApiRequestInner(
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
-        token: session.token,
         user: formatUserResponse(user)
       });
       return;
@@ -2270,7 +2269,6 @@ async function handleApiRequestInner(
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
-        token: session.token,
         user: formatUserResponse(updatedUser)
       });
       return;
@@ -2340,7 +2338,6 @@ async function handleApiRequestInner(
       setSessionCookie(res, session.token);
       res.status(201).json({
         success: true,
-        token: session.token,
         user: formatUserResponse(newUser)
       });
       return;
@@ -2348,10 +2345,7 @@ async function handleApiRequestInner(
 
     // 4. AUTH: Me
     if (pathname === '/api/auth/me' && method === 'GET') {
-      const token =
-        getBearerToken(req) ||
-        getTokenFromCookie(req) ||
-        queryParams.get('token');
+      const token = getTokenFromCookie(req);
       if (!token) {
         res.status(401).json({ error: 'Chưa đăng nhập (thiếu token)' });
         return;
@@ -2374,10 +2368,7 @@ async function handleApiRequestInner(
 
     // 5. AUTH: Logout
     if (pathname === '/api/auth/logout' && method === 'POST') {
-      const token =
-        getBearerToken(req) ||
-        getTokenFromCookie(req) ||
-        (reqBody.token as string | undefined);
+      const token = getTokenFromCookie(req);
       if (token) {
         dbService.deleteSession(token);
       }

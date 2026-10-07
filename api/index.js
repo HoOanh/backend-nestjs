@@ -1691,7 +1691,6 @@ async function handleApiRequestInner(req, res) {
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
-        token: session.token,
         user: formatUserResponse(user)
       });
       return;
@@ -1730,7 +1729,6 @@ async function handleApiRequestInner(req, res) {
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
-        token: session.token,
         user: formatUserResponse(updatedUser)
       });
       return;
@@ -1788,13 +1786,12 @@ async function handleApiRequestInner(req, res) {
       setSessionCookie(res, session.token);
       res.status(201).json({
         success: true,
-        token: session.token,
         user: formatUserResponse(newUser)
       });
       return;
     }
     if (pathname === "/api/auth/me" && method === "GET") {
-      const token = getBearerToken(req) || getTokenFromCookie(req) || queryParams.get("token");
+      const token = getTokenFromCookie(req);
       if (!token) {
         res.status(401).json({ error: "Ch\u01B0a \u0111\u0103ng nh\u1EADp (thi\u1EBFu token)" });
         return;
@@ -1811,7 +1808,7 @@ async function handleApiRequestInner(req, res) {
       return;
     }
     if (pathname === "/api/auth/logout" && method === "POST") {
-      const token = getBearerToken(req) || getTokenFromCookie(req) || reqBody.token;
+      const token = getTokenFromCookie(req);
       if (token) {
         dbService.deleteSession(token);
       }

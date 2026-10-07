@@ -5,23 +5,10 @@ const API_BASE = '/api';
 const TOKEN_KEY = STORAGE_KEYS.TOKEN;
 const USER_KEY = STORAGE_KEYS.USER;
 
-function getStoredToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
-  }
-
-  const token = getStoredToken();
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -100,30 +87,8 @@ function mapUserResponse(u?: RawUserPayload | null): UserProfile {
 }
 
 export const apiClient = {
-  // Token & Local Session Management
-  getToken(): string | null {
-    return getStoredToken();
-  },
-
-  getStoredUser(): UserProfile | null {
-    try {
-      const raw = localStorage.getItem(USER_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as RawUserPayload;
-        return mapUserResponse(parsed);
-      }
-    } catch {}
-    return null;
-  },
-
-  setAuth(token: string, user: UserProfile): void {
-    try {
-      if (token) localStorage.setItem(TOKEN_KEY, token);
-      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-    } catch {}
-  },
-
-  clearAuth(): void {
+  // Clear credentials left by older localStorage-based releases.
+  clearLegacyAuth(): void {
     try {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
@@ -131,68 +96,54 @@ export const apiClient = {
   },
 
   // 1. AUTH: Google Login
-  async loginGoogle(payload: { accessToken?: string; credential?: string; email?: string; name?: string; avatar?: string; googleId?: string }): Promise<{ user: UserProfile; token: string }> {
-    const data = await apiFetch<{ success: boolean; token: string; user: RawUserPayload }>('/auth/google', {
+  async loginGoogle(payload: { accessToken?: string; credential?: string; email?: string; name?: string; avatar?: string; googleId?: string }): Promise<{ user: UserProfile }> {
+    const data = await apiFetch<{ success: boolean; user: RawUserPayload }>('/auth/google', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
     const user = mapUserResponse(data.user);
-    this.setAuth(data.token, user);
-    return {
-      token: data.token,
-      user
-    };
+    return { user };
   },
 
   // 2. AUTH: Email Login
-  async login(payload: { email: string; password?: string; authProvider?: string; name?: string }): Promise<{ user: UserProfile; token: string }> {
+  async login(payload: { email: string; password?: string; authProvider?: string; name?: string }): Promise<{ user: UserProfile }> {
     if (payload.authProvider === 'google') {
       return this.loginGoogle({ email: payload.email, name: payload.name });
     }
 
-    const data = await apiFetch<{ success: boolean; token: string; user: RawUserPayload }>('/auth/login', {
+    const data = await apiFetch<{ success: boolean; user: RawUserPayload }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: payload.email, password: payload.password })
     });
     const user = mapUserResponse(data.user);
-    this.setAuth(data.token, user);
-    return {
-      token: data.token,
-      user
-    };
+    return { user };
   },
 
   // 3. AUTH: Register
-  async register(payload: { name: string; email: string; password?: string; role?: 'student' | 'admin'; planId?: string }): Promise<{ user: UserProfile; token: string }> {
-    const data = await apiFetch<{ success: boolean; token: string; user: RawUserPayload }>('/auth/register', {
+  async register(payload: { name: string; email: string; password?: string; role?: 'student' | 'admin'; planId?: string }): Promise<{ user: UserProfile }> {
+    const data = await apiFetch<{ success: boolean; user: RawUserPayload }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
     const user = mapUserResponse(data.user);
-    this.setAuth(data.token, user);
-    return {
-      token: data.token,
-      user
-    };
+    return { user };
   },
 
   // 4. AUTH: Get Current User Session (Me)
   async getMe(): Promise<UserProfile | null> {
     try {
+      this.clearLegacyAuth();
       const data = await apiFetch<{ success: boolean; user: RawUserPayload }>('/auth/me');
       if (!data?.user) {
         return null;
       }
       const user = mapUserResponse(data.user);
-      try {
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-      } catch {}
       return user;
     } catch (err: unknown) {
       // If server explicitly returns unauthorized, clear invalid local credentials
       const errMsg = err instanceof Error ? err.message : String(err);
       if (errMsg.includes('401') || errMsg.includes('hết hạn') || errMsg.includes('Chưa đăng nhập')) {
-        this.clearAuth();
+        this.clearLegacyAuth();
       }
       return null;
     }
@@ -200,10 +151,13 @@ export const apiClient = {
 
   // 5. AUTH: Logout
   async logout(): Promise<void> {
-    this.clearAuth();
     try {
       await apiFetch('/auth/logout', { method: 'POST' });
-    } catch {}
+    } catch {
+      // Clear stale client-side credentials even if the server is unavailable.
+    } finally {
+      this.clearLegacyAuth();
+    }
   },
 
   // 6. USERS

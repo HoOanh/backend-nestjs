@@ -16,10 +16,9 @@ const INITIAL_PROGRESS: UserProgressState = {
 
 export function useLearningProgress(activeUser: UserProfile | null) {
   const [state, setState] = useState<UserProgressState>(() => {
-    const storedUser = apiClient.getStoredUser();
-    if (storedUser?.id) {
+    if (activeUser?.id) {
       try {
-        const local = localStorage.getItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${storedUser.id}`);
+        const local = localStorage.getItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${activeUser.id}`);
         if (local) return JSON.parse(local) as UserProgressState;
       } catch {}
     }

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { Lesson } from '../data/curriculum.ts';
 import type { ChatSession, ChatMessage, ChatLog, SqlQueryResult } from '../types/chat.ts';
-import { apiClient } from '../services/apiClient.ts';
 import { chatDbService } from '../services/db/chatDbService.ts';
 
 export interface ModelOption {
@@ -299,9 +298,9 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'text/event-stream, application/json',
-          ...(apiClient.getToken() ? { Authorization: `Bearer ${apiClient.getToken()}` } : {})
+          Accept: 'text/event-stream, application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           sessionId: currentSession.id,
           lesson: {

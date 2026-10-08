@@ -36,6 +36,13 @@ class ChatDbService {
     await apiFetch('/chat/sessions', { method: 'PATCH', body: JSON.stringify({ sessionId, title }) });
   }
 
+  public async authorizeTutorSession(sessionId: string): Promise<void> {
+    await apiFetch('/chat/sessions/tutor-proof', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId })
+    });
+  }
+
   public async deleteSession(sessionId: string): Promise<void> {
     await this.log('INFO', 'SESSION_DELETED', `Xóa session: ${sessionId}`, undefined, sessionId);
     await apiFetch('/chat/sessions', { method: 'DELETE', body: JSON.stringify({ sessionId }) });

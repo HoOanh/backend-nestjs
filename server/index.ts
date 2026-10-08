@@ -226,6 +226,67 @@ export function verifyJwt(token: string): TokenPayload | null {
   }
 }
 
+interface TutorProofPayload {
+  userId: string;
+  sessionId: string;
+  scope: 'tutor';
+  exp: number;
+}
+
+function signTutorProof(userId: string, sessionId: string): string {
+  const header = Buffer.from(
+    JSON.stringify({ alg: 'HS256', typ: 'JWT' })
+  ).toString('base64url');
+  const payload: TutorProofPayload = {
+    userId,
+    sessionId,
+    scope: 'tutor',
+    exp: Math.floor(Date.now() / 1000) + 120
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest('base64url');
+  return `${header}.${body}.${signature}`;
+}
+
+function verifyTutorProof(token: string): TutorProofPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+    const expectedSignature = crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(`${header}.${body}`)
+      .digest('base64url');
+    const received = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (
+      received.length !== expected.length ||
+      !crypto.timingSafeEqual(received, expected) ||
+      JSON.parse(Buffer.from(header, 'base64url').toString()).alg !== 'HS256'
+    ) {
+      return null;
+    }
+    const payload = JSON.parse(
+      Buffer.from(body, 'base64url').toString('utf-8')
+    ) as Partial<TutorProofPayload>;
+    if (
+      payload.scope !== 'tutor' ||
+      typeof payload.userId !== 'string' ||
+      typeof payload.sessionId !== 'string' ||
+      !Number.isFinite(payload.exp) ||
+      (payload.exp || 0) <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+    return payload as TutorProofPayload;
+  } catch {
+    return null;
+  }
+}
+
 interface Entitlement {
   id: string;
   user_id: string;
@@ -891,6 +952,7 @@ export const dbService = {
 
 const COOKIE_NAME = 'arc_session';
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
+const TUTOR_PROOF_COOKIE_PREFIX = 'arc_tutor_proof_';
 
 interface ApiRequest {
   method?: string;
@@ -929,6 +991,41 @@ function setSessionCookie(res: ApiResponse, token: string): void {
       `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`
     );
   }
+}
+
+function getTutorProofCookieName(sessionId: string): string | null {
+  return /^[A-Za-z0-9_-]{1,100}$/.test(sessionId)
+    ? `${TUTOR_PROOF_COOKIE_PREFIX}${sessionId}`
+    : null;
+}
+
+function getTutorProofFromCookie(
+  req: Pick<ApiRequest, 'headers'>,
+  sessionId: string
+): string | null {
+  const cookieHeader = req.headers?.cookie;
+  const cookieName = getTutorProofCookieName(sessionId);
+  if (typeof cookieHeader !== 'string' || !cookieName) return null;
+  const entry = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${cookieName}=`));
+  return entry ? entry.slice(cookieName.length + 1) || null : null;
+}
+
+function setTutorProofCookie(
+  res: ApiResponse,
+  sessionId: string,
+  userId: string
+): boolean {
+  const cookieName = getTutorProofCookieName(sessionId);
+  if (!cookieName || typeof res.setHeader !== 'function') return false;
+  res.setHeader(
+    'Set-Cookie',
+    `${cookieName}=${signTutorProof(userId, sessionId)}; Path=/api/tutor; Max-Age=120; SameSite=Strict; HttpOnly; Secure`
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  return true;
 }
 
 function clearSessionCookie(res: ApiResponse): void {
@@ -973,14 +1070,18 @@ export function authorizeTutorRequest(
   sessionId?: string
 ): 401 | 403 | null {
   const request = { headers };
-  const token = getBearerToken(request) || getTokenFromCookie(request);
-  const actor = token ? dbService.getAuthUser(token) : null;
-  if (!actor) return 401;
-  if (sessionId) {
-    loadStore();
-    const session = store.chat_sessions.find((s) => s.id === sessionId);
-    if (!session || (session.userId !== actor.id && actor.role !== 'admin'))
-      return 403;
+  if (!sessionId) return 401;
+  const token = getTokenFromCookie(request);
+  const actor = token ? verifyJwt(token) : null;
+  const proofToken = getTutorProofFromCookie(request, sessionId);
+  const proof = proofToken ? verifyTutorProof(proofToken) : null;
+  if (
+    !actor ||
+    !proof ||
+    proof.sessionId !== sessionId ||
+    proof.userId !== actor.userId
+  ) {
+    return 401;
   }
   return null;
 }
@@ -1789,6 +1890,21 @@ async function handleApiRequestInner(
       const deny = () => {
         res.status(404).json({ error: 'Không tìm thấy phiên chat' });
       };
+      if (
+        pathname === '/api/chat/sessions/tutor-proof' &&
+        method === 'POST'
+      ) {
+        if (!owned) {
+          deny();
+          return;
+        }
+        if (!setTutorProofCookie(res, owned.id, actor.id)) {
+          res.status(400).json({ error: 'Session ID không hợp lệ' });
+          return;
+        }
+        res.status(200).json({ success: true });
+        return;
+      }
       if (pathname === '/api/chat/sessions' && method === 'GET') {
         const lessonId = queryParams.get('lessonId');
         const userId = queryParams.get('userId') || actor.id;

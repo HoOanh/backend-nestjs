@@ -185,6 +185,42 @@ function verifyJwt(token) {
     return null;
   }
 }
+function signTutorProof(userId, sessionId) {
+  const header = Buffer.from(
+    JSON.stringify({ alg: "HS256", typ: "JWT" })
+  ).toString("base64url");
+  const payload = {
+    userId,
+    sessionId,
+    scope: "tutor",
+    exp: Math.floor(Date.now() / 1e3) + 120
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto2.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
+  return `${header}.${body}.${signature}`;
+}
+function verifyTutorProof(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+    const expectedSignature = crypto2.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
+    const received = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (received.length !== expected.length || !crypto2.timingSafeEqual(received, expected) || JSON.parse(Buffer.from(header, "base64url").toString()).alg !== "HS256") {
+      return null;
+    }
+    const payload = JSON.parse(
+      Buffer.from(body, "base64url").toString("utf-8")
+    );
+    if (payload.scope !== "tutor" || typeof payload.userId !== "string" || typeof payload.sessionId !== "string" || !Number.isFinite(payload.exp) || (payload.exp || 0) <= Math.floor(Date.now() / 1e3)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
 function getStoreFilePath() {
   if (process.env.ARC_STORE_PATH) {
     const location = path2.resolve(process.env.ARC_STORE_PATH);
@@ -706,6 +742,7 @@ var dbService = {
 };
 var COOKIE_NAME = "arc_session";
 var COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+var TUTOR_PROOF_COOKIE_PREFIX = "arc_tutor_proof_";
 function getBearerToken(req) {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
@@ -728,6 +765,26 @@ function setSessionCookie(res, token) {
       `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`
     );
   }
+}
+function getTutorProofCookieName(sessionId) {
+  return /^[A-Za-z0-9_-]{1,100}$/.test(sessionId) ? `${TUTOR_PROOF_COOKIE_PREFIX}${sessionId}` : null;
+}
+function getTutorProofFromCookie(req, sessionId) {
+  const cookieHeader = req.headers?.cookie;
+  const cookieName = getTutorProofCookieName(sessionId);
+  if (typeof cookieHeader !== "string" || !cookieName) return null;
+  const entry = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${cookieName}=`));
+  return entry ? entry.slice(cookieName.length + 1) || null : null;
+}
+function setTutorProofCookie(res, sessionId, userId) {
+  const cookieName = getTutorProofCookieName(sessionId);
+  if (!cookieName || typeof res.setHeader !== "function") return false;
+  res.setHeader(
+    "Set-Cookie",
+    `${cookieName}=${signTutorProof(userId, sessionId)}; Path=/api/tutor; Max-Age=120; SameSite=Strict; HttpOnly; Secure`
+  );
+  res.setHeader("Cache-Control", "no-store");
+  return true;
 }
 function clearSessionCookie(res) {
   if (typeof res.setHeader === "function") {
@@ -761,14 +818,13 @@ function formatUserResponse(u) {
 }
 function authorizeTutorRequest(headers, sessionId) {
   const request = { headers };
-  const token = getBearerToken(request) || getTokenFromCookie(request);
-  const actor = token ? dbService.getAuthUser(token) : null;
-  if (!actor) return 401;
-  if (sessionId) {
-    loadStore();
-    const session = store.chat_sessions.find((s) => s.id === sessionId);
-    if (!session || session.userId !== actor.id && actor.role !== "admin")
-      return 403;
+  if (!sessionId) return 401;
+  const token = getTokenFromCookie(request);
+  const actor = token ? verifyJwt(token) : null;
+  const proofToken = getTutorProofFromCookie(request, sessionId);
+  const proof = proofToken ? verifyTutorProof(proofToken) : null;
+  if (!actor || !proof || proof.sessionId !== sessionId || proof.userId !== actor.userId) {
+    return 401;
   }
   return null;
 }
@@ -1389,6 +1445,18 @@ async function handleApiRequestInner(req, res) {
       const deny = () => {
         res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y phi\xEAn chat" });
       };
+      if (pathname === "/api/chat/sessions/tutor-proof" && method === "POST") {
+        if (!owned) {
+          deny();
+          return;
+        }
+        if (!setTutorProofCookie(res, owned.id, actor.id)) {
+          res.status(400).json({ error: "Session ID kh\xF4ng h\u1EE3p l\u1EC7" });
+          return;
+        }
+        res.status(200).json({ success: true });
+        return;
+      }
       if (pathname === "/api/chat/sessions" && method === "GET") {
         const lessonId = queryParams.get("lessonId");
         const userId = queryParams.get("userId") || actor.id;

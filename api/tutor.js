@@ -93,6 +93,28 @@ function verifyJwt(token) {
     return null;
   }
 }
+function verifyTutorProof(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+    const expectedSignature = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
+    const received = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected) || JSON.parse(Buffer.from(header, "base64url").toString()).alg !== "HS256") {
+      return null;
+    }
+    const payload = JSON.parse(
+      Buffer.from(body, "base64url").toString("utf-8")
+    );
+    if (payload.scope !== "tutor" || typeof payload.userId !== "string" || typeof payload.sessionId !== "string" || !Number.isFinite(payload.exp) || (payload.exp || 0) <= Math.floor(Date.now() / 1e3)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
 function getStoreFilePath() {
   if (process.env.ARC_STORE_PATH) {
     const location = path.resolve(process.env.ARC_STORE_PATH);
@@ -573,6 +595,7 @@ var dbService = {
 };
 var COOKIE_NAME = "arc_session";
 var COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+var TUTOR_PROOF_COOKIE_PREFIX = "arc_tutor_proof_";
 function getBearerToken(req) {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
@@ -587,6 +610,16 @@ function getTokenFromCookie(req) {
     new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]+)`)
   );
   return match ? match[1] : null;
+}
+function getTutorProofCookieName(sessionId) {
+  return /^[A-Za-z0-9_-]{1,100}$/.test(sessionId) ? `${TUTOR_PROOF_COOKIE_PREFIX}${sessionId}` : null;
+}
+function getTutorProofFromCookie(req, sessionId) {
+  const cookieHeader = req.headers?.cookie;
+  const cookieName = getTutorProofCookieName(sessionId);
+  if (typeof cookieHeader !== "string" || !cookieName) return null;
+  const entry = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${cookieName}=`));
+  return entry ? entry.slice(cookieName.length + 1) || null : null;
 }
 function isTestUser(u) {
   if (u.data_origin) return u.data_origin === "test";
@@ -612,14 +645,13 @@ function formatUserResponse(u) {
 }
 function authorizeTutorRequest(headers, sessionId) {
   const request = { headers };
-  const token = getBearerToken(request) || getTokenFromCookie(request);
-  const actor = token ? dbService.getAuthUser(token) : null;
-  if (!actor) return 401;
-  if (sessionId) {
-    loadStore();
-    const session = store.chat_sessions.find((s) => s.id === sessionId);
-    if (!session || session.userId !== actor.id && actor.role !== "admin")
-      return 403;
+  if (!sessionId) return 401;
+  const token = getTokenFromCookie(request);
+  const actor = token ? verifyJwt(token) : null;
+  const proofToken = getTutorProofFromCookie(request, sessionId);
+  const proof = proofToken ? verifyTutorProof(proofToken) : null;
+  if (!actor || !proof || proof.sessionId !== sessionId || proof.userId !== actor.userId) {
+    return 401;
   }
   return null;
 }

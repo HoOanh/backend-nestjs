@@ -235,6 +235,8 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
     setIsLoading(true);
 
     try {
+      await chatDbService.authorizeTutorSession(currentSession.id);
+
       // 1. Save user message to SQLite and update state
       const savedUserMsg = await chatDbService.addMessage({
         sessionId: currentSession.id,

@@ -168,6 +168,12 @@ export interface TokenPayload {
   planId: string;
   exp: number;
   authVersion?: number;
+  authProvider?: 'google' | 'email';
+  avatar?: string;
+  avatarColor?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
+  dataOrigin?: 'real' | 'test';
 }
 
 export function signJwt(user: DbUser, expiresInDays = 30): string {
@@ -179,7 +185,13 @@ export function signJwt(user: DbUser, expiresInDays = 30): string {
     name: user.name,
     planId: user.plan_id,
     exp,
-    authVersion: user.auth_version || 0
+    authVersion: user.auth_version || 0,
+    authProvider: user.auth_provider,
+    avatar: user.avatar,
+    avatarColor: user.avatar_color,
+    createdAt: user.created_at,
+    lastLoginAt: user.last_login_at,
+    dataOrigin: user.data_origin
   };
   const header = Buffer.from(
     JSON.stringify({ alg: 'HS256', typ: 'JWT' })
@@ -696,22 +708,33 @@ export const dbService = {
     if (!token) return null;
     loadStore();
 
-    if (store.revoked_tokens && store.revoked_tokens.includes(token)) {
-      return null;
-    }
-
-    // 1. Check Stateless Cryptographic JWT Token (Resilient against cold starts & multiple lambdas)
+    // Signed JWT claims are the auth source of truth across isolated serverless
+    // instances. The JSON store under /tmp is only a local cache and cannot
+    // reliably revoke tokens or validate user versions across instances.
     const payload = verifyJwt(token);
     if (payload) {
       const user = store.users.find((u) => u.id === payload.userId);
-      return !user ||
-        user.status === 'suspended' ||
-        (payload.authVersion || 0) !== (user.auth_version || 0)
-        ? null
-        : user;
+      return {
+        id: payload.userId,
+        email: payload.email,
+        role: payload.role,
+        name: payload.name,
+        plan_id: payload.planId as DbUser['plan_id'],
+        auth_provider: payload.authProvider || user?.auth_provider || 'email',
+        avatar: payload.avatar ?? user?.avatar,
+        avatar_color: payload.avatarColor ?? user?.avatar_color,
+        created_at: payload.createdAt || user?.created_at || '',
+        last_login_at: payload.lastLoginAt || user?.last_login_at || '',
+        data_origin: payload.dataOrigin ?? user?.data_origin,
+        status: 'active',
+        version: user?.version || 1,
+        auth_version: payload.authVersion || 0
+      };
     }
 
-    // 2. Fallback to session store for legacy tokens
+    if (store.revoked_tokens?.includes(token)) return null;
+
+    // Fallback to session store for legacy non-JWT tokens.
     const session = store.sessions.find(
       (s) => s.token === token && new Date(s.expires_at) > new Date()
     );

@@ -152,7 +152,13 @@ function signJwt(user, expiresInDays = 30) {
     name: user.name,
     planId: user.plan_id,
     exp,
-    authVersion: user.auth_version || 0
+    authVersion: user.auth_version || 0,
+    authProvider: user.auth_provider,
+    avatar: user.avatar,
+    avatarColor: user.avatar_color,
+    createdAt: user.created_at,
+    lastLoginAt: user.last_login_at,
+    dataOrigin: user.data_origin
   };
   const header = Buffer.from(
     JSON.stringify({ alg: "HS256", typ: "JWT" })
@@ -545,14 +551,27 @@ var dbService = {
   getAuthUser(token) {
     if (!token) return null;
     loadStore();
-    if (store.revoked_tokens && store.revoked_tokens.includes(token)) {
-      return null;
-    }
     const payload = verifyJwt(token);
     if (payload) {
       const user = store.users.find((u) => u.id === payload.userId);
-      return !user || user.status === "suspended" || (payload.authVersion || 0) !== (user.auth_version || 0) ? null : user;
+      return {
+        id: payload.userId,
+        email: payload.email,
+        role: payload.role,
+        name: payload.name,
+        plan_id: payload.planId,
+        auth_provider: payload.authProvider || user?.auth_provider || "email",
+        avatar: payload.avatar ?? user?.avatar,
+        avatar_color: payload.avatarColor ?? user?.avatar_color,
+        created_at: payload.createdAt || user?.created_at || "",
+        last_login_at: payload.lastLoginAt || user?.last_login_at || "",
+        data_origin: payload.dataOrigin ?? user?.data_origin,
+        status: "active",
+        version: user?.version || 1,
+        auth_version: payload.authVersion || 0
+      };
     }
+    if (store.revoked_tokens?.includes(token)) return null;
     const session = store.sessions.find(
       (s) => s.token === token && new Date(s.expires_at) > /* @__PURE__ */ new Date()
     );

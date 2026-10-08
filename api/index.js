@@ -1704,7 +1704,11 @@ async function handleApiRequestInner(req, res) {
       "/api/exams/submit-final",
       "/api/exams/submit-sprint"
     ].includes(pathname)) {
-      if (typeof reqBody.userId !== "string" || !dbService.getUserById(reqBody.userId)) {
+      const actor = auditContext.getStore()?.actor;
+      const requestedUserId = typeof reqBody.userId === "string" ? reqBody.userId : "";
+      const belongsToAuthenticatedStudent = actor?.role !== "admin" && actor?.id === requestedUserId;
+      const isStoredAdminTarget = actor?.role === "admin" && requestedUserId.length > 0 && dbService.getUserById(requestedUserId) !== null;
+      if (!requestedUserId || !belongsToAuthenticatedStudent && !isStoredAdminTarget) {
         res.status(400).json({ error: "H\u1ECDc vi\xEAn kh\xF4ng t\u1ED3n t\u1EA1i" });
         return;
       }

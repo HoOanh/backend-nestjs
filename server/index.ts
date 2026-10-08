@@ -2235,9 +2235,18 @@ async function handleApiRequestInner(
         '/api/exams/submit-sprint'
       ].includes(pathname)
     ) {
+      const actor = auditContext.getStore()?.actor;
+      const requestedUserId =
+        typeof reqBody.userId === 'string' ? reqBody.userId : '';
+      const belongsToAuthenticatedStudent =
+        actor?.role !== 'admin' && actor?.id === requestedUserId;
+      const isStoredAdminTarget =
+        actor?.role === 'admin' &&
+        requestedUserId.length > 0 &&
+        dbService.getUserById(requestedUserId) !== null;
       if (
-        typeof reqBody.userId !== 'string' ||
-        !dbService.getUserById(reqBody.userId)
+        !requestedUserId ||
+        (!belongsToAuthenticatedStudent && !isStoredAdminTarget)
       ) {
         res.status(400).json({ error: 'Học viên không tồn tại' });
         return;

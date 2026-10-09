@@ -172,7 +172,9 @@ export default async function handler(
     'gemini-2.5-flash-lite',
     'gemma-4-31b'
   ];
-  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
+  // Keep enough time for streaming before Vercel's 30-second function limit.
+  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)].slice(0, 3);
+  const requestDeadline = AbortSignal.timeout(24_000);
 
   let currentActiveModel = model;
   let activeGeminiResponse: Response | null = null;
@@ -185,16 +187,33 @@ export default async function handler(
         const endpoint = isStream
           ? `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`
           : `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const generationConfig = candidate.startsWith('gemini-3.')
+          ? { maxOutputTokens: 2048 }
+          : { temperature: 0.25, maxOutputTokens: 2048 };
+        const candidateController = new AbortController();
+        const candidateTimeout = setTimeout(
+          () => candidateController.abort(),
+          7_000
+        );
 
-        const candidateResponse = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: prompt }] },
-            contents,
-            generationConfig: { temperature: 0.25, maxOutputTokens: 2048 }
-          })
-        });
+        let candidateResponse: Response;
+        try {
+          candidateResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.any([
+              requestDeadline,
+              candidateController.signal
+            ]),
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: prompt }] },
+              contents,
+              generationConfig
+            })
+          });
+        } finally {
+          clearTimeout(candidateTimeout);
+        }
 
         if (candidateResponse.ok) {
           trace('INFO', 'AI_PROVIDER_ACCEPTED', {

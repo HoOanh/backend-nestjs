@@ -792,7 +792,8 @@ ${lesson.realCodeSnippet || ""}`;
     "gemini-2.5-flash-lite",
     "gemma-4-31b"
   ];
-  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
+  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)].slice(0, 3);
+  const requestDeadline = AbortSignal.timeout(24e3);
   let currentActiveModel = model;
   let activeGeminiResponse = null;
   let lastErrorMsg = "";
@@ -801,15 +802,30 @@ ${lesson.realCodeSnippet || ""}`;
       const candidate = modelChain[i];
       try {
         const endpoint = isStream ? `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}` : `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        const candidateResponse = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: prompt }] },
-            contents,
-            generationConfig: { temperature: 0.25, maxOutputTokens: 2048 }
-          })
-        });
+        const generationConfig = candidate.startsWith("gemini-3.") ? { maxOutputTokens: 2048 } : { temperature: 0.25, maxOutputTokens: 2048 };
+        const candidateController = new AbortController();
+        const candidateTimeout = setTimeout(
+          () => candidateController.abort(),
+          7e3
+        );
+        let candidateResponse;
+        try {
+          candidateResponse = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.any([
+              requestDeadline,
+              candidateController.signal
+            ]),
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: prompt }] },
+              contents,
+              generationConfig
+            })
+          });
+        } finally {
+          clearTimeout(candidateTimeout);
+        }
         if (candidateResponse.ok) {
           trace("INFO", "AI_PROVIDER_ACCEPTED", {
             requestedModel: model,

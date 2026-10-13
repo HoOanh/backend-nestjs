@@ -162,13 +162,36 @@ function loadStore() {
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, "utf-8");
       if (raw.trim()) {
+        const parsed = JSON.parse(raw);
+        const diskSessions = parsed.chat_sessions || [];
+        const diskMessages = parsed.chat_messages || [];
+        const sessionMap = /* @__PURE__ */ new Map();
+        for (const s of diskSessions) sessionMap.set(s.id, s);
+        for (const s of store.chat_sessions) {
+          const onDisk = sessionMap.get(s.id);
+          if (!onDisk || s.updatedAt && s.updatedAt >= (onDisk.updatedAt || "")) {
+            sessionMap.set(s.id, s);
+          }
+        }
+        const messageMap = /* @__PURE__ */ new Map();
+        for (const m of diskMessages) messageMap.set(m.id, m);
+        for (const m of store.chat_messages) {
+          if (!messageMap.has(m.id)) messageMap.set(m.id, m);
+        }
         store = {
           entitlements: [],
           audit_logs: [],
-          chat_sessions: [],
-          chat_messages: [],
           chat_logs: [],
-          ...JSON.parse(raw)
+          users: [],
+          sessions: [],
+          revoked_tokens: [],
+          plans: [],
+          user_progress: [],
+          learning_history: [],
+          certificates: [],
+          ...parsed,
+          chat_sessions: Array.from(sessionMap.values()),
+          chat_messages: Array.from(messageMap.values())
         };
       }
     }
@@ -272,9 +295,17 @@ function saveStore() {
   const context = auditContext.getStore();
   if (context) appendChangeEvidence(context);
   const filePath = getStoreFilePath();
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporaryPath, JSON.stringify(store, null, 2), "utf-8");
-  fs.renameSync(temporaryPath, filePath);
+  const temporaryPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporaryPath, JSON.stringify(store, null, 2), "utf-8");
+    fs.renameSync(temporaryPath, filePath);
+  } catch (err) {
+    try {
+      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+    } catch {
+    }
+    throw err;
+  }
 }
 loadStore();
 function seedInitialData() {
@@ -404,9 +435,12 @@ var dbService = {
   getAuthUser(token) {
     if (!token) return null;
     loadStore();
+    if (store.revoked_tokens?.includes(token)) return null;
     const payload = verifyJwt(token);
     if (payload) {
       const user = store.users.find((u) => u.id === payload.userId);
+      if (user?.status === "suspended") return null;
+      if (user && (payload.authVersion || 0) !== (user.auth_version || 0)) return null;
       return {
         id: payload.userId,
         email: payload.email,
@@ -419,12 +453,11 @@ var dbService = {
         created_at: payload.createdAt || user?.created_at || "",
         last_login_at: payload.lastLoginAt || user?.last_login_at || "",
         data_origin: payload.dataOrigin ?? user?.data_origin,
-        status: "active",
+        status: user?.status || "active",
         version: user?.version || 1,
         auth_version: payload.authVersion || 0
       };
     }
-    if (store.revoked_tokens?.includes(token)) return null;
     const session = store.sessions.find(
       (s) => s.token === token && new Date(s.expires_at) > /* @__PURE__ */ new Date()
     );
@@ -681,9 +714,24 @@ function recordTutorTrace(headers, sessionId, level, event, metadata) {
     const actor = token ? dbService.getSessionByToken(token)?.user : void 0;
     if (!actor) return;
     loadStore();
-    const owned = store.chat_sessions.find(
+    let owned = store.chat_sessions.find(
       (s) => s.id === sessionId && s.userId === actor.id
     );
+    if (!owned && sessionId && sessionId.length >= 8) {
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      owned = {
+        id: sessionId,
+        userId: actor.id,
+        lessonId: "c1-l1",
+        title: "\u0110o\u1EA1n chat \u0111ang m\u1EDF",
+        messageCount: 0,
+        lastMessageAt: now,
+        createdAt: now,
+        updatedAt: now
+      };
+      store.chat_sessions.push(owned);
+      saveStore();
+    }
     store.chat_logs.push({
       id: crypto.randomUUID(),
       userId: actor.id,

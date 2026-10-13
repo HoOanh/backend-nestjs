@@ -253,7 +253,7 @@ function signTutorProof(userId: string, sessionId: string): string {
     userId,
     sessionId,
     scope: 'tutor',
-    exp: Math.floor(Date.now() / 1000) + 120
+    exp: Math.floor(Date.now() / 1000) + 86400
   };
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = crypto
@@ -366,13 +366,42 @@ function loadStore(): void {
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       if (raw.trim()) {
+        const parsed = JSON.parse(raw) as Partial<StoreState>;
+        const diskSessions = parsed.chat_sessions || [];
+        const diskMessages = parsed.chat_messages || [];
+
+        const sessionMap = new Map<string, ChatSession>();
+        for (const s of diskSessions) sessionMap.set(s.id, s);
+        for (const s of store.chat_sessions) {
+          const onDisk = sessionMap.get(s.id);
+          if (
+            !onDisk ||
+            (s.updatedAt && s.updatedAt >= (onDisk.updatedAt || ''))
+          ) {
+            sessionMap.set(s.id, s);
+          }
+        }
+
+        const messageMap = new Map<string, ChatMessage>();
+        for (const m of diskMessages) messageMap.set(m.id, m);
+        for (const m of store.chat_messages) {
+          if (!messageMap.has(m.id)) messageMap.set(m.id, m);
+        }
+
         store = {
           entitlements: [],
           audit_logs: [],
-          chat_sessions: [],
-          chat_messages: [],
           chat_logs: [],
-          ...JSON.parse(raw)
+          users: [],
+          sessions: [],
+          revoked_tokens: [],
+          plans: [],
+          user_progress: [],
+          learning_history: [],
+          certificates: [],
+          ...parsed,
+          chat_sessions: Array.from(sessionMap.values()),
+          chat_messages: Array.from(messageMap.values())
         };
       }
     }
@@ -509,9 +538,16 @@ function saveStore(): void {
   const context = auditContext.getStore();
   if (context) appendChangeEvidence(context);
   const filePath = getStoreFilePath();
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporaryPath, JSON.stringify(store, null, 2), 'utf-8');
-  fs.renameSync(temporaryPath, filePath);
+  const temporaryPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporaryPath, JSON.stringify(store, null, 2), 'utf-8');
+    fs.renameSync(temporaryPath, filePath);
+  } catch (err) {
+    try {
+      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+    } catch {}
+    throw err;
+  }
 }
 
 function operationsEvidence(
@@ -707,6 +743,7 @@ export const dbService = {
   getAuthUser(token: string): DbUser | null {
     if (!token) return null;
     loadStore();
+    if (store.revoked_tokens?.includes(token)) return null;
 
     // Signed JWT claims are the auth source of truth across isolated serverless
     // instances. The JSON store under /tmp is only a local cache and cannot
@@ -714,6 +751,8 @@ export const dbService = {
     const payload = verifyJwt(token);
     if (payload) {
       const user = store.users.find((u) => u.id === payload.userId);
+      if (user?.status === 'suspended') return null;
+      if (user && (payload.authVersion || 0) !== (user.auth_version || 0)) return null;
       return {
         id: payload.userId,
         email: payload.email,
@@ -726,13 +765,11 @@ export const dbService = {
         created_at: payload.createdAt || user?.created_at || '',
         last_login_at: payload.lastLoginAt || user?.last_login_at || '',
         data_origin: payload.dataOrigin ?? user?.data_origin,
-        status: 'active',
+        status: user?.status || 'active',
         version: user?.version || 1,
         auth_version: payload.authVersion || 0
       };
     }
-
-    if (store.revoked_tokens?.includes(token)) return null;
 
     // Fallback to session store for legacy non-JWT tokens.
     const session = store.sessions.find(
@@ -1043,9 +1080,13 @@ function setTutorProofCookie(
 ): boolean {
   const cookieName = getTutorProofCookieName(sessionId);
   if (!cookieName || typeof res.setHeader !== 'function') return false;
+  const isProd = Boolean(
+    process.env.VERCEL || process.env.NODE_ENV === 'production'
+  );
+  const secureFlag = isProd ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
-    `${cookieName}=${signTutorProof(userId, sessionId)}; Path=/api/tutor; Max-Age=120; SameSite=Strict; HttpOnly; Secure`
+    `${cookieName}=${signTutorProof(userId, sessionId)}; Path=/api/tutor; Max-Age=86400; SameSite=Lax; HttpOnly${secureFlag}`
   );
   res.setHeader('Cache-Control', 'no-store');
   return true;
@@ -1122,9 +1163,24 @@ export function recordTutorTrace(
     const actor = token ? dbService.getSessionByToken(token)?.user : undefined;
     if (!actor) return;
     loadStore();
-    const owned = store.chat_sessions.find(
+    let owned = store.chat_sessions.find(
       (s) => s.id === sessionId && s.userId === actor.id
     );
+    if (!owned && sessionId && sessionId.length >= 8) {
+      const now = new Date().toISOString();
+      owned = {
+        id: sessionId,
+        userId: actor.id,
+        lessonId: 'c1-l1',
+        title: 'Đoạn chat đang mở',
+        messageCount: 0,
+        lastMessageAt: now,
+        createdAt: now,
+        updatedAt: now
+      };
+      store.chat_sessions.push(owned);
+      saveStore();
+    }
     store.chat_logs.push({
       id: crypto.randomUUID(),
       userId: actor.id,
@@ -1909,7 +1965,42 @@ async function handleApiRequestInner(
       const sessionId = String(
         reqBody.sessionId || queryParams.get('sessionId') || ''
       );
-      const owned = ownedSessions.find((s) => s.id === sessionId);
+      function resolveOrCreateSession(
+        id: string,
+        lessonId?: string,
+        title?: string
+      ): ChatSession {
+        let existing = store.chat_sessions.find(
+          (s) => s.id === id && (isAdmin || s.userId === actor.id)
+        );
+        if (!existing && id && id.length >= 8) {
+          const now = new Date().toISOString();
+          existing = {
+            id,
+            userId: actor.id,
+            lessonId: lessonId || 'c1-l1',
+            title: title || 'Đoạn chat đang mở',
+            messageCount: 0,
+            lastMessageAt: now,
+            createdAt: now,
+            updatedAt: now
+          };
+          store.chat_sessions.push(existing);
+          saveStore();
+        }
+        return existing!;
+      }
+      const owned =
+        ownedSessions.find((s) => s.id === sessionId) ||
+        (sessionId && sessionId.length >= 8
+          ? resolveOrCreateSession(
+              sessionId,
+              (reqBody.lessonId as string | undefined) ||
+                queryParams.get('lessonId') ||
+                undefined,
+              (reqBody.title as string | undefined) || undefined
+            )
+          : undefined);
       const deny = () => {
         res.status(404).json({ error: 'Không tìm thấy phiên chat' });
       };
@@ -1930,12 +2021,12 @@ async function handleApiRequestInner(
       }
       if (pathname === '/api/chat/sessions' && method === 'GET') {
         const lessonId = queryParams.get('lessonId');
-        const userId = queryParams.get('userId') || actor.id;
         res.status(200).json({
-          sessions: ownedSessions
+          sessions: store.chat_sessions
             .filter(
               (s) =>
-                (!lessonId || s.lessonId === lessonId) && s.userId === userId
+                (isAdmin || s.userId === actor.id) &&
+                (!lessonId || s.lessonId === lessonId)
             )
             .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
         });
@@ -1947,18 +2038,32 @@ async function handleApiRequestInner(
           return;
         }
         const now = new Date().toISOString();
-        const created: ChatSession = {
-          id: crypto.randomUUID(),
-          userId: actor.id,
-          lessonId: reqBody.lessonId,
-          title:
-            typeof reqBody.title === 'string' ? reqBody.title : 'Hội thoại mới',
-          messageCount: 0,
-          lastMessageAt: now,
-          createdAt: now,
-          updatedAt: now
-        };
-        store.chat_sessions.push(created);
+        const customId =
+          (typeof reqBody.id === 'string' && reqBody.id) ||
+          (typeof reqBody.sessionId === 'string' && reqBody.sessionId) ||
+          crypto.randomUUID();
+        let created = store.chat_sessions.find(
+          (s) => s.id === customId && (isAdmin || s.userId === actor.id)
+        );
+        if (created) {
+          if (typeof reqBody.title === 'string' && reqBody.title) {
+            created.title = reqBody.title;
+          }
+          created.updatedAt = now;
+        } else {
+          created = {
+            id: customId,
+            userId: actor.id,
+            lessonId: reqBody.lessonId,
+            title:
+              typeof reqBody.title === 'string' ? reqBody.title : 'Hội thoại mới',
+            messageCount: 0,
+            lastMessageAt: now,
+            createdAt: now,
+            updatedAt: now
+          };
+          store.chat_sessions.push(created);
+        }
         saveStore();
         res.status(201).json({ session: created });
         return;
@@ -2009,19 +2114,32 @@ async function handleApiRequestInner(
           return;
         }
         const now = new Date().toISOString();
-        const msg: ChatMessage = {
-          id: crypto.randomUUID(),
-          sessionId,
-          lessonId: owned.lessonId,
-          userId: owned.userId,
-          role: reqBody.role as ChatMessage['role'],
-          content: reqBody.content,
-          image: reqBody.image as ChatMessage['image'],
-          model: typeof reqBody.model === 'string' ? reqBody.model : undefined,
-          createdAt: now
-        };
-        store.chat_messages.push(msg);
-        owned.messageCount++;
+        const msgId =
+          typeof reqBody.id === 'string' && reqBody.id
+            ? reqBody.id
+            : crypto.randomUUID();
+        let msg = store.chat_messages.find((m) => m.id === msgId);
+        if (msg) {
+          msg.content = reqBody.content;
+        } else {
+          msg = {
+            id: msgId,
+            sessionId,
+            lessonId: owned.lessonId,
+            userId: owned.userId,
+            role: reqBody.role as ChatMessage['role'],
+            content: reqBody.content,
+            image: reqBody.image as ChatMessage['image'],
+            model:
+              typeof reqBody.model === 'string' ? reqBody.model : undefined,
+            createdAt:
+              typeof reqBody.createdAt === 'string' && reqBody.createdAt
+                ? reqBody.createdAt
+                : now
+          };
+          store.chat_messages.push(msg);
+          owned.messageCount++;
+        }
         owned.updatedAt = now;
         owned.lastMessageAt = now;
         if (

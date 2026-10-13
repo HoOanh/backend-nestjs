@@ -89,25 +89,61 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
   const currentLessonRef = useRef<Lesson | null>(null);
   currentLessonRef.current = currentLesson;
 
+  const currentSessionRef = useRef<ChatSession | null>(null);
+  currentSessionRef.current = currentSession;
+
   const loadSessionsForLesson = useCallback(async (lessonId: string, lessonTitle: string, targetUserId?: string) => {
     try {
       await chatDbService.init();
       const effectiveUserId = targetUserId ?? userIdRef.current;
+
+      // 1. Phản hồi giao diện tức thì từ local cache (0ms perceived latency)
+      const localSessions = chatDbService.getLocalSessions(lessonId);
+      const savedActiveId = typeof window !== 'undefined'
+        ? localStorage.getItem(`arc_active_session_${lessonId}`)
+        : null;
+
+      const preservedId = currentSessionRef.current?.lessonId === lessonId
+        ? currentSessionRef.current.id
+        : savedActiveId;
+
+      const initialActive =
+        (preservedId ? localSessions.find((s) => s.id === preservedId) : null) ||
+        localSessions[0] ||
+        null;
+
+      if (localSessions.length > 0 && initialActive) {
+        setSessions(localSessions);
+        setCurrentSession(initialActive);
+        currentSessionRef.current = initialActive;
+        const cachedMsgs = chatDbService.getLocalMessages(initialActive.id);
+        setMessages(cachedMsgs);
+      }
+
+      // 2. Đồng bộ ngầm với server (Stale-While-Revalidate)
       const allSessions = await chatDbService.getSessions(lessonId, effectiveUserId);
       setSessions(allSessions);
 
       let activeSes: ChatSession;
       if (allSessions.length > 0) {
-        activeSes = allSessions[0];
+        const activeTargetId = currentSessionRef.current?.lessonId === lessonId
+          ? currentSessionRef.current.id
+          : (savedActiveId || allSessions[0].id);
+
+        activeSes = allSessions.find((s) => s.id === activeTargetId) || allSessions[0];
       } else {
+        // Chưa có session nào cả ở server lẫn local -> Tạo session khởi tạo
+        const greetingContent = `Em là tutor của bài “${lessonTitle}”. ĐẠI CA đang vướng đoạn nào hoặc có ảnh chụp sơ đồ / code lỗi nào thì gửi lên — em sẽ phân tích và giải thích tận tường theo đúng bản chất.`;
+        const newSesId = typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : 'sess_' + Date.now();
         activeSes = await chatDbService.createSession(
           lessonId,
           `Hỏi đáp bài: ${lessonTitle}`,
-          effectiveUserId
+          effectiveUserId,
+          newSesId
         );
-        // Add initial greeting message to SQLite
-        const greetingContent = `Em là tutor của bài “${lessonTitle}”. ĐẠI CA đang vướng đoạn nào hoặc có ảnh chụp sơ đồ / code lỗi nào thì gửi lên — em sẽ phân tích và giải thích tận tường theo đúng bản chất.`;
-        await chatDbService.addMessage({
+        const greetingMsg = await chatDbService.addMessage({
           sessionId: activeSes.id,
           lessonId,
           userId: effectiveUserId,
@@ -116,11 +152,20 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
         });
         activeSes.messageCount = 1;
         setSessions([activeSes]);
+        setMessages([greetingMsg]);
       }
 
       setCurrentSession(activeSes);
+      currentSessionRef.current = activeSes;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`arc_active_session_${lessonId}`, activeSes.id);
+      }
+
+      // Lấy messages từ server nếu user vẫn đang xem session này
       const loadedMsgs = await chatDbService.getMessages(activeSes.id);
-      setMessages(loadedMsgs);
+      if (currentSessionRef.current?.id === activeSes.id) {
+        setMessages(loadedMsgs);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được lịch sử chat từ server');
     }
@@ -128,12 +173,13 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
 
   const setCurrentLesson = useCallback((lesson: Lesson) => {
     if (currentLessonRef.current?.id === lesson.id) return;
+    currentLessonRef.current = lesson;
     setCurrentLessonState(lesson);
     setError('');
     void loadSessionsForLesson(lesson.id, lesson.title, userIdRef.current);
   }, [loadSessionsForLesson]);
 
-  // When user switches or logs in/out, reload session for current lesson
+  // When user switches or logs in/out, reload session for current lesson while preserving active conversation
   useEffect(() => {
     if (currentLessonRef.current) {
       void loadSessionsForLesson(currentLessonRef.current.id, currentLessonRef.current.title, userId);
@@ -144,17 +190,37 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
     try {
       let found = sessions.find((s) => s.id === sessionId);
       if (!found && currentLessonRef.current) {
+        const localList = chatDbService.getLocalSessions(currentLessonRef.current.id);
+        found = localList.find((s) => s.id === sessionId);
+      }
+      if (!found && currentLessonRef.current) {
         const reloaded = await chatDbService.getSessions(currentLessonRef.current.id, userIdRef.current);
         setSessions(reloaded);
         found = reloaded.find((s) => s.id === sessionId);
       }
       if (found) {
+        currentSessionRef.current = found;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`arc_active_session_${found.lessonId}`, found.id);
+        }
         setCurrentSession(found);
-        const msgs = await chatDbService.getMessages(sessionId);
-        setMessages(msgs);
+
+        // Hiển thị ngay lập tức từ local cache (0ms)
+        const cachedMsgs = chatDbService.getLocalMessages(sessionId);
+        setMessages(cachedMsgs);
         setError('');
         setIsHistoryOpen(false);
-        await chatDbService.log('INFO', 'SESSION_SWITCH', `Chuyển sang session: ${sessionId}`, undefined, sessionId, found.lessonId);
+
+        // Cập nhật messages từ server ngầm
+        chatDbService.getMessages(sessionId).then((serverMsgs) => {
+          if (currentSessionRef.current?.id === sessionId) {
+            setMessages(serverMsgs);
+          }
+        }).catch((err) => {
+          console.warn('Lỗi đồng bộ server messages khi switch session:', err);
+        });
+
+        void chatDbService.log('INFO', 'SESSION_SWITCH', `Chuyển sang session: ${sessionId}`, undefined, sessionId, found.lessonId);
       }
     } catch (err) {
       console.error('Failed to switch session:', err);
@@ -163,54 +229,82 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
 
   const createNewSession = useCallback(async (customTitle?: string) => {
     if (!currentLesson) return;
+    const lessonId = currentLesson.id;
+    const lessonTitle = currentLesson.title;
+    const effectiveUserId = userIdRef.current;
+    const sessionId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'sess_' + Date.now();
+    const now = new Date().toISOString();
+    const title = customTitle || `Hội thoại mới (${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})`;
+
+    const greetingContent = `Em là tutor của bài “${lessonTitle}”. ĐẠI CA đang vướng đoạn nào hoặc cần mổ xẻ phần kiến trúc / code mẫu nào thì gửi vào đây nhé.`;
+    const greetingMsgId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'msg_' + Date.now();
+
+    const newSes: ChatSession = {
+      id: sessionId,
+      userId: effectiveUserId,
+      lessonId,
+      title,
+      messageCount: 1,
+      lastMessageAt: now,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const greetingMsg: ChatMessage = {
+      id: greetingMsgId,
+      sessionId,
+      lessonId,
+      userId: effectiveUserId,
+      role: 'assistant',
+      content: greetingContent,
+      createdAt: now
+    };
+
+    // 1. Cập nhật state UI NGAY LẬP TỨC (0ms)
+    currentSessionRef.current = newSes;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`arc_active_session_${lessonId}`, sessionId);
+    }
+    setSessions((prev) => [newSes, ...prev.filter((s) => s.id !== sessionId)]);
+    setCurrentSession(newSes);
+    setMessages([greetingMsg]);
+    setInput('');
+    setSelectedImage(null);
+    setError('');
+    setIsHistoryOpen(false);
+
+    // 2. Đồng bộ ngầm với chatDbService & server
     try {
-      const effectiveUserId = userIdRef.current;
-      const newSes = await chatDbService.createSession(
-        currentLesson.id,
-        customTitle || `Hội thoại mới (${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})`,
-        effectiveUserId
-      );
-
-      const greetingContent = `Em là tutor của bài “${currentLesson.title}”. ĐẠI CA đang vướng đoạn nào hoặc cần mổ xẻ phần kiến trúc / code mẫu nào thì gửi vào đây nhé.`;
-      const greetingMsg = await chatDbService.addMessage({
-        sessionId: newSes.id,
-        lessonId: currentLesson.id,
-        userId: effectiveUserId,
-        role: 'assistant',
-        content: greetingContent
-      });
-      newSes.messageCount = 1;
-
-      setSessions((prev) => [newSes, ...prev]);
-      setCurrentSession(newSes);
-      setMessages([greetingMsg]);
-      setInput('');
-      setSelectedImage(null);
-      setError('');
-      setIsHistoryOpen(false);
+      await chatDbService.createSession(lessonId, title, effectiveUserId, sessionId);
+      await chatDbService.addMessage(greetingMsg);
+      void chatDbService.authorizeTutorSession(sessionId, lessonId, title);
     } catch (err) {
-      console.error('Failed to create new session:', err);
+      console.warn('Lỗi đồng bộ tạo session lên server, local cache vẫn an toàn:', err);
     }
   }, [currentLesson]);
 
   const deleteSession = useCallback(async (sessionId: string) => {
     if (!currentLesson) return;
     try {
-      await chatDbService.deleteSession(sessionId);
       const remaining = sessions.filter((s) => s.id !== sessionId);
       setSessions(remaining);
 
-      if (currentSession?.id === sessionId) {
+      if (currentSessionRef.current?.id === sessionId) {
         if (remaining.length > 0) {
           await switchSession(remaining[0].id);
         } else {
           await createNewSession();
         }
       }
+      await chatDbService.deleteSession(sessionId);
     } catch (err) {
       console.error('Failed to delete session:', err);
     }
-  }, [currentLesson, sessions, currentSession, switchSession, createNewSession]);
+  }, [currentLesson, sessions, switchSession, createNewSession]);
 
   const reloadSessions = useCallback(async () => {
     if (currentLesson) {
@@ -234,44 +328,78 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
     setError('');
     setIsLoading(true);
 
+    const now = new Date().toISOString();
+    const userMsgId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'msg_' + Date.now();
+    const assistantMsgId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'msg_' + (Date.now() + 1);
+
+    const userMsg: ChatMessage = {
+      id: userMsgId,
+      sessionId: currentSession.id,
+      lessonId: currentLesson.id,
+      userId: userIdRef.current,
+      role: 'user',
+      content: question,
+      image: currentImg
+        ? {
+            data: currentImg.base64,
+            mimeType: currentImg.mimeType,
+            fileName: currentImg.file.name
+          }
+        : undefined,
+      model: selectedModel,
+      createdAt: now
+    };
+
+    const assistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      sessionId: currentSession.id,
+      lessonId: currentLesson.id,
+      userId: userIdRef.current,
+      role: 'assistant',
+      content: '',
+      model: selectedModel,
+      createdAt: new Date(Date.now() + 10).toISOString()
+    };
+
+    activeAssistantMsgIdRef.current = assistantMsgId;
+
+    // 1. Phản hồi giao diện & session state NGAY LẬP TỨC (0ms)
+    const nextMessages = [...messages, userMsg];
+    setMessages([...nextMessages, assistantMsg]);
+
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== currentSession.id) return s;
+        const updatedTitle =
+          (s.messageCount || 0) <= 1 && question.trim()
+            ? question.slice(0, 32)
+            : s.title;
+        return {
+          ...s,
+          title: updatedTitle,
+          messageCount: (s.messageCount || 0) + 2,
+          lastMessageAt: now,
+          updatedAt: now
+        };
+      })
+    );
+
+    // Lưu ngầm userMsg và assistantMsg rỗng vào storage
+    void chatDbService.addMessage(userMsg);
+    void chatDbService.addMessage(assistantMsg);
+
     try {
-      await chatDbService.authorizeTutorSession(currentSession.id);
+      await chatDbService.authorizeTutorSession(
+        currentSession.id,
+        currentLesson.id,
+        currentSession.title
+      );
 
-      // 1. Save user message to SQLite and update state
-      const savedUserMsg = await chatDbService.addMessage({
-        sessionId: currentSession.id,
-        lessonId: currentLesson.id,
-        userId: userIdRef.current,
-        role: 'user',
-        content: question,
-        image: currentImg
-          ? {
-              data: currentImg.base64,
-              mimeType: currentImg.mimeType,
-              fileName: currentImg.file.name
-            }
-          : undefined,
-        model: selectedModel
-      });
-
-      const nextMessages = [...messages, savedUserMsg];
-      setMessages(nextMessages);
-
-      // 2. Insert blank assistant message in SQLite for streaming
-      const assistantMsg = await chatDbService.addMessage({
-        sessionId: currentSession.id,
-        lessonId: currentLesson.id,
-        userId: userIdRef.current,
-        role: 'assistant',
-        content: '',
-        model: selectedModel
-      });
-      activeAssistantMsgIdRef.current = assistantMsg.id;
-
-      setMessages([...nextMessages, assistantMsg]);
-
-      // 3. Prepare Multi-turn Context Window for Gemini
-      // Filter out empty messages, slice recent context
+      // 2. Chuẩn bị context window gửi sang Gemini
       const recentWindow = nextMessages.filter((m) => m.content.trim() || m.image);
       const slicedWindow = recentWindow.slice(-MAX_CONTEXT_TURNS);
 
@@ -452,7 +580,7 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
         );
       }
 
-      await reloadSessions();
+      void reloadSessions();
     } catch (requestError) {
       const errorMsg = requestError instanceof Error ? requestError.message : 'Tutor đang bận, thử lại sau.';
       setError(errorMsg);

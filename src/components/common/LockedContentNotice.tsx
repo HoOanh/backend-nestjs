@@ -9,7 +9,10 @@ interface LockedContentNoticeProps {
   requiredPreviousLesson?: Lesson | null;
   missingLessons?: Lesson[];
   missingSprints?: SprintExam[];
+  totalSprints?: number;
   onNavigateToAvailable: () => void;
+  onSelectLesson?: (lessonId: string) => void;
+  onSelectSprintExam?: (sprintId: number) => void;
   isAdmin?: boolean;
   onBypassLock?: () => void;
 }
@@ -20,7 +23,10 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
   requiredPreviousLesson,
   missingLessons,
   missingSprints,
+  totalSprints = 10,
   onNavigateToAvailable,
+  onSelectLesson,
+  onSelectSprintExam,
   isAdmin,
   onBypassLock
 }) => {
@@ -78,7 +84,10 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
           {type === 'final-exam' && missingSprints && (
             <>
               Kỳ thi Tốt nghiệp Toàn khóa yêu cầu thi đạt{' '}
-              <strong>100% (6/6) kỳ thi Sprint</strong>. Hiện còn{' '}
+              <strong>
+                100% ({totalSprints}/{totalSprints}) kỳ thi Sprint
+              </strong>
+              . Hiện còn{' '}
               <strong style={{ color: '#ef4444' }}>
                 {missingSprints.length} kỳ thi Sprint chưa đạt
               </strong>
@@ -93,7 +102,11 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
           missingLessons.length > 0 && (
             <div className="locked-requirements-list">
               {missingLessons.map((l) => (
-                <div key={l.id} className="locked-req-item">
+                <div
+                  key={l.id}
+                  className={`locked-req-item ${onSelectLesson ? 'clickable' : ''}`}
+                  onClick={() => onSelectLesson?.(l.id)}
+                >
                   <span>—</span>
                   <span>{l.title}</span>
                 </div>
@@ -107,7 +120,11 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
           missingSprints.length > 0 && (
             <div className="locked-requirements-list">
               {missingSprints.map((s) => (
-                <div key={s.sprintId} className="locked-req-item">
+                <div
+                  key={s.sprintId}
+                  className={`locked-req-item ${onSelectSprintExam ? 'clickable' : ''}`}
+                  onClick={() => onSelectSprintExam?.(s.sprintId)}
+                >
                   <span>—</span>
                   <span>{s.title}</span>
                 </div>

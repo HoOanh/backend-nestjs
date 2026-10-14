@@ -130,6 +130,18 @@
   color: var(--text-secondary);
 }
 
+.locked-req-item.clickable {
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.18s ease;
+}
+
+.locked-req-item.clickable:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--accent-primary);
+}
+
 .locked-actions {
   display: flex;
   flex-direction: column;

@@ -153,17 +153,22 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   className
 }) => {
   const [showHints, setShowHints] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<'split' | 'stacked'>('split');
+  const [problemTab, setProblemTab] = useState<'all' | 'spec' | 'guide'>('all');
 
   // Extract function name and parameter names from starterCode for clear Input display
   const signatureMeta = useMemo(() => {
     const fnMatch = challenge.starterCode.match(
-      /(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(([^)]*)\)/
+      /(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(([\s\S]*?)\)\s*(?::|\{)/
     );
     if (fnMatch) {
       const fnName = fnMatch[1];
-      const paramNames = fnMatch[2]
+      const strippedArgs = fnMatch[2]
+        .replace(/<[^>]*>/g, '')
+        .replace(/\{[^}]*\}/g, '');
+      const paramNames = strippedArgs
         .split(',')
-        .map((p) => p.trim().split(/[:=]/)[0].trim())
+        .map((p) => p.trim().split(/[:=?]/)[0].trim())
         .filter(Boolean);
       return { fnName, paramNames };
     }
@@ -217,7 +222,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   const [viewHistoryRecord, setViewHistoryRecord] = useState<SubmissionHistoryRecord | null>(null);
 
   const currentSolution = solutions.find((s) => s.id === activeSolutionId) || solutions[0];
-  const code = value !== undefined ? value : (currentSolution?.code ?? challenge.starterCode);
+  const code = currentSolution?.code ?? (value !== undefined ? value : challenge.starterCode);
 
   const [isRunning, setIsRunning] = useState(false);
   const [testOutcome, setTestOutcome] = useState<TestOutcome | null>(null);
@@ -233,6 +238,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   const gutterRef = useRef<HTMLDivElement | null>(null);
   const highlightRef = useRef<HTMLPreElement | null>(null);
 
+  // Reset sandbox state ONLY when switching to a different challenge
   useEffect(() => {
     setShowHints(false);
     if (storageKey) {
@@ -252,7 +258,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
     }
     setViewHistoryRecord(null);
 
-    if (value === undefined && storageKey) {
+    if (storageKey) {
       try {
         const savedMulti = localStorage.getItem(`${storageKey}_solutions`);
         if (savedMulti) {
@@ -266,16 +272,28 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
           }
         }
         const saved = localStorage.getItem(storageKey);
-        setSolutions([{ id: 'sol-1', name: fileName, code: saved || challenge.starterCode }]);
+        setSolutions([{ id: 'sol-1', name: fileName, code: saved || (value !== undefined ? value : challenge.starterCode) }]);
         setActiveSolutionId('sol-1');
       } catch {
-        setSolutions([{ id: 'sol-1', name: fileName, code: challenge.starterCode }]);
+        setSolutions([{ id: 'sol-1', name: fileName, code: value !== undefined ? value : challenge.starterCode }]);
         setActiveSolutionId('sol-1');
       }
+    } else {
+      setSolutions([{ id: 'sol-1', name: fileName, code: value !== undefined ? value : challenge.starterCode }]);
+      setActiveSolutionId('sol-1');
     }
     setTestOutcome(null);
     setSuggestions([]);
-  }, [challenge.title, storageKey, fileName, value, challenge.starterCode]);
+  }, [challenge.id, challenge.title, storageKey, fileName, challenge.starterCode]);
+
+  // Sync external controlled `value` updates (e.g. exam reset or attempt restore) into active tab without wiping UI state
+  useEffect(() => {
+    if (value !== undefined && currentSolution && value !== currentSolution.code) {
+      setSolutions((prev) =>
+        prev.map((s) => (s.id === currentSolution.id ? { ...s, code: value } : s))
+      );
+    }
+  }, [value]);
 
   // Extract dynamic variable/function names from user code for IntelliSense
   const dynamicWords = useMemo(() => {
@@ -625,115 +643,168 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   };
 
   return (
-    <div className={`sandbox-card ${className || ''}`}>
-      <div className="sandbox-header">
-        <div className="sandbox-header-top-row">
-          <div className="sandbox-header-badge">{headerBadge}</div>
-          {challenge.levelLabel && (
-            <span className={`sandbox-level-pill level-${challenge.level || 'basic'}`}>
-              {challenge.levelLabel}
-            </span>
-          )}
-        </div>
-        <h3 className="sandbox-title">{challenge.title}</h3>
-        <FormattedText content={challenge.description} className="sandbox-desc" />
-
-        {/* Step-by-step Pedagogical Guidance */}
-        {challenge.guidedSteps && challenge.guidedSteps.length > 0 && (
-          <div className="sandbox-guided-steps-box">
-            <div className="guided-steps-header">
-              <span className="guided-steps-title">HƯỚNG DẪN TƯ DUY & GIẢI TỪNG BƯỚC</span>
-              {challenge.hints && challenge.hints.length > 0 && (
+    <div className={`sandbox-card layout-${layoutMode} ${className || ''}`}>
+      <div className="sandbox-split-container">
+        {/* LEFT PANE: Problem Statement, Guided Steps & Visible I/O Specs */}
+        <div className="sandbox-problem-pane">
+          <div className="sandbox-problem-toolbar">
+            <div className="sandbox-problem-subtabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={problemTab === 'all'}
+                className={`problem-subtab-btn ${problemTab === 'all' ? 'active' : ''}`}
+                onClick={() => setProblemTab('all')}
+              >
+                Tất cả đề bài
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={problemTab === 'spec'}
+                className={`problem-subtab-btn ${problemTab === 'spec' ? 'active' : ''}`}
+                onClick={() => setProblemTab('spec')}
+              >
+                Đặc tả & I/O ({visibleTestCases.length})
+              </button>
+              {challenge.guidedSteps && challenge.guidedSteps.length > 0 && (
                 <button
                   type="button"
-                  className="btn-toggle-hints"
-                  onClick={() => setShowHints((prev) => !prev)}
+                  role="tab"
+                  aria-selected={problemTab === 'guide'}
+                  className={`problem-subtab-btn ${problemTab === 'guide' ? 'active' : ''}`}
+                  onClick={() => setProblemTab('guide')}
                 >
-                  {showHints ? 'Ẩn gợi ý mở rộng' : `Xem gợi ý & lưu ý biên (${challenge.hints.length})`}
+                  Hướng dẫn ({challenge.guidedSteps.length} bước)
                 </button>
               )}
             </div>
-            <div className="guided-steps-list">
-              {challenge.guidedSteps.map((rawStep, sIdx) => {
-                const match = rawStep.match(/^Bước\s*\d+(?:\s*&\s*\d+)?\s*(?:\(([^)]+)\))?\s*[:\-]?\s*(.*)$/i);
-                const stepSubtitle = match?.[1]?.trim();
-                const stepBody = match?.[2] ? match[2].trim() : rawStep.replace(/^Bước\s*\d+\s*[:\-]?\s*/i, '').trim();
-                const formattedStepContent = stepSubtitle ? `**${stepSubtitle}:** ${stepBody}` : stepBody;
-                return (
-                  <div key={sIdx} className="guided-step-item">
-                    <span className="guided-step-num">Bước {sIdx + 1}</span>
-                    <FormattedText content={formattedStepContent} className="guided-step-text" />
-                  </div>
-                );
-              })}
-            </div>
 
-            {showHints && challenge.hints && challenge.hints.length > 0 && (
-              <div className="sandbox-hints-drawer">
-                <div className="sandbox-hints-title">Gợi ý kiểm tra điều kiện biên & công thức:</div>
-                <ul className="hints-list">
-                  {challenge.hints.map((hint, hIdx) => (
-                    <li key={hIdx} className="hint-item">
-                      <FormattedText content={hint} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <button
+              type="button"
+              className="btn-layout-toggle"
+              onClick={() => setLayoutMode((prev) => (prev === 'split' ? 'stacked' : 'split'))}
+              title="Chuyển đổi bố cục Chia 2 cột (IDE) hoặc Trên-Dưới"
+            >
+              {layoutMode === 'split' ? '◫ Chia 2 cột' : '▤ Trên - Dưới'}
+            </button>
           </div>
-        )}
 
-        {/* Pre-Execution Visible Test Cases Input / Output Table */}
-        {visibleTestCases.length > 0 && (
-          <div className="sandbox-visible-specs-box">
-            <div className="visible-specs-header">
-              <div className="visible-specs-header-left">
-                <span className="visible-specs-title">
-                  ĐẶC TẢ INPUT / OUTPUT MẪU ({visibleTestCases.length} VISIBLE TEST CASES)
-                </span>
-                {signatureMeta.fnName && (
-                  <span className="visible-specs-fn-badge">
-                    {signatureMeta.fnName}({signatureMeta.paramNames.join(', ')})
-                  </span>
-                )}
-              </div>
-              {hiddenTestCases.length > 0 && (
-                <span className="sandbox-hidden-count-note">
-                  + {hiddenTestCases.length} Hidden Test Cases kiểm tra điều kiện biên khi Nộp Bài
+          <div className="sandbox-header">
+            <div className="sandbox-header-top-row">
+              <div className="sandbox-header-badge">{headerBadge}</div>
+              {challenge.levelLabel && (
+                <span className={`sandbox-level-pill level-${challenge.level || 'basic'}`}>
+                  {challenge.levelLabel}
                 </span>
               )}
             </div>
-            <div className="visible-specs-grid">
-              {visibleTestCases.map((tc, vIdx) => (
-                <div key={vIdx} className="sandbox-spec-card">
-                  <div className="spec-card-header">
-                    <span className="spec-card-badge">Ví dụ {vIdx + 1}</span>
-                    <span className="spec-card-name">
-                      {(tc.name || `Test Case ${vIdx + 1}`).replace(/^Case\s*\d+\s*\(Visible\):\s*/i, '')}
-                    </span>
-                  </div>
-                  {tc.description && (
-                    <div className="sandbox-spec-case-desc">{tc.description}</div>
-                  )}
-                  <div className="spec-card-io">
-                    <div className="spec-io-row">
-                      <span className="spec-io-label">Input:</span>
-                      <span className="spec-io-value">{formatInputArgs(tc.input)}</span>
-                    </div>
-                    <div className="spec-io-row">
-                      <span className="spec-io-label">Output kỳ vọng:</span>
-                      <span className="spec-io-value expected">{formatExpectedValue(tc.expected)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+            <h3 className="sandbox-title">{challenge.title}</h3>
 
-      {/* VS Code Interactive Editor */}
-      <div className="vs-code-editor sandbox-ide">
+            {(problemTab === 'all' || problemTab === 'spec') && (
+              <FormattedText content={challenge.description} className="sandbox-desc" />
+            )}
+
+            {/* Step-by-step Pedagogical Guidance */}
+            {(problemTab === 'all' || problemTab === 'guide') &&
+              challenge.guidedSteps &&
+              challenge.guidedSteps.length > 0 && (
+                <div className="sandbox-guided-steps-box">
+                  <div className="guided-steps-header">
+                    <span className="guided-steps-title">HƯỚNG DẪN TƯ DUY & GIẢI TỪNG BƯỚC</span>
+                    {challenge.hints && challenge.hints.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn-toggle-hints"
+                        onClick={() => setShowHints((prev) => !prev)}
+                      >
+                        {showHints ? 'Ẩn gợi ý mở rộng' : `Gợi ý & lưu ý biên (${challenge.hints.length})`}
+                      </button>
+                    )}
+                  </div>
+                  <div className="guided-steps-list">
+                    {challenge.guidedSteps.map((rawStep, sIdx) => {
+                      const match = rawStep.match(/^Bước\s*\d+(?:\s*&\s*\d+)?\s*(?:\(([^)]+)\))?\s*[:\-]?\s*(.*)$/i);
+                      const stepSubtitle = match?.[1]?.trim();
+                      const stepBody = match?.[2] ? match[2].trim() : rawStep.replace(/^Bước\s*\d+\s*[:\-]?\s*/i, '').trim();
+                      const formattedStepContent = stepSubtitle ? `**${stepSubtitle}:** ${stepBody}` : stepBody;
+                      return (
+                        <div key={sIdx} className="guided-step-item">
+                          <span className="guided-step-num">Bước {sIdx + 1}</span>
+                          <FormattedText content={formattedStepContent} className="guided-step-text" />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {showHints && challenge.hints && challenge.hints.length > 0 && (
+                    <div className="sandbox-hints-drawer">
+                      <div className="sandbox-hints-title">Gợi ý kiểm tra điều kiện biên & công thức:</div>
+                      <ul className="hints-list">
+                        {challenge.hints.map((hint, hIdx) => (
+                          <li key={hIdx} className="hint-item">
+                            <FormattedText content={hint} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {/* Pre-Execution Visible Test Cases Input / Output Table */}
+            {(problemTab === 'all' || problemTab === 'spec') && visibleTestCases.length > 0 && (
+              <div className="sandbox-visible-specs-box">
+                <div className="visible-specs-header">
+                  <div className="visible-specs-header-left">
+                    <span className="visible-specs-title">
+                      ĐẶC TẢ INPUT / OUTPUT MẪU ({visibleTestCases.length} VISIBLE CASES)
+                    </span>
+                    {signatureMeta.fnName && (
+                      <span className="visible-specs-fn-badge">
+                        {signatureMeta.fnName}({signatureMeta.paramNames.join(', ')})
+                      </span>
+                    )}
+                  </div>
+                  {hiddenTestCases.length > 0 && (
+                    <span className="sandbox-hidden-count-note">
+                      + {hiddenTestCases.length} Hidden Cases khi Nộp Bài
+                    </span>
+                  )}
+                </div>
+                <div className="visible-specs-grid">
+                  {visibleTestCases.map((tc, vIdx) => (
+                    <div key={vIdx} className="sandbox-spec-card">
+                      <div className="spec-card-header">
+                        <span className="spec-card-badge">Ví dụ {vIdx + 1}</span>
+                        <span className="spec-card-name">
+                          {(tc.name || `Test Case ${vIdx + 1}`).replace(/^Case\s*\d+\s*\(Visible\):\s*/i, '')}
+                        </span>
+                      </div>
+                      {tc.description && (
+                        <div className="sandbox-spec-case-desc">{tc.description}</div>
+                      )}
+                      <div className="spec-card-io">
+                        <div className="spec-io-row">
+                          <span className="spec-io-label">Input:</span>
+                          <span className="spec-io-value">{formatInputArgs(tc.input)}</span>
+                        </div>
+                        <div className="spec-io-row">
+                          <span className="spec-io-label">Output kỳ vọng:</span>
+                          <span className="spec-io-value expected">{formatExpectedValue(tc.expected)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT PANE: VS Code Interactive Editor + Terminal Output */}
+        <div className="sandbox-workspace-pane">
+          <div className="vs-code-editor sandbox-ide">
         {/* Tab Delete Confirmation Overlay Modal */}
         {tabToDelete && (
           <div className="vs-tab-delete-overlay" onClick={() => setTabToDeleteId(null)}>
@@ -776,7 +847,10 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
               <div
                 key={sol.id}
                 className={`vs-tab ${sol.id === activeSolutionId ? 'active' : ''}`}
-                onClick={() => setActiveSolutionId(sol.id)}
+                onClick={() => {
+                  setActiveSolutionId(sol.id);
+                  if (onChange) onChange(sol.code);
+                }}
                 onDoubleClick={(e) => startRenamingTab(sol, e)}
                 title="Nhấp đúp hoặc bấm nút sửa để đổi tên tab"
               >
@@ -929,20 +1003,17 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
         </div>
       </div>
 
-      {/* Terminal / Test Output Panel */}
-      {(testOutcome || history.length > 0) && (
+        {/* Terminal / Test Output Panel */}
         <div className="test-results-panel">
           <div className="terminal-header">
             <div className="terminal-tabs">
-              {testOutcome && (
-                <button
-                  type="button"
-                  className={`terminal-tab ${activeTab === 'tests' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('tests')}
-                >
-                  TEST CASES ({testOutcome.passedCount}/{testOutcome.total})
-                </button>
-              )}
+              <button
+                type="button"
+                className={`terminal-tab ${activeTab === 'tests' ? 'active' : ''}`}
+                onClick={() => setActiveTab('tests')}
+              >
+                TEST CASES {testOutcome ? `(${testOutcome.passedCount}/${testOutcome.total})` : `(${visibleTestCases.length} mẫu)`}
+              </button>
               <button
                 type="button"
                 className={`terminal-tab ${activeTab === 'console' ? 'active' : ''}`}
@@ -956,16 +1027,20 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                 className={`terminal-tab ${activeTab === 'history' ? 'active' : ''}`}
                 onClick={() => setActiveTab('history')}
               >
-                LỊCH SỬ LÀM BÀI ({history.length})
+                LỊCH SỬ ({history.length})
               </button>
             </div>
-            {testOutcome && (
+            {testOutcome ? (
               <div className="terminal-status-info">
                 {testOutcome.passed ? (
                   <span className="terminal-badge pass">PASS ({testOutcome.passedCount}/{testOutcome.total})</span>
                 ) : (
                   <span className="terminal-badge fail">FAIL ({testOutcome.passedCount}/{testOutcome.total})</span>
                 )}
+              </div>
+            ) : (
+              <div className="terminal-status-info">
+                <span className="terminal-badge ready">SẴN SÀNG CHẠY THỬ</span>
               </div>
             )}
           </div>
@@ -1098,9 +1173,16 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                 </div>
               )}
             </div>
-          ) : null}
+          ) : (
+            <div className="terminal-body">
+              <div className="console-empty-hint">
+                Bấm <strong>{runVisibleButtonText}</strong> (hoặc nhấn <strong>{getModKey()} + Enter</strong>) để thực thi hàm <code>{signatureMeta.fnName}</code> và kiểm tra kết quả trực tiếp.
+              </div>
+            </div>
+          )}
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 };

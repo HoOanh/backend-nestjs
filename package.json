@@ -8,7 +8,8 @@
     "build": "tsc && tsc -p tsconfig.api.json && node scripts/build-api.mjs && vite build",
     "preview": "vite preview",
     "test:admin": "bun test/adminReview.probe.ts && bun test/adminCommands.test.ts && bun test/e2e.test.ts && bun test/adminData.test.ts && bun test/sqliteChat.test.ts && bun test/dataOperations.test.ts",
-    "store:review": "bun scripts/review-store.ts"
+    "store:review": "bun scripts/review-store.ts",
+    "curriculum:validate": "bun .agents/skills/curriculum-authoring/scripts/validate-lesson.ts"
   },
   "dependencies": {
     "react": "^19.0.0",

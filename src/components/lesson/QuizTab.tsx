@@ -33,9 +33,12 @@ export const QuizTab: React.FC<QuizTabProps> = ({
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState<number>(0);
+  const [quizViewMode, setQuizViewMode] = useState<'single' | 'all'>('single');
 
   // Initialize or restore session (both submitted results AND in-progress draft answers) when lesson.id changes
   useEffect(() => {
+    setCurrentQuestionIdx(0);
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -145,6 +148,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({
     setSelectedAnswers({});
     setIsSubmitted(false);
     setShowConfirmModal(false);
+    setCurrentQuestionIdx(0);
     try {
       const nextDraft: SavedQuizResult = {
         selectedAnswers: {},
@@ -159,26 +163,77 @@ export const QuizTab: React.FC<QuizTabProps> = ({
     } catch {}
   };
 
+  const safeCurrentIdx = currentQuestionIdx < totalQuestions ? currentQuestionIdx : 0;
+
   return (
     <div className="quiz-tab-wrapper">
-      {/* 1. Header Banner & Progress */}
+      {/* 1. STICKY HEADER HUD: Progress Bar, Question Pills & Mode Controls */}
       {!isSubmitted ? (
-        <div className="quiz-header-card">
-          <div className="quiz-header-info">
+        <div className="quiz-header-card quiz-sticky-hud">
+          <div className="quiz-hud-top-row">
             <div className="quiz-header-title-row">
               <h3>Khảo Thí Trắc Nghiệm Ôn Luyện</h3>
-              <span className="quiz-badge-count">{totalQuestions} câu hỏi chuyên sâu</span>
+              <span className="quiz-badge-count">
+                Đã chọn {answeredCount}/{totalQuestions} câu ({progressPercent}%)
+              </span>
             </div>
-            <p className="quiz-header-desc">
-              Bộ câu hỏi đánh giá kiến thức kiến trúc hệ thống và cơ chế thực thi Senior Backend. ĐẠI CA đọc kỹ câu hỏi trước khi nộp bài.
-            </p>
+
+            <div className="quiz-hud-actions">
+              <button
+                type="button"
+                className="quiz-mode-toggle-btn"
+                onClick={() =>
+                  setQuizViewMode((prev) => (prev === 'single' ? 'all' : 'single'))
+                }
+              >
+                {quizViewMode === 'single'
+                  ? 'Hiển thị: Từng câu (1/1)'
+                  : 'Hiển thị: Tất cả câu'}
+              </button>
+
+              <button
+                className="btn btn-success btn-sm quiz-hud-submit-btn"
+                onClick={handlePreSubmit}
+                type="button"
+              >
+                Nộp Bài ({answeredCount}/{totalQuestions})
+              </button>
+            </div>
           </div>
 
-          <div className="quiz-progress-section">
-            <div className="quiz-progress-labels">
-              <span>Tiến độ hoàn thành:</span>
-              <strong>{answeredCount}/{totalQuestions} câu ({progressPercent}%)</strong>
+          <div className="quiz-hud-nav-row">
+            <div className="quiz-question-pills-grid">
+              {activeQuestions.map((q, idx) => {
+                const isAnswered = selectedAnswers[q.id] !== undefined;
+                const isCurrent = idx === safeCurrentIdx;
+                const chosenLetter = isAnswered
+                  ? String.fromCharCode(65 + selectedAnswers[q.id])
+                  : '';
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    className={`quiz-q-pill ${isAnswered ? 'answered' : ''} ${isCurrent ? 'current' : ''}`}
+                    onClick={() => {
+                      setCurrentQuestionIdx(idx);
+                      if (quizViewMode === 'all') {
+                        const el = document.getElementById(`lesson-quiz-q-${idx + 1}`);
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    title={
+                      isAnswered
+                        ? `Câu ${idx + 1}: Đã chọn đáp án ${chosenLetter}`
+                        : `Câu ${idx + 1}: Chưa trả lời`
+                    }
+                  >
+                    <span>{idx + 1}</span>
+                    {isAnswered && <small>{chosenLetter}</small>}
+                  </button>
+                );
+              })}
             </div>
+
             <div className="quiz-progress-track">
               <div
                 className="quiz-progress-fill"
@@ -188,8 +243,8 @@ export const QuizTab: React.FC<QuizTabProps> = ({
           </div>
         </div>
       ) : (
-        /* 2. Submitted Score Summary Result Banner */
-        <div className={`quiz-result-banner ${isPassed ? 'is-passed' : 'is-failed'}`}>
+        /* 2. Submitted Score Summary Result Banner (Sticky) */
+        <div className={`quiz-result-banner quiz-sticky-hud ${isPassed ? 'is-passed' : 'is-failed'}`}>
           <div className="result-main-col">
             <div className="result-badge-row">
               <span className="result-badge-icon">{isPassed ? 'PASS' : 'REVIEW'}</span>
@@ -197,56 +252,79 @@ export const QuizTab: React.FC<QuizTabProps> = ({
                 {isPassed ? 'ĐẠT TIÊU CHUẨN KỸ THUẬT (PASS)' : 'CHƯA ĐẠT TIÊU CHUẨN (NEED REVIEW)'}
               </span>
               <span className="result-timestamp">
-                Hạn mức yêu cầu: ≥ 70%
+                Kết quả: {correctCount}/{totalQuestions} câu đúng ({scorePercent}% — Yêu cầu ≥ 70%)
               </span>
             </div>
 
-            <div className="result-score-highlight">
-              <span className="result-score-large">{scorePercent}%</span>
-              <div className="result-score-details">
-                <strong>{correctCount} / {totalQuestions} câu chính xác</strong>
-                <p>
-                  {isPassed
-                    ? 'ĐẠI CA đã nắm vững kiến thức lý thuyết và cơ chế runtime của bài học này.'
-                    : 'ĐẠI CA cần rà soát lại các câu sai để nắm chắc cơ chế vận hành trước khi triển khai thực tế.'}
-                </p>
-              </div>
+            <div className="quiz-question-pills-grid">
+              {activeQuestions.map((q, idx) => {
+                const selectedIdx = selectedAnswers[q.id];
+                const hasAnswered = selectedIdx !== undefined;
+                const isCorrect = selectedIdx === q.correctIndex;
+                const isCurrent = idx === safeCurrentIdx;
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    className={`quiz-q-pill ${
+                      !hasAnswered ? 'review-unanswered' : isCorrect ? 'review-correct' : 'review-wrong'
+                    } ${isCurrent ? 'current' : ''}`}
+                    onClick={() => {
+                      setCurrentQuestionIdx(idx);
+                      if (quizViewMode === 'all') {
+                        const el = document.getElementById(`lesson-quiz-review-q-${idx + 1}`);
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    title={`Câu ${idx + 1}: ${!hasAnswered ? 'Chưa trả lời' : isCorrect ? 'Đúng' : 'Sai'}`}
+                  >
+                    <span>{idx + 1}</span>
+                    <small>{!hasAnswered ? '!' : isCorrect ? '✓' : '✗'}</small>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="result-actions-col">
-            <button className="btn btn-secondary retake-btn" onClick={handleRetake} type="button">
-              Làm Lại Bài Trắc Nghiệm
+            <button
+              type="button"
+              className="quiz-mode-toggle-btn"
+              onClick={() =>
+                setQuizViewMode((prev) => (prev === 'single' ? 'all' : 'single'))
+              }
+            >
+              {quizViewMode === 'single'
+                ? 'Xem: Từng câu (1/1)'
+                : 'Xem: Tất cả câu'}
             </button>
-            <button className="btn btn-primary" onClick={onNextTab} type="button">
-              Sang Bài Tập Code Sandbox →
+            <button className="btn btn-secondary btn-sm retake-btn" onClick={handleRetake} type="button">
+              Làm Lại Bài
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={onNextTab} type="button">
+              Sang Code Sandbox →
             </button>
           </div>
         </div>
       )}
 
-      {/* 3. Section Title for Review Mode */}
-      {isSubmitted && (
-        <div className="quiz-review-section-title">
-          <h4>Chi Tiết Sửa Bài & Phân Tích Kỹ Thuật (Review Mode)</h4>
-          <span className="quiz-review-note">
-            Đối chiếu chi tiết phương án đã chọn với cơ chế hoạt động của Node.js / NestJS runtime
-          </span>
-        </div>
-      )}
-
-      {/* 4. List of Questions */}
+      {/* 3. Questions Content (Single-Question Stepper Mode or Full List Mode) */}
       <div className="quiz-container">
-        {activeQuestions.map((q, idx) => {
+        {(quizViewMode === 'single' && activeQuestions.length > 0
+          ? [{ q: activeQuestions[safeCurrentIdx], idx: safeCurrentIdx }]
+          : activeQuestions.map((q, idx) => ({ q, idx }))
+        ).map(({ q, idx }) => {
           const selectedIdx = selectedAnswers[q.id];
           const hasAnswered = selectedIdx !== undefined;
           const isCorrect = selectedIdx === q.correctIndex;
+          const isLastQuestion = idx === totalQuestions - 1;
 
           // Review Mode Card
           if (isSubmitted) {
             return (
               <div
                 key={q.id}
+                id={`lesson-quiz-review-q-${idx + 1}`}
                 className={`review-question-card ${
                   !hasAnswered ? 'is-unanswered' : isCorrect ? 'is-correct' : 'is-wrong'
                 }`}
@@ -260,7 +338,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({
                       : '✗ SAI (0đ)'}
                   </div>
                   <div className="review-question-title">
-                    <span className="question-idx-tag">Câu {idx + 1}:</span>
+                    <span className="question-idx-tag">Câu {idx + 1}/{totalQuestions}:</span>
                     <FormattedText content={q.question} />
                   </div>
                 </div>
@@ -301,13 +379,55 @@ export const QuizTab: React.FC<QuizTabProps> = ({
                   <div className="exp-badge">Phân Tích & Giải Thích Kỹ Thuật Chuyên Sâu:</div>
                   <FormattedText content={q.explanation} className="exp-text" />
                 </div>
+
+                {quizViewMode === 'single' && (
+                  <div className="quiz-step-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={idx === 0}
+                      onClick={() => setCurrentQuestionIdx((prev) => Math.max(0, prev - 1))}
+                    >
+                      ← Câu trước
+                    </button>
+                    <span className="quiz-step-counter">
+                      Đang xem sửa bài Câu {idx + 1} / {totalQuestions}
+                    </span>
+                    {!isLastQuestion ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() =>
+                          setCurrentQuestionIdx((prev) => Math.min(totalQuestions - 1, prev + 1))
+                        }
+                      >
+                        Câu tiếp theo (Câu {idx + 2}) →
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-primary" onClick={onNextTab}>
+                        Sang Bài Tập Code Sandbox →
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           }
 
           // Active Answering Mode Card
           return (
-            <div key={q.id} className="question-card">
+            <div key={q.id} id={`lesson-quiz-q-${idx + 1}`} className="question-card">
+              <div className="quiz-single-card-meta">
+                <span className="quiz-single-step-label">
+                  CÂU HỎI {idx + 1} / {totalQuestions}
+                </span>
+                <span className={`quiz-single-state ${hasAnswered ? 'answered' : 'pending'}`}>
+                  {hasAnswered
+                    ? `✓ Đã chọn đáp án ${String.fromCharCode(65 + selectedIdx)}`
+                    : 'Chưa chọn đáp án'}
+                </span>
+              </div>
+
               <div className="question-header">
                 <span className="question-num">Câu {idx + 1}</span>
                 <div className="question-text">
@@ -337,36 +457,80 @@ export const QuizTab: React.FC<QuizTabProps> = ({
                   );
                 })}
               </div>
+
+              {quizViewMode === 'single' && (
+                <div className="quiz-step-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      if (idx === 0) {
+                        onPrevTab();
+                      } else {
+                        setCurrentQuestionIdx((prev) => Math.max(0, prev - 1));
+                      }
+                    }}
+                  >
+                    {idx === 0 ? '← Quay lại Lý thuyết' : '← Câu trước'}
+                  </button>
+
+                  <span className="quiz-step-counter">
+                    Đã trả lời <strong>{answeredCount}/{totalQuestions}</strong> câu ({progressPercent}%)
+                  </span>
+
+                  {!isLastQuestion ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() =>
+                        setCurrentQuestionIdx((prev) => Math.min(totalQuestions - 1, prev + 1))
+                      }
+                    >
+                      Câu tiếp theo (Câu {idx + 2}) →
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-success quiz-submit-btn"
+                      onClick={handlePreSubmit}
+                    >
+                      Nộp Bài Trắc Nghiệm ({answeredCount}/{totalQuestions} câu) ✓
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* 5. Footer Navigation & Submit Button */}
-      <div className="quiz-footer-row">
-        <button className="btn btn-secondary" onClick={onPrevTab} type="button">
-          ← Quay lại Lý thuyết
-        </button>
-
-        {!isSubmitted ? (
-          <button
-            className="btn btn-success quiz-submit-btn"
-            onClick={handlePreSubmit}
-            type="button"
-          >
-            Nộp Bài Trắc Nghiệm ({answeredCount}/{totalQuestions} câu)
+      {/* 5. Footer Navigation & Submit Button (shown in 'all' view mode) */}
+      {quizViewMode === 'all' && (
+        <div className="quiz-footer-row">
+          <button className="btn btn-secondary" onClick={onPrevTab} type="button">
+            ← Quay lại Lý thuyết
           </button>
-        ) : (
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button className="btn btn-secondary" onClick={handleRetake} type="button">
-              Làm Lại Bài
+
+          {!isSubmitted ? (
+            <button
+              className="btn btn-success quiz-submit-btn"
+              onClick={handlePreSubmit}
+              type="button"
+            >
+              Nộp Bài Trắc Nghiệm ({answeredCount}/{totalQuestions} câu)
             </button>
-            <button className="btn btn-primary" onClick={onNextTab} type="button">
-              Chuyển sang Bài Tập Code Sandbox →
-            </button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={handleRetake} type="button">
+                Làm Lại Bài
+              </button>
+              <button className="btn btn-primary" onClick={onNextTab} type="button">
+                Chuyển sang Bài Tập Code Sandbox →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 6. Unfinished Confirmation Modal */}
       {showConfirmModal && (

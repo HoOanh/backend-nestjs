@@ -163,10 +163,175 @@ const serialize = (value: unknown, seen = new WeakSet<object>()): SerializedValu
 
 export const CodeEvaluator = {
   stripSimpleTypeScript(code: string): string {
-    return code
-      .replace(/:\s*(?:string|number|boolean|any|void|unknown|never|Record<[^>]+>|Array<[^>]+>|Promise<[^>]+>|Map<[^>]+>|Set<[^>]+>|PrismaService|DeepMockProxy<[^>]+>|\w+Dto|\w+Props|\w+Payload)(?=[,\s\)=;\{])/g, '')
-      .replace(/as\s+[A-Za-z0-9_<>]+(?=[,\s\)=;\{])/g, '')
-      .replace(/<[A-Za-z0-9_,\s]+>(?=\()/g, '');
+    let out = code
+      .replace(/\bexport\s+default\s+/g, '')
+      .replace(/\bexport\s+(?=(?:async\s+)?(?:function|class|const|let|var|interface|type)\b)/g, '')
+      .replace(/\binterface\s+[A-Za-z0-9_$]+(?:\s*<[^>]+>)?\s*\{[\s\S]*?\}/g, '')
+      .replace(/\btype\s+[A-Za-z0-9_$]+(?:\s*<[^>]+>)?\s*=[^;]+;/g, '');
+
+    const fnRegex = /\b(?:async\s+)?function\*?\s+[A-Za-z0-9_$]+/g;
+    let match: RegExpExecArray | null;
+    let result = '';
+    let lastIndex = 0;
+
+    while ((match = fnRegex.exec(out)) !== null) {
+      const fnStart = match.index;
+      const fnHeadEnd = fnStart + match[0].length;
+      result += out.slice(lastIndex, fnHeadEnd);
+
+      let pos = fnHeadEnd;
+      while (pos < out.length && /\s/.test(out[pos])) pos++;
+
+      if (out[pos] === '<') {
+        let d = 0;
+        while (pos < out.length) {
+          if (out[pos] === '<') d++;
+          else if (out[pos] === '>') {
+            d--;
+            if (d === 0) {
+              pos++;
+              break;
+            }
+          }
+          pos++;
+        }
+        while (pos < out.length && /\s/.test(out[pos])) pos++;
+      }
+
+      if (out[pos] !== '(') {
+        lastIndex = fnHeadEnd;
+        continue;
+      }
+
+      const paramOpen = pos;
+      let dParen = 0;
+      while (pos < out.length) {
+        if (out[pos] === '(') dParen++;
+        else if (out[pos] === ')') {
+          dParen--;
+          if (dParen === 0) break;
+        }
+        pos++;
+      }
+      const paramClose = pos;
+      const paramsRaw = out.slice(paramOpen + 1, paramClose);
+      pos = paramClose + 1;
+
+      const cleanParams: string[] = [];
+      let current = '';
+      let dA = 0,
+        dB = 0,
+        dP = 0,
+        dK = 0;
+      for (let i = 0; i < paramsRaw.length; i++) {
+        const ch = paramsRaw[i];
+        if (ch === '<') dA++;
+        else if (ch === '>') dA = Math.max(0, dA - 1);
+        else if (ch === '{') dB++;
+        else if (ch === '}') dB = Math.max(0, dB - 1);
+        else if (ch === '(') dP++;
+        else if (ch === ')') dP = Math.max(0, dP - 1);
+        else if (ch === '[') dK++;
+        else if (ch === ']') dK = Math.max(0, dK - 1);
+
+        if (ch === ',' && dA === 0 && dB === 0 && dP === 0 && dK === 0) {
+          cleanParams.push(current);
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      if (current.trim()) cleanParams.push(current);
+
+      const strippedParams = cleanParams.map((p) => {
+        let colonIdx = -1,
+          eqIdx = -1;
+        let a = 0,
+          b = 0,
+          pr = 0,
+          k = 0;
+        for (let i = 0; i < p.length; i++) {
+          const c = p[i];
+          if (c === '<') a++;
+          else if (c === '>') a = Math.max(0, a - 1);
+          else if (c === '{') b++;
+          else if (c === '}') b = Math.max(0, b - 1);
+          else if (c === '(') pr++;
+          else if (c === ')') pr = Math.max(0, pr - 1);
+          else if (c === '[') k++;
+          else if (c === ']') k = Math.max(0, k - 1);
+          if (a === 0 && b === 0 && pr === 0 && k === 0) {
+            if (c === ':' && colonIdx === -1 && eqIdx === -1) colonIdx = i;
+            else if (c === '=' && eqIdx === -1 && p[i - 1] !== '=' && p[i + 1] !== '=' && p[i + 1] !== '>') eqIdx = i;
+          }
+        }
+        if (colonIdx === -1) return p.trim();
+        const namePart = p.slice(0, colonIdx).replace(/\?\s*$/, '').trim();
+        const defaultPart = eqIdx !== -1 ? ' = ' + p.slice(eqIdx + 1).trim() : '';
+        return namePart + defaultPart;
+      });
+
+      while (pos < out.length && /\s/.test(out[pos])) pos++;
+      if (out[pos] === ':') {
+        pos++;
+        let rA = 0,
+          rB = 0,
+          rP = 0,
+          rK = 0;
+        while (pos < out.length) {
+          const c = out[pos];
+          if (c === '<') rA++;
+          else if (c === '>') rA = Math.max(0, rA - 1);
+          else if (c === '(') rP++;
+          else if (c === ')') rP = Math.max(0, rP - 1);
+          else if (c === '[') rK++;
+          else if (c === ']') rK = Math.max(0, rK - 1);
+          else if (c === '{') {
+            if (rA === 0 && rP === 0 && rK === 0 && rB === 0) {
+              let tempPos = pos;
+              let tempB = 0;
+              while (tempPos < out.length) {
+                if (out[tempPos] === '{') tempB++;
+                else if (out[tempPos] === '}') {
+                  tempB--;
+                  if (tempB === 0) {
+                    tempPos++;
+                    break;
+                  }
+                }
+                tempPos++;
+              }
+              const afterBrace = out.slice(tempPos).match(/^\s*(\||&|\[\]|\{)/);
+              if (afterBrace) {
+                pos = tempPos;
+                continue;
+              } else {
+                break;
+              }
+            }
+            rB++;
+          } else if (c === '}') {
+            rB = Math.max(0, rB - 1);
+          }
+          pos++;
+        }
+      }
+
+      result += `(${strippedParams.join(', ')}) `;
+      lastIndex = pos;
+      fnRegex.lastIndex = pos;
+    }
+    result += out.slice(lastIndex);
+    out = result;
+
+    return out
+      .replace(/\b(const|let|var)\s+([A-Za-z0-9_$]+)\s*:\s*[^=;\n]+(?=\s*=)/g, '$1 $2')
+      .replace(/<[A-Za-z0-9_,\s|{}[\]'"]+>(?=\s*\()/g, '')
+      .replace(/\bas\s+(?:const|[A-Za-z0-9_$<>[\]|&\s]+)(?=[,\s)=;}\]])/g, '')
+      .replace(
+        /:\s*(?:string|number|boolean|any|void|unknown|never|Record<[^>]+>|Array<[^>]+>|Promise<[^>]+>|Map<[^>]+>|Set<[^>]+>|PrismaService|DeepMockProxy<[^>]+>|\w+Dto|\w+Props|\w+Payload)(?:\[\])*(?=[,\s)=;{])/g,
+        ''
+      );
   },
 
   async runTests(userCode: string, testCases: TestCase[], includeHidden = true): Promise<TestOutcome> {

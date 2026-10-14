@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './FinalExamView.css';
 import type { FinalExam } from '../../data/finalExam.ts';
 import { GraduationCertificate } from '../common/GraduationCertificate.tsx';
@@ -125,17 +125,10 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
     if (isSubmitted || activeTab !== 'exam') return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          void handleSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => clearInterval(timer);
-  }, [isSubmitted, activeTab, activeQuestions, codes, selectedAnswers, studentName]);
+  }, [isSubmitted, activeTab]);
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -239,6 +232,15 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
 
     onFinalExamSubmitted(finalScore, passed, studentName.trim() || 'Kỹ Sư Arc Irobot');
   };
+
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
+  useEffect(() => {
+    if (timeLeft === 0 && !isSubmitted && activeTab === 'exam' && activeQuestions.length > 0) {
+      void handleSubmitRef.current();
+    }
+  }, [timeLeft, isSubmitted, activeTab, activeQuestions.length]);
 
   const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.finalScore)) : (finalResult?.score || 0);
   const hasPassedEver = attempts.some((a) => a.passed) || Boolean(finalResult?.passed);
@@ -557,16 +559,21 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
             <div className="review-questions-list">
               {reviewData.questions.map((q, idx) => {
                 const userChoice = reviewData.selectedAnswers[q.id];
-                const isCorrect = userChoice === q.correctIndex;
+                const isUnanswered = userChoice === undefined;
+                const isCorrect = !isUnanswered && userChoice === q.correctIndex;
 
                 return (
                   <div
                     key={q.id}
-                    className={`review-question-card ${isCorrect ? 'is-correct' : 'is-wrong'}`}
+                    className={`review-question-card ${isCorrect ? 'is-correct' : isUnanswered ? 'is-unanswered' : 'is-wrong'}`}
                   >
                     <div className="review-question-header">
                       <div className="review-status-badge">
-                        {isCorrect ? 'ĐÚNG (+10đ)' : 'SAI (0đ)'}
+                        {isCorrect
+                          ? 'ĐÚNG (+10đ)'
+                          : isUnanswered
+                            ? 'CHƯA TRẢ LỜI (0đ)'
+                            : 'SAI (0đ)'}
                       </div>
                       <div className="review-question-title">
                         <strong>Câu {idx + 1}:</strong>
@@ -591,7 +598,12 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                             </div>
                             <div className="opt-content">
                               <FormattedText content={opt} />
-                              {isTheCorrectOne && (
+                              {isTheCorrectOne && isSelected && (
+                                <span className="answer-tag correct-user">
+                                  ✓ Đại ca chọn chính xác
+                                </span>
+                              )}
+                              {isTheCorrectOne && !isSelected && (
                                 <span className="answer-tag correct">
                                   Đáp án chuẩn
                                 </span>
@@ -645,7 +657,16 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                     <FormattedText content={challenge.description} />
                   </div>
 
-                  {outcome && (
+                  {outcome?.syntaxError && (
+                    <div className="review-syntax-error-banner">
+                      <strong>
+                        Lỗi Biên Dịch / Thực Thi (Syntax / Runtime Error):
+                      </strong>
+                      <code>{outcome.syntaxError}</code>
+                    </div>
+                  )}
+
+                  {outcome && outcome.results.length > 0 && (
                     <div className="test-outcome-table">
                       <table>
                         <thead>
@@ -675,13 +696,13 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                                 </span>
                               </td>
                               <td>
-                                <code>{JSON.stringify(r.expected)}</code>
+                                <code>{String(r.expected)}</code>
                               </td>
                               <td>
                                 <code>
                                   {r.error
                                     ? `Error: ${r.error}`
-                                    : JSON.stringify(r.received)}
+                                    : String(r.received)}
                                 </code>
                               </td>
                             </tr>

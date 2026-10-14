@@ -1238,7 +1238,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
   background: #12131c;
   border-top: 1px solid #232638;
 }
@@ -1246,15 +1248,28 @@
 .sandbox-footer-left {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
   color: #64748b;
   font-family: var(--font-mono);
 }
 
+.sandbox-footer-left span {
+  white-space: nowrap;
+}
+
 .sandbox-footer-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  margin-left: auto;
+}
+
+.sandbox-footer-actions .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-sm {
@@ -1320,6 +1335,13 @@
   border-radius: 4px;
   font-family: var(--font-mono);
   letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.terminal-badge.ready {
+  background: rgba(14, 165, 233, 0.14);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.35);
 }
 
 .terminal-badge.pass {
@@ -2380,5 +2402,149 @@
   transform: translateY(-1px);
 }
 
+/* =========================================================================
+   Split-Pane 2-Column Interactive IDE Layout (Problem Left / Editor Right)
+   ========================================================================= */
+.sandbox-problem-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 18px;
+  background: var(--bg-surface-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
 
+.sandbox-problem-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.problem-subtab-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.problem-subtab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.problem-subtab-btn.active {
+  color: var(--accent-primary);
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+[data-theme='light'] .problem-subtab-btn.active {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0284c7;
+}
+
+.btn-layout-toggle {
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.btn-layout-toggle:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.sandbox-split-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.sandbox-workspace-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #0d0f18;
+}
+
+@media (min-width: 1080px) {
+  .sandbox-card.layout-split .sandbox-split-container {
+    display: grid;
+    grid-template-columns: minmax(380px, 46%) minmax(460px, 54%);
+    align-items: stretch;
+  }
+
+  .sandbox-card.layout-split .sandbox-problem-pane {
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 140px);
+    min-height: 620px;
+    min-width: 0;
+  }
+
+  .sandbox-card.layout-split .sandbox-header {
+    flex: 1;
+    overflow-y: auto;
+    border-bottom: none;
+    padding: 20px 22px;
+    scrollbar-width: thin;
+  }
+
+  .sandbox-card.layout-split .visible-specs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sandbox-card.layout-split .sandbox-workspace-pane {
+    max-height: calc(100vh - 140px);
+    min-height: 620px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sandbox-card.layout-split .vs-code-editor.sandbox-ide {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-top: none;
+    border-bottom: none;
+  }
+
+  .sandbox-card.layout-split .sandbox-editor-wrapper {
+    flex: 1;
+    min-height: 280px;
+    max-height: none;
+  }
+
+  .sandbox-card.layout-split .test-results-panel {
+    max-height: 42%;
+    display: flex;
+    flex-direction: column;
+    border-bottom-left-radius: 0;
+  }
+
+  .sandbox-card.layout-split .terminal-body {
+    overflow-y: auto;
+    flex: 1;
+  }
+}
 

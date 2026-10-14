@@ -821,14 +821,40 @@ export function renderLayeredStack(text: string, title?: string): string {
     `;
   }
 
-  // Parser tổng quát cho các Bản đồ phân tầng khác (Fallback Parser)
+  // Parser tổng quát cho các Bản đồ phân tầng khác (hỗ trợ đầy đủ 2 Tab: Stack + Interactive Radial Mindmap)
+  interface EnrichedLayer extends ParsedLayer {
+    connectorToNext?: string;
+  }
+
   const lines = text.split('\n');
-  const layers: ParsedLayer[] = [];
-  let currentLayer: ParsedLayer | null = null;
+  const layers: EnrichedLayer[] = [];
+  let currentLayer: EnrichedLayer | null = null;
+  let inBox = false;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i].trim();
-    if (!rawLine || rawLine.startsWith('┌') || rawLine.startsWith('└') || rawLine.startsWith('├') || rawLine === '│') continue;
+    if (!rawLine) continue;
+
+    if (rawLine.startsWith('┌')) {
+      inBox = true;
+      continue;
+    }
+    if (rawLine.startsWith('└')) {
+      inBox = false;
+      continue;
+    }
+    if (rawLine.startsWith('├') || rawLine === '│') continue;
+
+    // Dòng kết nối nằm giữa 2 hộp (ngoài khung ┌...┘)
+    if (!inBox) {
+      const connText = rawLine.replace(/^[│▼▲\s]+/, '').replace(/[│▼▲\s]+$/, '').trim();
+      if (connText && layers.length > 0) {
+        layers[layers.length - 1].connectorToNext = connText;
+      } else if (connText && currentLayer) {
+        currentLayer.connectorToNext = connText;
+      }
+      continue;
+    }
 
     const layerMatch = rawLine.match(/(?:│\s*)?(\d+)\.\s+([^│\n]+)(?:│)?/);
     if (
@@ -837,7 +863,9 @@ export function renderLayeredStack(text: string, title?: string): string {
         rawLine.includes('LAYER') ||
         rawLine.includes('PILLARS') ||
         rawLine.includes('TRỤ CỘT') ||
-        rawLine.includes('CẤP'))
+        rawLine.includes('CẤP') ||
+        rawLine.includes('GIAI ĐOẠN') ||
+        rawLine.includes('PHA'))
     ) {
       if (currentLayer) {
         layers.push(currentLayer);
@@ -851,8 +879,39 @@ export function renderLayeredStack(text: string, title?: string): string {
     }
 
     if (currentLayer) {
-      const cleanItem = rawLine.replace(/^[│├──└──\[\]\s]+/, '').replace(/[│\]]+$/, '').trim();
-      if (cleanItem && cleanItem.length > 2 && !cleanItem.startsWith('---')) {
+      const innerLine = rawLine.replace(/^│\s*/, '').replace(/\s*│$/, '').trim();
+      if (!innerLine || innerLine.startsWith('---')) continue;
+
+      // Trường hợp dòng chứa chuỗi thành phần ngang: [ A ] ◄───► [ B ] ◄───► [ C ]
+      if (
+        (innerLine.includes('◄') || innerLine.includes('──►') || innerLine.includes('<-->')) &&
+        innerLine.includes('[')
+      ) {
+        const segments = innerLine
+          .split(/◄?─+►|<--+>|──►/)
+          .map((s) => s.replace(/^[\[\s]+|[\]\s]+$/g, '').trim())
+          .filter((s) => s.length > 0);
+        if (segments.length >= 2) {
+          segments.forEach((seg, segIdx) => {
+            const parenMatch = seg.match(/^([^(]+)\(([^)]+)\)$/);
+            if (parenMatch) {
+              currentLayer!.items.push({
+                title: parenMatch[1].trim(),
+                subtitle: `Bước ${segIdx + 1} trong chuỗi thực thi: ${parenMatch[2].trim()}`,
+              });
+            } else {
+              currentLayer!.items.push({
+                title: seg,
+                subtitle: `Thành phần thứ ${segIdx + 1} trong luồng xử lý tầng ${currentLayer!.layerNumber}`,
+              });
+            }
+          });
+          continue;
+        }
+      }
+
+      const cleanItem = innerLine.replace(/^[│├──└──•\[\]\s]+/, '').replace(/[│\]]+$/, '').trim();
+      if (cleanItem && cleanItem.length > 2) {
         const parts = cleanItem.split(':');
         currentLayer.items.push({
           title: parts[0].trim(),
@@ -870,12 +929,56 @@ export function renderLayeredStack(text: string, title?: string): string {
     return renderCleanBlueprint(text, cleanedTitle);
   }
 
+  const tierPalettes: Array<{
+    tierClass: string;
+    headerClass: string;
+    badgeClass: string;
+    blockClass: string;
+    colorClass: 'amber' | 'green' | 'sky' | 'purple';
+    strokeColor: string;
+  }> = [
+    {
+      tierClass: 'tier-hardware',
+      headerClass: 'header-hardware',
+      badgeClass: 'badge-hardware',
+      blockClass: 'block-hardware',
+      colorClass: 'amber',
+      strokeColor: '#d97706',
+    },
+    {
+      tierClass: 'tier-kernel',
+      headerClass: 'header-kernel',
+      badgeClass: 'badge-kernel',
+      blockClass: 'block-kernel',
+      colorClass: 'green',
+      strokeColor: '#16a34a',
+    },
+    {
+      tierClass: 'tier-runtime',
+      headerClass: 'header-runtime',
+      badgeClass: 'badge-runtime',
+      blockClass: 'block-runtime',
+      colorClass: 'sky',
+      strokeColor: '#0284c7',
+    },
+    {
+      tierClass: 'tier-app',
+      headerClass: 'header-app',
+      badgeClass: 'badge-app',
+      blockClass: 'block-app',
+      colorClass: 'purple',
+      strokeColor: '#8b5cf6',
+    },
+  ];
+
   const tiersHtml = layers
     .map((l, index) => {
+      const palette = tierPalettes[index % tierPalettes.length];
+      const tierNumStr = String(l.layerNumber).padStart(2, '0');
       const itemsHtml = l.items
         .map(
           (it, itemIdx) => `
-          <div class="component-block">
+          <div class="component-block ${palette.blockClass}">
             <div class="comp-head">
               <span class="comp-icon">${String(itemIdx + 1).padStart(2, '0')}</span>
               <strong>${escapeHtml(it.title)}</strong>
@@ -886,6 +989,7 @@ export function renderLayeredStack(text: string, title?: string): string {
         )
         .join('');
 
+      const bridgeLabel = l.connectorToNext || 'Dòng Dữ Liệu & Chuyển Tiếp Giữa Các Tầng';
       const connectorHtml =
         index < layers.length - 1
           ? `
@@ -893,7 +997,7 @@ export function renderLayeredStack(text: string, title?: string): string {
             <div class="connector-line"></div>
             <div class="connector-pill">
               <span class="connector-direction">▲</span>
-              <span>Dòng Dữ Liệu & Gọi Hàm Hệ Thống</span>
+              <span>${escapeHtml(bridgeLabel)}</span>
               <span class="connector-direction">▼</span>
             </div>
             <div class="connector-line"></div>
@@ -902,10 +1006,11 @@ export function renderLayeredStack(text: string, title?: string): string {
           : '';
 
       return `
-        <div class="arch-tier-card tier-general">
-          <div class="tier-card-header">
+        <div class="arch-tier-card ${palette.tierClass}">
+          <div class="tier-card-header ${palette.headerClass}">
             <div class="tier-badge-wrap">
-              <span class="tier-number-badge">CẤP ${escapeHtml(l.layerNumber)}</span>
+              <span class="tier-number-badge ${palette.badgeClass}">TIER ${escapeHtml(tierNumStr)}</span>
+              <span class="tier-scope-tag">ARCHITECTURE LAYER ${escapeHtml(tierNumStr)}</span>
             </div>
             <div class="tier-title">${escapeHtml(l.layerTitle)}</div>
           </div>
@@ -918,6 +1023,112 @@ export function renderLayeredStack(text: string, title?: string): string {
     })
     .join('');
 
+  // Xây dựng Sơ đồ tư duy Radial SVG động cho mọi bài học
+  const truncateLabel = (str: string, maxLen: number): string =>
+    str.length > maxLen ? `${str.slice(0, maxLen - 1).trim()}…` : str;
+
+  const radialBranchesSvg = layers
+    .map((l, idx) => {
+      const palette = tierPalettes[idx % tierPalettes.length];
+      const isLeft = idx % 2 === 0; // idx 0, 2 -> bên trái; idx 1, 3 -> bên phải
+      const isTop = idx < 2; // idx 0, 1 -> nửa trên (cardY=320); idx 2, 3 -> nửa dưới (cardY=880)
+      const cardY = layers.length <= 2 ? 600 : isTop ? 320 : 880;
+      const hubExitY = layers.length <= 2 ? 600 : isTop ? 580 : 620;
+      const tierId = `t${idx + 1}`;
+      const tierBadge = `TIER ${String(l.layerNumber).padStart(2, '0')}`;
+
+      // Tách tên ngắn gọn cho thẻ Tier
+      const parenMatch = l.layerTitle.match(/^([^(]+)\(([^)]+)\)/);
+      const rawShortTitle = parenMatch
+        ? parenMatch[2].replace(/LAYER/i, '').trim()
+        : l.layerTitle.replace(/^\d+\.\s*/, '').replace(/^TẦNG\s+/i, '').trim();
+      const tierTitle = truncateLabel(rawShortTitle || `Tier ${l.layerNumber}`, 22);
+      const tierSub = truncateLabel(
+        parenMatch ? parenMatch[1].replace(/^TẦNG\s+/i, '').trim() : `${l.items.length} thành phần cốt lõi`,
+        26
+      );
+
+      const items = l.items.length > 0 ? l.items : [{ title: l.layerTitle, subtitle: 'Thành phần kiến trúc' }];
+      const span = Math.min(340, Math.max(140, (items.length - 1) * 145));
+      const startY = cardY - span / 2;
+
+      const subBranches: SubBranchSpec[] = items.map((it, itemIdx) => {
+        const subY = items.length === 1 ? cardY : Math.round(startY + (itemIdx * span) / (items.length - 1));
+        const subId = `${tierId}-sub-${itemIdx + 1}`;
+        const leafId = `${uniqueId}_${tierId}_leaf_${itemIdx + 1}`;
+        return {
+          subId,
+          nodeId: leafId,
+          y: subY,
+          title: truncateLabel(it.title, 22),
+          leaves: [
+            {
+              nodeId: leafId,
+              y: subY,
+              title: truncateLabel(it.title, 38),
+              subtitle: truncateLabel(it.subtitle || l.connectorToNext || l.layerTitle, 54),
+            },
+          ],
+        };
+      });
+
+      const rawSvg = isLeft
+        ? renderLeftWingBranch({
+            tierId,
+            nodeId: `${uniqueId}_${tierId}_root`,
+            colorClass: palette.colorClass as 'amber' | 'green',
+            strokeColor: palette.strokeColor,
+            hubExitY,
+            cardY,
+            tierBadge,
+            tierTitle,
+            tierSub,
+            subBranches,
+          })
+        : renderRightWingBranch({
+            tierId,
+            nodeId: `${uniqueId}_${tierId}_root`,
+            colorClass: palette.colorClass as 'purple' | 'sky',
+            strokeColor: palette.strokeColor,
+            hubExitY,
+            cardY,
+            tierBadge,
+            tierTitle,
+            tierSub,
+            subBranches,
+          });
+
+      // Gắn metadata cho Inspector Drawer lên các node
+      let enrichedSvg = rawSvg.replace(
+        `data-node-id="${uniqueId}_${tierId}_root"`,
+        `data-node-id="${uniqueId}_${tierId}_root" data-tier-number="${escapeHtml(tierBadge)}" data-tier-color="${palette.strokeColor}" data-node-title="${escapeHtml(l.layerTitle)}" data-node-concept="${escapeHtml(l.items.map((x) => `${x.title}${x.subtitle ? `: ${x.subtitle}` : ''}`).join(' • '))}" data-node-gotchas="${escapeHtml(l.connectorToNext || 'Tuân thủ chặt chẽ ranh giới giữa các tầng để đạt hiệu năng tối đa.')}"`
+      );
+
+      items.forEach((it, itemIdx) => {
+        const leafId = `${uniqueId}_${tierId}_leaf_${itemIdx + 1}`;
+        const specsJson = JSON.stringify([
+          { label: 'Phân tầng', value: `${tierBadge} (${tierTitle})` },
+          { label: 'Thành phần', value: it.title },
+          { label: 'Liên kết', value: l.connectorToNext || 'Nội bộ tầng thực thi' },
+        ]);
+        enrichedSvg = enrichedSvg.replaceAll(
+          `data-node-id="${leafId}"`,
+          `data-node-id="${leafId}" data-tier-number="${escapeHtml(tierBadge)}" data-tier-color="${palette.strokeColor}" data-node-title="${escapeHtml(it.title)}" data-node-concept="${escapeHtml(it.subtitle || it.title)}" data-node-specs="${escapeHtml(specsJson)}" data-node-gotchas="${escapeHtml(l.connectorToNext || 'Đảm bảo thực thi đúng quy chuẩn kiến trúc ở tầng này.')}"`
+        );
+      });
+
+      return enrichedSvg;
+    })
+    .join('');
+
+  const filterChipsHtml = layers
+    .map((l, idx) => {
+      const palette = tierPalettes[idx % tierPalettes.length];
+      const tierBadge = `Tier ${String(l.layerNumber).padStart(2, '0')}`;
+      return `<button type="button" class="mindmap-chip chip-${palette.colorClass}" data-filter="${palette.colorClass}"><span class="chip-dot"></span> ${escapeHtml(tierBadge)}</button>`;
+    })
+    .join('');
+
   return `
     <div class="system-architecture-board" id="${uniqueId}" data-board-key="${uniqueId}">
       <div class="arch-board-header">
@@ -927,13 +1138,110 @@ export function renderLayeredStack(text: string, title?: string): string {
           </span>
           <div>
             <span class="arch-main-title">${escapeHtml(cleanedTitle)}</span>
-            <span class="arch-subtitle">Mô hình phân tầng kiến trúc hệ thống</span>
+            <span class="arch-subtitle">Kiến trúc phân tầng &amp; Bản đồ tư duy tương tác (${layers.length} Tầng)</span>
           </div>
         </div>
-        <div class="arch-view-badge">ENTERPRISE STACK</div>
+        <div class="arch-view-switcher">
+          <button type="button" class="arch-tab-btn active" data-tab-target="stack">
+            Kiến Trúc Phân Tầng (Stack)
+          </button>
+          <button type="button" class="arch-tab-btn" data-tab-target="radial">
+            Sơ Đồ Tư Duy (Mindmap)
+          </button>
+        </div>
       </div>
-      <div class="arch-stack-container">
+
+      <!-- VIEW 1: KIẾN TRÚC PHÂN TẦNG -->
+      <div class="arch-stack-container" style="display: flex;">
         ${tiersHtml}
+      </div>
+
+      <!-- VIEW 2: SƠ ĐỒ TƯ DUY TƯƠNG TÁC -->
+      <div class="arch-radial-container" id="radial_${uniqueId}" data-board-id="${uniqueId}" style="display: none;">
+        <div class="mindmap-top-bar">
+          <div class="mindmap-legend-group">
+            <button type="button" class="mindmap-chip chip-all active" data-filter="all">Tất cả (${layers.length} Tầng)</button>
+            ${filterChipsHtml}
+          </div>
+
+          <div class="mindmap-tree-ctrl-group">
+            <button type="button" class="mindmap-ctrl-btn btn-expand-all" title="Mở rộng toàn bộ các nhánh con">+ Mở tất cả</button>
+            <button type="button" class="mindmap-ctrl-btn btn-collapse-all" title="Thu gọn tất cả các nhánh con">− Thu gọn</button>
+          </div>
+
+          <div class="mindmap-ctrl-group">
+            <button type="button" class="mindmap-ctrl-btn btn-zoom-out" title="Thu nhỏ (Cuộn chuột xuống)">−</button>
+            <button type="button" class="mindmap-ctrl-btn btn-zoom-level" title="Bấm để đặt lại tỉ lệ chuẩn 100%">100%</button>
+            <button type="button" class="mindmap-ctrl-btn btn-zoom-in" title="Phóng to (Cuộn chuột lên)">+</button>
+            <button type="button" class="mindmap-ctrl-btn btn-zoom-fit" title="Thu phóng vừa vặn toàn màn hình">Vừa khung</button>
+            <button type="button" class="mindmap-ctrl-btn btn-zoom-reset" title="Đặt lại vị trí trung tâm">Đặt lại</button>
+            <button type="button" class="mindmap-ctrl-btn btn-fullscreen" title="Phóng to toàn màn hình (Esc để thoát)">Toàn màn hình</button>
+          </div>
+        </div>
+
+        <div class="mindmap-viewport" id="viewport_${uniqueId}">
+          <div class="mindmap-stage" id="stage_${uniqueId}">
+            <svg class="mindmap-master-svg" viewBox="0 0 2600 1200" width="2600" height="1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="hub-bg-${uniqueId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#0d9488" />
+                  <stop offset="100%" stop-color="#0f766e" />
+                </linearGradient>
+                <filter id="card-shadow" x="-10%" y="-10%" width="125%" height="125%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.10" />
+                </filter>
+                <filter id="hub-shadow" x="-10%" y="-10%" width="125%" height="125%">
+                  <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0d9488" flood-opacity="0.30" />
+                </filter>
+              </defs>
+
+              <g class="mindmap-hub mindmap-interactive-node" data-node-id="${uniqueId}_hub" data-tier-number="SYSTEM TAXONOMY" data-tier-color="#14b8a6" data-node-title="${escapeHtml(cleanedTitle)}" data-node-concept="Bản đồ tổng thể kết nối ${layers.length} tầng kiến trúc từ cấp thấp lên cấp cao." transform="translate(1300, 600)" cursor="pointer">
+                <rect x="-140" y="-44" width="280" height="88" rx="20" fill="none" stroke="#14b8a6" stroke-width="2" stroke-opacity="0.45" stroke-dasharray="5 5" />
+                <rect x="-130" y="-36" width="260" height="72" rx="16" fill="url(#hub-bg-${uniqueId})" filter="url(#hub-shadow)" />
+                <text x="0" y="-4" text-anchor="middle" class="hub-svg-title">System Taxonomy</text>
+                <text x="0" y="16" text-anchor="middle" class="hub-svg-sub">${escapeHtml(truncateLabel(cleanedTitle.replace(/^Sơ đồ \d+:\s*/i, ''), 24).toUpperCase())}</text>
+              </g>
+
+              ${radialBranchesSvg}
+            </svg>
+          </div>
+
+          <div class="mindmap-interaction-hint">
+            <span>Kéo chuột để di chuyển • Cuộn chuột để thu phóng • Nhấp vào thẻ để xem chi tiết kỹ thuật • Bấm [＋]/[−] để đóng/mở nhánh</span>
+          </div>
+        </div>
+
+        <div class="mindmap-inspector-drawer" id="inspector_${uniqueId}">
+          <div class="inspector-header">
+            <div class="inspector-header-left">
+              <span class="inspector-tier-tag" id="insp_tag_${uniqueId}">TIER 01</span>
+              <h3 class="inspector-title" id="insp_title_${uniqueId}">Khám Phá Chi Tiết Kiến Trúc</h3>
+            </div>
+            <button type="button" class="inspector-close-btn" title="Đóng bảng chi tiết (Esc)">✕</button>
+          </div>
+          <div class="inspector-body">
+            <div class="inspector-card-section">
+              <div class="section-label">NGUYÊN LÝ KIẾN TRÚC BẢN CHẤT</div>
+              <p class="inspector-concept-text" id="insp_concept_${uniqueId}">Nhấp chuột vào bất kỳ thành phần nào trên sơ đồ tư duy để tra cứu thông số kỹ thuật và vai trò trong hệ thống.</p>
+            </div>
+            <div class="inspector-card-section">
+              <div class="section-label">THÔNG SỐ VẬN HÀNH &amp; LIÊN KẾT (SPECS)</div>
+              <div class="inspector-specs-grid" id="insp_specs_${uniqueId}">
+                <div class="spec-cell"><span class="spec-k">Hệ thống:</span><span class="spec-v">${layers.length} Tiers Architecture</span></div>
+              </div>
+            </div>
+            <div class="inspector-card-section">
+              <div class="section-label">MÃ NGUỒN CHUẨN PRODUCTION</div>
+              <div class="inspector-code-box">
+                <pre><code class="inspector-code-content" id="insp_code_${uniqueId}">// Chọn một Node để xem thông tin</code></pre>
+              </div>
+            </div>
+            <div class="inspector-card-section section-gotchas">
+              <div class="section-label">LƯU Ý VẬN HÀNH &amp; CHUYỂN TIẾP TẦNG</div>
+              <div class="inspector-gotchas-box" id="insp_gotchas_${uniqueId}">Chọn một thành phần để xem cơ chế kết nối giữa các tầng.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;

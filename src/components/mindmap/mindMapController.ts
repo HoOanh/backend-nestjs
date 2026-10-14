@@ -230,8 +230,37 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
 
     // ===== 1. DEEP KNOWLEDGE INSPECTOR LOGIC =====
     const openInspector = (nodeId: string, nodeEl?: SVGElement | HTMLElement | null) => {
-      const data = MINDMAP_KNOWLEDGE_BASE[nodeId];
-      if (!data || !inspectorDrawer) return;
+      if (!inspectorDrawer) return;
+      const targetEl =
+        nodeEl || stage.querySelector<SVGElement>(`[data-node-id="${nodeId}"]`);
+
+      let data = MINDMAP_KNOWLEDGE_BASE[nodeId];
+      if (!data && targetEl) {
+        const ds = targetEl.dataset;
+        if (ds.nodeTitle) {
+          let parsedSpecs: Array<{ label: string; value: string }> = [];
+          if (ds.nodeSpecs) {
+            try {
+              parsedSpecs = JSON.parse(ds.nodeSpecs) as Array<{ label: string; value: string }>;
+            } catch {
+              parsedSpecs = [];
+            }
+          }
+          data = {
+            id: nodeId,
+            tierNumber: ds.tierNumber || 'SYSTEM TIER',
+            tierTitle: ds.tierTitle || 'KIẾN TRÚC HỆ THỐNG',
+            tierColor: ds.tierColor || '#0d9488',
+            nodeTitle: ds.nodeTitle,
+            icon: 'SYS',
+            concept: ds.nodeConcept || ds.nodeTitle,
+            specs: parsedSpecs,
+            codeSnippet: ds.nodeCode || '// Thành phần thuộc kiến trúc thực thi hệ thống',
+            gotchas: ds.nodeGotchas || 'Đảm bảo tính nhất quán kiểu dữ liệu và giới hạn tài nguyên trên đường nóng (Hot Path).',
+          };
+        }
+      }
+      if (!data) return;
 
       state.selectedNodeId = nodeId;
 
@@ -274,8 +303,6 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
         el.classList.remove('is-selected-node');
       });
 
-      const targetEl =
-        nodeEl || stage.querySelector<SVGElement>(`[data-node-id="${nodeId}"]`);
       if (targetEl) {
         targetEl.classList.add('is-selected-node');
       }

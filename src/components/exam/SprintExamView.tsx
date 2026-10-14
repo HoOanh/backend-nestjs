@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './SprintExamView.css';
 import type { SprintExam } from '../../data/sprintExams.ts';
 import { CodeEvaluator, type TestOutcome } from '../../services/codeEvaluator.ts';
@@ -40,9 +40,17 @@ export interface SprintExamAttempt {
   reviewData: ExamReviewData;
 }
 
+interface SprintExamDraft {
+  questions: RandomizedQuestion[];
+  selectedAnswers: Record<string, number>;
+  code: string;
+  timeLeft: number;
+}
+
 export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingScore, onExamSubmitted }) => {
   const STORAGE_REVIEW_KEY = `arc_sprint_exam_review_${exam.sprintId}`;
   const STORAGE_ATTEMPTS_KEY = `arc_sprint_exam_attempts_${exam.sprintId}`;
+  const STORAGE_DRAFT_KEY = `arc_sprint_exam_draft_${exam.sprintId}`;
 
   // Read saved data from LocalStorage
   const loadSavedReview = (): ExamReviewData | null => {
@@ -61,6 +69,19 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
     return [];
   };
 
+  const loadSavedDraft = (): SprintExamDraft | null => {
+    try {
+      const saved = localStorage.getItem(STORAGE_DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as SprintExamDraft;
+        if (Array.isArray(parsed.questions) && parsed.questions.length > 0 && parsed.timeLeft > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  };
+
   const [activeQuestions, setActiveQuestions] = useState<RandomizedQuestion[]>([]);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [code, setCode] = useState<string>(exam.codeChallenge.starterCode);
@@ -69,58 +90,85 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
   const [reviewData, setReviewData] = useState<ExamReviewData | null>(null);
   const [attempts, setAttempts] = useState<SprintExamAttempt[]>([]);
   const [activeTab, setActiveTab] = useState<'exam' | 'review' | 'history'>('exam');
+  const [confirmModal, setConfirmModal] = useState<'retake' | 'incomplete-submit' | null>(null);
+  const [examSection, setExamSection] = useState<'quiz' | 'code'>('quiz');
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState<number>(0);
+  const [quizViewMode, setQuizViewMode] = useState<'single' | 'all'>('single');
 
   // Initialize or restore session when sprintId changes
   useEffect(() => {
     const savedAttempts = loadSavedAttempts();
     const savedReview = loadSavedReview();
+    const savedDraft = loadSavedDraft();
     setAttempts(savedAttempts);
+    setConfirmModal(null);
+    setExamSection('quiz');
+    setCurrentQuestionIdx(0);
 
-    if (savedReview) {
+    if (savedDraft) {
+      setReviewData(savedReview);
+      setIsSubmitted(false);
+      setActiveTab('exam');
+      setActiveQuestions(savedDraft.questions);
+      setSelectedAnswers(savedDraft.selectedAnswers || {});
+      setCode(savedDraft.code || exam.codeChallenge.starterCode);
+      setTimeLeft(savedDraft.timeLeft);
+    } else if (savedReview) {
       setReviewData(savedReview);
       setIsSubmitted(true);
       setActiveTab('review');
       setActiveQuestions(savedReview.questions);
       setSelectedAnswers(savedReview.selectedAnswers);
       setCode(savedReview.code);
-    } else if (existingScore) {
-      // If user has existing score from backend but no local review, start fresh but mark score
-      setIsSubmitted(false);
-      startNewExamSession();
     } else {
       setIsSubmitted(false);
       startNewExamSession();
     }
   }, [exam.sprintId]);
 
+  // Persist active exam draft so switching views or reloading doesn't lose progress
+  useEffect(() => {
+    if (isSubmitted || activeTab !== 'exam' || activeQuestions.length === 0) return;
+    try {
+      const draft: SprintExamDraft = {
+        questions: activeQuestions,
+        selectedAnswers,
+        code,
+        timeLeft
+      };
+      localStorage.setItem(STORAGE_DRAFT_KEY, JSON.stringify(draft));
+    } catch {}
+  }, [STORAGE_DRAFT_KEY, isSubmitted, activeTab, activeQuestions, selectedAnswers, code, timeLeft]);
+
   // Start new randomized exam session
   const startNewExamSession = () => {
+    try {
+      localStorage.removeItem(STORAGE_DRAFT_KEY);
+      localStorage.removeItem(`draft_sprint_exam_code_${exam.sprintId}`);
+    } catch {}
     const picked = generateRandomExamQuestions(exam.questions, exam.questionCountToPick || 10);
     setActiveQuestions(picked);
     setSelectedAnswers({});
     setCode(exam.codeChallenge.starterCode);
     setTimeLeft(exam.timeLimitMinutes * 60);
     setIsSubmitted(false);
+    setConfirmModal(null);
+    setExamSection('quiz');
+    setCurrentQuestionIdx(0);
     setActiveTab('exam');
   };
 
   // Timer countdown (only active during 'exam' mode and not submitted)
+  // Does NOT depend on `code` or `selectedAnswers` so typing in the IDE never resets the 1-second interval.
   useEffect(() => {
     if (isSubmitted || activeTab !== 'exam') return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          void handleSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [exam.sprintId, isSubmitted, activeTab, activeQuestions, code, selectedAnswers]);
+  }, [exam.sprintId, isSubmitted, activeTab]);
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -138,6 +186,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
   const handleSubmit = async () => {
     if (isSubmitted) return;
+    setConfirmModal(null);
 
     // 1. Calculate Quiz Score
     let correctCount = 0;
@@ -187,10 +236,11 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
     const updatedAttempts = [newAttempt, ...attempts];
 
-    // Save to LocalStorage
+    // Save to LocalStorage and clear active draft
     try {
       localStorage.setItem(STORAGE_REVIEW_KEY, JSON.stringify(submittedData));
       localStorage.setItem(STORAGE_ATTEMPTS_KEY, JSON.stringify(updatedAttempts));
+      localStorage.removeItem(STORAGE_DRAFT_KEY);
     } catch (e) {
       console.error('Failed to save exam attempt to localStorage:', e);
     }
@@ -202,6 +252,18 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
     onExamSubmitted(exam.sprintId, finalScore, passed);
   };
+
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
+  // Trigger auto-submit cleanly when timer reaches 0
+  useEffect(() => {
+    if (timeLeft === 0 && !isSubmitted && activeTab === 'exam' && activeQuestions.length > 0) {
+      void handleSubmitRef.current();
+    }
+  }, [timeLeft, isSubmitted, activeTab, activeQuestions.length]);
+
+  const answeredCount = Object.keys(selectedAnswers).length;
 
   // Best score calculation
   const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.finalScore)) : (existingScore?.score || 0);
@@ -255,9 +317,11 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
         </div>
 
         {activeTab === 'exam' && !isSubmitted ? (
-          <div className="exam-timer">
+          <div className={`exam-timer ${timeLeft <= 300 ? 'urgent' : ''}`}>
             <div className="timer-digits">{formatTimer(timeLeft)}</div>
-            <div className="timer-label">Thời gian còn lại</div>
+            <div className="timer-label">
+              {timeLeft <= 300 ? 'Sắp hết giờ!' : 'Thời gian còn lại'}
+            </div>
           </div>
         ) : (
           <div className={`exam-timer ${hasPassedEver ? 'completed' : ''}`}>
@@ -281,6 +345,77 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
         )}
       </div>
 
+      {/* Custom Confirmation Modal */}
+      {confirmModal && (
+        <div
+          className="exam-confirm-modal-backdrop"
+          onClick={() => setConfirmModal(null)}
+        >
+          <div
+            className="exam-confirm-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {confirmModal === 'retake' ? (
+              <>
+                <h4>Bắt đầu lượt thi Sprint mới?</h4>
+                <p>
+                  Bộ đếm thời gian sẽ đặt lại về{' '}
+                  <strong>{exam.timeLimitMinutes} phút</strong> và hệ thống sẽ
+                  bốc thăm ngẫu nhiên{' '}
+                  <strong>{exam.questionCountToPick || 10} câu hỏi mới</strong>{' '}
+                  từ ngân hàng đề. Kết quả các lần thi trước vẫn được lưu trong
+                  tab Lịch Sử Thi.
+                </p>
+                <div className="exam-confirm-modal-actions">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setConfirmModal(null)}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={startNewExamSession}
+                  >
+                    Bắt Đầu Đề Mới
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h4>Đại ca chưa trả lời hết câu hỏi lý thuyết!</h4>
+                <p>
+                  Hiện tại đại ca mới chọn đáp án cho{' '}
+                  <strong>
+                    {answeredCount}/{activeQuestions.length} câu hỏi
+                  </strong>{' '}
+                  (còn{' '}
+                  <strong style={{ color: '#f87171' }}>
+                    {activeQuestions.length - answeredCount} câu bỏ trống
+                  </strong>
+                  ). Các câu bỏ trống sẽ tính 0 điểm. Đại ca có chắc chắn muốn
+                  nộp bài ngay không?
+                </p>
+                <div className="exam-confirm-modal-actions">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setConfirmModal(null)}
+                  >
+                    Quay Lại Làm Tiếp
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => void handleSubmit()}
+                  >
+                    Vẫn Nộp Bài Ngay
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Mode Switcher Tabs */}
       {(isSubmitted || attempts.length > 0 || reviewData) && (
         <div className="exam-mode-tabs">
@@ -300,13 +435,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
             className={`mode-tab-btn ${activeTab === 'exam' ? 'active' : ''}`}
             onClick={() => {
               if (isSubmitted) {
-                if (
-                  window.confirm(
-                    'Đại ca có muốn bắt đầu một lượt thi mới? Bộ đếm thời gian sẽ reset và 10 câu hỏi ngẫu nhiên mới sẽ được bốc thăm.'
-                  )
-                ) {
-                  startNewExamSession();
-                }
+                setConfirmModal('retake');
               } else {
                 setActiveTab('exam');
               }
@@ -381,16 +510,21 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
             <div className="review-questions-list">
               {reviewData.questions.map((q, idx) => {
                 const userChoice = reviewData.selectedAnswers[q.id];
-                const isCorrect = userChoice === q.correctIndex;
+                const isUnanswered = userChoice === undefined;
+                const isCorrect = !isUnanswered && userChoice === q.correctIndex;
 
                 return (
                   <div
                     key={q.id}
-                    className={`review-question-card ${isCorrect ? 'is-correct' : 'is-wrong'}`}
+                    className={`review-question-card ${isCorrect ? 'is-correct' : isUnanswered ? 'is-unanswered' : 'is-wrong'}`}
                   >
                     <div className="review-question-header">
                       <div className="review-status-badge">
-                        {isCorrect ? 'ĐÚNG (+10đ)' : 'SAI (0đ)'}
+                        {isCorrect
+                          ? 'ĐÚNG (+10đ)'
+                          : isUnanswered
+                            ? 'CHƯA TRẢ LỜI (0đ)'
+                            : 'SAI (0đ)'}
                       </div>
                       <div className="review-question-title">
                         <strong>Câu {idx + 1}:</strong>
@@ -415,7 +549,12 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                             </div>
                             <div className="opt-content">
                               <FormattedText content={opt} />
-                              {isTheCorrectOne && (
+                              {isTheCorrectOne && isSelected && (
+                                <span className="answer-tag correct-user">
+                                  ✓ Đại ca chọn chính xác
+                                </span>
+                              )}
+                              {isTheCorrectOne && !isSelected && (
                                 <span className="answer-tag correct">
                                   Đáp án chuẩn
                                 </span>
@@ -459,48 +598,59 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                 <FormattedText content={exam.codeChallenge.description} />
               </div>
 
+              {reviewData.codeOutcome.syntaxError && (
+                <div className="review-syntax-error-banner">
+                  <strong>
+                    Lỗi Biên Dịch / Thực Thi (Syntax / Runtime Error):
+                  </strong>
+                  <code>{reviewData.codeOutcome.syntaxError}</code>
+                </div>
+              )}
+
               {/* Test Cases Outcome Table */}
-              <div className="test-outcome-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Mô Tả Kiểm Thử</th>
-                      <th>Trạng Thái</th>
-                      <th>Kỳ Vọng (Expected)</th>
-                      <th>Thực Tế (Received)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reviewData.codeOutcome.results.map((r, rIdx) => (
-                      <tr
-                        key={rIdx}
-                        className={r.passed ? 'row-pass' : 'row-fail'}
-                      >
-                        <td>{rIdx + 1}</td>
-                        <td>{r.description || `Test case ${rIdx + 1}`}</td>
-                        <td>
-                          <span
-                            className={`status-pill ${r.passed ? 'pass' : 'fail'}`}
-                          >
-                            {r.passed ? 'PASSED' : 'FAILED'}
-                          </span>
-                        </td>
-                        <td>
-                          <code>{JSON.stringify(r.expected)}</code>
-                        </td>
-                        <td>
-                          <code>
-                            {r.error
-                              ? `Error: ${r.error}`
-                              : JSON.stringify(r.received)}
-                          </code>
-                        </td>
+              {reviewData.codeOutcome.results.length > 0 && (
+                <div className="test-outcome-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Mô Tả Kiểm Thử</th>
+                        <th>Trạng Thái</th>
+                        <th>Kỳ Vọng (Expected)</th>
+                        <th>Thực Tế (Received)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {reviewData.codeOutcome.results.map((r, rIdx) => (
+                        <tr
+                          key={rIdx}
+                          className={r.passed ? 'row-pass' : 'row-fail'}
+                        >
+                          <td>{rIdx + 1}</td>
+                          <td>{r.description || `Test case ${rIdx + 1}`}</td>
+                          <td>
+                            <span
+                              className={`status-pill ${r.passed ? 'pass' : 'fail'}`}
+                            >
+                              {r.passed ? 'PASSED' : 'FAILED'}
+                            </span>
+                          </td>
+                          <td>
+                            <code>{String(r.expected)}</code>
+                          </td>
+                          <td>
+                            <code>
+                              {r.error
+                                ? `Error: ${r.error}`
+                                : String(r.received)}
+                            </code>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {/* Code Submitted Viewer */}
               <div className="submitted-code-viewer">
@@ -633,73 +783,367 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
       {/* TAB 3: EXAM TAKING VIEW */}
       {activeTab === 'exam' && (
         <div className="exam-taking-container">
-          {/* SECTION 1: QUIZ */}
-          <div className="quiz-container" style={{ marginBottom: '32px' }}>
-            <h3 className="section-title">
-              Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc Lõi (
-              {activeQuestions.length} câu)
-            </h3>
-            {activeQuestions.map((q, idx) => (
-              <div key={q.id} className="question-card">
-                <div className="question-header">
-                  <span className="question-num">Câu {idx + 1}</span>
-                  <div className="question-text">
-                    <FormattedText content={q.question} />
-                  </div>
+          {/* STICKY EXAM HUD: Timer + Section Switcher + Question Progress Pills */}
+          <div className="exam-sticky-hud">
+            <div className="exam-hud-top-row">
+              <div className="exam-hud-section-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={examSection === 'quiz'}
+                  className={`exam-hud-section-btn ${examSection === 'quiz' ? 'active' : ''}`}
+                  onClick={() => setExamSection('quiz')}
+                >
+                  <span className="hud-step-badge">Phần 1</span>
+                  <span>Trắc Nghiệm Lý Thuyết</span>
+                  <span className="hud-count-pill">
+                    {answeredCount}/{activeQuestions.length} câu
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={examSection === 'code'}
+                  className={`exam-hud-section-btn ${examSection === 'code' ? 'active' : ''}`}
+                  onClick={() => setExamSection('code')}
+                >
+                  <span className="hud-step-badge">Phần 2</span>
+                  <span>Bài Tập Code Thực Hành</span>
+                  <span className="hud-count-pill">50% điểm</span>
+                </button>
+              </div>
+
+              <div className="exam-hud-right-controls">
+                {examSection === 'quiz' && (
+                  <button
+                    type="button"
+                    className="exam-view-mode-toggle"
+                    onClick={() =>
+                      setQuizViewMode((prev) =>
+                        prev === 'single' ? 'all' : 'single'
+                      )
+                    }
+                    title="Chuyển đổi giữa chế độ làm từng câu (Next/Prev) hoặc xem danh sách"
+                  >
+                    {quizViewMode === 'single'
+                      ? 'Hiển thị: Từng câu (1/1)'
+                      : 'Hiển thị: Tất cả câu'}
+                  </button>
+                )}
+
+                <div
+                  className={`exam-hud-timer-pill ${timeLeft <= 300 ? 'urgent' : ''}`}
+                  title="Thời gian làm bài còn lại"
+                >
+                  <span className="hud-timer-label">Còn lại:</span>
+                  <strong className="hud-timer-digits">
+                    {formatTimer(timeLeft)}
+                  </strong>
                 </div>
-                <div className="options-list">
-                  {q.options.map((opt, optIdx) => (
-                    <div
-                      key={optIdx}
-                      className={`option-item ${selectedAnswers[q.id] === optIdx ? 'selected' : ''}`}
-                      onClick={() => handleSelectOption(q.id, optIdx)}
+
+                <button
+                  type="button"
+                  className="btn btn-primary exam-hud-submit-btn"
+                  onClick={() => {
+                    if (answeredCount < activeQuestions.length) {
+                      setConfirmModal('incomplete-submit');
+                    } else {
+                      void handleSubmit();
+                    }
+                  }}
+                >
+                  Nộp Bài Thi ({answeredCount}/{activeQuestions.length})
+                </button>
+              </div>
+            </div>
+
+            <div className="exam-hud-bottom-row">
+              <div className="exam-question-nav-grid">
+                {activeQuestions.map((q, idx) => {
+                  const isAnswered = selectedAnswers[q.id] !== undefined;
+                  const isCurrent =
+                    examSection === 'quiz' && idx === currentQuestionIdx;
+                  const chosenLetter = isAnswered
+                    ? String.fromCharCode(65 + selectedAnswers[q.id])
+                    : '';
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      className={`exam-q-nav-pill ${isAnswered ? 'answered' : ''} ${isCurrent ? 'current' : ''}`}
+                      onClick={() => {
+                        setExamSection('quiz');
+                        setCurrentQuestionIdx(idx);
+                        if (quizViewMode === 'all') {
+                          setTimeout(() => {
+                            const el = document.getElementById(
+                              `sprint-exam-q-${idx + 1}`
+                            );
+                            el?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center'
+                            });
+                          }, 20);
+                        }
+                      }}
+                      title={
+                        isAnswered
+                          ? `Câu ${idx + 1}: Đã chọn đáp án ${chosenLetter}`
+                          : `Câu ${idx + 1}: Chưa trả lời`
+                      }
                     >
-                      <span className="opt-index-badge">
-                        {String.fromCharCode(65 + optIdx)}.
-                      </span>
-                      <div className="opt-text">
-                        <FormattedText content={opt} />
+                      <span>{idx + 1}</span>
+                      {isAnswered && (
+                        <small className="pill-chosen-letter">
+                          {chosenLetter}
+                        </small>
+                      )}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  className={`exam-q-nav-pill code-lab-pill ${examSection === 'code' ? 'current' : ''}`}
+                  onClick={() => setExamSection('code')}
+                  title="Chuyển sang Phần 2: Bài Tập Code Thực Hành"
+                >
+                  &lt;/&gt; Code Lab
+                </button>
+              </div>
+
+              <div className="exam-hud-progress-track">
+                <div
+                  className="exam-hud-progress-fill"
+                  style={{
+                    width: `${
+                      activeQuestions.length > 0
+                        ? Math.round(
+                            (answeredCount / activeQuestions.length) * 100
+                          )
+                        : 0
+                    }%`
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 1: QUIZ (SINGLE-QUESTION STEPPER OR FULL LIST) */}
+          {examSection === 'quiz' && activeQuestions.length > 0 && (
+            <div className="quiz-container" style={{ marginBottom: '32px' }}>
+              {quizViewMode === 'single' ? (
+                (() => {
+                  const safeIdx =
+                    currentQuestionIdx < activeQuestions.length
+                      ? currentQuestionIdx
+                      : 0;
+                  const currentQ = activeQuestions[safeIdx];
+                  const selectedOpt = selectedAnswers[currentQ.id];
+                  const isLastQuestion =
+                    safeIdx === activeQuestions.length - 1;
+
+                  return (
+                    <div
+                      key={currentQ.id}
+                      className="question-card single-step-question-card"
+                    >
+                      <div className="single-q-meta-bar">
+                        <span className="single-q-step-indicator">
+                          CÂU HỎI {safeIdx + 1} / {activeQuestions.length}
+                        </span>
+                        <span
+                          className={`single-q-status-tag ${selectedOpt !== undefined ? 'is-answered' : 'is-pending'}`}
+                        >
+                          {selectedOpt !== undefined
+                            ? `✓ Đã chọn đáp án ${String.fromCharCode(65 + selectedOpt)}`
+                            : 'Chưa chọn đáp án'}
+                        </span>
+                      </div>
+
+                      <div className="question-header">
+                        <span className="question-num">Câu {safeIdx + 1}</span>
+                        <div className="question-text">
+                          <FormattedText content={currentQ.question} />
+                        </div>
+                      </div>
+
+                      <div className="options-list">
+                        {currentQ.options.map((opt, optIdx) => {
+                          const isSelected = selectedOpt === optIdx;
+                          return (
+                            <div
+                              key={optIdx}
+                              className={`option-item ${isSelected ? 'selected' : ''}`}
+                              onClick={() =>
+                                handleSelectOption(currentQ.id, optIdx)
+                              }
+                            >
+                              <span className="opt-index-badge">
+                                {String.fromCharCode(65 + optIdx)}.
+                              </span>
+                              <div className="opt-text">
+                                <FormattedText content={opt} />
+                              </div>
+                              {isSelected && (
+                                <span className="opt-selected-check">
+                                  ✓ Đã chọn
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Step-by-Step Navigation Footer */}
+                      <div className="question-step-nav-footer">
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={safeIdx === 0}
+                          onClick={() =>
+                            setCurrentQuestionIdx((prev) =>
+                              Math.max(0, prev - 1)
+                            )
+                          }
+                        >
+                          ← Câu trước
+                        </button>
+
+                        <div className="question-step-hint">
+                          Đã hoàn thành{' '}
+                          <strong>
+                            {answeredCount}/{activeQuestions.length}
+                          </strong>{' '}
+                          câu trắc nghiệm
+                        </div>
+
+                        {!isLastQuestion ? (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() =>
+                              setCurrentQuestionIdx((prev) =>
+                                Math.min(activeQuestions.length - 1, prev + 1)
+                              )
+                            }
+                          >
+                            Câu tiếp theo (Câu {safeIdx + 2}) →
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-success"
+                            onClick={() => setExamSection('code')}
+                          >
+                            Sang Phần 2: Bài Tập Code Thực Hành →
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <>
+                  {activeQuestions.map((q, idx) => (
+                    <div
+                      key={q.id}
+                      id={`sprint-exam-q-${idx + 1}`}
+                      className="question-card"
+                      onClick={() => setCurrentQuestionIdx(idx)}
+                    >
+                      <div className="question-header">
+                        <span className="question-num">Câu {idx + 1}</span>
+                        <div className="question-text">
+                          <FormattedText content={q.question} />
+                        </div>
+                      </div>
+                      <div className="options-list">
+                        {q.options.map((opt, optIdx) => {
+                          const isSelected = selectedAnswers[q.id] === optIdx;
+                          return (
+                            <div
+                              key={optIdx}
+                              className={`option-item ${isSelected ? 'selected' : ''}`}
+                              onClick={() => handleSelectOption(q.id, optIdx)}
+                            >
+                              <span className="opt-index-badge">
+                                {String.fromCharCode(65 + optIdx)}.
+                              </span>
+                              <div className="opt-text">
+                                <FormattedText content={opt} />
+                              </div>
+                              {isSelected && (
+                                <span className="opt-selected-check">
+                                  ✓ Đã chọn
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
-                </div>
+
+                  <div className="exam-section-bottom-actions">
+                    <button
+                      type="button"
+                      className="btn btn-success btn-lg"
+                      onClick={() => setExamSection('code')}
+                    >
+                      Chuyển sang Phần 2: Bài Tập Code Thực Hành →
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 2: SPLIT-PANE CODEX SANDBOX LAB */}
+          {examSection === 'code' && (
+            <div id="sprint-exam-code-lab" className="exam-code-lab-section">
+              <CodeSandboxEditor
+                challenge={exam.codeChallenge}
+                value={code}
+                onChange={setCode}
+                storageKey={`draft_sprint_exam_code_${exam.sprintId}`}
+                fileName="solution.ts"
+                filePath={`sprints > sprint-${exam.sprintId} > solution.ts`}
+                headerBadge={`Thực Hành Sprint ${exam.sprintId} (50% Tổng Điểm)`}
+                runVisibleButtonText="Chạy Thử (Visible Cases)"
+                submitButtonText="Kiểm Tra & Chấm Điểm Thử"
+              />
+
+              <div className="exam-code-bottom-bar">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setExamSection('quiz')}
+                >
+                  ← Quay lại Phần 1: Trắc Nghiệm ({answeredCount}/
+                  {activeQuestions.length} câu)
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg"
+                  onClick={() => {
+                    if (answeredCount < activeQuestions.length) {
+                      setConfirmModal('incomplete-submit');
+                    } else {
+                      void handleSubmit();
+                    }
+                  }}
+                >
+                  Nộp Bài Thi & Xem Điểm Chi Tiết ({answeredCount}/
+                  {activeQuestions.length} câu đã chọn)
+                </button>
               </div>
-            ))}
-          </div>
-
-          {/* SECTION 2: FULL CODEX SANDBOX LAB */}
-          <div style={{ marginBottom: '36px' }}>
-            <h3 className="section-title">
-              Phần 2: Lab Thực Hành — {exam.codeChallenge.title}
-            </h3>
-            <CodeSandboxEditor
-              challenge={exam.codeChallenge}
-              value={code}
-              onChange={setCode}
-              fileName="solution.ts"
-              filePath={`sprints > sprint-${exam.sprintId} > solution.ts`}
-              headerBadge={`Thực Hành Sprint ${exam.sprintId}`}
-              runVisibleButtonText="Chạy Thử (Visible Cases)"
-              submitButtonText="Kiểm Tra & Chấm Điểm Thử"
-            />
-          </div>
-
-          {/* Submit Button */}
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-            <button
-              className="btn btn-primary btn-lg"
-              style={{
-                padding: '16px 48px',
-                fontSize: '17px',
-                borderRadius: '12px'
-              }}
-              onClick={handleSubmit}
-            >
-              Nộp Bài Thi & Xem Điểm Chi Tiết
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
+

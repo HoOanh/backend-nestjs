@@ -2,8 +2,8 @@
    Exam Modern Layout, Scorecard, Review Mode & Test Runner Styles
    ========================================================================== */
 .exam-view-wrapper {
-  max-width: 1000px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
 }
 
 .exam-badges-row {
@@ -231,6 +231,10 @@
   border-left: 4px solid #ef4444;
 }
 
+.review-question-card.is-unanswered {
+  border-left: 4px solid #f59e0b;
+}
+
 .review-question-header {
   display: flex;
   align-items: flex-start;
@@ -244,6 +248,7 @@
   font-size: 12px;
   font-weight: 800;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .review-question-card.is-correct .review-status-badge {
@@ -256,7 +261,14 @@
   color: #f87171;
 }
 
+.review-question-card.is-unanswered .review-status-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
 .review-question-title {
+  flex: 1;
+  min-width: 0;
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -314,11 +326,18 @@
   padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .answer-tag.correct {
   background: #10b981;
   color: white;
+}
+
+.answer-tag.correct-user {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid #10b981;
+  color: #34d399;
 }
 
 .answer-tag.wrong {
@@ -353,6 +372,31 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 24px;
+}
+
+.review-syntax-error-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-left: 4px solid #ef4444;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  color: #fca5a5;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.review-syntax-error-banner strong {
+  display: block;
+  color: #f87171;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.review-syntax-error-banner code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: #fecaca;
 }
 
 .code-challenge-title h4 {
@@ -865,3 +909,414 @@
   display: flex;
   gap: 8px;
 }
+
+/* ==========================================================================
+   Exam Progress & Question Quick-Jump Navigator
+   ========================================================================== */
+.exam-timer.urgent {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  animation: pulseUrgentTimer 1.4s infinite ease-in-out;
+}
+
+.exam-timer.urgent .timer-digits {
+  color: #f87171;
+}
+
+.exam-timer.urgent .timer-label {
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+@keyframes pulseUrgentTimer {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+}
+
+/* ==========================================================================
+   Sticky Exam HUD (Fixed Progress, Section Tabs, Timer & Quick-Jump Pills)
+   ========================================================================== */
+.exam-sticky-hud {
+  position: sticky;
+  top: -28px;
+  z-index: 40;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+[data-theme='light'] .exam-sticky-hud {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.exam-hud-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.exam-hud-section-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exam-hud-section-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-surface-subtle);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.exam-hud-section-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.exam-hud-section-btn.active {
+  background: rgba(14, 165, 233, 0.14);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+}
+
+.hud-step-badge {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--accent-primary);
+  color: #ffffff;
+}
+
+.hud-count-pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-surface-elevated);
+  color: var(--accent-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.exam-hud-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.exam-view-mode-toggle {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.exam-view-mode-toggle:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.exam-hud-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1.5px solid rgba(245, 158, 11, 0.4);
+  white-space: nowrap;
+}
+
+.exam-hud-timer-pill.urgent {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  animation: pulseUrgentTimer 1.4s infinite ease-in-out;
+}
+
+.hud-timer-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.hud-timer-digits {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.exam-hud-timer-pill.urgent .hud-timer-digits {
+  color: #ef4444;
+}
+
+.exam-hud-submit-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.exam-hud-bottom-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.exam-question-nav-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.exam-q-nav-pill {
+  min-width: 38px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.exam-q-nav-pill:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.exam-q-nav-pill.answered {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #10b981;
+}
+
+.exam-q-nav-pill.current {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);
+}
+
+.pill-chosen-letter {
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+.exam-q-nav-pill.code-lab-pill {
+  margin-left: auto;
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-color: rgba(99, 102, 241, 0.45);
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme='light'] .exam-q-nav-pill.code-lab-pill {
+  color: #4f46e5;
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.exam-hud-progress-track {
+  height: 6px;
+  background: var(--bg-app);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.exam-hud-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), #10b981);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* ==========================================================================
+   Single-Question Step-by-Step Card & Footer Controls
+   ========================================================================== */
+.single-step-question-card {
+  padding: 28px 32px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.single-q-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.single-q-step-indicator {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+}
+
+.single-q-status-tag {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.single-q-status-tag.is-answered {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.single-q-status-tag.is-pending {
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.question-step-nav-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.question-step-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.question-step-hint strong {
+  color: var(--accent-primary);
+}
+
+.exam-section-bottom-actions,
+.exam-code-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 24px 0 48px;
+  padding: 18px 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.opt-selected-check {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Exam Confirmation Modal
+   ========================================================================== */
+.exam-confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 20px;
+}
+
+.exam-confirm-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+}
+
+.exam-confirm-modal h4 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+}
+
+.exam-confirm-modal p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 22px;
+}
+
+.exam-confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+

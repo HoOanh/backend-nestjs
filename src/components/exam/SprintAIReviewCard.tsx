@@ -68,11 +68,16 @@ export const SprintAIReviewCard: React.FC<SprintAIReviewCardProps> = ({
   // Lỗ hổng cần lưu ý
   const vulnerabilities: string[] = [];
   if (wrongQuestions.length > 0) {
-    const wrongTopics = wrongQuestions.slice(0, 3).map((q, i) => `Câu ${i + 1} (${q.question.slice(0, 45)}...)`);
+    const wrongTopics = wrongQuestions.slice(0, 3).map((q) => {
+      const qNum = reviewData.questions.findIndex((item) => item.id === q.id) + 1;
+      return `Câu ${qNum} (${q.question.slice(0, 45)}...)`;
+    });
     vulnerabilities.push(`Lý thuyết cần rà soát: Có ${wrongQuestions.length} câu trắc nghiệm chưa chính xác. Cần chú ý kỹ các câu: ${wrongTopics.join('; ')}.`);
   }
 
-  if (failedTestCases.length > 0) {
+  if (reviewData.codeOutcome.syntaxError) {
+    vulnerabilities.push(`Lỗi Biên Dịch / Thực Thi (Syntax Error): ${reviewData.codeOutcome.syntaxError}`);
+  } else if (failedTestCases.length > 0) {
     vulnerabilities.push(`Test cases chưa đạt: Bị fail ${failedTestCases.length}/${reviewData.codeOutcome.total} trường hợp kiểm thử. Các trường hợp này thường rơi vào input không hợp lệ, biên dữ liệu (corner cases) hoặc xử lý ngoại lệ.`);
   }
 
@@ -85,7 +90,7 @@ export const SprintAIReviewCard: React.FC<SprintAIReviewCardProps> = ({
   if (wrongQuestions.length > 0) {
     recommendations.push('Đọc lại mục "Giải Thích Kỹ Thuật Chuyên Sâu" ở Phần 1 bên dưới cho từng câu trả lời sai để củng cố mental model.');
   }
-  if (failedTestCases.length > 0) {
+  if (reviewData.codeOutcome.syntaxError || failedTestCases.length > 0) {
     recommendations.push('Xem lại bảng kiểm thử ở Phần 2 bên dưới, đối chiếu kết quả Expected vs Received để hoàn thiện logic phòng thủ (Defensive Programming).');
   }
   if (reviewData.passed) {
@@ -104,12 +109,17 @@ export const SprintAIReviewCard: React.FC<SprintAIReviewCardProps> = ({
     setLiveReviewText('');
 
     const wrongListText = wrongQuestions
-      .map((q, idx) => `${idx + 1}. ${q.question} (Đáp án đúng: ${q.options[q.correctIndex]})`)
+      .map((q) => {
+        const qNum = reviewData.questions.findIndex((item) => item.id === q.id) + 1;
+        return `Câu ${qNum}: ${q.question} (Đáp án đúng: ${q.options[q.correctIndex]})`;
+      })
       .join('\n');
 
-    const failedTestsText = failedTestCases
-      .map((t, idx) => `${idx + 1}. ${t.description || 'Test'} - Expected: ${JSON.stringify(t.expected)}, Received: ${JSON.stringify(t.received)}`)
-      .join('\n');
+    const failedTestsText = reviewData.codeOutcome.syntaxError
+      ? `Syntax/Runtime Error: ${reviewData.codeOutcome.syntaxError}`
+      : failedTestCases
+          .map((t, idx) => `${idx + 1}. ${t.description || 'Test'} - Expected: ${String(t.expected)}, Received: ${t.error ? `Error: ${t.error}` : String(t.received)}`)
+          .join('\n');
 
     const promptMessage = `Em vừa hoàn thành bài thi Sprint ${sprintId}: "${examTitle}".
 Kết quả telemetry:
@@ -117,7 +127,7 @@ Kết quả telemetry:
 - Trắc nghiệm: ${reviewData.quizScore}% (${reviewData.correctCount}/${reviewData.totalQuestions} câu đúng)
 - Code thực hành: ${reviewData.codeScore}% (${passedTestCases.length}/${reviewData.codeOutcome.total} tests passed)
 ${wrongQuestions.length > 0 ? `\nCác câu trắc nghiệm bị sai:\n${wrongListText}` : '\nTrắc nghiệm đúng toàn bộ.'}
-${failedTestCases.length > 0 ? `\nCác test case code bị failed:\n${failedTestsText}` : '\nCode tests đạt 100%.'}
+${reviewData.codeOutcome.syntaxError || failedTestCases.length > 0 ? `\nCác test case code bị failed:\n${failedTestsText}` : '\nCode tests đạt 100%.'}
 
 Mã code em đã nộp:
 \`\`\`ts

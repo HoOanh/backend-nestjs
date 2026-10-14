@@ -83,26 +83,155 @@ export function renderComparisonFlow(text: string, title?: string): string {
     `;
   }
 
-  // Parser tổng quát cho các so sánh khác
-  const lines = text
-    .split('\n')
-    .map((l) => stripEmojis(l.trim()))
-    .filter((l) => l.length > 0 && !l.startsWith('┌') && !l.startsWith('└') && !l.startsWith('├'));
+  // Parser thông minh cho mọi sơ đồ So Sánh (4.2)
+  function normalizeBlockLines(rawLines: string[], defaultHeader: string): { headerTitle: string; points: string[] } {
+    const cleaned = rawLines
+      .map((l) => stripEmojis(l.trim()))
+      .filter((l) => l.length > 0 && !l.startsWith('┌') && !l.startsWith('└─') && !l.startsWith('├─'));
 
-  const mid = Math.ceil(lines.length / 2);
-  const leftLines = lines.slice(0, mid);
-  const rightLines = lines.slice(mid);
+    let headerTitle = defaultHeader;
+    let bodyLines = cleaned;
+
+    if (
+      cleaned.length > 0 &&
+      /^(?:MÔ HÌNH|KỊCH BẢN|THIẾT KẾ|PHƯƠNG ÁN|CÁCH TIẾP CẬN|KIẾN TRÚC)[^:]*:/i.test(cleaned[0])
+    ) {
+      headerTitle = cleaned[0];
+      bodyLines = cleaned.slice(1);
+    }
+
+    const points: string[] = [];
+    const fanInActors: string[] = [];
+    let pendingFanInTarget = '';
+
+    for (let i = 0; i < bodyLines.length; i++) {
+      const line = bodyLines[i];
+
+      // Dòng mở đầu nhánh gộp: "Record 1 ──┐"
+      if (/─+┐\s*$/.test(line)) {
+        const actor = line.replace(/\s*─+┐\s*$/, '').trim();
+        if (actor) fanInActors.push(actor);
+        continue;
+      }
+
+      // Dòng giữa nhánh gộp: "Record 2 ──┼──► [ Target ] ──► ..."
+      if (line.includes('┼')) {
+        const parts = line.split(/─*┼─*►?/);
+        const actor = (parts[0] || '').trim();
+        if (actor) fanInActors.push(actor);
+        pendingFanInTarget = parts.slice(1).join(' → ').trim();
+        continue;
+      }
+
+      // Dòng đóng nhánh gộp: "Record 3 ──┘               │"
+      if (line.includes('┘')) {
+        const actor = line.replace(/\s*─+┘[\s│]*$/, '').trim();
+        if (actor) fanInActors.push(actor);
+        if (pendingFanInTarget) {
+          points.push(`${fanInActors.join(', ')} → ${pendingFanInTarget.replace(/─+►/g, '→')}`);
+          fanInActors.length = 0;
+          pendingFanInTarget = '';
+        }
+        continue;
+      }
+
+      // Nếu còn nhánh gộp chưa đóng thì đẩy ra
+      if (pendingFanInTarget) {
+        points.push(`${fanInActors.join(', ')} → ${pendingFanInTarget.replace(/─+►/g, '→')}`);
+        fanInActors.length = 0;
+        pendingFanInTarget = '';
+      }
+
+      // Dòng nhánh rẽ phụ: "└──► Luôn hoạt động ────► ..."
+      if (/^[└├]─+►/.test(line)) {
+        const branchFlow = line
+          .replace(/^[└├]─+►\s*/, '')
+          .replace(/\s*─+►\s*/g, ' → ')
+          .trim();
+        if (branchFlow) {
+          points.push(`Luồng xử lý song hành: ${branchFlow}`);
+        }
+        continue;
+      }
+
+      const normalLine = line
+        .replace(/^[│├──└──\s]+/, '')
+        .replace(/\s*─+►\s*/g, ' → ')
+        .trim();
+      if (normalLine) {
+        points.push(normalLine);
+      }
+    }
+
+    if (pendingFanInTarget) {
+      points.push(`${fanInActors.join(', ')} → ${pendingFanInTarget.replace(/─+►/g, '→')}`);
+    }
+
+    return { headerTitle, points };
+  }
+
+  const allRawLines = text.trim().split(/\r?\n/);
+  let splitIndex = -1;
+
+  for (let i = 1; i < allRawLines.length; i++) {
+    const trimmed = allRawLines[i].trim();
+    if (
+      /^(?:MÔ HÌNH HIỆN ĐẠI|MÔ HÌNH MỚI|MÔ HÌNH CHUẨN|KỊCH BẢN 2|THIẾT KẾ CHUẨN|PHƯƠNG ÁN TỐI ƯU)/i.test(
+        trimmed
+      )
+    ) {
+      splitIndex = i;
+      break;
+    }
+  }
+
+  let leftRaw: string[];
+  let rightRaw: string[];
+
+  if (splitIndex !== -1) {
+    leftRaw = allRawLines.slice(0, splitIndex);
+    rightRaw = allRawLines.slice(splitIndex);
+  } else {
+    const paragraphs = text.trim().split(/\r?\n\s*\r?\n/);
+    if (paragraphs.length >= 2) {
+      leftRaw = paragraphs[0].split(/\r?\n/);
+      rightRaw = paragraphs.slice(1).join('\n').split(/\r?\n/);
+    } else {
+      const nonEmpty = allRawLines.filter((l) => l.trim().length > 0);
+      const mid = Math.ceil(nonEmpty.length / 2);
+      leftRaw = nonEmpty.slice(0, mid);
+      rightRaw = nonEmpty.slice(mid);
+    }
+  }
+
+  const leftParsed = normalizeBlockLines(leftRaw, 'MÔ HÌNH CŨ / RỦI RO NGHẼN HIỆU NĂNG');
+  const rightParsed = normalizeBlockLines(rightRaw, 'MÔ HÌNH HIỆN ĐẠI / KIẾN TRÚC CHUẨN PRODUCTION');
+
+  const formatPointHtml = (pt: string): string => {
+    const eqIndex = pt.indexOf(' = ');
+    if (eqIndex > 0 && eqIndex < 45) {
+      const head = escapeHtml(pt.slice(0, eqIndex).trim());
+      const tail = escapeHtml(pt.slice(eqIndex + 3).trim());
+      return `<strong>${head}:</strong> ${tail}`;
+    }
+    const colonIndex = pt.indexOf(': ');
+    if (colonIndex > 0 && colonIndex < 45) {
+      const head = escapeHtml(pt.slice(0, colonIndex).trim());
+      const tail = escapeHtml(pt.slice(colonIndex + 2).trim());
+      return `<strong>${head}:</strong> ${tail}`;
+    }
+    return escapeHtml(pt);
+  };
 
   const renderPoints = (ptLines: string[], isDanger: boolean) => {
     return ptLines
-      .map((line) => {
-        const clean = line.replace(/^[│├──└──\[\]\s\─►]+/, '').trim();
-        if (!clean) return '';
-        const icon = isDanger ? '×' : '✓';
+      .map((line, idx) => {
+        if (!line) return '';
+        const icon = isDanger ? (idx === ptLines.length - 1 && line.includes('=') ? '!' : '×') : '✓';
         return `
           <div class="comparison-point-row">
             <span class="point-icon">${icon}</span>
-            <span class="point-text">${escapeHtml(clean)}</span>
+            <span class="point-text">${formatPointHtml(line)}</span>
           </div>
         `;
       })
@@ -126,12 +255,12 @@ export function renderComparisonFlow(text: string, title?: string): string {
             <div class="comparison-col-header header-legacy">
               <span class="col-status-icon">−</span>
               <div>
-                <div class="col-title">MÔ HÌNH TRUYỀN THỐNG / RỦI RO NGHẼN</div>
-                <div class="col-sub">Hạn chế về tài nguyên & chi phí I/O cao</div>
+                <div class="col-title">${escapeHtml(leftParsed.headerTitle)}</div>
+                <div class="col-sub">Phân tích điểm nghẽn tài nguyên &amp; suy thoái hiệu năng</div>
               </div>
             </div>
             <div class="comparison-col-content">
-              ${renderPoints(leftLines, true)}
+              ${renderPoints(leftParsed.points, true)}
             </div>
           </div>
 
@@ -139,12 +268,12 @@ export function renderComparisonFlow(text: string, title?: string): string {
             <div class="comparison-col-header header-modern">
               <span class="col-status-icon">+</span>
               <div>
-                <div class="col-title">MÔ HÌNH HIỆN ĐẠI TỐI ƯU (RECOMMENDED)</div>
-                <div class="col-sub">Non-blocking, Event-Driven & Hiệu năng cao</div>
+                <div class="col-title">${escapeHtml(rightParsed.headerTitle)}</div>
+                <div class="col-sub">Kiến trúc tối ưu thông lượng &amp; bảo toàn tài nguyên phần cứng</div>
               </div>
             </div>
             <div class="comparison-col-content">
-              ${renderPoints(rightLines, false)}
+              ${renderPoints(rightParsed.points, false)}
             </div>
           </div>
         </div>

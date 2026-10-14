@@ -251,7 +251,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {finalExam?.passed
                 ? 'Đã Tốt Nghiệp (Xem Bằng)'
                 : !finalExamStatus.unlocked
-                  ? `Cần đạt 6/6 Sprint (${finalExamStatus.passedSprintsCount}/6)`
+                  ? `Cần đạt ${finalExamStatus.totalSprints}/${finalExamStatus.totalSprints} Sprint (${finalExamStatus.passedSprintsCount}/${finalExamStatus.totalSprints})`
                   : 'Khảo Thí & Cấp Bằng'}
             </div>
           </div>

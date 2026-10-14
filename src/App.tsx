@@ -441,6 +441,7 @@ export const App: React.FC = () => {
                       title={currentSprintExam.title}
                       missingLessons={sprintExamUnlockStatus.missingLessons}
                       onNavigateToAvailable={handleNavigateToAvailable}
+                      onSelectLesson={handleSelectLesson}
                       isAdmin={isEffectiveAdmin}
                       onBypassLock={toggleAdminBypass}
                     />
@@ -465,7 +466,9 @@ export const App: React.FC = () => {
                       type="final-exam"
                       title="Kỳ Thi Tốt Nghiệp Toàn Khóa Arc Irobot Academy"
                       missingSprints={finalExamUnlockStatus.missingSprints}
+                      totalSprints={finalExamUnlockStatus.totalSprints}
                       onNavigateToAvailable={handleNavigateToAvailable}
+                      onSelectSprintExam={handleSelectSprintExam}
                       isAdmin={isEffectiveAdmin}
                       onBypassLock={toggleAdminBypass}
                     />

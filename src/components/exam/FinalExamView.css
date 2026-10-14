@@ -2,8 +2,8 @@
    Exam Modern Layout, Scorecard, Review Mode & Test Runner Styles
    ========================================================================== */
 .exam-view-wrapper {
-  max-width: 1000px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
 }
 
 .exam-badges-row {
@@ -231,6 +231,10 @@
   border-left: 4px solid #ef4444;
 }
 
+.review-question-card.is-unanswered {
+  border-left: 4px solid #f59e0b;
+}
+
 .review-question-header {
   display: flex;
   align-items: flex-start;
@@ -244,6 +248,7 @@
   font-size: 12px;
   font-weight: 800;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .review-question-card.is-correct .review-status-badge {
@@ -256,7 +261,14 @@
   color: #f87171;
 }
 
+.review-question-card.is-unanswered .review-status-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
 .review-question-title {
+  flex: 1;
+  min-width: 0;
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -314,11 +326,18 @@
   padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .answer-tag.correct {
   background: #10b981;
   color: white;
+}
+
+.answer-tag.correct-user {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid #10b981;
+  color: #34d399;
 }
 
 .answer-tag.wrong {
@@ -353,6 +372,18 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 24px;
+}
+
+.review-syntax-error-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-left: 4px solid #ef4444;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  color: #fca5a5;
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 
 .code-challenge-title h4 {

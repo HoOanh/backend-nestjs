@@ -212,24 +212,43 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
       {/* Exam Banner Header */}
       <div className="exam-banner">
         <div className="exam-info">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <h2>🎯 {exam.title}</h2>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginBottom: '6px'
+            }}
+          >
+            <h2>{exam.title}</h2>
           </div>
           <FormattedText content={exam.description} />
-          <p role="note">Kết quả luyện tập được chấm trong trình duyệt, chờ xác minh trên server. Điểm này chưa tự cấp chứng chỉ tốt nghiệp.</p>
+          <p role="note">
+            Kết quả luyện tập được chấm trong trình duyệt, chờ xác minh trên
+            server. Điểm này chưa tự cấp chứng chỉ tốt nghiệp.
+          </p>
           <div className="exam-badges-row">
             <span className="exam-pill">
-              📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc ngẫu nhiên <strong>{exam.questionCountToPick || 10} câu</strong>)
+              Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc ngẫu
+              nhiên <strong>{exam.questionCountToPick || 10} câu</strong>)
             </span>
             <span className="exam-pill">
-              🎯 Điểm đạt: <strong>≥ {exam.passingScore}%</strong>
+              Điểm đạt: <strong>≥ {exam.passingScore}%</strong>
             </span>
             <span className="exam-pill">
-              ⏱️ Thời gian: <strong>{exam.timeLimitMinutes} phút</strong>
+              Thời gian: <strong>{exam.timeLimitMinutes} phút</strong>
             </span>
             {attempts.length > 0 && (
-              <span className="exam-pill" style={{ borderColor: hasPassedEver ? '#10b981' : '#f59e0b' }}>
-                🏆 Cao nhất: <strong style={{ color: hasPassedEver ? '#10b981' : '#f59e0b' }}>{bestScore}% ({hasPassedEver ? 'ĐÃ ĐẠT' : 'CHƯA ĐẠT'})</strong>
+              <span
+                className="exam-pill"
+                style={{ borderColor: hasPassedEver ? '#10b981' : '#f59e0b' }}
+              >
+                Cao nhất:{' '}
+                <strong
+                  style={{ color: hasPassedEver ? '#10b981' : '#f59e0b' }}
+                >
+                  {bestScore}% ({hasPassedEver ? 'ĐÃ ĐẠT' : 'CHƯA ĐẠT'})
+                </strong>
               </span>
             )}
           </div>
@@ -242,9 +261,21 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           </div>
         ) : (
           <div className={`exam-timer ${hasPassedEver ? 'completed' : ''}`}>
-            <div className="timer-digits">{reviewData ? `${reviewData.finalScore}%` : (existingScore ? `${existingScore.score}%` : '--')}</div>
+            <div className="timer-digits">
+              {reviewData
+                ? `${reviewData.finalScore}%`
+                : existingScore
+                  ? `${existingScore.score}%`
+                  : '--'}
+            </div>
             <div className="timer-label">
-              {reviewData ? (reviewData.passed ? '🏆 ĐÃ ĐẠT' : '❌ CHƯA ĐẠT') : (existingScore?.passed ? '🏆 ĐÃ ĐẠT' : 'CHƯA THI')}
+              {reviewData
+                ? reviewData.passed
+                  ? 'ĐÃ ĐẠT'
+                  : 'CHƯA ĐẠT'
+                : existingScore?.passed
+                  ? 'ĐÃ ĐẠT'
+                  : 'CHƯA THI'}
             </div>
           </div>
         )}
@@ -257,19 +288,23 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
             className={`mode-tab-btn ${activeTab === 'review' ? 'active' : ''}`}
             onClick={() => setActiveTab('review')}
           >
-            📊 Bảng Điểm & Sửa Bài (Review)
+            Bảng Điểm & Sửa Bài (Review)
           </button>
           <button
             className={`mode-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => setActiveTab('history')}
           >
-            📜 Lịch Sử Thi ({attempts.length} lần)
+            Lịch Sử Thi ({attempts.length} lần)
           </button>
           <button
             className={`mode-tab-btn ${activeTab === 'exam' ? 'active' : ''}`}
             onClick={() => {
               if (isSubmitted) {
-                if (window.confirm('Đại ca có muốn bắt đầu một lượt thi mới? Bộ đếm thời gian sẽ reset và 10 câu hỏi ngẫu nhiên mới sẽ được bốc thăm.')) {
+                if (
+                  window.confirm(
+                    'Đại ca có muốn bắt đầu một lượt thi mới? Bộ đếm thời gian sẽ reset và 10 câu hỏi ngẫu nhiên mới sẽ được bốc thăm.'
+                  )
+                ) {
                   startNewExamSession();
                 }
               } else {
@@ -277,7 +312,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
               }
             }}
           >
-            {isSubmitted ? '🔄 Làm Bài Lại (Đề Mới)' : '✍️ Đang Làm Bài Thi'}
+            {isSubmitted ? 'Làm Bài Lại (Đề Mới)' : 'Đang Làm Bài Thi'}
           </button>
         </div>
       )}
@@ -286,27 +321,40 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
       {activeTab === 'review' && reviewData && (
         <div className="exam-review-container">
           {/* Scorecard Hero */}
-          <div className={`scorecard-hero ${reviewData.passed ? 'passed' : 'failed'}`}>
+          <div
+            className={`scorecard-hero ${reviewData.passed ? 'passed' : 'failed'}`}
+          >
             <div className="scorecard-main">
               <div className="score-circle">
                 <span className="score-num">{reviewData.finalScore}%</span>
                 <span className="score-sub">TỔNG ĐIỂM</span>
               </div>
               <div className="scorecard-text">
-                <h3>{reviewData.passed ? '🎉 CHÚC MỪNG ĐẠI CA ĐÃ ĐẠT CHỈ TIÊU!' : '⚠️ CHƯA ĐẠT CHỈ TIÊU YÊU CẦU!'}</h3>
+                <h3>
+                  {reviewData.passed
+                    ? 'ĐẠT CHỈ TIÊU KỲ THI SPRINT'
+                    : 'CHƯA ĐẠT CHỈ TIÊU YÊU CẦU'}
+                </h3>
                 <p>
                   {reviewData.passed
-                    ? `Đại ca đã hoàn thành xuất sắc Sprint ${exam.sprintId} với ${reviewData.finalScore}% (vượt mức tiêu chuẩn ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}.`
-                    : `Điểm của đại ca là ${reviewData.finalScore}% (tiêu chuẩn yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết bài làm bên dưới và bấm nút "Làm Bài Lại" để thử sức với đề mới nhé!`}
+                    ? `Đại ca đã hoàn thành Sprint ${exam.sprintId} với ${reviewData.finalScore}% (tiêu chuẩn ≥ ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}.`
+                    : `Điểm của đại ca là ${reviewData.finalScore}% (tiêu chuẩn yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết bài làm bên dưới và bấm nút "Làm Bài Lại" để thử sức với đề mới.`}
                 </p>
                 <div className="score-breakdown-row">
                   <div className="score-item">
                     <span>Trắc Nghiệm (50%):</span>
-                    <strong>{reviewData.quizScore}% ({reviewData.correctCount}/{reviewData.totalQuestions} câu đúng)</strong>
+                    <strong>
+                      {reviewData.quizScore}% ({reviewData.correctCount}/
+                      {reviewData.totalQuestions} câu đúng)
+                    </strong>
                   </div>
                   <div className="score-item">
                     <span>Thực Hành Code (50%):</span>
-                    <strong>{reviewData.codeScore}% ({reviewData.codeOutcome.passedCount}/{reviewData.codeOutcome.total} tests đạt)</strong>
+                    <strong>
+                      {reviewData.codeScore}% (
+                      {reviewData.codeOutcome.passedCount}/
+                      {reviewData.codeOutcome.total} tests đạt)
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -324,7 +372,10 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           {/* SECTION 1: QUIZ REVIEW */}
           <div className="review-section">
             <div className="review-section-header">
-              <h3>📝 Phần 1: Khảo Thí Trắc Nghiệm ({reviewData.correctCount}/{reviewData.totalQuestions} câu đúng — {reviewData.quizScore}%)</h3>
+              <h3>
+                Phần 1: Khảo Thí Trắc Nghiệm ({reviewData.correctCount}/
+                {reviewData.totalQuestions} câu đúng — {reviewData.quizScore}%)
+              </h3>
             </div>
 
             <div className="review-questions-list">
@@ -333,10 +384,13 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                 const isCorrect = userChoice === q.correctIndex;
 
                 return (
-                  <div key={q.id} className={`review-question-card ${isCorrect ? 'is-correct' : 'is-wrong'}`}>
+                  <div
+                    key={q.id}
+                    className={`review-question-card ${isCorrect ? 'is-correct' : 'is-wrong'}`}
+                  >
                     <div className="review-question-header">
                       <div className="review-status-badge">
-                        {isCorrect ? '✅ ĐÚNG (+10đ)' : '❌ SAI (0đ)'}
+                        {isCorrect ? 'ĐÚNG (+10đ)' : 'SAI (0đ)'}
                       </div>
                       <div className="review-question-title">
                         <strong>Câu {idx + 1}:</strong>
@@ -351,7 +405,8 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
                         let optClass = 'review-opt';
                         if (isTheCorrectOne) optClass += ' correct-answer';
-                        if (isSelected && !isTheCorrectOne) optClass += ' user-wrong-choice';
+                        if (isSelected && !isTheCorrectOne)
+                          optClass += ' user-wrong-choice';
 
                         return (
                           <div key={optIdx} className={optClass}>
@@ -360,8 +415,16 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                             </div>
                             <div className="opt-content">
                               <FormattedText content={opt} />
-                              {isTheCorrectOne && <span className="answer-tag correct">✓ Đáp án chuẩn</span>}
-                              {isSelected && !isTheCorrectOne && <span className="answer-tag wrong">✗ Lựa chọn của đại ca</span>}
+                              {isTheCorrectOne && (
+                                <span className="answer-tag correct">
+                                  Đáp án chuẩn
+                                </span>
+                              )}
+                              {isSelected && !isTheCorrectOne && (
+                                <span className="answer-tag wrong">
+                                  Lựa chọn của đại ca
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
@@ -370,8 +433,13 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
                     {/* Deep Technical Explanation */}
                     <div className="review-explanation-box">
-                      <div className="exp-badge">💡 Phân Tích & Giải Thích Kỹ Thuật Chuyên Sâu:</div>
-                      <FormattedText content={q.explanation} className="exp-text" />
+                      <div className="exp-badge">
+                        Phân Tích & Giải Thích Kỹ Thuật:
+                      </div>
+                      <FormattedText
+                        content={q.explanation}
+                        className="exp-text"
+                      />
                     </div>
                   </div>
                 );
@@ -382,7 +450,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           {/* SECTION 2: CODE LAB REVIEW */}
           <div className="review-section">
             <div className="review-section-header">
-              <h3>💻 Phần 2: Đánh Giá Lab Code ({reviewData.codeScore}%)</h3>
+              <h3>Phần 2: Đánh Giá Lab Code ({reviewData.codeScore}%)</h3>
             </div>
 
             <div className="review-code-card">
@@ -405,11 +473,16 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                   </thead>
                   <tbody>
                     {reviewData.codeOutcome.results.map((r, rIdx) => (
-                      <tr key={rIdx} className={r.passed ? 'row-pass' : 'row-fail'}>
+                      <tr
+                        key={rIdx}
+                        className={r.passed ? 'row-pass' : 'row-fail'}
+                      >
                         <td>{rIdx + 1}</td>
                         <td>{r.description || `Test case ${rIdx + 1}`}</td>
                         <td>
-                          <span className={`status-pill ${r.passed ? 'pass' : 'fail'}`}>
+                          <span
+                            className={`status-pill ${r.passed ? 'pass' : 'fail'}`}
+                          >
                             {r.passed ? 'PASSED' : 'FAILED'}
                           </span>
                         </td>
@@ -417,7 +490,11 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                           <code>{JSON.stringify(r.expected)}</code>
                         </td>
                         <td>
-                          <code>{r.error ? `Error: ${r.error}` : JSON.stringify(r.received)}</code>
+                          <code>
+                            {r.error
+                              ? `Error: ${r.error}`
+                              : JSON.stringify(r.received)}
+                          </code>
                         </td>
                       </tr>
                     ))}
@@ -427,7 +504,9 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
 
               {/* Code Submitted Viewer */}
               <div className="submitted-code-viewer">
-                <div className="code-viewer-label">Mã nguồn đại ca đã nộp:</div>
+                <div className="code-viewer-label">
+                  Mã nguồn đại ca đã nộp:
+                </div>
                 <pre className="code-snippet-pre">
                   <code>{reviewData.code}</code>
                 </pre>
@@ -451,12 +530,17 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
             </div>
             <div className="attempt-stat-card">
               <span className="stat-label">Lần Thi Gần Nhất</span>
-              <span className="stat-value">{attempts[0]?.finalScore ?? '--'}%</span>
+              <span className="stat-value">
+                {attempts[0]?.finalScore ?? '--'}%
+              </span>
             </div>
             <div className="attempt-stat-card">
               <span className="stat-label">Trạng Thái Chuẩn</span>
-              <span className="stat-value" style={{ color: hasPassedEver ? '#10b981' : '#f87171' }}>
-                {hasPassedEver ? '🏆 ĐÃ ĐẠT' : '❌ CHƯA ĐẠT'}
+              <span
+                className="stat-value"
+                style={{ color: hasPassedEver ? '#10b981' : '#f87171' }}
+              >
+                {hasPassedEver ? 'ĐÃ ĐẠT' : 'CHƯA ĐẠT'}
               </span>
             </div>
           </div>
@@ -464,7 +548,10 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           <div className="attempts-table-container">
             {attempts.length === 0 ? (
               <div className="empty-attempts-notice">
-                <p>Đại ca chưa có lịch sử làm bài nào cho Sprint này. Hãy bấm "Làm Bài Lại" để bắt đầu thử sức!</p>
+                <p>
+                  Đại ca chưa có lịch sử làm bài nào cho Sprint này. Hãy bấm
+                  "Làm Bài Lại" để bắt đầu thử sức.
+                </p>
               </div>
             ) : (
               <table className="attempts-table">
@@ -483,28 +570,41 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                   {attempts.map((att) => (
                     <tr key={att.id}>
                       <td>
-                        <span className="attempt-badge-num">#{att.attemptNumber}</span>
+                        <span className="attempt-badge-num">
+                          #{att.attemptNumber}
+                        </span>
                       </td>
                       <td>
                         <div>
-                          <div>{new Date(att.submittedAt).toLocaleTimeString('vi-VN')}</div>
+                          <div>
+                            {new Date(att.submittedAt).toLocaleTimeString(
+                              'vi-VN'
+                            )}
+                          </div>
                           <small style={{ color: 'var(--text-muted)' }}>
-                            {new Date(att.submittedAt).toLocaleDateString('vi-VN')}
+                            {new Date(att.submittedAt).toLocaleDateString(
+                              'vi-VN'
+                            )}
                           </small>
                         </div>
                       </td>
                       <td>
-                        <strong>{att.quizScore}%</strong> ({att.correctCount}/{att.totalQuestions} câu)
+                        <strong>{att.quizScore}%</strong> ({att.correctCount}/
+                        {att.totalQuestions} câu)
                       </td>
                       <td>
                         <strong>{att.codeScore}%</strong>
                       </td>
                       <td>
-                        <strong style={{ fontSize: '15px' }}>{att.finalScore}%</strong>
+                        <strong style={{ fontSize: '15px' }}>
+                          {att.finalScore}%
+                        </strong>
                       </td>
                       <td>
-                        <span className={`attempt-score-pill ${att.passed ? 'passed' : 'failed'}`}>
-                          {att.passed ? '✓ ĐẠT CHUẨN' : '✗ CHƯA ĐẠT'}
+                        <span
+                          className={`attempt-score-pill ${att.passed ? 'passed' : 'failed'}`}
+                        >
+                          {att.passed ? 'ĐẠT CHUẨN' : 'CHƯA ĐẠT'}
                         </span>
                       </td>
                       <td>
@@ -518,7 +618,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
                             setActiveTab('review');
                           }}
                         >
-                          👁️ Xem Lại
+                          Xem Lại
                         </button>
                       </td>
                     </tr>
@@ -536,7 +636,8 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           {/* SECTION 1: QUIZ */}
           <div className="quiz-container" style={{ marginBottom: '32px' }}>
             <h3 className="section-title">
-              📝 Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc Lõi ({activeQuestions.length} câu)
+              Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc Lõi (
+              {activeQuestions.length} câu)
             </h3>
             {activeQuestions.map((q, idx) => (
               <div key={q.id} className="question-card">
@@ -569,7 +670,7 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           {/* SECTION 2: FULL CODEX SANDBOX LAB */}
           <div style={{ marginBottom: '36px' }}>
             <h3 className="section-title">
-              💻 Phần 2: Lab Thực Hành — {exam.codeChallenge.title}
+              Phần 2: Lab Thực Hành — {exam.codeChallenge.title}
             </h3>
             <CodeSandboxEditor
               challenge={exam.codeChallenge}
@@ -578,8 +679,8 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
               fileName="solution.ts"
               filePath={`sprints > sprint-${exam.sprintId} > solution.ts`}
               headerBadge={`Thực Hành Sprint ${exam.sprintId}`}
-              runVisibleButtonText="▶️ Chạy Thử (Visible Cases)"
-              submitButtonText="🔍 Kiểm Tra & Chấm Điểm Thử"
+              runVisibleButtonText="Chạy Thử (Visible Cases)"
+              submitButtonText="Kiểm Tra & Chấm Điểm Thử"
             />
           </div>
 
@@ -587,10 +688,14 @@ export const SprintExamView: React.FC<SprintExamViewProps> = ({ exam, existingSc
           <div style={{ textAlign: 'center', marginBottom: '60px' }}>
             <button
               className="btn btn-primary btn-lg"
-              style={{ padding: '16px 48px', fontSize: '17px', borderRadius: '12px' }}
+              style={{
+                padding: '16px 48px',
+                fontSize: '17px',
+                borderRadius: '12px'
+              }}
               onClick={handleSubmit}
             >
-              🚀 Nộp Bài Thi & Xem Điểm Chi Tiết
+              Nộp Bài Thi & Xem Điểm Chi Tiết
             </button>
           </div>
         </div>

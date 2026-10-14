@@ -16,15 +16,14 @@ export const chapter7: Sprint = {
 Tại sao một tiến trình đơn luồng (Single-Threaded Process) như Redis lại có thể đạt thông lượng vượt trội hơn 100,000 phép toán mỗi giây (100k+ OPS) với độ trễ dưới 1 mili giây (Sub-millisecond Latency), vượt xa các hệ thống đa luồng phức tạp?
 * **Bản chất của Mô hình Đơn Luồng Thực Thi (Single-Threaded Execution Model):**
   - Trong các hệ thống đa luồng (Multi-threaded), việc nhiều luồng cùng truy cập một cấu trúc dữ liệu chia sẻ đòi hỏi các cơ chế đồng bộ hóa (Mutex, Read-Write Locks, Spinlocks, Semaphores). Khi số lượng kết nối tăng cao, hiện tượng **Lock Contention** (tranh chấp khóa) và chi phí chuyển đổi ngữ cảnh (**Thread Context Switching Overhead**) sẽ tiêu tốn phần lớn năng lực xử lý của CPU.
-  - Redis loại bỏ hoàn toàn các loại khóa bằng cách chạy toàn bộ logic dữ liệu trên **1 luồng chính duy nhất**. Hậu quả tích cực: $0\\%$ chi phí Locking, $0\\%$ nguy cơ Race Condition nội tại, và mọi lệnh thao tác đơn lẻ (\`INCR\`, \`HSET\`, \`LPUSH\`, \`ZADD\`) đều có tính **Nguyên tử tuyệt đối (Atomic by default)**!
+  - Redis loại bỏ hoàn toàn các loại khóa bằng cách chạy toàn bộ logic dữ liệu trên **1 luồng chính duy nhất**. Hậu quả tích cực: $0\\%$ chi phí Locking, $0\\%$ nguy cơ Race Condition nội tại, và mọi lệnh thao tác đơn lẻ (\`INCR\`, \`HSET\`, \`LPUSH\`, \`ZADD\`) đều có tính **Nguyên tử hoàn toàn (Atomic by default)**.
 * **Cơ chế Phân Kênh I/O Bất Đồng Bộ (Non-blocking I/O Multiplexing via epoll/kqueue):**
   - Redis không để một luồng bị chặn khi chờ đợi dữ liệu từ socket mạng.
   - Sử dụng các lệnh gọi hệ thống (System Calls) hiện đại của Linux Kernel như **\`epoll\`** (hoặc \`kqueue\` trên BSD/macOS), một luồng Redis có thể theo dõi đồng thời hàng chục nghìn kết nối mạng (File Descriptors).
-  - Khi một gói tin TCP truyền đến, Kernel thông báo cho Redis qua một sự kiện sẵn sàng (Read Event). Bộ điều phối sự kiện (**Event Dispatcher**) đưa sự kiện vào hàng đợi và luồng chính thực thi lệnh trong vài microsecond!
+  - Khi một gói tin TCP truyền đến, Kernel thông báo cho Redis qua một sự kiện sẵn sàng (Read Event). Bộ điều phối sự kiện (**Event Dispatcher**) đưa sự kiện vào hàng đợi và luồng chính thực thi lệnh trong vài microsecond.
 * **Tối Ưu Hóa Cấu Trúc Dữ Liệu Ở Tầng C:**
   - Redis không sử dụng chuỗi ký tự chuẩn của C (\`char*\` kết thúc bằng byte \`\\0\` vốn đòi hỏi $O(N)$ để đo độ dài). Nó tự phát minh ra **SDS (Simple Dynamic String)**: Lưu sẵn độ dài chuỗi (\`len\`) và dung lượng cấp phát dư (\`alloc\`) trong phần Header, giúp đo độ dài trong $O(1)$ và ngăn chặn triệt để lỗi tràn bộ đệm (Buffer Overflow).
-  - Tự động chuyển đổi biểu diễn nội tại (Internal Encoding Transformation): Khi tập hợp có ít phần tử, Redis dùng **ZipList / Listpack** (mảng nén liên tục trong RAM để giảm thiểu phân mảnh bộ nhớ và tận dụng CPU Cache L1/L2); khi số lượng phần tử vượt ngưỡng, nó tự động nâng cấp thành **SkipList** (cấu trúc dữ liệu phân tầng xác suất) để duy trì tốc độ tìm kiếm và sắp xếp $O(\\log N)$!
-
+  - Tự động chuyển đổi biểu diễn nội tại (Internal Encoding Transformation): Khi tập hợp có ít phần tử, Redis dùng **ZipList / Listpack** (mảng nén liên tục trong RAM để giảm thiểu phân mảnh bộ nhớ và tận dụng CPU Cache L1/L2); khi số lượng phần tử vượt ngưỡng, nó tự động nâng cấp thành **SkipList** (cấu trúc dữ liệu phân tầng xác suất) để duy trì tốc độ tìm kiếm và sắp xếp $O(\\log N)$.
 ---
 
 # 2. VÌ SAO REDIS ĐƠN LUỒNG LẠI NHANH VƯỢT TRỘI?
@@ -32,8 +31,7 @@ Tại sao một tiến trình đơn luồng (Single-Threaded Process) như Redis
 Tốc độ của Redis bắt nguồn từ 3 yếu tố kiến trúc cốt lõi:
 1. **$100\\%$ Toàn bộ dữ liệu nằm trong RAM:** Truy xuất RAM mất ~100 nanoseconds, nhanh hơn đọc ổ cứng SSD NVMe hàng nghìn lần.
 2. **Non-blocking I/O Multiplexing (epoll/kqueue):** Một luồng duy nhất có thể tiếp nhận và theo dõi hàng chục nghìn kết nối mạng đồng thời mà không tốn công cấp phát thread riêng.
-3. **Tuyệt đối không có Lock Contention:** Vì chỉ có 1 luồng thực thi các lệnh dữ liệu, Redis không bao giờ phải dùng Mutex, Semaphore hay Spinlock để bảo vệ dữ liệu. Mọi thao tác đơn lẻ (\`INCR\`, \`HSET\`, \`LPUSH\`) đều có tính **Nguyên tử tuyệt đối (Atomic by default)**!
-
+3. **không có Lock Contention:** Vì chỉ có 1 luồng thực thi các lệnh dữ liệu, Redis không bao giờ phải dùng Mutex, Semaphore hay Spinlock để bảo vệ dữ liệu. Mọi thao tác đơn lẻ (\`INCR\`, \`HSET\`, \`LPUSH\`) đều có tính **Nguyên tử hoàn toàn (Atomic by default)**.
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          KIẾN TRÚC NỘI TẠI CỦA REDIS RUNTIME                │
@@ -80,13 +78,12 @@ Thay vì dùng cây cân bằng Red-Black Tree phức tạp đòi hỏi tái câ
 Redis dùng **SkipList (Danh sách liên kết nhảy cóc)**:
 * Nhiều tầng danh sách liên kết chồng lên nhau.
 * Tầng trên cùng có bước nhảy thưa (nhảy 10 bước), tầng dưới bước nhảy dày hơn.
-* Cho phép tìm kiếm, thêm, xóa phần tử với độ phức tạp kỳ vọng **$O(\\log N)$** nhưng cài đặt đơn giản hơn nhiều và hỗ trợ duyệt khoảng (\`ZRANGEBYSCORE\`) cực kỳ xuất sắc!
-
+* Cho phép tìm kiếm, thêm, xóa phần tử với độ phức tạp kỳ vọng **$O(\\log N)$** nhưng cài đặt đơn giản hơn nhiều và hỗ trợ duyệt khoảng (\`ZRANGEBYSCORE\`) rất xuất sắc.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Ánh Xạ Kiểu Dữ Liệu Redis (Data Types & Encodings Map)
+### 4.1 Sơ đồ 1: Bản Đồ Ánh Xạ Kiểu Dữ Liệu Redis (Data Types & Encodings Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    REDIS USER TYPES  ◄───►  INTERNAL ENCODINGS              │
@@ -103,7 +100,7 @@ Redis dùng **SkipList (Danh sách liên kết nhảy cóc)**:
 └──────────────────────────────────────┴──────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Cơ Chế Tìm Kiếm Nhảy Cóc Trong SkipList (SkipList Search Flow)
+### 4.2 Sơ đồ 2: Cơ Chế Tìm Kiếm Nhảy Cóc Trong SkipList (SkipList Search Flow)
 \`\`\`diagram
 Tầng 3: [ Head ] ──────────────────────────────────────────► [ Node 50 ] ──► NULL
              │                                                     │
@@ -116,7 +113,7 @@ Tầng 1: [ Head ] ──► [ Node 10 ] ──► [ Node 25 ] ──► [ Node 
  -> Hạ xuống Tầng 1 -> Nhảy 1 bước tới đúng Node 30! Chỉ tốn vài bước nhảy O(log N)).
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Cấu Trúc Dữ Liệu (Data Structure Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Cấu Trúc Dữ Liệu (Data Structure Tree)
 \`\`\`diagram
 BẠN CẦN LƯU TRỮ DỮ LIỆU GÌ TRONG REDIS?
 │
@@ -136,7 +133,7 @@ BẠN CẦN LƯU TRỮ DỮ LIỆU GÌ TRONG REDIS?
     └──► DÙNG: SET (SADD, SISMEMBER, SINTER)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Kiểu Dữ Liệu | Thao Tác Điển Hình | Độ Phức Tạp Thời Gian | Mức Tiêu Hao Bộ Nhớ RAM | Kịch Bản Ứng Dụng Chuẩn |
 | :--- | :--- | :--- | :--- | :--- |
 | **String** | GET / SET | $O(1)$ | Trung bình (Có header SDS) | Caching HTML/JSON, Idempotency Key |
@@ -383,14 +380,14 @@ export class RedisDiagnosticsService implements OnModuleDestroy {
       duration: '60 phút',
       tag: 'Distributed Caching Strategies',
       theory: `
-# 1. BỐI CẢNH KỸ THUẬT: CÁC MẪU HÌNH BỘ NHỚ ĐỆM PHÂN TÁN & CƠ CHẾ PHÒNG VỆ THẢM HỌA CACHE FAILURE (ARCHITECTURAL CONTEXT & CACHE RESILIENCE)
+# 1. BỐI CẢNH KỸ THUẬT: CÁC MẪU HÌNH BỘ NHỚ ĐỆM PHÂN TÁN & CƠ CHẾ PHÒNG VỆ SỰ CỐ CACHE FAILURE (ARCHITECTURAL CONTEXT & CACHE RESILIENCE)
 
-Trong kiến trúc Backend hiện đại, tầng In-Memory Cache (Redis) đóng vai trò lá chắn bảo vệ hệ cơ sở dữ liệu quan hệ (RDBMS) phía sau. Một thiết kế Cache cẩu thả không những không tăng tốc hệ thống mà còn có thể làm sập toàn bộ hạ tầng cơ sở dữ liệu khi xảy ra các thảm họa đồng thời:
+Trong kiến trúc Backend hiện đại, tầng In-Memory Cache (Redis) đóng vai trò lá chắn bảo vệ hệ cơ sở dữ liệu quan hệ (RDBMS) phía sau. Một thiết kế Cache cẩu thả không những không tăng tốc hệ thống mà còn có thể làm sập toàn bộ hạ tầng cơ sở dữ liệu khi xảy ra các sự cố nghiêm trọng đồng thời:
 * **Các Mẫu Hình Triển Khai Cache Phổ Biến:**
   - **Cache-Aside (Lazy Loading):** Ứng dụng đọc Cache trước. Nếu Cache Miss, ứng dụng truy vấn Database, sau đó nạp kết quả vào Cache và trả về cho Client. Đây là mô hình mặc định cho $90\\%$ hệ thống vì tính linh hoạt và khả năng phục hồi khi Cache bị sự cố (Fallback về DB).
-  - **Write-Through:** Dữ liệu mới được ghi đồng thời vào Cache và Database trước khi trả về kết quả thành công. Đảm bảo tính nhất quán tuyệt đối giữa Cache và DB nhưng làm tăng độ trễ ghi (Write Latency).
+  - **Write-Through:** Dữ liệu mới được ghi đồng thời vào Cache và Database trước khi trả về kết quả thành công. Đảm bảo tính nhất quán hoàn toàn giữa Cache và DB nhưng làm tăng độ trễ ghi (Write Latency).
   - **Write-Behind (Write-Back):** Ghi trực tiếp vào Cache và trả về thành công tức thì; một tiến trình nền gom nhóm các thay đổi và ghi bất đồng bộ xuống DB sau. Đạt thông lượng ghi tối đa nhưng tiềm ẩn nguy cơ mất dữ liệu nếu Redis sập nguồn trước khi xả đĩa.
-* **3 Thảm Họa Độc Hại Khi Vận Hành Cache Trên Production:**
+* **3 Sự Cố Hệ Thống Độc Hại Khi Vận Hành Cache Trên Production:**
   - **1. Cache Stampede (Thundering Herd Problem):** Xảy ra khi một Hot Key có lưu lượng truy cập khổng lồ (ví dụ 50,000 req/s) bị hết hạn (TTL Expired) hoặc bị xóa. Trong cùng một tích tắc mili giây, 50,000 requests đồng loạt nhận kết quả Cache Miss và cùng lúc nện thẳng vào Database để tái tạo dữ liệu! Hồ bơi kết nối (Connection Pool) cạn kiệt, CPU của Database vọt lên $100\\%$ và sập nguồn tức khắc. Giải pháp: Áp dụng thuật toán **XFetch (Probabilistic Early Expiration)** hoặc sử dụng Mutex Lock / Singleflight để chỉ cho phép duy nhất 1 request đi vào DB, các request còn lại xếp hàng đợi.
   - **2. Cache Penetration (Xuyên Thủng Cache):** Kẻ tấn công cố tình quét các khóa không hề tồn tại trong cơ sở dữ liệu (ví dụ: \`id = -1\`, \`id = 9999999999\`). Vì dữ liệu không có trong DB nên cũng không bao giờ có trong Cache, khiến mọi request đều đâm xuyên qua lớp Cache và nện thẳng vào đĩa cứng Database! Giải pháp: Sử dụng **Bloom Filter** (cấu trúc dữ liệu xác suất trong RAM để kiểm tra phần tử có chắc chắn KHÔNG tồn tại hay không) hoặc chủ động Cache giá trị \`NULL\` kèm TTL ngắn (1-2 phút).
   - **3. Cache Avalanche (Lở Tuyết Cache):** Khi hàng triệu khóa Cache được nạp vào lúc khởi động hoặc được cấu hình cùng một thời gian hết hạn TTL (ví dụ: đúng 3600 giây). Đến đúng giây thứ 3600, toàn bộ hàng triệu khóa đồng loạt bốc hơi, dồn toàn bộ tải đọc của toàn bộ nền tảng xuống Database! Giải pháp: Bắt buộc cộng thêm một độ lệch ngẫu nhiên (**Jitter**): \`TTL = baseTTL + random(0, 300)\` để làm phẳng phân phối hết hạn của các khóa.
@@ -423,23 +420,21 @@ Trong kiến trúc Backend hiện đại, tầng In-Memory Cache (Redis) đóng 
 ### 3.1 Cache Penetration (Thủng Lớp Đệm)
 * **Hiện tượng:** Truy vấn các khóa hoàn toàn không tồn tại trong hệ thống (Hacker quét ID ngẫu nhiên).
 * **Giải pháp 1 - Cache Null Object:** Nếu DB trả về \`null\`, lưu luôn giá trị \`"NULL"\` vào Redis với TTL ngắn (ví dụ: 60 giây).
-* **Giải pháp 2 - Bloom Filter:** Đặt một mảng bit Bloom Filter ở trước Redis. Nếu Bloom Filter báo phần tử không tồn tại, từ chối ngay lập tức với xác suất chính xác $100\\%$!
-
+* **Giải pháp 2 - Bloom Filter:** Đặt một mảng bit Bloom Filter ở trước Redis. Nếu Bloom Filter báo phần tử không tồn tại, từ chối ngay lập tức với xác suất chính xác $100\\%$.
 ### 3.2 Cache Breakdown / Stampede (Tê Liệt Khóa Hot-key)
-* **Hiện tượng:** Một khóa cực kỳ "nóng" (ví dụ: Trang chủ Black Friday, Trang chi tiết iPhone 16) bị hết hạn (TTL Expired), hàng chục nghìn request cùng lúc tràn xuống DB để tính toán lại.
+* **Hiện tượng:** Một khóa rất "nóng" (ví dụ: Trang chủ Black Friday, Trang chi tiết iPhone 16) bị hết hạn (TTL Expired), hàng chục nghìn request cùng lúc tràn xuống DB để tính toán lại.
 * **Giải pháp 1 - Mutex Lock (Khóa phân tán):** Request đầu tiên gặp Miss sẽ chiếm khóa Redis \`SET lock_key 1 NX EX 5\`. Chỉ DUY NHẤT một request này được quyền truy vấn Database để nạp lại Cache. Các request khác ngủ chờ vài chục ms rồi đọc lại Cache.
-* **Giải pháp 2 - Logical Expiration:** Trong Cache lưu 2 trường: \`data\` và \`expireAt\`. Khi một request thấy \`Date.now() > expireAt\`, nó vẫn trả về dữ liệu cũ (Stale Data) cho khách hàng ngay lập tức, đồng thời đẩy một background job ngầm đi cập nhật dữ liệu mới!
-
+* **Giải pháp 2 - Logical Expiration:** Trong Cache lưu 2 trường: \`data\` và \`expireAt\`. Khi một request thấy \`Date.now() > expireAt\`, nó vẫn trả về dữ liệu cũ (Stale Data) cho khách hàng ngay lập tức, đồng thời đẩy một background job ngầm đi cập nhật dữ liệu mới.
 ### 3.3 Cache Avalanche (Tuyết Lở Toàn Hệ Thống)
-* **Hiện tượng:** Hàng triệu khóa cùng được gán thời hạn TTL giống hệt nhau (ví dụ: cùng hết hạn sau đúng 3600 giây lúc 12:00 trưa). Toàn bộ Cache đồng loạt biến mất cùng một giây!
-* **Giải pháp:** **Jitter Randomization!** Thêm một khoảng thời gian ngẫu nhiên vào TTL:
+* **Hiện tượng:** Hàng triệu khóa cùng được gán thời hạn TTL giống hệt nhau (ví dụ: cùng hết hạn sau đúng 3600 giây lúc 12:00 trưa). Toàn bộ Cache đồng loạt biến mất cùng một giây.
+* **Giải pháp:** **Jitter Randomization.** Thêm một khoảng thời gian ngẫu nhiên vào TTL:
 $$\\text{TTL} = \\text{Base TTL} + \\text{Random}(1, 300) \\text{ giây}$$
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Kiến Trúc Bộ Đệm Toàn Diện (Caching Architecture Map)
+### 4.1 Sơ đồ 1: Phân Phối Kiến Trúc Bộ Đệm Toàn Diện (Caching Architecture Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          LỚP 1: BẢO VỆ PHÒNG NGỰ (BLOOM FILTER)             │
@@ -457,7 +452,7 @@ $$\\text{TTL} = \\text{Base TTL} + \\text{Random}(1, 300) \\text{ giây}$$
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Cache-Aside Có Khóa Mutex Chống Stampede (Mutex Cache Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Cache-Aside Có Khóa Mutex Chống Stampede (Mutex Cache Flow)
 \`\`\`diagram
 Request đến tìm kiếm dữ liệu Khóa K
    │
@@ -480,7 +475,7 @@ Request đến tìm kiếm dữ liệu Khóa K
                  └── 4. Trả kết quả về cho người dùng
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý Sự Cố Bộ Đệm (Cache Failure Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý Sự Cố Bộ Đệm (Cache Failure Decision Tree)
 \`\`\`diagram
 HỆ THỐNG GẶP SỰ CỐ VỀ CACHE?
 │
@@ -494,12 +489,12 @@ HỆ THỐNG GẶP SỰ CỐ VỀ CACHE?
     └──► Phát hiện Cache Avalanche! Thêm ngay: Math.random() vào TTL!
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược / Kỹ Thuật | Tính Nhất Quán Dữ Liệu | Khả Năng Bảo Vệ Database | Độ Phức Tạp Mã Nguồn | Độ Trễ Phản Hồi |
 | :--- | :--- | :--- | :--- | :--- |
-| **Cache-Aside Đơn Giản**| Eventual Consistency | Yếu trước các đợt Stampede| Cực kỳ đơn giản | Rất nhanh khi Hit, chậm khi Miss |
-| **Mutex Lock Cache** | Rất cao | Tuyệt đối chống Stampede | Trung bình | Request sau phải đợi vài chục ms |
-| **Logical Expiration** | Chấp nhận đọc dữ liệu cũ | Hoàn hảo ($0\\text{ ms}$ chờ đợi) | Cao (Cần background worker) | Nhanh $100\\%$ mọi thời điểm |
+| **Cache-Aside Đơn Giản**| Eventual Consistency | Yếu trước các đợt Stampede| Rất đơn giản | Rất nhanh khi Hit, chậm khi Miss |
+| **Mutex Lock Cache** | Rất cao | Hoàn toàn chống Stampede | Trung bình | Request sau phải đợi vài chục ms |
+| **Logical Expiration** | Chấp nhận đọc dữ liệu cũ | Toàn diện ($0\\text{ ms}$ chờ đợi) | Cao (Cần background worker) | Nhanh $100\\%$ mọi thời điểm |
 | **Write-Through** | Nhất quán mạnh mẽ | Rất tốt | Phức tạp ở tầng Storage | Chậm hơn khi ghi do phải cập nhật cả hai |
 `,
       realCodeSnippet: `import { Injectable, Logger } from '@nestjs/common';
@@ -665,7 +660,7 @@ export class SafeCacheAsideService {
             'Chỉ hỗ trợ kiểm tra các số nguyên chẵn và tự động trả về lỗi với chuỗi ký tự UTF-8.',
           ],
           correctIndex: 2,
-          explanation: 'Đặc tính kinh điển của Bloom Filter: "False positive is possible, but false negative is impossible". Nghĩa là: Nếu Bloom Filter bảo một ID KHÔNG tồn tại, thì chắc chắn 100% nó không có trong DB (từ chối ngay lập tức, bảo vệ tuyệt đối DB). Nếu nó bảo có, thì có khả năng nhỏ là nó nhầm lẫn do hash collision (vẫn cho đi qua).'
+          explanation: 'Đặc tính điển hình của Bloom Filter: "False positive is possible, but false negative is impossible". Nghĩa là: Nếu Bloom Filter bảo một ID KHÔNG tồn tại, thì chắc chắn 100% nó không có trong DB (từ chối ngay lập tức, bảo vệ hoàn toàn DB). Nếu nó bảo có, thì có khả năng nhỏ là nó nhầm lẫn do hash collision (vẫn cho đi qua).'
         },
         {
           id: 'c7-l2-q8',
@@ -747,17 +742,16 @@ Khi một hệ thống Backend được mở rộng theo chiều ngang (Horizont
   - Cần bảo đảm tính **Loại Trừ Lẫn Nhau (Mutual Exclusion)** trên quy mô toàn cụm máy chủ: Tại một thời điểm, chỉ duy nhất một Worker được phép thực thi một tác vụ đặc quyền (ví dụ: chạy Cron Job kết toán số dư cuối ngày, xử lý trừ kho sản phẩm duy nhất còn lại, hoặc gọi đối tác thanh toán).
   - Vì Redis là một dịch vụ tập trung (Centralized In-Memory Datastore) có tính đơn luồng và độ trễ cực thấp, nó trở thành giải pháp tiêu chuẩn công nghiệp để hiện thực Distributed Lock.
 * **Bài toán Sinh tử về Thời hạn Khóa (Lock TTL Expiration) & Cơ chế Tự Giải Phóng:**
-  - Nếu một tiến trình chiếm được khóa nhưng sau đó bị sập nguồn đột ngột (Kernel Panic, OOM Killer) hoặc rơi vào trạng thái đóng băng kéo dài (V8 Garbage Collection Stop-The-World Pause): Nếu khóa không có thời gian tự hủy (TTL), toàn bộ hệ thống sẽ bị **Deadlock vĩnh viễn** vì không ai có thể chiếm được khóa nữa!
+  - Nếu một tiến trình chiếm được khóa nhưng sau đó bị sập nguồn đột ngột (Kernel Panic, OOM Killer) hoặc rơi vào trạng thái đóng băng kéo dài (V8 Garbage Collection Stop-The-World Pause): Nếu khóa không có thời gian tự hủy (TTL), toàn bộ hệ thống sẽ bị **Deadlock vĩnh viễn** vì không ai có thể chiếm được khóa nữa.
   - Do đó, khóa phân tán bắt buộc phải được gắn một giá trị thời gian sống hợp lý (ví dụ: \`PX 10000\` = 10 giây).
 * **Hiểm họa Giải Phóng Khóa Nhầm Lẫn (Releasing Someone Else's Lock Disaster):**
   - Giả sử Worker A chiếm khóa với TTL 10 giây.
   - Do nghẽn mạng I/O hoặc GC Pause, tác vụ của Worker A kéo dài mất 15 giây.
   - Sau 10 giây, khóa của Worker A tự động hết hạn trên Redis.
   - Worker B nhảy vào chiếm khóa thành công và bắt đầu thực thi tác vụ.
-  - Đúng lúc này, Worker A hoàn thành công việc và ngây thơ gọi lệnh \`DEL lock_key\`!
-  - **Hậu quả thảm khốc:** Worker A đã vô tình **xóa mất khóa hợp lệ của Worker B**! Một Worker C thứ ba lập tức nhảy vào chiếm khóa, dẫn đến việc cả Worker B và Worker C cùng lúc thực thi tác vụ nhạy cảm, phá hủy hoàn toàn tính Mutual Exclusion!
-  - **Giải pháp Bắt Buộc:** Mỗi Client khi chiếm khóa phải sinh ra một chuỗi ngẫu nhiên duy nhất (**UUID v4**) làm giá trị khóa (\`lockValue\`). Khi giải phóng, Client bắt buộc phải thực thi một đoạn **Lua Script nguyên tử**: Chỉ kiểm tra nếu giá trị trên Redis khớp chính xác với UUID của mình thì mới thực hiện lệnh \`DEL\`, bảo đảm an toàn phân tán tuyệt đối!
-
+  - Đúng lúc này, Worker A hoàn thành công việc và ngây thơ gọi lệnh \`DEL lock_key\`.
+  - **Hậu quả thảm khốc:** Worker A đã vô tình **xóa mất khóa hợp lệ của Worker B**! Một Worker C thứ ba lập tức nhảy vào chiếm khóa, dẫn đến việc cả Worker B và Worker C cùng lúc thực thi tác vụ nhạy cảm, phá hủy hoàn toàn tính Mutual Exclusion.
+  - **Giải pháp Bắt Buộc:** Mỗi Client khi chiếm khóa phải sinh ra một chuỗi ngẫu nhiên duy nhất (**UUID v4**) làm giá trị khóa (\`lockValue\`). Khi giải phóng, Client bắt buộc phải thực thi một đoạn **Lua Script nguyên tử**: Chỉ kiểm tra nếu giá trị trên Redis khớp chính xác với UUID của mình thì mới thực hiện lệnh \`DEL\`, bảo đảm an toàn phân tán hoàn toàn.
 ---
 
 # 2. HIỆN THỰC KHÓA PHÂN TÁN AN TOÀN BẰNG LỆNH NGUYÊN TỬ SET NX PX
@@ -767,7 +761,7 @@ Khi một hệ thống Backend được mở rộng theo chiều ngang (Horizont
 SET resource_name my_random_value NX PX 30000
 \`\`\`
 * \`resource_name\`: Tên khóa đại diện cho tài nguyên cần bảo vệ (vd: \`lock:order:102\`).
-* \`my_random_value\`: Một chuỗi ngẫu nhiên duy nhất (UUID v4) được sinh ra riêng cho mỗi request. **BẮT BUỘC PHẢI CÓ** để phân biệt chủ sở hữu khóa!
+* \`my_random_value\`: Một chuỗi ngẫu nhiên duy nhất (UUID v4) được sinh ra riêng cho mỗi request. **BẮT BUỘC PHẢI CÓ** để phân biệt chủ sở hữu khóa.
 * \`NX\`: Chỉ gán nếu khóa chưa từng tồn tại (Set if Not eXists) - Đảm bảo tính loại trừ lẫn nhau (Mutual Exclusion).
 * \`PX 30000\`: Hạn sử dụng tự động hủy sau 30,000 mili giây (30 giây) - Chống Deadlock khi server gặp sự cố.
 
@@ -775,10 +769,10 @@ SET resource_name my_random_value NX PX 30000
 
 # 3. GIẢI PHÓNG KHÓA NGUYÊN TỬ BẰNG LUA SCRIPT
 
-Khi giải phóng khóa, tuyệt đối **KHÔNG ĐƯỢC PHÉP** gọi lệnh \`DEL lock_name\` một cách ngây thơ!
+Khi giải phóng khóa, hoàn toàn **KHÔNG ĐƯỢC PHÉP** gọi lệnh \`DEL lock_name\` một cách ngây thơ.
 Bởi vì đại ca có thể vô tình xóa mất khóa của một tiến trình khác đã chiếm được sau khi khóa của đại ca bị quá hạn TTL.
 Ta bắt buộc phải: **So sánh chuỗi ngẫu nhiên (UUID) xem có đúng là mình không, NẾU ĐÚNG thì mới được XÓA.**
-Hai bước này phải được thực thi **Nguyên tử tuyệt đối (Atomic)** thông qua đoạn **Lua Script**:
+Hai bước này phải được thực thi **Nguyên tử hoàn toàn (Atomic)** thông qua đoạn **Lua Script**:
 
 \`\`\`lua
 -- Lua script giải phóng khóa an toàn trong Redis
@@ -788,23 +782,21 @@ else
     return 0
 end
 \`\`\`
-* Vì Redis thực thi Lua Script trên một luồng duy nhất, không có bất kỳ lệnh nào khác có thể chen vào giữa lệnh \`GET\` và \`DEL\`. Đảm bảo an toàn phân tán $100\\%$!
-
+* Vì Redis thực thi Lua Script trên một luồng duy nhất, không có bất kỳ lệnh nào khác có thể chen vào giữa lệnh \`GET\` và \`DEL\`. Đảm bảo an toàn phân tán $100\\%$.
 ---
 
 # 4. THUẬT TOÁN REDLOCK TRÊN CỤM ĐA MÁY CHỦ (MULTI-NODE CLUSTER)
 
-Nếu chỉ có 1 Redis Master: Khi Master sập ngay sau khi bạn chiếm khóa (dữ liệu chưa kịp replicate sang Replica), Replica lên làm Master mới và chưa có khóa đó, dẫn đến một tiến trình khác lại chiếm được khóa lần hai!
+Nếu chỉ có 1 Redis Master: Khi Master sập ngay sau khi kỹ sư chiếm khóa (dữ liệu chưa kịp replicate sang Replica), Replica lên làm Master mới và chưa có khóa đó, dẫn đến một tiến trình khác lại chiếm được khóa lần hai.
 Để giải quyết bài toán này, tác giả của Redis (Antirez) đề xuất **Thuật toán Redlock**:
 1. Triển khai $N$ máy chủ Redis Master hoàn toàn độc lập (thường $N = 5$).
 2. Client cố gắng chiếm khóa trên tất cả 5 node với cùng một chuỗi UUID và một timeout nhỏ.
-3. Nếu client chiếm được khóa thành công trên **đa số quá bán** (Majority: $\ge 3$ node trên 5 node), và tổng thời gian chiếm khóa nhỏ hơn thời gian sống (TTL), thì khóa được coi là **Hợp lệ và Thành công**!
-
+3. Nếu client chiếm được khóa thành công trên **đa số quá bán** (Majority: $\ge 3$ node trên 5 node), và tổng thời gian chiếm khóa nhỏ hơn thời gian sống (TTL), thì khóa được coi là **Hợp lệ và Thành công**.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Các Thành Phần Của Distributed Lock (Lock Architecture Map)
+### 4.1 Sơ đồ 1: Bản Đồ Các Thành Phần Của Distributed Lock (Lock Architecture Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          KIẾN TRÚC KHÓA PHÂN TÁN AN TOÀN                    │
@@ -823,7 +815,7 @@ Nếu chỉ có 1 Redis Master: Khi Master sập ngay sau khi bạn chiếm khó
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Vòng Đời Chiếm & Giải Phóng Khóa (Distributed Lock Lifecycle)
+### 4.2 Sơ đồ 2: Dòng Chảy Vòng Đời Chiếm & Giải Phóng Khóa (Distributed Lock Lifecycle)
 \`\`\`diagram
 [ Khởi tạo tác vụ cần bảo vệ ]
               │
@@ -846,7 +838,7 @@ Nếu chỉ có 1 Redis Master: Khi Master sập ngay sau khi bạn chiếm khó
               └── 6. Chạy Lua Script: So sánh lockToken & Xóa khóa!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Cơ Chế Khóa Phân Tán (Lock Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Cơ Chế Khóa Phân Tán (Lock Decision Tree)
 \`\`\`diagram
 BẠN CẦN BẢO VỆ TÀI NGUYÊN ĐỒNG THỜI TRONG HỆ THỐNG PHÂN TÁN?
 │
@@ -860,7 +852,7 @@ BẠN CẦN BẢO VỆ TÀI NGUYÊN ĐỒNG THỜI TRONG HỆ THỐNG PHÂN TÁN
     └──► DÙNG: Thuật toán Redlock trên cụm 5 Redis Nodes độc lập
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cơ Chế Khóa | Tốc Độ Thực Thi | Mức Tiêu Tốn Tài Nguyên | Độ Tin Cậy Khi Sập Máy Chủ | Nguy Cơ Xóa Nhầm Khóa |
 | :--- | :--- | :--- | :--- | :--- |
 | **SETNX thông thường (không value)**| Cực nhanh | Thấp | Rất kém (Dễ dính Deadlock vĩnh viễn)| Rất cao |
@@ -1020,7 +1012,7 @@ export class DistributedLockService implements OnModuleDestroy {
             'Vì các tiến trình ứng dụng Node.js sẽ tự động thoát với mã lỗi SIGSEGV khi mất kết nối tới Redis Master.',
           ],
           correctIndex: 0,
-          explanation: 'Redis sao lưu sang Replica theo cơ chế bất đồng bộ (Asynchronous Replication) để giữ tốc độ. Nếu Client A chiếm khóa trên Master, nhưng trước khi Master kịp replicate sang Replica thì Master bị sập nguồn: Sentinel sẽ bầu Replica đó làm Master mới. Master mới này hoàn toàn không biết gì về khóa của Client A, do đó sẵn sàng cấp cùng khóa đó cho Client B, vi phạm tính Mutual Exclusion!'
+          explanation: 'Redis sao lưu sang Replica theo cơ chế bất đồng bộ (Asynchronous Replication) để giữ tốc độ. Nếu Client A chiếm khóa trên Master, nhưng trước khi Master kịp replicate sang Replica thì Master bị sập nguồn: Sentinel sẽ bầu Replica đó làm Master mới. Master mới này hoàn toàn không biết gì về khóa của Client A, do đó sẵn sàng cấp cùng khóa đó cho Client B, vi phạm tính Mutual Exclusion.'
         },
         {
           id: 'c7-l3-q7',

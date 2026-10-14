@@ -6,8 +6,13 @@ import { FormattedText } from '../common/FormattedText.tsx';
 import { getModKey } from '../../utils/platform.ts';
 
 export interface CodeSandboxChallenge {
+  id?: string;
+  level?: 'basic' | 'intermediate' | 'advanced';
+  levelLabel?: string;
   title: string;
   description: string;
+  guidedSteps?: string[];
+  hints?: string[];
   starterCode: string;
   testCases: TestCase[];
 }
@@ -24,6 +29,8 @@ export interface CodeSandboxEditorProps {
   runVisibleButtonText?: string;
   submitButtonText?: string;
   onPassed?: () => void;
+  onNextChallenge?: () => void;
+  nextChallengeLabel?: string;
   className?: string;
 }
 
@@ -138,11 +145,40 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   filePath,
   storageKey,
   headerBadge = 'Thực Hành & Chấm Điểm Sandbox',
-  runVisibleButtonText = '▶️ Chạy Thử (Visible Cases)',
-  submitButtonText = '🚀 Nộp Bài (Kèm Hidden Cases)',
+  runVisibleButtonText = 'Chạy Thử (Visible Cases)',
+  submitButtonText = 'Nộp Bài (Kèm Hidden Cases)',
   onPassed,
+  onNextChallenge,
+  nextChallengeLabel,
   className
 }) => {
+  const [showHints, setShowHints] = useState(false);
+
+  // Extract function name and parameter names from starterCode for clear Input display
+  const signatureMeta = useMemo(() => {
+    const fnMatch = challenge.starterCode.match(
+      /(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(([^)]*)\)/
+    );
+    if (fnMatch) {
+      const fnName = fnMatch[1];
+      const paramNames = fnMatch[2]
+        .split(',')
+        .map((p) => p.trim().split(/[:=]/)[0].trim())
+        .filter(Boolean);
+      return { fnName, paramNames };
+    }
+    return { fnName: 'solution', paramNames: [] as string[] };
+  }, [challenge.starterCode]);
+
+  const visibleTestCases = useMemo(
+    () => challenge.testCases.filter((tc) => !tc.hidden),
+    [challenge.testCases]
+  );
+  const hiddenTestCases = useMemo(
+    () => challenge.testCases.filter((tc) => Boolean(tc.hidden)),
+    [challenge.testCases]
+  );
+
   // 1. Multi Solutions Tabs State
   const [solutions, setSolutions] = useState<CodeSolutionTab[]>(() => {
     if (storageKey) {
@@ -198,6 +234,24 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
   const highlightRef = useRef<HTMLPreElement | null>(null);
 
   useEffect(() => {
+    setShowHints(false);
+    if (storageKey) {
+      try {
+        const savedHist = localStorage.getItem(`${storageKey}_history`);
+        if (savedHist) {
+          const parsedHist = JSON.parse(savedHist);
+          setHistory(Array.isArray(parsedHist) ? parsedHist : []);
+        } else {
+          setHistory([]);
+        }
+      } catch {
+        setHistory([]);
+      }
+    } else {
+      setHistory([]);
+    }
+    setViewHistoryRecord(null);
+
     if (value === undefined && storageKey) {
       try {
         const savedMulti = localStorage.getItem(`${storageKey}_solutions`);
@@ -206,18 +260,22 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
           if (Array.isArray(parsed) && parsed.length > 0) {
             setSolutions(parsed);
             setActiveSolutionId(parsed[0].id);
+            setTestOutcome(null);
+            setSuggestions([]);
             return;
           }
         }
         const saved = localStorage.getItem(storageKey);
         setSolutions([{ id: 'sol-1', name: fileName, code: saved || challenge.starterCode }]);
+        setActiveSolutionId('sol-1');
       } catch {
         setSolutions([{ id: 'sol-1', name: fileName, code: challenge.starterCode }]);
+        setActiveSolutionId('sol-1');
       }
     }
     setTestOutcome(null);
     setSuggestions([]);
-  }, [challenge.title, storageKey]);
+  }, [challenge.title, storageKey, fileName, value, challenge.starterCode]);
 
   // Extract dynamic variable/function names from user code for IntelliSense
   const dynamicWords = useMemo(() => {
@@ -487,7 +545,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
         code: code
       };
       setHistory((prev) => {
-        const next = [newRecord, ...prev].slice(0, 20);
+        const next = [newRecord, ...prev].slice(0, 100);
         if (storageKey) {
           try {
             localStorage.setItem(`${storageKey}_history`, JSON.stringify(next));
@@ -523,7 +581,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
         code: code
       };
       setHistory((prev) => {
-        const next = [newRecord, ...prev].slice(0, 20);
+        const next = [newRecord, ...prev].slice(0, 100);
         if (storageKey) {
           try {
             localStorage.setItem(`${storageKey}_history`, JSON.stringify(next));
@@ -548,12 +606,130 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
 
   const breadcrumb = filePath || `src > solutions > ${fileName}`;
 
+  const formatInputArgs = (inputs: unknown[]) => {
+    if (!Array.isArray(inputs) || inputs.length === 0) return '()';
+    return inputs
+      .map((val, idx) => {
+        const paramName = signatureMeta.paramNames[idx];
+        const serialized = typeof val === 'undefined' ? 'undefined' : JSON.stringify(val);
+        return paramName ? `${paramName} = ${serialized}` : serialized;
+      })
+      .join(', ');
+  };
+
+  const formatExpectedValue = (expected: unknown) => {
+    if (expected === 'ERROR_THROWN') {
+      return 'Ném ngoại lệ (throw new Error(...))';
+    }
+    return JSON.stringify(expected);
+  };
+
   return (
     <div className={`sandbox-card ${className || ''}`}>
       <div className="sandbox-header">
-        <div className="sandbox-header-badge">{headerBadge}</div>
+        <div className="sandbox-header-top-row">
+          <div className="sandbox-header-badge">{headerBadge}</div>
+          {challenge.levelLabel && (
+            <span className={`sandbox-level-pill level-${challenge.level || 'basic'}`}>
+              {challenge.levelLabel}
+            </span>
+          )}
+        </div>
         <h3 className="sandbox-title">{challenge.title}</h3>
         <FormattedText content={challenge.description} className="sandbox-desc" />
+
+        {/* Step-by-step Pedagogical Guidance */}
+        {challenge.guidedSteps && challenge.guidedSteps.length > 0 && (
+          <div className="sandbox-guided-steps-box">
+            <div className="guided-steps-header">
+              <span className="guided-steps-title">HƯỚNG DẪN TƯ DUY & GIẢI TỪNG BƯỚC</span>
+              {challenge.hints && challenge.hints.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-toggle-hints"
+                  onClick={() => setShowHints((prev) => !prev)}
+                >
+                  {showHints ? 'Ẩn gợi ý mở rộng' : `Xem gợi ý & lưu ý biên (${challenge.hints.length})`}
+                </button>
+              )}
+            </div>
+            <div className="guided-steps-list">
+              {challenge.guidedSteps.map((rawStep, sIdx) => {
+                const match = rawStep.match(/^Bước\s*\d+(?:\s*&\s*\d+)?\s*(?:\(([^)]+)\))?\s*[:\-]?\s*(.*)$/i);
+                const stepSubtitle = match?.[1]?.trim();
+                const stepBody = match?.[2] ? match[2].trim() : rawStep.replace(/^Bước\s*\d+\s*[:\-]?\s*/i, '').trim();
+                const formattedStepContent = stepSubtitle ? `**${stepSubtitle}:** ${stepBody}` : stepBody;
+                return (
+                  <div key={sIdx} className="guided-step-item">
+                    <span className="guided-step-num">Bước {sIdx + 1}</span>
+                    <FormattedText content={formattedStepContent} className="guided-step-text" />
+                  </div>
+                );
+              })}
+            </div>
+
+            {showHints && challenge.hints && challenge.hints.length > 0 && (
+              <div className="sandbox-hints-drawer">
+                <div className="sandbox-hints-title">Gợi ý kiểm tra điều kiện biên & công thức:</div>
+                <ul className="hints-list">
+                  {challenge.hints.map((hint, hIdx) => (
+                    <li key={hIdx} className="hint-item">
+                      <FormattedText content={hint} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pre-Execution Visible Test Cases Input / Output Table */}
+        {visibleTestCases.length > 0 && (
+          <div className="sandbox-visible-specs-box">
+            <div className="visible-specs-header">
+              <div className="visible-specs-header-left">
+                <span className="visible-specs-title">
+                  ĐẶC TẢ INPUT / OUTPUT MẪU ({visibleTestCases.length} VISIBLE TEST CASES)
+                </span>
+                {signatureMeta.fnName && (
+                  <span className="visible-specs-fn-badge">
+                    {signatureMeta.fnName}({signatureMeta.paramNames.join(', ')})
+                  </span>
+                )}
+              </div>
+              {hiddenTestCases.length > 0 && (
+                <span className="sandbox-hidden-count-note">
+                  + {hiddenTestCases.length} Hidden Test Cases kiểm tra điều kiện biên khi Nộp Bài
+                </span>
+              )}
+            </div>
+            <div className="visible-specs-grid">
+              {visibleTestCases.map((tc, vIdx) => (
+                <div key={vIdx} className="sandbox-spec-card">
+                  <div className="spec-card-header">
+                    <span className="spec-card-badge">Ví dụ {vIdx + 1}</span>
+                    <span className="spec-card-name">
+                      {(tc.name || `Test Case ${vIdx + 1}`).replace(/^Case\s*\d+\s*\(Visible\):\s*/i, '')}
+                    </span>
+                  </div>
+                  {tc.description && (
+                    <div className="sandbox-spec-case-desc">{tc.description}</div>
+                  )}
+                  <div className="spec-card-io">
+                    <div className="spec-io-row">
+                      <span className="spec-io-label">Input:</span>
+                      <span className="spec-io-value">{formatInputArgs(tc.input)}</span>
+                    </div>
+                    <div className="spec-io-row">
+                      <span className="spec-io-label">Output kỳ vọng:</span>
+                      <span className="spec-io-value expected">{formatExpectedValue(tc.expected)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* VS Code Interactive Editor */}
@@ -563,7 +739,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
           <div className="vs-tab-delete-overlay" onClick={() => setTabToDeleteId(null)}>
             <div className="vs-tab-delete-modal" onClick={(e) => e.stopPropagation()}>
               <div className="tab-delete-header">
-                <span className="tab-delete-icon">⚠️</span>
+                <span className="tab-delete-icon">!</span>
                 <span className="tab-delete-title">Xóa tab <strong>{tabToDelete.name}</strong>?</span>
               </div>
               <p className="tab-delete-desc">
@@ -602,7 +778,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                 className={`vs-tab ${sol.id === activeSolutionId ? 'active' : ''}`}
                 onClick={() => setActiveSolutionId(sol.id)}
                 onDoubleClick={(e) => startRenamingTab(sol, e)}
-                title="Nhấp đúp hoặc bấm icon ✏️ để đổi tên tab"
+                title="Nhấp đúp hoặc bấm nút sửa để đổi tên tab"
               >
                 <span className="vs-tab-badge">TS</span>
                 {editingTabId === sol.id ? (
@@ -628,7 +804,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                   onClick={(e) => startRenamingTab(sol, e)}
                   title="Đổi tên solution"
                 >
-                  ✏️
+                  ✎
                 </span>
                 {solutions.length > 1 && (
                   <span
@@ -651,7 +827,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             </button>
           </div>
           <div className="vs-editor-actions">
-            <span className="vs-breadcrumb-text">{filePath || `src > solutions > ${currentSolution.name}`}</span>
+            <span className="vs-breadcrumb-text">{breadcrumb || `src > solutions > ${currentSolution.name}`}</span>
             <span className="vs-save-badge">● Tự động lưu</span>
           </div>
         </div>
@@ -730,22 +906,24 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             <span className="shortcut-hint">{getModKey()} + Enter: Chạy thử</span>
           </div>
           <div className="sandbox-footer-actions">
-            <button className="btn btn-secondary btn-sm" onClick={handleReset} title="Khôi phục code ban đầu của solution này">
+            <button className="btn btn-secondary btn-sm" onClick={handleReset} title="Khôi phục code ban đầu của solution này" type="button">
               ↺ Khôi phục
             </button>
             <button
               className="btn btn-primary btn-sm"
               disabled={isRunning}
               onClick={() => handleRunTests(false)}
+              type="button"
             >
-              {isRunning ? '⏳ Đang chạy...' : runVisibleButtonText}
+              {isRunning ? 'Đang chạy...' : runVisibleButtonText}
             </button>
             <button
               className="btn btn-success btn-sm"
               disabled={isRunning}
               onClick={() => handleRunTests(true)}
+              type="button"
             >
-              {isRunning ? '⏳ Đang kiểm tra...' : submitButtonText}
+              {isRunning ? 'Đang kiểm tra...' : submitButtonText}
             </button>
           </div>
         </div>
@@ -778,7 +956,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                 className={`terminal-tab ${activeTab === 'history' ? 'active' : ''}`}
                 onClick={() => setActiveTab('history')}
               >
-                📜 LỊCH SỬ LÀM BÀI ({history.length})
+                LỊCH SỬ LÀM BÀI ({history.length})
               </button>
             </div>
             {testOutcome && (
@@ -818,12 +996,12 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                       <div className="history-record-header">
                         <div className="history-record-title">
                           <span className={`record-badge ${rec.action === 'submit' ? 'submit' : 'run'}`}>
-                            {rec.action === 'submit' ? '🚀 Nộp Bài' : '▶️ Chạy Thử'}
+                            {rec.action === 'submit' ? 'Nộp Bài' : 'Chạy Thử'}
                           </span>
                           <span className={`record-result ${rec.passed ? 'pass' : 'fail'}`}>
                             {rec.passed ? `PASSED (${rec.passedCount}/${rec.totalCount})` : `FAILED (${rec.passedCount}/${rec.totalCount})`}
                           </span>
-                          <span className="record-sol-name">📄 {rec.solutionName}</span>
+                          <span className="record-sol-name">{rec.solutionName}</span>
                         </div>
                         <div className="history-record-time">
                           {new Date(rec.timestamp).toLocaleTimeString('vi-VN')} {new Date(rec.timestamp).toLocaleDateString('vi-VN')}
@@ -844,7 +1022,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                           className="btn-history-action view"
                           onClick={() => setViewHistoryRecord(viewHistoryRecord?.id === rec.id ? null : rec)}
                         >
-                          {viewHistoryRecord?.id === rec.id ? 'Ẩn Code' : '👁️ Xem Code'}
+                          {viewHistoryRecord?.id === rec.id ? 'Ẩn Code' : 'Xem Code'}
                         </button>
                       </div>
 
@@ -862,7 +1040,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             </div>
           ) : testOutcome?.syntaxError ? (
             <div className="terminal-body">
-              <div className="test-summary-badge fail">❌ Lỗi Cú Pháp / Thực Thi Runtime</div>
+              <div className="test-summary-badge fail">Lỗi Cú Pháp / Thực Thi Runtime</div>
               <div className="test-case-error">
                 {testOutcome.syntaxError}
               </div>
@@ -871,7 +1049,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
             <div className="terminal-body">
               {allConsoleLogs.length > 0 && (
                 <div className="terminal-log-hint" onClick={() => setActiveTab('console')}>
-                  <span>💡 Code đã xuất ra {allConsoleLogs.length} dòng log qua console.</span>
+                  <span>Code đã xuất ra {allConsoleLogs.length} dòng log qua console.</span>
                   <span className="btn-link-view-log">Xem Console Logs →</span>
                 </div>
               )}
@@ -882,11 +1060,11 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                     <div className="test-case-header">
                       <span className="test-case-name">
                         <span className="case-index-pill">Case {idx + 1}</span>
-                        {res.hidden ? ' 🔒 [Hidden Test] ' : ' (Visible): '}
+                        {res.hidden ? ' [Hidden Test] ' : ' (Visible): '}
                         {res.name}
                       </span>
                       <span className={`test-case-status ${res.passed ? 'pass' : 'fail'}`}>
-                        {res.passed ? 'PASS ✅' : 'FAIL ❌'}
+                        {res.passed ? 'PASS' : 'FAIL'}
                       </span>
                     </div>
                     {res.error && (
@@ -894,7 +1072,7 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
                         Chi tiết: {res.error}
                       </div>
                     )}
-                    {!res.hidden && !res.passed && (
+                    {!res.hidden && (
                       <div className="test-case-diff">
                         <div><strong>Input:</strong> <code>{res.input}</code></div>
                         <div><strong>Expected:</strong> <code>{res.expected}</code></div>
@@ -907,7 +1085,16 @@ export const CodeSandboxEditor: React.FC<CodeSandboxEditorProps> = ({
 
               {testOutcome.passed && (
                 <div className="test-pass-banner">
-                  🎉 Xuất sắc! Tất cả {testOutcome.total} test cases (kèm hidden test) đã vượt qua thành công!
+                  <span>Tất cả {testOutcome.total} test cases (kèm hidden test) đã vượt qua thành công.</span>
+                  {onNextChallenge && (
+                    <button
+                      type="button"
+                      className="btn-next-challenge-cta"
+                      onClick={onNextChallenge}
+                    >
+                      {nextChallengeLabel || 'Chuyển Sang Bài Tập Tiếp Theo →'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

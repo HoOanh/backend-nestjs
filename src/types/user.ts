@@ -18,9 +18,23 @@ export interface UserProfile {
 export interface LearningHistoryRecord {
   id: string;
   userId: string;
-  lessonId: string;
-  lessonTitle: string;
-  action: 'theory_read' | 'quiz_passed' | 'code_passed' | 'sprint_passed' | 'final_certified';
+  lessonId?: string;
+  lessonTitle?: string;
+  action:
+    | 'theory_read'
+    | 'quiz_passed'
+    | 'quiz_failed'
+    | 'code_passed'
+    | 'lesson_completed'
+    | 'sprint_passed'
+    | 'sprint_unverified'
+    | 'sprint_failed'
+    | 'final_certified'
+    | 'final_unverified'
+    | 'final_failed'
+    | 'registered'
+    | 'certificate_issued'
+    | string;
   score?: number;
   details?: string;
   timestamp: string;
@@ -53,6 +67,7 @@ export interface UserProgressState {
   streakDays: number;
   lastActiveDate: string;
   clearedLessons: Record<string, boolean>;
+  quizScores?: Record<string, { score: number; passed: boolean; completedAt: string }>;
 }
 
 export interface AdminStats {

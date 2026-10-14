@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './LearningHistoryModal.css';
 import { UserProfile, LearningHistoryRecord } from '../../types/user.ts';
 import { apiClient } from '../../services/apiClient.ts';
 import { chatDbService } from '../../services/db/chatDbService.ts';
+import { CURRICULUM } from '../../data/curriculum.ts';
 
 interface LearningHistoryModalProps {
   isOpen: boolean;
@@ -11,9 +12,26 @@ interface LearningHistoryModalProps {
   completedCount: number;
   totalLessons: number;
   progressPercent: number;
+  completedLessons?: Record<string, { completedAt: string }> | string[];
+  clearedLessons?: Record<string, boolean> | string[];
+  quizScores?: Record<string, { score: number; passed: boolean; completedAt: string } | number>;
   sprintExamScores: Record<number, { score: number; passed: boolean; completedAt: string }>;
   finalExam: { score: number; passed: boolean; certificateId: string; completedAt: string } | null;
 }
+
+const ACTION_LABELS: Record<string, string> = {
+  lesson_completed: 'Hoàn thành bài học',
+  code_passed: 'Vượt qua Code Sandbox',
+  quiz_passed: 'Đạt Trắc nghiệm',
+  quiz_failed: 'Làm Trắc nghiệm',
+  theory_read: 'Đã đọc Lý thuyết',
+  sprint_passed: 'Đạt kỳ thi Sprint',
+  sprint_failed: 'Thi Sprint chưa đạt',
+  final_passed: 'Đạt kỳ thi Tốt nghiệp',
+  final_failed: 'Thi Tốt nghiệp chưa đạt',
+  certificate_issued: 'Cấp chứng chỉ',
+  registered: 'Khởi tạo tài khoản',
+};
 
 export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
   isOpen,
@@ -22,8 +40,11 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
   completedCount,
   totalLessons,
   progressPercent,
+  completedLessons = {},
+  clearedLessons = {},
+  quizScores = {},
   sprintExamScores,
-  finalExam
+  finalExam,
 }) => {
   const [history, setHistory] = useState<LearningHistoryRecord[]>([]);
   const [aiChatSummaries, setAiChatSummaries] = useState<
@@ -46,9 +67,48 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
     }
   }, [isOpen, currentUser?.id]);
 
+  // Build lesson progress items from completedLessons, clearedLessons, and quizScores
+  const trackedLessonItems = useMemo(() => {
+    const completedSet = new Set(
+      Array.isArray(completedLessons) ? completedLessons : Object.keys(completedLessons || {})
+    );
+    const clearedSet = new Set(
+      Array.isArray(clearedLessons)
+        ? clearedLessons
+        : Object.keys(clearedLessons || {}).filter((k) => Boolean((clearedLessons as Record<string, boolean>)[k]))
+    );
+    const result: Array<{
+      id: string;
+      title: string;
+      chapterTitle: string;
+      isCompleted: boolean;
+      isCleared: boolean;
+      quizScore?: number;
+    }> = [];
+
+    for (const chapter of CURRICULUM) {
+      for (const lesson of chapter.lessons) {
+        const isCompleted = completedSet.has(lesson.id);
+        const isCleared = clearedSet.has(lesson.id);
+        const rawQuiz = quizScores[lesson.id];
+        const quizScore = typeof rawQuiz === 'number' ? rawQuiz : rawQuiz?.score;
+        if (isCompleted || isCleared || quizScore !== undefined) {
+          result.push({
+            id: lesson.id,
+            title: lesson.title,
+            chapterTitle: chapter.sprintTitle,
+            isCompleted,
+            isCleared,
+            quizScore,
+          });
+        }
+      }
+    }
+    return result;
+  }, [completedLessons, clearedLessons, quizScores]);
+
   if (!isOpen) return null;
 
-  // Helper to read local attempt counts
   const getSprintAttemptCount = (sprintId: number): number => {
     try {
       const saved = localStorage.getItem(`arc_sprint_exam_attempts_${sprintId}`);
@@ -78,10 +138,10 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
       <div className="modal-content student-history-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="history-header-title">
-            <span className="history-badge">📊 HỒ SƠ HỌC TẬP</span>
-            <h2>Lịch Sử & Kết Quả Học Của {currentUser.name}</h2>
+            <span className="history-badge">HỒ SƠ HỌC TẬP</span>
+            <h2>Lịch Sử & Kết Quả Học Tập Của {currentUser.name}</h2>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
+          <button className="modal-close-btn" onClick={onClose} type="button">✕</button>
         </div>
 
         {/* User Summary Card */}
@@ -106,7 +166,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
             </div>
             <div className="hist-stat">
               <span className="hist-val">{completedCount}/{totalLessons}</span>
-              <span className="hist-lbl">Bài Học Đã Pass</span>
+              <span className="hist-lbl">Bài Học Đã Hoàn Thành</span>
             </div>
             <div className="hist-stat">
               <span className="hist-val">{Object.keys(sprintExamScores).length}/10</span>
@@ -114,16 +174,72 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
             </div>
             <div className="hist-stat">
               <span className="hist-val" style={{ color: finalExam?.passed ? '#10b981' : '#64748b' }}>
-                {finalExam?.passed ? 'Tốt Nghiệp 🎓' : 'Đang Học'}
+                {finalExam?.passed ? 'Đã Tốt Nghiệp' : 'Đang Học'}
               </span>
               <span className="hist-lbl">Chứng Chỉ</span>
             </div>
           </div>
         </div>
 
+        {/* Completed & In-Progress Lessons List */}
+        <div className="history-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0 }}>Danh Sách Bài Học Đã Học & Hoàn Thành</h4>
+            <span style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: 600 }}>
+              {trackedLessonItems.length} bài đã ghi nhận
+            </span>
+          </div>
+          <div className="history-timeline-box" style={{ maxHeight: '220px' }}>
+            {trackedLessonItems.length === 0 ? (
+              <div className="empty-history">
+                <p>Chưa có bài học nào được ghi nhận. Khi đọc lý thuyết, làm trắc nghiệm hoặc vượt qua bài tập Code Sandbox, tiến độ sẽ được lưu tự động tại đây.</p>
+              </div>
+            ) : (
+              <div className="timeline-items">
+                {trackedLessonItems.map((item) => (
+                  <div key={item.id} className="timeline-row">
+                    <div className="timeline-time" style={{ minWidth: '72px', fontFamily: 'var(--font-mono)' }}>
+                      {item.id.toUpperCase()}
+                    </div>
+                    <div
+                      className="timeline-dot"
+                      style={{ background: item.isCompleted ? '#10b981' : '#0ea5e9' }}
+                    />
+                    <div className="timeline-content" style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <strong>{item.title}</strong>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          {item.quizScore !== undefined && (
+                            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.14)', color: '#6366f1', fontWeight: 700 }}>
+                              Quiz: {item.quizScore}%
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: item.isCompleted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)',
+                              color: item.isCompleted ? '#10b981' : '#0284c7',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {item.isCompleted ? 'Đã hoàn thành' : 'Đã đọc lý thuyết'}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="timeline-action">{item.chapterTitle}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Final Exam Highlight Card */}
         <div className="history-section">
-          <h4>🏆 Khảo Thí Tốt Nghiệp Toàn Khóa (Final Exam)</h4>
+          <h4>Khảo Thí Tốt Nghiệp Toàn Khóa (Final Exam)</h4>
           <div style={{
             background: finalExam?.passed
               ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.2) 100%)'
@@ -139,12 +255,12 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
           }}>
             <div>
               <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                {finalExam?.passed ? '🎓 ĐÃ TỐT NGHIỆP DANH DỰ' : (finalExam ? '⚠️ CHƯA ĐẠT ĐIỂM TỐT NGHIỆP' : '⚪ CHƯA THAM GIA THI')}
+                {finalExam?.passed ? 'ĐÃ TỐT NGHIỆP DANH DỰ' : (finalExam ? 'CHƯA ĐẠT ĐIỂM TỐT NGHIỆP' : 'CHƯA THAM GIA THI')}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
                 {finalExam
                   ? `Điểm đạt được: ${finalExam.score}% • Đã thi ${finalAttemptCount > 0 ? finalAttemptCount : 1} lần`
-                  : 'Hãy hoàn thành 10 kỳ thi Sprint để mở khóa bài thi tốt nghiệp'}
+                  : 'Hoàn thành 10 kỳ thi Sprint để mở khóa bài thi tốt nghiệp'}
               </div>
               {finalExam?.certificateId && (
                 <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
@@ -167,7 +283,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
 
         {/* Sprint Exam Results (10 Sprints) */}
         <div className="history-section">
-          <h4>🎯 Kết Quả 10 Kỳ Thi Sprint (Chương 1 Đến Chương 10)</h4>
+          <h4>Kết Quả 10 Kỳ Thi Sprint (Chương 1 Đến Chương 10)</h4>
           <div className="sprint-results-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((spId) => {
               const res = sprintExamScores[spId];
@@ -179,7 +295,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
                     <span>{res ? `${res.score}%` : 'Chưa thi'}</span>
                   </div>
                   <span className="sprint-res-status">
-                    {res ? (res.passed ? '✅ Đạt Chuẩn' : '❌ Chưa Đạt') : '⚪ Chưa thi'}
+                    {res ? (res.passed ? '✓ Đạt Chuẩn' : '✗ Chưa Đạt') : 'Chưa thi'}
                   </span>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
                     {attCount > 0 && (
@@ -202,7 +318,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
         {/* AI Tutor Chat Conversations */}
         <div className="history-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h4 style={{ margin: 0 }}>🤖 Lịch Sử Hỏi Đáp AI Tutor</h4>
+            <h4 style={{ margin: 0 }}>Lịch Sử Hỏi Đáp AI Tutor</h4>
             <span style={{ fontSize: '12px', color: '#0ea5e9', fontWeight: 600 }}>
               {aiChatSummaries.length} phiên trao đổi
             </span>
@@ -210,7 +326,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
           <div className="history-timeline-box" style={{ maxHeight: '240px' }}>
             {aiChatSummaries.length === 0 ? (
               <div className="empty-history">
-                <p>Chưa có đoạn hội thoại nào với AI Tutor. Khi học các bài học, hãy mở Arc AI Co-Pilot để đặt câu hỏi và trao đổi bài học nhé!</p>
+                <p>Chưa có đoạn hội thoại nào với AI Tutor. Khi học các bài học, ĐẠI CA có thể mở Arc AI Co-Pilot để đặt câu hỏi và trao đổi trực tiếp.</p>
               </div>
             ) : (
               <div className="timeline-items">
@@ -229,7 +345,7 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
                       </div>
                       {ses.lastMessage && (
                         <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          💬 {ses.lastMessage.replace(/^>\s*💡[^\n]*\n*/, '').replace(/💡[^\n]*\n*/, '').trim()}
+                          {ses.lastMessage.replace(/^>\s*💡[^\n]*\n*/, '').replace(/💡[^\n]*\n*/, '').trim()}
                         </p>
                       )}
                     </div>
@@ -242,24 +358,37 @@ export const LearningHistoryModal: React.FC<LearningHistoryModalProps> = ({
 
         {/* Learning Activity Timeline */}
         <div className="history-section">
-          <h4>⏱️ Nhật Ký Hoạt Động Chi Tiết</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0 }}>Nhật Ký Hoạt Động Chi Tiết</h4>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              {history.length} bản ghi
+            </span>
+          </div>
           <div className="history-timeline-box">
             {history.length === 0 ? (
               <div className="empty-history">
-                <p>Chưa có nhật ký học tập nào được ghi nhận cho tài khoản này. Hãy bắt đầu học và hoàn thành các bài tập!</p>
+                <p>Chưa có nhật ký hoạt động chi tiết nào được ghi nhận cho tài khoản này.</p>
               </div>
             ) : (
               <div className="timeline-items">
-                {history.map((item) => (
-                  <div key={item.id} className="timeline-row">
-                    <div className="timeline-time">{new Date(item.timestamp).toLocaleTimeString('vi-VN')}</div>
-                    <div className="timeline-dot" />
-                    <div className="timeline-content">
-                      <strong>{item.lessonTitle}</strong>
-                      <span className="timeline-action">{item.details || item.action}</span>
+                {history.map((item) => {
+                  const dt = new Date(item.timestamp);
+                  const dateStr = Number.isNaN(dt.getTime())
+                    ? ''
+                    : `${dt.toLocaleDateString('vi-VN')} ${dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+                  return (
+                    <div key={item.id} className="timeline-row">
+                      <div className="timeline-time" style={{ minWidth: '125px' }}>{dateStr}</div>
+                      <div className="timeline-dot" />
+                      <div className="timeline-content">
+                        <strong>{item.lessonTitle}</strong>
+                        <span className="timeline-action">
+                          {item.details || ACTION_LABELS[item.action] || item.action}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

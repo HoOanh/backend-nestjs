@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         {bypassLock && (
           <div className="admin-preview-pill">
-            ⚡ Chế độ Xem trước (Admin Preview)
+            Chế độ Xem trước (Admin Preview)
           </div>
         )}
       </div>
@@ -81,7 +81,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav className="sidebar-nav">
         {curriculum.map((sprint) => {
           const isSprintActive =
-            activeView === 'sprint-exam' && currentSprintExam?.sprintId === sprint.sprintId;
+            activeView === 'sprint-exam' &&
+            currentSprintExam?.sprintId === sprint.sprintId;
           const sprintScore = sprintExamScores[sprint.sprintId];
 
           const sprintExamStatus = checkSprintExamUnlockStatus(
@@ -97,7 +98,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="sprint-title-badge">
                 <span>{sprint.sprintTitle.split(':')[0]}</span>
                 <span>
-                  {sprint.lessons.filter((l) => completedLessons[l.id]).length}/{sprint.lessons.length} bài
+                  {sprint.lessons.filter((l) => completedLessons[l.id]).length}/
+                  {sprint.lessons.length} bài
                 </span>
               </div>
 
@@ -114,7 +116,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     title={lesson.title}
                   >
                     <span className="status-icon">
-                      {isCompleted ? '✅' : isActive ? '🔵' : '⚪'}
+                      {isCompleted ? (
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#10b981"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : isActive ? (
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="#38bdf8"
+                          stroke="#38bdf8"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="7" />
+                        </svg>
+                      ) : (
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#64748b"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="7" />
+                        </svg>
+                      )}
                     </span>
                     <span
                       style={{
@@ -137,18 +174,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onSelectSprintExam(sprint.sprintId)}
                 title={
                   !sprintExamStatus.unlocked
-                    ? `🔒 Kỳ thi khóa. Cần hoàn thành đủ ${sprintExamStatus.totalLessons} bài học trong Sprint này.`
-                    : '🎯 Kỳ thi đánh giá tiến độ Sprint'
+                    ? `Kỳ thi khóa. Cần hoàn thành đủ ${sprintExamStatus.totalLessons} bài học trong Sprint này.`
+                    : 'Kỳ thi đánh giá tiến độ Sprint'
                 }
               >
                 <span>
                   {!sprintExamStatus.unlocked
-                    ? `🔒 Thi Sprint (${sprintExamStatus.completedLessonsCount}/${sprintExamStatus.totalLessons} bài)`
+                    ? `Thi Sprint (${sprintExamStatus.completedLessonsCount}/${sprintExamStatus.totalLessons} bài)`
                     : sprintScore
-                    ? sprintScore.passed
-                      ? `🏆 Đã Đạt ${sprintScore.score}%`
-                      : `❌ Thi Lại ${sprintScore.score}%`
-                    : '🎯 Thi Sprint'}
+                      ? sprintScore.passed
+                        ? `Đã Đạt ${sprintScore.score}%`
+                        : `Thi Lại ${sprintScore.score}%`
+                      : 'Thi Sprint'}
                 </span>
                 <span style={{ fontSize: '11px', opacity: 0.8 }}>
                   {sprintScore?.passed ? '(Đã xong)' : '(Đánh giá)'}
@@ -165,21 +202,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onSelectFinalExam}
           title={
             !finalExamStatus.unlocked
-              ? `🔒 Cần hoàn thành ${finalExamStatus.passedSprintsCount}/${finalExamStatus.totalSprints} kỳ thi để mở khóa tốt nghiệp.`
-              : '🎓 Kỳ thi tốt nghiệp toàn khóa Arc Irobot Academy'
+              ? `Cần hoàn thành ${finalExamStatus.passedSprintsCount}/${finalExamStatus.totalSprints} kỳ thi để mở khóa tốt nghiệp.`
+              : 'Kỳ thi tốt nghiệp toàn khóa Arc Irobot Academy'
           }
         >
-          <span style={{ fontSize: '22px' }}>
-            {!finalExamStatus.unlocked && !finalExam?.passed ? '🔒' : '🎓'}
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {!finalExamStatus.unlocked && !finalExam?.passed ? (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            ) : (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+              </svg>
+            )}
           </span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '13px' }}>Thi Tốt Nghiệp Toàn Khóa</div>
+            <div style={{ fontWeight: 700, fontSize: '13px' }}>
+              Thi Tốt Nghiệp Toàn Khóa
+            </div>
             <div style={{ fontSize: '11px', opacity: 0.85 }}>
               {finalExam?.passed
                 ? 'Đã Tốt Nghiệp (Xem Bằng)'
                 : !finalExamStatus.unlocked
-                ? `Cần đạt 6/6 Sprint (${finalExamStatus.passedSprintsCount}/6)`
-                : 'Khảo Thí & Cấp Bằng'}
+                  ? `Cần đạt 6/6 Sprint (${finalExamStatus.passedSprintsCount}/6)`
+                  : 'Khảo Thí & Cấp Bằng'}
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import type { Sprint } from './types.ts';
 export const chapter2: Sprint = {
   sprintId: 2,
   sprintTitle: 'Chương 2: Libuv, OS Kernel System Calls & Kiến Trúc Bất Đồng Bộ Non-Blocking',
-  sprintDesc: 'Khám phá trái tim điều phối của Node.js: 6 Pha Event Loop, Thứ tự Drain Microtasks, Linux epoll/kqueue vs Libuv Threadpool, và Kỹ thuật điều phối Worker Threads',
+  sprintDesc: 'Phân tích cơ chế lõi điều phối của Node.js: 6 Pha Event Loop, Thứ tự Drain Microtasks, Linux epoll/kqueue vs Libuv Threadpool, và Kỹ thuật điều phối Worker Threads',
   lessons: [
     {
       id: 'c2-l1',
@@ -20,12 +20,12 @@ export const chapter2: Sprint = {
   - Tuy nhiên, Node.js không thực hiện các tác vụ I/O trên luồng này. V8 Main Thread chỉ đóng vai trò điều phối: tiếp nhận request, đăng ký các hàm phản hồi (Event Handlers / Callbacks), ủy thác thao tác chờ đợi I/O xuống nhân hệ điều hành, rồi lập tức giải phóng Call Stack để tiếp tục phục vụ các request khác.
 
 * **Vòng điều phối 6 Pha của Libuv (The 6-Phase Event Loop):**
-  - Trái tim của Libuv là một vòng lặp sự kiện tuần tự gồm 6 pha tách biệt: Timers (xử lý setTimeout/setInterval), Pending Callbacks (xử lý lỗi I/O hệ thống), Idle/Prepare (dọn dẹp nội bộ), Poll (chờ đợi và đọc sự kiện mạng mới), Check (thực thi setImmediate), và Close Callbacks (đóng socket, dọn dẹp tài nguyên).
+  - Cơ chế cốt lõi của Libuv là một vòng lặp sự kiện tuần tự gồm 6 pha tách biệt: Timers (xử lý setTimeout/setInterval), Pending Callbacks (xử lý lỗi I/O hệ thống), Idle/Prepare (dọn dẹp nội bộ), Poll (chờ đợi và đọc sự kiện mạng mới), Check (thực thi setImmediate), và Close Callbacks (đóng socket, dọn dẹp tài nguyên).
   - Mỗi pha sở hữu một hàng đợi FIFO riêng, được thiết kế để không một loại tác vụ nào có thể chiếm dụng vĩnh viễn vòng lặp.
 
 * **Hiện tượng Starvation từ Microtask Queue (nextTick & Promise Drain):**
   - Khác với 6 pha của Libuv (vốn chỉ xử lý Macrotasks), V8 duy trì hai hàng đợi ưu tiên đặc biệt: \`process.nextTickQueue\` và \`microtaskQueue\` (Promise).
-  - **Cơ chế Drain Tuyệt Đối:** Ngay sau khi một tác vụ JavaScript kết thúc ở BẤT KỲ pha nào của Event Loop, V8 bắt buộc phải xả sạch hoàn toàn (Drain completely) toàn bộ các tác vụ trong \`nextTickQueue\`, kế tiếp là \`microtaskQueue\`, trước khi cho phép Libuv chuyển sang pha tiếp theo.
+  - **Cơ chế Drain Toàn Bộ:** Ngay sau khi một tác vụ JavaScript kết thúc ở BẤT KỲ pha nào của Event Loop, V8 bắt buộc phải xả sạch hoàn toàn (Drain completely) toàn bộ các tác vụ trong \`nextTickQueue\`, kế tiếp là \`microtaskQueue\`, trước khi cho phép Libuv chuyển sang pha tiếp theo.
   - **Hiểm họa Starvation trong Production:** Nếu kỹ sư vô tình kích hoạt đệ quy vô hạn \`process.nextTick()\` hoặc chuỗi Promise không hồi kết, Event Loop sẽ bị giam cầm vĩnh viễn giữa hai pha. Toàn bộ pha Poll (đọc I/O mạng) và pha Timers bị tê liệt hoàn toàn, dẫn đến sập hệ thống do nghẽn I/O (Event Loop Starvation).
 
 ---
@@ -65,24 +65,23 @@ Trong mỗi vòng lặp (Tick) của Event Loop, Libuv duyệt qua 6 pha tuần 
 1. **Pha Timers:** Thực thi các callback của \`setTimeout()\` và \`setInterval()\` có ngưỡng thời gian đã hết hạn. Libuv lưu các timer trong cấu trúc Min-Heap để lấy ra timer hết hạn sớm nhất với độ phức tạp $O(1)$.
 2. **Pha Pending Callbacks:** Thực thi các callback I/O còn tồn đọng từ vòng lặp trước, ví dụ các lỗi mạng cấp thấp như \`ECONNREFUSED\` từ hệ điều hành.
 3. **Pha Idle, Prepare:** Sử dụng nội bộ bởi Libuv cho các mục đích dọn dẹp và chuẩn bị trước khi vào pha quan trọng nhất.
-4. **Pha Poll:** Trái tim tiếp nhận dữ liệu của Node.js:
+4. **Pha Poll:** Trọng tâm tiếp nhận dữ liệu của Node.js:
    - Tính toán thời gian cần block luồng để chờ kernel báo sự kiện I/O mới (dựa trên timer gần nhất).
    - Đọc dữ liệu từ các socket, network packets gửi đến, xử lý HTTP request mới.
 5. **Pha Check:** Dành riêng cho \`setImmediate()\`. Cho phép thực thi mã code ngay sau khi pha Poll hoàn tất đọc I/O mà không cần đợi vòng tick kế tiếp.
-6. **Pha Close Callbacks:** Thực thi các sự kiện đóng tài nguyên như \`socket.on('close', ...)\` để giải phóng socket descriptors.
+6. **Pha Close Callbacks:** Thực thi các sự kiện đóng tài nguyên như \`socket.on('close', ..)\` để giải phóng socket descriptors.
 
 ### 2.2 Quy Tắc Drain Microtasks (Node.js 11+)
 Trước Node 11, Microtasks chỉ được xả sau khi toàn bộ pha kết thúc. Từ Node 11 trở đi, để đồng bộ với chuẩn Web Browser:
 * **Quy tắc xả tức thì:** Giữa mỗi callback đơn lẻ trong bất kỳ pha nào, nếu có Microtask được sinh ra, Node.js sẽ lập tức xả Microtasks Queue.
-* **Thứ tự ưu tiên tuyệt đối:**
+* **Thứ tự ưu tiên thực thi:**
   $$\\text{process.nextTick Queue} \\longrightarrow \\text{Promise Reaction Queue (Microtasks)} \\longrightarrow \\text{Macrotask tiếp theo}$$
-* **Hiểm họa Starvation (Bỏ đói Event Loop):** Nếu đại ca đệ quy \`process.nextTick()\`, Event Loop sẽ bị kẹt vĩnh viễn ở Microtask Queue và **không bao giờ tiến vào pha Poll hay Timers**, khiến toàn bộ server bị tê liệt!
-
+* **Hiểm họa Starvation (Bỏ đói Event Loop):** Nếu đại ca đệ quy \`process.nextTick()\`, Event Loop sẽ bị kẹt vĩnh viễn ở Microtask Queue và **không bao giờ tiến vào pha Poll hay Timers**, khiến toàn bộ server bị tê liệt.
 ---
 
 # 3. PHÂN BIỆT THỰC NGHIỆM: setImmediate VS setTimeout(0)
 
-Một trong những câu hỏi phỏng vấn Senior kinh điển: Đoạn code sau in ra gì?
+Bài toán phân tích thứ tự thực thi: Đoạn code sau in ra gì?
 \`\`\`typescript
 setTimeout(() => console.log('Timeout'), 0);
 setImmediate(() => console.log('Immediate'));
@@ -95,14 +94,14 @@ fs.readFile('config.json', () => {
   setImmediate(() => console.log('Immediate'));
 });
 \`\`\`
-Kết quả luôn luôn là: **\`Immediate\` in trước \`Timeout\` $100\\%$!**
+Kết quả luôn luôn là: **\`Immediate\` in trước \`Timeout\` $100\\%$.**
 Bởi vì callback \`fs.readFile\` được xử lý trong **pha Poll**. Sau khi rời khỏi pha Poll, pha tiếp theo liền kề theo chiều kim đồng hồ chính là **pha Check** (\`setImmediate\`), trong khi pha Timers phải đợi hết 1 vòng lặp để quay lại.
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Thứ Tự Ưu Tiên Phân Cấp Hàng Đợi (Task Hierarchy Map)
+### 4.1 Sơ đồ 1: Thứ Tự Ưu Tiên Phân Cấp Hàng Đợi (Task Hierarchy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       THỨ TỰ ƯU TIÊN HÀNG ĐỢI RUNTIME                       │
@@ -123,7 +122,7 @@ Bởi vì callback \`fs.readFile\` được xử lý trong **pha Poll**. Sau khi
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Vòng Lặp Tick & Điểm Kiểm Tra Thoát (Lifecycle Flowchart)
+### 4.2 Sơ đồ 2: Dòng Chảy Vòng Lặp Tick & Điểm Kiểm Tra Thoát (Lifecycle Flowchart)
 \`\`\`diagram
                [ BẮT ĐẦU VÒNG TICK MỚI ]
                           │
@@ -152,7 +151,7 @@ Bởi vì callback \`fs.readFile\` được xử lý trong **pha Poll**. Sau khi
               [ KẾT THÚC 1 VÒNG TICK ] ──► Quay lại kiểm tra từ đầu
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Chọn Hàm Hoãn Thực Thi (Execution Deferral Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Chọn Hàm Hoãn Thực Thi (Execution Deferral Decision Tree)
 \`\`\`diagram
 CẦN HOÃN THỰC THI MỘT CALLBACK TRONG BACKEND?
 │
@@ -169,7 +168,7 @@ CẦN HOÃN THỰC THI MỘT CALLBACK TRONG BACKEND?
     └──► Chọn: setTimeout(fn, delayMs) (Dùng Min-Heap kiểm tra thời gian)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cơ Chế Điều Phối | Thời Điểm Chạy | Mức Tiêu Hao CPU | Rủi Ro Vận Hành Hệ Thống | Ứng Dụng Chuẩn Khuyên Dùng |
 | :--- | :--- | :--- | :--- | :--- |
 | **process.nextTick** | Ngay lập tức sau call frame hiện tại | Cực thấp (Array queue) | Gây Starvation tê liệt toàn bộ I/O | Dọn dẹp lỗi khẩn cấp, phát event đồng bộ sau constructor |
@@ -264,7 +263,7 @@ export class NonBlockingChunkService {
             'Promise.then chạy trên luồng chính của V8, còn process.nextTick được gửi trực tiếp xuống hàng đợi ngắt (Interrupt Queue) của nhân hệ điều hành thông qua Libuv C++ bindings.'
           ],
           correctIndex: 0,
-          explanation: 'Trong kiến trúc của Node.js, process.nextTickQueue có độ ưu tiên tuyệt đối cao hơn Promise reaction microtask queue. Khi Call Stack vừa trống, Node.js sẽ luôn xả sạch toàn bộ các callback trong nextTickQueue trước, sau đó mới tiến hành xả các Promise microtask.'
+          explanation: 'Trong kiến trúc của Node.js, process.nextTickQueue có độ ưu tiên hoàn toàn cao hơn Promise reaction microtask queue. Khi Call Stack vừa trống, Node.js sẽ luôn xả sạch toàn bộ các callback trong nextTickQueue trước, sau đó mới tiến hành xả các Promise microtask.'
         },
         {
           id: 'c2-l1-q4',
@@ -417,8 +416,8 @@ Khi một máy chủ Backend phải duy trì 50,000 kết nối TCP (như WebSoc
   - Khi Node.js gọi \`epoll_wait()\` trong pha Poll của Libuv, nó chỉ nhận về đúng danh sách các socket thực sự có dữ liệu với độ phức tạp $O(1)$ Event-driven, hoàn toàn không tiêu tốn chu kỳ CPU vô ích.
 
 * **Ranh giới cốt lõi: Khi nào Libuv dùng Kernel và khi nào dùng Threadpool?**
-  - **Network I/O (TCP, UDP, UNIX Sockets, HTTP, DNS resolve qua c-ares):** Hoàn toàn là Non-blocking thực sự thông qua cơ chế \`epoll/kqueue\` của Kernel, không tốn bất kỳ thread nền nào của Libuv!
-  - **File System (fs), DNS lookup (getaddrinfo), và Crypto (pbkdf2, scrypt):** Nhân hệ điều hành Linux truyền thống KHÔNG hỗ trợ Asynchronous I/O hoàn hảo cho tập tin đĩa (POSIX AIO bị hạn chế). Do đó, Libuv bắt buộc phải chuyển giao (Offload) các tác vụ này sang một **Threadpool nội bộ C++** (mặc định gồm 4 Worker Threads).
+  - **Network I/O (TCP, UDP, UNIX Sockets, HTTP, DNS resolve qua c-ares):** Hoàn toàn là Non-blocking thực sự thông qua cơ chế \`epoll/kqueue\` của Kernel, không tốn bất kỳ thread nền nào của Libuv.
+  - **File System (fs), DNS lookup (getaddrinfo), và Crypto (pbkdf2, scrypt):** Nhân hệ điều hành Linux truyền thống KHÔNG hỗ trợ Asynchronous I/O toàn vẹn cho tập tin đĩa (POSIX AIO bị hạn chế). Do đó, Libuv bắt buộc phải chuyển giao (Offload) các tác vụ này sang một **Threadpool nội bộ C++** (mặc định gồm 4 Worker Threads).
   - **Điểm nghẽn Threadpool Starvation:** Nếu 4 request gọi hàm mã hóa mật khẩu nặng đồng thời, toàn bộ 4 thread của Libuv bị chiếm dụng, khiến toàn bộ các lệnh đọc ghi file (\`fs.readFile\`) của hệ thống bị xếp hàng chờ, gây nghẽn nghiêm trọng. Kỹ sư phải chủ động cấu hình biến môi trường \`UV_THREADPOOL_SIZE\` phù hợp.
 
 ---
@@ -444,15 +443,13 @@ Khi Node.js lắng nghe một cổng mạng (ví dụ port 3000), hệ điều h
 Linux \`epoll\` không kiểm tra thủ công từng socket. Nó duy trì 2 cấu trúc dữ liệu chính trong không gian Kernel:
 1. **Red-Black Tree (Cây đỏ đen):** Lưu trữ tập hợp tất cả các File Descriptors mà ứng dụng quan tâm theo dõi. Cho phép thêm, sửa, xóa socket với thời gian $O(\\log N)$.
 2. **Ready List (Danh sách liên kết sẵn sàng):** Khi có gói tin TCP ập đến Card mạng (NIC), NIC kích hoạt phần cứng gián đoạn (Hardware Interrupt). Kernel xử lý và đẩy trực tiếp FD tương ứng vào Ready List.
-3. Khi Node.js gọi \`epoll_wait()\`, Kernel chỉ việc trả về danh sách các socket thực sự có dữ liệu với độ phức tạp **$O(1)$** mà không tốn công duyệt qua hàng nghìn kết nối đang nhàn rỗi!
-
+3. Khi Node.js gọi \`epoll_wait()\`, Kernel chỉ việc trả về danh sách các socket thực sự có dữ liệu với độ phức tạp **$O(1)$** mà không tốn công duyệt qua hàng nghìn kết nối đang nhàn rỗi.
 ---
 
 # 3. KHI NÀO SỬ DỤNG KERNEL EPOLL VÀ KHI NÀO CẦN LIBUV THREADPOOL?
 
 Đây là một trong những hiểu lầm lớn nhất của các kỹ sư: **"Mọi thao tác bất đồng bộ trong Node.js đều chạy bằng Libuv Threadpool."**
-> **Sự thật kỹ thuật:** Threadpool chỉ được sử dụng khi hệ điều hành KHÔNG CÓ cơ chế thông báo bất đồng bộ thực sự!
-
+> **Sự thật kỹ thuật:** Threadpool chỉ được sử dụng khi hệ điều hành KHÔNG CÓ cơ chế thông báo bất đồng bộ thực sự.
 \`\`\`diagram
                               TÁC VỤ BẤT ĐỒNG BỘ TRONG NODE.JS
                                              │
@@ -477,7 +474,7 @@ Tại sao \`fs.readFile\` lại phải dùng Threadpool trong khi socket mạng 
 
 ### 3.2 Tinh Chỉnh Biến Môi Trường UV_THREADPOOL_SIZE
 Mặc định, Libuv chỉ khởi tạo **4 luồng** (\`UV_THREADPOOL_SIZE = 4\`).
-Nếu đại ca chạy 8 tác vụ mã hóa mật khẩu \`crypto.pbkdf2()\` đồng thời, 4 tác vụ đầu tiên sẽ chiếm dụng sạch 4 luồng, 4 tác vụ còn lại bị xếp hàng chờ hoàn toàn, làm tăng gấp đôi thời gian đáp ứng!
+Nếu đại ca chạy 8 tác vụ mã hóa mật khẩu \`crypto.pbkdf2()\` đồng thời, 4 tác vụ đầu tiên sẽ chiếm dụng sạch 4 luồng, 4 tác vụ còn lại bị xếp hàng chờ hoàn toàn, làm tăng gấp đôi thời gian đáp ứng.
 * **Quy tắc cấu hình Production:** Có thể tăng lên tối đa 128 luồng bằng biến môi trường:
 \`\`\`bash
 UV_THREADPOOL_SIZE=16 node dist/main.js
@@ -486,9 +483,9 @@ UV_THREADPOOL_SIZE=16 node dist/main.js
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Kiến Trúc Dưới Kernel (Kernel I/O Subsystem Map)
+### 4.1 Sơ đồ 1: Phân Phối Kiến Trúc Dưới Kernel (Kernel I/O Subsystem Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          NODE.JS RUNTIME APIS                               │
@@ -508,7 +505,7 @@ UV_THREADPOOL_SIZE=16 node dist/main.js
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Vòng Đời Tiếp Nhận Gói Tin Mạng Cấp Thấp (Network Packet Lifecycle)
+### 4.2 Sơ đồ 2: Vòng Đời Tiếp Nhận Gói Tin Mạng Cấp Thấp (Network Packet Lifecycle)
 \`\`\`diagram
 1. Client gửi HTTP GET Request qua mạng Internet
    │
@@ -525,7 +522,7 @@ UV_THREADPOOL_SIZE=16 node dist/main.js
 7. NestJS Controller tiếp nhận Request Object và xử lý logic nghiệp vụ
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý I/O Nặng (I/O Architecture Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý I/O Nặng (I/O Architecture Decision Tree)
 \`\`\`diagram
 TÁC VỤ CẦN THỰC THI TRONG BACKEND LÀ GÌ?
 │
@@ -544,7 +541,7 @@ TÁC VỤ CẦN THỰC THI TRONG BACKEND LÀ GÌ?
     └──► TUYỆT ĐỐI KHÔNG dùng Threadpool (Sẽ block Main Thread) ──► Dùng Worker Threads!
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Kỹ Thuật I/O | Tiêu Hao Bộ Nhớ RAM | Khả Năng Scale Kết Nối | Nguy Cơ Nghẽn Hệ Thống | Kịch Bản Ứng Dụng Lý Tưởng |
 | :--- | :--- | :--- | :--- | :--- |
 | **Kernel epoll/kqueue** | Cực thấp (~vài KB mỗi socket) | Hơn 100,000 kết nối đồng thời | Hầu như không có, phụ thuộc băng thông mạng | Máy chủ API REST, Gateway WebSocket, Microservices |
@@ -799,13 +796,12 @@ Khi giả định này bị phá vỡ bởi một tác vụ tính toán CPU nặ
   - **Tác vụ I/O-bound (Truy vấn DB, đọc Redis, gọi HTTP API bên ngoài):** 99% thời gian là chờ đợi mạng. Luồng chính Node.js không bị chặn vì chỉ việc ủy thác cho Kernel rồi chuyển sang phục vụ request khác.
   - **Tác vụ CPU-bound (Phân tích cú pháp JSON payload 50MB, nén file zip/gzip, xử lý hình ảnh sharp, tính toán thuật toán mã hóa):** CPU core bị ép thực thi tính toán liên tục 100% công suất mà không bao giờ nhường quyền thực thi cho Event Loop.
 
-* **Thảm họa Event Loop Lag trong môi trường Production:**
+* **Sự cố nghiêm trọng Event Loop Lag trong môi trường Production:**
   - Khi một tác vụ CPU-bound chiếm giữ Main Thread trong 3.5 giây:
     + Toàn bộ 5,000 kết nối HTTP đồng thời khác bị đóng băng tại pha Poll của Libuv.
     + Trình duyệt client bị timeout (\`504 Gateway Timeout\`), người dùng liên tục bấm F5 gửi thêm request mới, gây ra hiện tượng bão request (Retry Storm).
     + Các endpoint giám sát sức khỏe (\`/healthz\` Liveness/Readiness Probe của Kubernetes) không nhận được phản hồi trong ngưỡng 3 giây.
-    + **Hệ quả chết người:** Kubernetes nhận định Container đã bị chết đứng (Deadlock/Frozen) và tiến hành tiêu diệt (Restart/Kill Pod). Hàng nghìn người dùng bị rớt kết nối đột ngột, toàn bộ dịch vụ rơi vào vòng lặp CrashLoopBackOff!
-
+    + **Hệ quả chết người:** Kubernetes nhận định Container đã bị chết đứng (Deadlock/Frozen) và tiến hành tiêu diệt (Restart/Kill Pod). Hàng nghìn người dùng bị rớt kết nối đột ngột, toàn bộ dịch vụ rơi vào vòng lặp CrashLoopBackOff.
 * **Giải pháp Kiến trúc Chuẩn Mực: Worker Threads & Multi-Process Clustering:**
   - Không bao giờ chạy tác vụ CPU-bound trên Main Thread.
   - Sử dụng module \`worker_threads\` để tạo các tiến trình con độc lập chạy trên các CPU Cores riêng biệt, giao tiếp bất đồng bộ qua kênh truyền tin \`MessagePort\` (sử dụng cấu trúc sao chép bộ nhớ \`Structured Clone\` hoặc vùng nhớ chia sẻ tốc độ cao \`SharedArrayBuffer\`).
@@ -846,8 +842,7 @@ console.log('P50 Lag:', histogram.percentile(50) / 1e6, 'ms');
 console.log('P99 Lag:', histogram.percentile(99) / 1e6, 'ms');
 console.log('Max Lag:', histogram.max / 1e6, 'ms');
 \`\`\`
-> **Ngưỡng cảnh báo Production:** Nếu chỉ số P99 Lag vượt quá **50ms**, hệ thống đang có nguy cơ nghẽn nghiêm trọng. Nếu vượt quá **1000ms**, Kubernetes Liveness Probe sẽ đánh dấu Pod Unhealthy và Restart liên tục (CrashLoopBackOff)!
-
+> **Ngưỡng cảnh báo Production:** Nếu chỉ số P99 Lag vượt quá **50ms**, hệ thống đang có nguy cơ nghẽn nghiêm trọng. Nếu vượt quá **1000ms**, Kubernetes Liveness Probe sẽ đánh dấu Pod Unhealthy và Restart liên tục (CrashLoopBackOff).
 ---
 
 # 3. WORKER THREADS: KIẾN TRÚC ĐA LUỒNG THỰC SỰ TRONG NODE.JS
@@ -873,13 +868,12 @@ Khi buộc phải thực hiện các phép toán nặng (nén video, tạo file 
 
 ### 3.1 Sự Khác Biệt Giữa Worker Thread và Child Process
 1. **Child Process (\`child_process.fork\`):** Khởi tạo một tiến trình OS hoàn toàn mới, tiêu tốn 30MB-50MB RAM tối thiểu, giao tiếp qua IPC socket serialize/deserialize chậm chạp.
-2. **Worker Thread (\`worker_threads\`):** Chạy trong cùng một tiến trình OS, có V8 Isolate độc lập (Heap và Stack riêng), nhưng có thể chia sẻ bộ nhớ vật lý cực nhanh thông qua **\`SharedArrayBuffer\`** ($0\\%$ serialization overhead)!
-
+2. **Worker Thread (\`worker_threads\`):** Chạy trong cùng một tiến trình OS, có V8 Isolate độc lập (Heap và Stack riêng), nhưng có thể chia sẻ bộ nhớ vật lý cực nhanh thông qua **\`SharedArrayBuffer\`** ($0\\%$ serialization overhead).
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Kiến Trúc Xử Lý CPU (CPU Offloading Taxonomy Map)
+### 4.1 Sơ đồ 1: Phân Phối Kiến Trúc Xử Lý CPU (CPU Offloading Taxonomy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     CHIẾN LƯỢC ĐIỀU PHỐI TÁC VỤ BACKEND                     │
@@ -898,7 +892,7 @@ Khi buộc phải thực hiện các phép toán nặng (nén video, tạo file 
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Giao Tiếp Hai Chiều Main - Worker (Thread Communication Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Giao Tiếp Hai Chiều Main - Worker (Thread Communication Flow)
 \`\`\`diagram
 [ MAIN THREAD (NestJS Service) ]                 [ WORKER THREAD (Background) ]
                │                                                │
@@ -914,7 +908,7 @@ Khi buộc phải thực hiện các phép toán nặng (nén video, tạo file 
                └── 6. Nhận kết quả: worker.on('message', cb) ───┘
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý CPU Lag (Lag Mitigation Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý CPU Lag (Lag Mitigation Decision Tree)
 \`\`\`diagram
 HỆ THỐNG GẶP TÌNH TRẠNG EVENT LOOP LAG CAO (>50MS)?
 │
@@ -933,7 +927,7 @@ HỆ THỐNG GẶP TÌNH TRẠNG EVENT LOOP LAG CAO (>50MS)?
 │       └──► Chụp Heap Snapshot phân tích Retained Size để triệt tiêu Leak
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cơ Chế Xử Lý | Chi Phí Khởi Tạo (Overhead) | Cơ Chế Giao Tiếp (IPC) | Rủi Ro Vận Hành | Kịch Bản Khuyên Dùng |
 | :--- | :--- | :--- | :--- | :--- |
 | **Main Thread trực tiếp** | 0 ms (Có sẵn) | Trực tiếp trong bộ nhớ | Gây tê liệt toàn bộ API của hệ thống | Phép toán cực ngắn (<5ms), logic CRUD chuẩn |

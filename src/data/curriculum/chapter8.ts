@@ -19,14 +19,14 @@ Trong kiến trúc hệ thống phân tán, việc lựa chọn giữa giao ti�
   - **Sự cố Sụp Đổ Dây Chuyền (Cascading Failures):** Nếu dịch vụ Gửi SMS bên thứ ba bị quá tải hoặc phản hồi chậm (Timeout 30 giây), các Worker của dịch vụ Thanh toán sẽ bị giam lỏng kết nối, cạn kiệt Connection Pool và khiến toàn bộ luồng thanh toán chính bị sập theo. Hệ thống bị giới hạn độ tin cậy bởi mắt xích yếu nhất trong chuỗi.
 * **Kiến Trúc Hàng Đợi Bất Đồng Bộ (Message-Driven Decoupling):**
   - **Cắt giảm Độ trễ & San phẳng Tải (Load Leveling / Traffic Spike Smoothing):** Thay vì bắt Client chờ đợi toàn bộ các tác vụ phụ, máy chủ chỉ việc đẩy một thông điệp (Message Payload) vào Broker và trả ngay phản hồi \`202 Accepted\` cho Client trong vòng dưới 10 mili giây.
-  - **Mô hình Consumer Pull (Kéo công việc chủ động):** Các Worker Consumer sẽ chủ động kéo việc từ hàng đợi theo đúng năng lực xử lý thực tế của chúng (ví dụ 100 jobs/giây). Khi có đợt bùng nổ truy cập (Flash Sale với 10,000 requests/giây), toàn bộ tải dư thừa được tích tụ an toàn trong Broker mà không làm tràn bộ nhớ hay làm sập các dịch vụ xử lý phía sau!
+  - **Mô hình Consumer Pull (Kéo công việc chủ động):** Các Worker Consumer sẽ chủ động kéo việc từ hàng đợi theo đúng năng lực xử lý thực tế của chúng (ví dụ 100 jobs/giây). Khi có đợt bùng nổ truy cập (Flash Sale với 10,000 requests/giây), toàn bộ tải dư thừa được tích tụ an toàn trong Broker mà không làm tràn bộ nhớ hay làm sập các dịch vụ xử lý phía sau.
   - **Bảo toàn Tính Bền vững (Message Persistence):** Dù các tiến trình Worker có bị khởi động lại, gặp sự cố sập nguồn hoặc đang triển khai phiên bản mới, các tin nhắn vẫn được lưu trữ bền vững trên đĩa hoặc bộ nhớ Redis, sẵn sàng được xử lý ngay khi Worker hoạt động trở lại.
 
 ---
 
 # 2. CÁC CẤP ĐỘ BẢO ĐẢM PHÂN PHỐI TIN NHẮN (DELIVERY GUARANTEES)
 
-Trong các hệ thống phân tán, do độ trễ mạng, mất kết nối, hoặc máy chủ sập nguồn giữa chừng, không có một phép màu nào đảm bảo gửi tin nhắn một cách tuyệt đối dễ dàng:
+Trong các hệ thống phân tán, do độ trễ mạng, mất kết nối, hoặc máy chủ sập nguồn giữa chừng, không có một phép màu nào đảm bảo gửi tin nhắn một cách hoàn toàn dễ dàng:
 
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -46,21 +46,19 @@ Trong các hệ thống phân tán, do độ trễ mạng, mất kết nối, ho
 \`\`\`
 
 > **Chân Lý Bất Biến Của Kỹ Sư Hệ Thống:** Trong thế giới thực, $99.9\\%$ các Message Broker uy tín (RabbitMQ, Kafka, BullMQ, AWS SQS) đều hoạt động theo mô hình **\`At-Least-Once Delivery\`**.
-> Do đó, **TRÁCH NHIỆM BẢO VỆ DỮ LIỆU THUỘC VỀ CONSUMER!** Consumer bắt buộc phải được thiết kế có tính **Lũy kế (Idempotent Consumer)** để xử lý an toàn khi một tin nhắn bị gửi lặp lại 2 lần do mạng lag!
-
+> Do đó, **TRÁCH NHIỆM BẢO VỆ DỮ LIỆU THUỘC VỀ CONSUMER.** Consumer bắt buộc phải được thiết kế có tính **Lũy kế (Idempotent Consumer)** để xử lý an toàn khi một tin nhắn bị gửi lặp lại 2 lần do mạng lag.
 ---
 
 # 3. KỸ THUẬT LÀM MỀM TẢI (TRAFFIC PEAK SHAVING)
 
 Khi diễn ra sự kiện săn Voucher khuyến mãi lúc 00:00:
 * **Hệ thống không có Queue:** 50,000 requests/giây cùng lúc đập vào Database. Database quá tải CPU $100\\%$, sập toàn diện.
-* **Hệ thống có Message Queue:** API Gateway chỉ làm nhiệm vụ cực nhẹ: Đẩy 50,000 tin nhắn vào Redis Queue trong vòng 1 giây ($0\\%$ áp lực lên DB). Đội ngũ 10 Workers phía sau ung dung rút dần các job ra xử lý với tốc độ ổn định 1,000 jobs/giây (Peak Shaving). Hệ thống êm ả vượt qua bão tải!
-
+* **Hệ thống có Message Queue:** API Gateway chỉ làm nhiệm vụ cực nhẹ: Đẩy 50,000 tin nhắn vào Redis Queue trong vòng 1 giây ($0\\%$ áp lực lên DB). Đội ngũ 10 Workers phía sau ung dung rút dần các job ra xử lý với tốc độ ổn định 1,000 jobs/giây (Peak Shaving). Hệ thống êm ả vượt qua bão tải.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Kiến Trúc Hàng Đợi (Queue Ecosystem Map)
+### 4.1 Sơ đồ 1: Phân Phối Kiến Trúc Hàng Đợi (Queue Ecosystem Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          PRODUCERS (TẦNG TIẾP NHẬN REQUEST)                 │
@@ -76,7 +74,7 @@ Khi diễn ra sự kiện săn Voucher khuyến mãi lúc 00:00:
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: So Sánh Dòng Chảy Ghép Nối Chặt vs Bất Đồng Bộ (Flowchart)
+### 4.2 Sơ đồ 2: So Sánh Dòng Chảy Ghép Nối Chặt vs Bất Đồng Bộ (Flowchart)
 \`\`\`diagram
 MÔ HÌNH GHÉP NỐI CHẶT (HTTP ĐỒNG BỘ):
 Client ──► [ Order API ] ──► [ Payment API ] ──► [ Email API (CHẬM/CHẾT) ]
@@ -91,7 +89,7 @@ Client ──► [ Order API ] ──► Lưu DB Order ──► Đẩy Job vào
                                                 (Email sập thì Queue tự retry sau)
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Công Nghệ Queue (Broker Selection Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Công Nghệ Queue (Broker Selection Tree)
 \`\`\`diagram
 BẠN CẦN CHỌN MESSAGE BROKER CHO HỆ THỐNG?
 │
@@ -105,12 +103,12 @@ BẠN CẦN CHỌN MESSAGE BROKER CHO HỆ THỐNG?
     └──► CHỌN: Apache Kafka / Redpanda (Lưu trữ Log trên ổ đĩa theo Partition)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Tiêu Chí So Sánh | HTTP REST Đồng Bộ | BullMQ (Redis) | RabbitMQ | Apache Kafka |
 | :--- | :--- | :--- | :--- | :--- |
 | **Độ trễ tiếp nhận** | Phụ thuộc downstream | ~1ms - 2ms | ~2ms - 5ms | ~2ms - 5ms |
 | **Độ phức tạp hạ tầng** | Không có (Gọi trực tiếp) | Rất thấp (Dùng lại Redis)| Trung bình | Rất cao (Cần KRaft) |
-| **Khả năng làm mềm tải**| 0% (Dễ quá tải DB) | Rất xuất sắc | Cực kỳ xuất sắc | Tối thượng (Hàng triệu msg/s) |
+| **Khả năng làm mềm tải**| 0% (Dễ quá tải DB) | Rất xuất sắc | Rất xuất sắc | Tối thượng (Hàng triệu msg/s) |
 | **Hỗ trợ Delayed Job** | Khó (Cần DB polling) | Tự nhiên (100% mượt mà) | Cần plugin x-delayed | Không hỗ trợ tự nhiên |
 `,
       realCodeSnippet: `import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
@@ -203,7 +201,7 @@ export class OrderProducerService implements OnModuleDestroy {
             'HTTP 202 Accepted kèm thông tin Job ID / Status URI để báo hiệu yêu cầu đã được tiếp nhận hợp lệ và đang xếp hàng xử lý.',
           ],
           correctIndex: 3,
-          explanation: 'HTTP 202 Accepted là mã tiêu chuẩn quốc tế biểu thị: Yêu cầu của bạn đã được máy chủ tiếp nhận hợp lệ và đưa vào hàng đợi xử lý ngầm, nhưng quá trình xử lý chưa hoàn tất. Phản hồi thường trả kèm { jobId, statusUrl } để client có thể chủ động thăm dò (polling) hoặc chờ thông báo Webhook.'
+          explanation: 'HTTP 202 Accepted là mã tiêu chuẩn quốc tế biểu thị: Yêu cầu của kỹ sư đã được máy chủ tiếp nhận hợp lệ và đưa vào hàng đợi xử lý ngầm, nhưng quá trình xử lý chưa hoàn tất. Phản hồi thường trả kèm { jobId, statusUrl } để client có thể chủ động thăm dò (polling) hoặc chờ thông báo Webhook.'
         },
         {
           id: 'c8-l1-q4',
@@ -227,7 +225,7 @@ export class OrderProducerService implements OnModuleDestroy {
             'Giúp hệ thống không cần lưu trữ dữ liệu tin nhắn trên ổ đĩa hay bộ nhớ RAM.',
           ],
           correctIndex: 1,
-          explanation: 'Với mô hình Broker Push, Broker có thể bắn ồ ạt tin nhắn xuống Consumer nhanh hơn tốc độ xử lý của nó, làm tràn bộ đệm RAM của Worker và gây sập tiến trình. Với mô hình Consumer Pull, Worker chỉ chủ động kéo thêm việc khi nó đã xử lý xong tác vụ hiện tại, giải quyết hoàn hảo bài toán áp lực ngược (Backpressure).'
+          explanation: 'Với mô hình Broker Push, Broker có thể bắn ồ ạt tin nhắn xuống Consumer nhanh hơn tốc độ xử lý của nó, làm tràn bộ đệm RAM của Worker và gây sập tiến trình. Với mô hình Consumer Pull, Worker chỉ chủ động kéo thêm việc khi nó đã xử lý xong tác vụ hiện tại, giải quyết toàn vẹn bài toán áp lực ngược (Backpressure).'
         },
         {
           id: 'c8-l1-q6',
@@ -263,7 +261,7 @@ export class OrderProducerService implements OnModuleDestroy {
             'Cho phép truy vấn cơ sở dữ liệu PostgreSQL trực tiếp từ giao diện dòng lệnh của Redis.',
           ],
           correctIndex: 1,
-          explanation: 'Bài toán Dual-Write: Nếu lưu DB thành công nhưng Broker bị sập trước khi gửi tin nhắn, sự kiện bị mất; nếu gửi Broker trước nhưng DB rollback, Broker gửi tin nhắn rác! Outbox Pattern giải quyết bằng cách lưu luôn tin nhắn vào một bảng "outbox" trong cùng DB Transaction với dữ liệu chính. Một worker riêng biệt (CDC hoặc poller) sau đó đọc bảng outbox và publish vào Broker, đảm bảo tính nguyên tử tuyệt đối.'
+          explanation: 'Bài toán Dual-Write: Nếu lưu DB thành công nhưng Broker bị sập trước khi gửi tin nhắn, sự kiện bị mất; nếu gửi Broker trước nhưng DB rollback, Broker gửi tin nhắn rác! Outbox Pattern giải quyết bằng cách lưu luôn tin nhắn vào một bảng "outbox" trong cùng DB Transaction với dữ liệu chính. Một worker riêng biệt (CDC hoặc poller) sau đó đọc bảng outbox và publish vào Broker, đảm bảo tính nguyên tử hoàn toàn.'
         }
       ],
       codeChallenge: {
@@ -358,10 +356,10 @@ export class OrderProducerService implements OnModuleDestroy {
 
 BullMQ là giải pháp hàng đầu trong hệ sinh thái Node.js/NestJS để điều phối các tác vụ nền quy mô lớn (Background Job Processing). Khác với các hệ thống cồng kềnh, BullMQ tận dụng tối đa sức mạnh của **Cấu trúc Dữ liệu Nguyên tử trong Redis** để vận hành mà không cần thêm một Message Broker độc lập:
 * **Ánh Xạ Cấu Trúc Dữ Liệu Redis Vào Quản Trị Hàng Đợi (Redis-backed Primitive Mapping):**
-  - **Hàng đợi Chờ (Wait Queue):** Sử dụng cấu trúc **Redis List** (với lệnh nguyên tử \`BRPOPLPUSH\` hoặc \`RPOPLPUSH\`) hoặc **Redis Streams** (\`XREADGROUP\`). Cơ chế này đảm bảo khi một Job được lấy ra khỏi hàng đợi \`wait\`, nó được lập tức chuyển sang hàng đợi \`active\` một cách nguyên tử. Dù Worker có bị crash đúng tại thời điểm nhận Job, Job đó vẫn không bao giờ bị mất!
-  - **Tác vụ Hẹn giờ & Trì hoãn (Delayed Jobs):** Thay vì sử dụng vòng lặp \`setInterval\` kiểm tra mỗi giây (gây lãng phí CPU và nghẽn Event Loop), BullMQ lưu trữ các tác vụ cần trì hoãn trong một **Redis Sorted Set (ZSET)** với **Score chính là Epoch Timestamp tương lai** (\`executeAt\`). Một tiến trình điều phối sử dụng Lua Script định kỳ quét: Chỉ cần gọi lệnh \`ZRANGEBYSCORE key 0 current_timestamp\`, bốc các Job đã đến hạn và trượt thẳng xuống hàng đợi \`wait\` trong độ phức tạp $O(\\log N + M)$!
+  - **Hàng đợi Chờ (Wait Queue):** Sử dụng cấu trúc **Redis List** (với lệnh nguyên tử \`BRPOPLPUSH\` hoặc \`RPOPLPUSH\`) hoặc **Redis Streams** (\`XREADGROUP\`). Cơ chế này đảm bảo khi một Job được lấy ra khỏi hàng đợi \`wait\`, nó được lập tức chuyển sang hàng đợi \`active\` một cách nguyên tử. Dù Worker có bị crash đúng tại thời điểm nhận Job, Job đó vẫn không bao giờ bị mất.
+  - **Tác vụ Hẹn giờ & Trì hoãn (Delayed Jobs):** Thay vì sử dụng vòng lặp \`setInterval\` kiểm tra mỗi giây (gây lãng phí CPU và nghẽn Event Loop), BullMQ lưu trữ các tác vụ cần trì hoãn trong một **Redis Sorted Set (ZSET)** với **Score chính là Epoch Timestamp tương lai** (\`executeAt\`). Một tiến trình điều phối sử dụng Lua Script định kỳ quét: Chỉ cần gọi lệnh \`ZRANGEBYSCORE key 0 current_timestamp\`, bốc các Job đã đến hạn và trượt thẳng xuống hàng đợi \`wait\` trong độ phức tạp $O(\\log N + M)$.
 * **Chiến Lược Thử Lại Lũy Thừa (Exponential Backoff Resilience):**
-  - Khi một tác vụ gọi sang dịch vụ bên thứ ba (như cổng thanh toán ngân hàng) bị lỗi gián đoạn mạng tạm thời, việc thử lại ngay lập tức (Immediate Retry) sẽ gây ra thảm họa **Retry Storm**, làm quá tải thêm hệ thống đang gặp sự cố.
+  - Khi một tác vụ gọi sang dịch vụ bên thứ ba (như cổng thanh toán ngân hàng) bị lỗi gián đoạn mạng tạm thời, việc thử lại ngay lập tức (Immediate Retry) sẽ gây ra sự cố nghiêm trọng **Retry Storm**, làm quá tải thêm hệ thống đang gặp sự cố.
   - BullMQ áp dụng công thức giãn cách thời gian lũy thừa:
     $$T_{\\text{wait}} = \\text{delay} \\times 2^{\\text{attempts} - 1} + \\text{jitter}$$
     Khoảng thời gian chờ tăng từ 2s -> 4s -> 8s -> 16s, cho phép các dịch vụ phụ trợ có đủ khoảng lặng để tự phục hồi trước khi tiếp nhận yêu cầu mới.
@@ -411,9 +409,9 @@ $$\\text{Delay}(n) = \\text{Base Delay} \\times 2^{n-1} + \\text{Jitter}$$
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Cấu Trúc Khóa Redis Của BullMQ (Redis Key Structure Map)
+### 4.1 Sơ đồ 1: Cấu Trúc Khóa Redis Của BullMQ (Redis Key Structure Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          BỐ CỤC KHÓA BỘ NHỚ TRONG REDIS                     │
@@ -427,7 +425,7 @@ $$\\text{Delay}(n) = \\text{Base Delay} \\times 2^{n-1} + \\text{Jitter}$$
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Xử Lý Lỗi Và Tự Động Thử Lại (Error Retry Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Xử Lý Lỗi Và Tự Động Thử Lại (Error Retry Flow)
 \`\`\`diagram
 Worker xử lý Job ném ra Ngoại lệ (Throw Error)
    │
@@ -445,7 +443,7 @@ BullMQ Worker bắt lấy ngoại lệ và tăng số lần thử: attemptsMade+
           └── Khi đến giờ: Bộ đếm Redis tự động chuyển Job ngược về WAIT để chạy lại!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý Thất Bại Trong Worker (Worker Failure Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý Thất Bại Trong Worker (Worker Failure Tree)
 \`\`\`diagram
 JOB XỬ LÝ TRONG WORKER BỊ LỖI?
 │
@@ -457,12 +455,12 @@ JOB XỬ LÝ TRONG WORKER BỊ LỖI?
          └──► Bắt lỗi, ghi log cảnh báo, và return thành công hoặc ném lỗi Unrecoverable!
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược Retry | Mức Độ An Toàn Đối Tác | Thời Gian Xử Lý Tổng Thể | Nguy Cơ Thundering Herd | Ứng Dụng Chuẩn Khuyên Dùng |
 | :--- | :--- | :--- | :--- | :--- |
 | **Fixed Delay (Cố định)** | Kém (Bắn dồn dập mỗi 2s)| Ngắn | Rất cao | Tác vụ nội bộ đọc file đĩa |
 | **Exponential Backoff** | Rất tốt (Dãn cách thời gian)| Dài hơn qua từng lần thử| Trung bình | Gọi các API bên ngoài (Stripe, Zalo) |
-| **Exponential + Jitter** | Hoàn hảo nhất | Dài hơn, phân tán mượt mà| Hoàn toàn 0% | Tiêu chuẩn bắt buộc cho Production |
+| **Exponential + Jitter** | Toàn diện nhất | Dài hơn, phân tán mượt mà| Hoàn toàn 0% | Tiêu chuẩn bắt buộc cho Production |
 | **Không Retry (0 attempts)**| 0% | Kết thúc ngay lập tức | 0% | Tác vụ gửi thông báo quảng cáo rác |
 `,
       realCodeSnippet: `import { Processor, WorkerHost } from '@nestjs/bullmq';
@@ -531,7 +529,7 @@ export class EmailNotificationConsumer extends WorkerHost {
             'Cơ chế tệp tin nhật ký WAL của hệ quản trị cơ sở dữ liệu quan hệ PostgreSQL thông qua kết nối mạng nội bộ.',
           ],
           correctIndex: 0,
-          explanation: 'BullMQ sử dụng Sorted Set (ZSET) cho các Delayed Jobs. Điểm số (Score) của mỗi phần tử trong ZSET chính là thời điểm tương lai (timestamp tính bằng mili giây) mà job cần được thực thi. Khi thời gian hiện tại vượt qua Score đó, BullMQ dùng Lua script trích xuất các job đã "chín" và đẩy sang danh sách Wait của hàng đợi cực kỳ tối ưu mà không cần polling CPU.'
+          explanation: 'BullMQ sử dụng Sorted Set (ZSET) cho các Delayed Jobs. Điểm số (Score) của mỗi phần tử trong ZSET chính là thời điểm tương lai (timestamp tính bằng mili giây) mà job cần được thực thi. Khi thời gian hiện tại vượt qua Score đó, BullMQ dùng Lua script trích xuất các job đã "chín" và đẩy sang danh sách Wait của hàng đợi rất tối ưu mà không cần polling CPU.'
         },
         {
           id: 'c8-l2-q2',
@@ -677,26 +675,26 @@ export class EmailNotificationConsumer extends WorkerHost {
       duration: '60 phút',
       tag: 'DLQ & Idempotency',
       theory: `
-# 1. BỐI CẢNH KỸ THUẬT: CƠ CHẾ PHÒNG VỆ THẢM HỌA POISON PILL, BẢO TOÀN TÍNH TOÀN VẸN VỚI DEAD LETTER QUEUE & IDEMPOTENT CONSUMER (ARCHITECTURAL CONTEXT & RESILIENCE)
+# 1. BỐI CẢNH KỸ THUẬT: CƠ CHẾ PHÒNG VỆ SỰ CỐ POISON PILL, BẢO TOÀN TÍNH TOÀN VẸN VỚI DEAD LETTER QUEUE & IDEMPOTENT CONSUMER (ARCHITECTURAL CONTEXT & RESILIENCE)
 
 Trong các hệ sinh thái xử lý thông điệp quy mô hàng triệu sự kiện mỗi ngày, hai vấn đề sống còn về độ tin cậy kiến trúc luôn đe dọa sự ổn định của hệ thống:
-* **Thảm họa Thông Điệp Độc Hại (Poison Pill Messages) & Hiện Tượng Nghẽn Cổ Chai (Head-of-Line Blocking):**
+* **Sự cố nghiêm trọng Thông Điệp Độc Hại (Poison Pill Messages) & Hiện Tượng Nghẽn Cổ Chai (Head-of-Line Blocking):**
   - Xảy ra khi một tin nhắn chứa Payload bị hỏng (corrupted schema), mã hóa sai, hoặc kích hoạt một nhánh lỗi logic chưa được xử lý (Uncaught Exception) trong mã nguồn Consumer.
-  - Mỗi khi Worker nhận tin nhắn này, tiến trình bị crash hoặc ném lỗi, kích hoạt cơ chế tự động thử lại (Retry). Worker lại tiếp tục nhận lại chính tin nhắn đó, lại sập và lại thử lại vô hạn lần!
+  - Mỗi khi Worker nhận tin nhắn này, tiến trình bị crash hoặc ném lỗi, kích hoạt cơ chế tự động thử lại (Retry). Worker lại tiếp tục nhận lại chính tin nhắn đó, lại sập và lại thử lại vô hạn lần.
   - **Hậu quả trên Production:** Toàn bộ năng lực tính toán của Worker Pool bị giam lỏng bởi một vài tin nhắn độc hại. Hàng trăm nghìn tin nhắn hợp lệ phía sau bị đóng băng tại chỗ (**Head-of-Line Blocking**), độ trễ hàng đợi tăng vọt từ vài giây lên nhiều giờ, và hệ thống rơi vào trạng thái tê liệt hoàn toàn.
-* **Kiến Trúc Cô Lập Thảm Họa: Dead Letter Queue (DLQ):**
+* **Kiến Trúc Cô Lập Sự Cố Hệ Thống: Dead Letter Queue (DLQ):**
   - Để bảo vệ hàng đợi chính, BullMQ cấu hình một ngưỡng thử lại tối đa (ví dụ: \`attempts: 5\`).
   - Khi một Job thất bại đủ 5 lần, nó không bị vứt bỏ ngẫu nhiên mà được tự động chuyển hướng sang một hàng đợi độc lập chuyên dụng: **Dead Letter Queue (DLQ)**.
-  - Hàng đợi chính lập tức được giải phóng để tiếp tục phục vụ các đơn hàng bình thường. Tin nhắn trong DLQ được làm giàu (Enriched) với toàn bộ Stack Trace, lý do lỗi, và số lần đã thử, giúp đội ngũ kỹ sư vận hành có thể phân tích nguyên nhân gốc rễ (Root Cause Analysis), sửa lỗi mã nguồn, và nhấn nút **Replay (Phát lại)** để phục hồi dữ liệu trọn vẹn $100\\%$!
+  - Hàng đợi chính lập tức được giải phóng để tiếp tục phục vụ các đơn hàng bình thường. Tin nhắn trong DLQ được làm giàu (Enriched) với toàn bộ Stack Trace, lý do lỗi, và số lần đã thử, giúp đội ngũ kỹ sư vận hành có thể phân tích nguyên nhân gốc rễ (Root Cause Analysis), sửa lỗi mã nguồn, và nhấn nút **Replay (Phát lại)** để phục hồi dữ liệu trọn vẹn $100\\%$.
 * **Nguyên Lý Bất Biến Của Consumer (Idempotent Consumer Pattern):**
   - Trong mạng máy tính phân tán, cơ chế giao nhận tin cậy tuân theo chuẩn **At-Least-Once Delivery**: Tin nhắn không bao giờ bị mất, nhưng hoàn toàn có thể bị gửi trùng lặp (ví dụ: Worker đã xử lý xong nhưng kết nối mạng bị đứt trước khi gửi tín hiệu Acknowledgment về Broker, Broker tưởng Worker bị chết nên gửi lại tin nhắn đó cho một Worker khác).
-  - Do đó, mọi Consumer xử lý các tác vụ nhạy cảm tài chính (trừ tiền, gửi hóa đơn, tạo tài khoản) **BẮT BUỘC PHẢI CÓ TÍNH CHẤT BẤT BIẾN (IDEMPOTENT)**: Sử dụng Khóa Idempotency Key (hoặc Unique Job ID) kết hợp kiểm tra trạng thái trên Redis hoặc Database Unique Constraint để đảm bảo: **Dù một tin nhắn có bị gửi lại 100 lần, hành động nghiệp vụ cũng chỉ được thực thi duy nhất đúng 1 lần!**
+  - Do đó, mọi Consumer xử lý các tác vụ nhạy cảm tài chính (trừ tiền, gửi hóa đơn, tạo tài khoản) **BẮT BUỘC PHẢI CÓ TÍNH CHẤT BẤT BIẾN (IDEMPOTENT)**: Sử dụng Khóa Idempotency Key (hoặc Unique Job ID) kết hợp kiểm tra trạng thái trên Redis hoặc Database Unique Constraint để đảm bảo: **Dù một tin nhắn có bị gửi lại 100 lần, hành động nghiệp vụ cũng chỉ được thực thi duy nhất đúng 1 lần.**
 
 ---
 
 # 2. KIẾN TRÚC DEAD LETTER QUEUE (DLQ) CHUẨN DOANH NGHIỆP
 
-DLQ không phải là thùng rác để vứt bỏ dữ liệu, mà là **Một mạng lưới an toàn phục hồi thảm họa (Disaster Recovery Net)**:
+DLQ không phải là thùng rác để vứt bỏ dữ liệu, mà là **Một mạng lưới an toàn phục hồi sự cố nghiêm trọng (Disaster Recovery Net)**:
 
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -761,9 +759,9 @@ Bất kỳ Worker nào cũng có thể nhận cùng 1 tin nhắn 2 lần. Để 
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Các Rào Chắn Toàn Vẹn Tin Nhắn (Message Integrity Map)
+### 4.1 Sơ đồ 1: Bản Đồ Các Rào Chắn Toàn Vẹn Tin Nhắn (Message Integrity Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          TẦNG PRODUCER: DEDUPLICATION                       │
@@ -779,7 +777,7 @@ Bất kỳ Worker nào cũng có thể nhận cùng 1 tin nhắn 2 lần. Để 
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Vòng Đời Cứu Hộ Tin Nhắn Lỗi (DLQ Recovery Lifecycle)
+### 4.2 Sơ đồ 2: Vòng Đời Cứu Hộ Tin Nhắn Lỗi (DLQ Recovery Lifecycle)
 \`\`\`diagram
 Job hỏng ──► Rơi vào DLQ ──► Bắn Slack Alert ──► Kỹ sư điều tra lỗi
                                                       │
@@ -794,7 +792,7 @@ Job hỏng ──► Rơi vào DLQ ──► Bắn Slack Alert ──► Kỹ s�
               ngược về Hàng đợi chính!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý Trùng Lặp Tin Nhắn (Deduplication Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý Trùng Lặp Tin Nhắn (Deduplication Tree)
 \`\`\`diagram
 LÀM THẾ NÀO ĐỂ BẢO VỆ CONSUMER KHÔNG BỊ XỬ LÝ LẶP LẠI?
 │
@@ -808,12 +806,12 @@ LÀM THẾ NÀO ĐỂ BẢO VỆ CONSUMER KHÔNG BỊ XỬ LÝ LẶP LẠI?
 │       └──► DÙNG: Redis Atomic Lock (SET processed:id 1 NX EX 86400)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược Chống Trùng | Chi Phí Bộ Nhớ | Mức Độ An Toàn Dữ Liệu | Độ Phức Tạp Kiến Trúc | Rủi Ro Vận Hành |
 | :--- | :--- | :--- | :--- | :--- |
-| **Không kiểm tra** | 0% | Cực kỳ nguy hiểm, mất tiền | 0% | Khách hàng bị trừ tiền nhiều lần |
+| **Không kiểm tra** | 0% | Rất nguy hiểm, mất tiền | 0% | Khách hàng bị trừ tiền nhiều lần |
 | **Job ID Deduplication** | Rất thấp (Redis Set) | Tốt ở tầng Ingestion | Thấp | Không bảo vệ được khi Consumer lỗi |
-| **DB processed_messages**| Tốn thêm dung lượng bảng| Tuyệt đối 100% ACID | Trung bình | Cần dọn dẹp các ID cũ định kỳ |
+| **DB processed_messages**| Tốn thêm dung lượng bảng| Hoàn toàn 100% ACID | Trung bình | Cần dọn dẹp các ID cũ định kỳ |
 | **Dead Letter Queue** | Tốn RAM/Đĩa lưu Job lỗi | Ngăn chặn mất mát dữ liệu | Cần viết script Replay | Phải theo dõi và xử lý trước khi đầy |
 `,
       realCodeSnippet: `import { Injectable, Logger } from '@nestjs/common';
@@ -911,7 +909,7 @@ export class IdempotentPaymentConsumerService {
             'Bỏ qua việc lưu trữ lịch sử giao dịch và chỉ cập nhật số dư cuối cùng của người dùng vào lúc nửa đêm.',
           ],
           correctIndex: 1,
-          explanation: 'Giải pháp chuẩn mực nhất là sử dụng bảng processed_messages (hoặc cột idempotent_key có UNIQUE constraint) nằm trong cùng Database Transaction với câu lệnh trừ tiền. Khi nhận tin nhắn, Consumer kiểm tra message_id: nếu đã có thì bỏ qua; nếu chưa có thì vừa trừ tiền vừa chèn message_id trong cùng một Transaction nguyên tử, đảm bảo tuyệt đối không bao giờ bị trừ tiền 2 lần.'
+          explanation: 'Giải pháp chuẩn mực nhất là sử dụng bảng processed_messages (hoặc cột idempotent_key có UNIQUE constraint) nằm trong cùng Database Transaction với câu lệnh trừ tiền. Khi nhận tin nhắn, Consumer kiểm tra message_id: nếu đã có thì bỏ qua; nếu chưa có thì vừa trừ tiền vừa chèn message_id trong cùng một Transaction nguyên tử, đảm bảo không bao giờ bị trừ tiền 2 lần.'
         },
         {
           id: 'c8-l3-q4',
@@ -923,7 +921,7 @@ export class IdempotentPaymentConsumerService {
             'Hệ quản trị Redis sẽ tự động chuyển đổi toàn bộ các khóa dữ liệu sang định dạng văn bản thô không thể phục hồi.',
           ],
           correctIndex: 0,
-          explanation: 'Một Poison Pill là tin nhắn mà mã nguồn của bạn chắc chắn sẽ bị crash khi đọc. Nếu không có giới hạn retry và DLQ, Worker sẽ thất bại -> ném lỗi -> Queue đưa tin nhắn quay lại đầu hàng đợi -> Worker lại bốc chính tin nhắn đó và lại crash... tạo thành vòng lặp vô tận (Infinite Crash Loop), làm tê liệt hoàn toàn Worker và ngăn chặn mọi tin nhắn bình thường phía sau.'
+          explanation: 'Một Poison Pill là tin nhắn mà mã nguồn của kỹ sư chắc chắn sẽ bị crash khi đọc. Nếu không có giới hạn retry và DLQ, Worker sẽ thất bại -> ném lỗi -> Queue đưa tin nhắn quay lại đầu hàng đợi -> Worker lại bốc chính tin nhắn đó và lại crash... tạo thành vòng lặp vô tận (Infinite Crash Loop), làm tê liệt hoàn toàn Worker và ngăn chặn mọi tin nhắn bình thường phía sau.'
         },
         {
           id: 'c8-l3-q5',

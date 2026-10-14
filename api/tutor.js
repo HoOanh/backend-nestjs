@@ -1,5 +1,79 @@
 // server/tutor-config.ts
-var DEFAULT_MODEL = "gemini-3.8-flash";
+var DEFAULT_MODEL = "gemini-3.5-flash-lite";
+var FALLBACK_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
+  "gemma-4-31b-it",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash"
+];
+var MODEL_QUOTA_SPECS = [
+  {
+    id: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash Lite",
+    priority: 1,
+    rpmLimit: 30,
+    rpdLimit: 1500,
+    tpmLimit: 25e4,
+    tierNote: "M\u1EB7c \u0111\u1ECBnh \xB7 Bucket r\u1ED9ng nh\u1EA5t (15\u201330 RPM)"
+  },
+  {
+    id: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
+    priority: 2,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "Suy lu\u1EADn s\xE2u \xB7 G\u1ED9p chung bucket 3.7-flash"
+  },
+  {
+    id: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    priority: 3,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "C\xE2n b\u1EB1ng \xB7 G\u1ED9p chung bucket 3.5-flash"
+  },
+  {
+    id: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    priority: 4,
+    rpmLimit: 30,
+    rpdLimit: 1500,
+    tpmLimit: 25e4,
+    tierNote: "D\u1EF1 ph\xF2ng t\u1EA3i cao \xB7 Ph\u1EA3n h\u1ED3i si\xEAu t\u1ED1c"
+  },
+  {
+    id: "gemma-4-31b-it",
+    label: "Gemma 4 31B IT",
+    priority: 5,
+    rpmLimit: 15,
+    rpdLimit: 1500,
+    tpmLimit: 15e4,
+    tierNote: "Open-weights 31B \xB7 100% Free Tier"
+  },
+  {
+    id: "gemini-2.5-flash-lite",
+    label: "Gemini 2.5 Flash Lite",
+    priority: 6,
+    rpmLimit: 15,
+    rpdLimit: 1500,
+    tpmLimit: 25e4,
+    tierNote: "Th\u1EBF h\u1EC7 2.5 Lite \xB7 \u1ED4n \u0111\u1ECBnh, \u0111\u1ED9 tr\u1EC5 th\u1EA5p"
+  },
+  {
+    id: "gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    priority: 7,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "Ch\u1ED1t ch\u1EB7n cu\u1ED1i \xB7 C\u1EE5m h\u1EA1 t\u1EA7ng 2.5 \u0111\u1ED9c l\u1EADp"
+  }
+];
 var SYSTEM_PROMPT = `Em l\xE0 m\u1ED9t tutor k\u1EF9 thu\u1EADt c\u1EE7a Arc Irobot Academy.
 Nhi\u1EC7m v\u1EE5: gi\xFAp h\u1ECDc vi\xEAn hi\u1EC3u th\u1EADt ch\u1EAFc b\xE0i h\u1ECDc hi\u1EC7n t\u1EA1i tr\u01B0\u1EDBc khi l\xE0m tr\u1EAFc nghi\u1EC7m.
 Quy t\u1EAFc b\u1EAFt bu\u1ED9c:
@@ -149,6 +223,7 @@ var store = {
   chat_messages: [],
   chat_logs: [],
   users: [],
+  deleted_users: [],
   sessions: [],
   revoked_tokens: [],
   plans: [],
@@ -163,35 +238,21 @@ function loadStore() {
       const raw = fs.readFileSync(filePath, "utf-8");
       if (raw.trim()) {
         const parsed = JSON.parse(raw);
-        const diskSessions = parsed.chat_sessions || [];
-        const diskMessages = parsed.chat_messages || [];
-        const sessionMap = /* @__PURE__ */ new Map();
-        for (const s of diskSessions) sessionMap.set(s.id, s);
-        for (const s of store.chat_sessions) {
-          const onDisk = sessionMap.get(s.id);
-          if (!onDisk || s.updatedAt && s.updatedAt >= (onDisk.updatedAt || "")) {
-            sessionMap.set(s.id, s);
-          }
-        }
-        const messageMap = /* @__PURE__ */ new Map();
-        for (const m of diskMessages) messageMap.set(m.id, m);
-        for (const m of store.chat_messages) {
-          if (!messageMap.has(m.id)) messageMap.set(m.id, m);
-        }
         store = {
           entitlements: [],
           audit_logs: [],
+          chat_sessions: [],
+          chat_messages: [],
           chat_logs: [],
           users: [],
+          deleted_users: [],
           sessions: [],
           revoked_tokens: [],
           plans: [],
           user_progress: [],
           learning_history: [],
           certificates: [],
-          ...parsed,
-          chat_sessions: Array.from(sessionMap.values()),
-          chat_messages: Array.from(messageMap.values())
+          ...parsed
         };
       }
     }
@@ -438,6 +499,7 @@ var dbService = {
     if (store.revoked_tokens?.includes(token)) return null;
     const payload = verifyJwt(token);
     if (payload) {
+      if (store.deleted_users?.includes(payload.userId)) return null;
       const user = store.users.find((u) => u.id === payload.userId);
       if (user?.status === "suspended") return null;
       if (user && (payload.authVersion || 0) !== (user.auth_version || 0)) return null;
@@ -462,6 +524,7 @@ var dbService = {
       (s) => s.token === token && new Date(s.expires_at) > /* @__PURE__ */ new Date()
     );
     if (session) {
+      if (store.deleted_users?.includes(session.user_id)) return null;
       return store.users.find(
         (u) => u.id === session.user_id && u.status !== "suspended"
       ) || null;
@@ -534,6 +597,9 @@ var dbService = {
       created_at: now,
       last_login_at: now
     };
+    if (store.deleted_users) {
+      store.deleted_users = store.deleted_users.filter((uid) => uid !== user.id);
+    }
     store.users.push(newUser);
     saveStore();
     return newUser;
@@ -561,6 +627,10 @@ var dbService = {
     );
     store.chat_logs = store.chat_logs.filter((l) => l.userId !== id);
     store.users = store.users.filter((u) => u.id !== id);
+    if (!store.deleted_users) store.deleted_users = [];
+    if (!store.deleted_users.includes(id)) {
+      store.deleted_users.push(id);
+    }
     store.sessions = store.sessions.filter((s) => s.user_id !== id);
     store.user_progress = store.user_progress.filter((p) => p.user_id !== id);
     store.learning_history = store.learning_history.filter(
@@ -603,13 +673,18 @@ var dbService = {
   getLearningHistory(userId) {
     loadStore();
     if (userId) {
-      return store.learning_history.filter((h) => h.user_id === userId).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 100);
+      return store.learning_history.filter((h) => h.user_id === userId).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 1e3);
     }
-    return [...store.learning_history].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 200);
+    return [...store.learning_history].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 1e3);
   },
   addLearningHistory(history) {
     loadStore();
-    store.learning_history.push(history);
+    const existingIdx = store.learning_history.findIndex((h) => h.id === history.id);
+    if (existingIdx !== -1) {
+      store.learning_history[existingIdx] = history;
+    } else {
+      store.learning_history.push(history);
+    }
     saveStore();
     return history;
   },
@@ -698,14 +773,83 @@ function formatUserResponse(u) {
 function authorizeTutorRequest(headers, sessionId) {
   const request = { headers };
   if (!sessionId) return 401;
-  const token = getTokenFromCookie(request);
-  const actor = token ? verifyJwt(token) : null;
+  const token = getBearerToken(request) || getTokenFromCookie(request);
+  const actor = token ? dbService.getAuthUser(token) : null;
+  if (!actor) return 401;
   const proofToken = getTutorProofFromCookie(request, sessionId);
   const proof = proofToken ? verifyTutorProof(proofToken) : null;
-  if (!actor || !proof || proof.sessionId !== sessionId || proof.userId !== actor.userId) {
-    return 401;
+  if (proof && proof.sessionId === sessionId && proof.userId === actor.id) {
+    return null;
   }
-  return null;
+  loadStore();
+  const session = store.chat_sessions.find((s) => s.id === sessionId);
+  if (session) {
+    if (session.userId !== actor.id && actor.role !== "admin") return 403;
+    return null;
+  }
+  return 401;
+}
+function getPersistedModelCooldowns(now = Date.now()) {
+  loadStore();
+  const cooldownMap = /* @__PURE__ */ new Map();
+  const fiveMinAgoIso = new Date(now - 3e5).toISOString();
+  for (const log of store.chat_logs) {
+    if (!log.timestamp || log.timestamp < fiveMinAgoIso) continue;
+    const meta = log.metadata || {};
+    if (log.event === "AI_PROVIDER_ACCEPTED") {
+      const m = String(meta.actualModel || "");
+      if (m) cooldownMap.delete(m);
+    } else if (log.event === "AI_PROVIDER_REJECTED") {
+      const m = String(meta.model || "");
+      const status = Number(meta.status || 0);
+      const ts = Date.parse(log.timestamp);
+      if (!m || !Number.isFinite(ts)) continue;
+      const durationMs = status === 429 ? 6e4 : status === 503 ? 3e4 : status === 404 ? 3e5 : 0;
+      if (durationMs > 0 && ts + durationMs > now) {
+        cooldownMap.set(m, ts + durationMs);
+      }
+    }
+  }
+  return cooldownMap;
+}
+function computeModelQuotaSnapshot(modelId, now = Date.now(), currentEvent) {
+  const spec = MODEL_QUOTA_SPECS.find((s) => s.id === modelId) || {
+    id: modelId,
+    label: modelId,
+    priority: 99,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "Model t\xF9y ch\u1EC9nh / Legacy"
+  };
+  const oneMinAgoIso = new Date(now - 6e4).toISOString();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartIso = dayStart.toISOString();
+  let rpmUsed = 0;
+  let rpdUsed = 0;
+  for (const log of store.chat_logs) {
+    if (!log.timestamp || log.timestamp < dayStartIso) continue;
+    const meta = log.metadata || {};
+    const isAttempt = log.event === "AI_PROVIDER_ACCEPTED" && meta.actualModel === modelId || (log.event === "AI_PROVIDER_REJECTED" || log.event === "AI_PROVIDER_NETWORK_ERROR") && meta.model === modelId;
+    if (!isAttempt) continue;
+    rpdUsed++;
+    if (log.timestamp >= oneMinAgoIso) {
+      rpmUsed++;
+    }
+  }
+  if (currentEvent === "AI_PROVIDER_ACCEPTED" || currentEvent === "AI_PROVIDER_REJECTED" || currentEvent === "AI_PROVIDER_NETWORK_ERROR") {
+    rpmUsed++;
+    rpdUsed++;
+  }
+  return {
+    rpmLimit: spec.rpmLimit,
+    rpmUsed,
+    rpmRemaining: Math.max(0, spec.rpmLimit - rpmUsed),
+    rpdLimit: spec.rpdLimit,
+    rpdUsed,
+    rpdRemaining: Math.max(0, spec.rpdLimit - rpdUsed)
+  };
 }
 function recordTutorTrace(headers, sessionId, level, event, metadata) {
   try {
@@ -732,6 +876,13 @@ function recordTutorTrace(headers, sessionId, level, event, metadata) {
       store.chat_sessions.push(owned);
       saveStore();
     }
+    const targetModel = String(
+      metadata.actualModel || metadata.model || metadata.requestedModel || ""
+    );
+    const enrichedMetadata = targetModel ? {
+      ...metadata,
+      quota: computeModelQuotaSnapshot(targetModel, Date.now(), event)
+    } : metadata;
     store.chat_logs.push({
       id: crypto.randomUUID(),
       userId: actor.id,
@@ -740,7 +891,7 @@ function recordTutorTrace(headers, sessionId, level, event, metadata) {
       level,
       event,
       message: event,
-      metadata,
+      metadata: enrichedMetadata,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
     saveStore();
@@ -750,9 +901,16 @@ function recordTutorTrace(headers, sessionId, level, event, metadata) {
 }
 
 // server/tutor.ts
+var LEGACY_MODEL_ALIASES = {
+  antigravity: "gemini-3.8-flash",
+  "gemini-3.7-flash": "gemini-3.8-flash",
+  "gemini-3.5-flash": "gemini-3.6-flash",
+  "gemma-4-31b": "gemma-4-31b-it"
+};
+var modelCooldownUntil = /* @__PURE__ */ new Map();
 function sanitizeModel(model) {
   if (model && /^[a-zA-Z0-9.\-_]+$/.test(model)) {
-    return model;
+    return LEGACY_MODEL_ALIASES[model] || model;
   }
   return DEFAULT_MODEL;
 }
@@ -829,18 +987,30 @@ ${lesson.theory || ""}
 
 REAL_CODE:
 ${lesson.realCodeSnippet || ""}`;
-  const FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-    "antigravity",
-    "gemini-2.5-flash-lite",
-    "gemma-4-31b"
+  const estimatedPromptTokens = Math.max(
+    1,
+    Math.ceil((prompt.length + JSON.stringify(contents).length) / 4)
+  );
+  const now = Date.now();
+  try {
+    const persistedCooldowns = getPersistedModelCooldowns(now);
+    for (const [m, until] of persistedCooldowns.entries()) {
+      const existing = modelCooldownUntil.get(m) ?? 0;
+      if (until > existing) modelCooldownUntil.set(m, until);
+    }
+  } catch {
+  }
+  const baseCandidates = [
+    model,
+    ...FALLBACK_MODELS.filter((m) => m !== model)
   ];
-  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)].slice(0, 3);
+  const healthyCandidates = baseCandidates.filter(
+    (m) => (modelCooldownUntil.get(m) ?? 0) <= now
+  );
+  const cooledDownCandidates = baseCandidates.filter(
+    (m) => (modelCooldownUntil.get(m) ?? 0) > now
+  );
+  const modelChain = [...healthyCandidates, ...cooledDownCandidates].slice(0, 3);
   const requestDeadline = AbortSignal.timeout(24e3);
   let currentActiveModel = model;
   let activeGeminiResponse = null;
@@ -875,9 +1045,12 @@ ${lesson.realCodeSnippet || ""}`;
           clearTimeout(candidateTimeout);
         }
         if (candidateResponse.ok) {
+          modelCooldownUntil.delete(candidate);
           trace("INFO", "AI_PROVIDER_ACCEPTED", {
             requestedModel: model,
             actualModel: candidate,
+            isFallback: candidate !== model,
+            attempt: i + 1,
             status: candidateResponse.status
           });
           currentActiveModel = candidate;
@@ -889,6 +1062,17 @@ ${lesson.realCodeSnippet || ""}`;
           }
           break;
         }
+        let cooldownMs = 0;
+        if (candidateResponse.status === 429) {
+          cooldownMs = 6e4;
+          modelCooldownUntil.set(candidate, Date.now() + cooldownMs);
+        } else if (candidateResponse.status === 503) {
+          cooldownMs = 3e4;
+          modelCooldownUntil.set(candidate, Date.now() + cooldownMs);
+        } else if (candidateResponse.status === 404) {
+          cooldownMs = 3e5;
+          modelCooldownUntil.set(candidate, Date.now() + cooldownMs);
+        }
         const errorText = await candidateResponse.text();
         let parsedMsg = `HTTP ${candidateResponse.status}`;
         try {
@@ -899,23 +1083,34 @@ ${lesson.realCodeSnippet || ""}`;
         } catch {
         }
         trace("WARN", "AI_PROVIDER_REJECTED", {
+          requestedModel: model,
           model: candidate,
-          status: candidateResponse.status
+          attempt: i + 1,
+          status: candidateResponse.status,
+          error: parsedMsg,
+          cooldownMs
         });
         lastErrorMsg = `[${candidate}] HTTP ${candidateResponse.status}: ${parsedMsg}`;
         console.warn(
-          `Gemini model ${candidate} failed (${candidateResponse.status}): ${parsedMsg}. Trying next 3.x fallback...`
+          `Gemini model ${candidate} failed (${candidateResponse.status}): ${parsedMsg}. Trying next fallback...`
         );
       } catch (subErr) {
-        lastErrorMsg = subErr instanceof Error ? subErr.message : "Network error";
-        trace("WARN", "AI_PROVIDER_NETWORK_ERROR", { model: candidate });
+        const netMsg = subErr instanceof Error ? subErr.message : "Network error";
+        lastErrorMsg = netMsg;
+        trace("WARN", "AI_PROVIDER_NETWORK_ERROR", {
+          requestedModel: model,
+          model: candidate,
+          attempt: i + 1,
+          error: netMsg
+        });
         console.warn(`Failed to connect to ${candidate}:`, subErr);
       }
     }
     if (!activeGeminiResponse) {
       trace("ERROR", "AI_REQUEST_FAILED", {
         requestedModel: model,
-        durationMs: Date.now() - startedAt
+        durationMs: Date.now() - startedAt,
+        error: lastErrorMsg
       });
       return response.status(503).json({
         error: `M\xE1y ch\u1EE7 AI Google \u0111ang qu\xE1 t\u1EA3i t\u1EA1m th\u1EDDi (${lastErrorMsg}). \u0110\u1EA0I CA vui l\xF2ng th\u1EED l\u1EA1i sau gi\xE2y l\xE1t.`
@@ -943,6 +1138,10 @@ ${lesson.realCodeSnippet || ""}`;
       }
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
+      let streamedLength = 0;
+      let providerPromptTokens = 0;
+      let providerCompletionTokens = 0;
+      let providerTotalTokens = 0;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -956,8 +1155,20 @@ ${lesson.realCodeSnippet || ""}`;
           if (!jsonStr) continue;
           try {
             const parsed = JSON.parse(jsonStr);
+            if (parsed.usageMetadata) {
+              if (parsed.usageMetadata.promptTokenCount) {
+                providerPromptTokens = parsed.usageMetadata.promptTokenCount;
+              }
+              if (parsed.usageMetadata.candidatesTokenCount) {
+                providerCompletionTokens = parsed.usageMetadata.candidatesTokenCount;
+              }
+              if (parsed.usageMetadata.totalTokenCount) {
+                providerTotalTokens = parsed.usageMetadata.totalTokenCount;
+              }
+            }
             const text = parsed.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("");
             if (text && response.write) {
+              streamedLength += text.length;
               response.write(`data: ${JSON.stringify({ text })}
 
 `);
@@ -970,8 +1181,20 @@ ${lesson.realCodeSnippet || ""}`;
         const jsonStr = buffer.trim().replace(/^data:\s*/, "");
         try {
           const parsed = JSON.parse(jsonStr);
+          if (parsed.usageMetadata) {
+            if (parsed.usageMetadata.promptTokenCount) {
+              providerPromptTokens = parsed.usageMetadata.promptTokenCount;
+            }
+            if (parsed.usageMetadata.candidatesTokenCount) {
+              providerCompletionTokens = parsed.usageMetadata.candidatesTokenCount;
+            }
+            if (parsed.usageMetadata.totalTokenCount) {
+              providerTotalTokens = parsed.usageMetadata.totalTokenCount;
+            }
+          }
           const text = parsed.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("");
           if (text && response.write) {
+            streamedLength += text.length;
             response.write(`data: ${JSON.stringify({ text })}
 
 `);
@@ -980,9 +1203,18 @@ ${lesson.realCodeSnippet || ""}`;
         }
       }
       if (response.write) {
+        const promptTokens2 = providerPromptTokens || estimatedPromptTokens;
+        const completionTokens2 = providerCompletionTokens || Math.max(1, Math.ceil(streamedLength / 4));
+        const totalTokens2 = providerTotalTokens || promptTokens2 + completionTokens2;
         trace("INFO", "AI_STREAM_COMPLETE", {
+          requestedModel: model,
           actualModel: currentActiveModel,
-          durationMs: Date.now() - startedAt
+          isFallback: currentActiveModel !== model,
+          durationMs: Date.now() - startedAt,
+          responseLength: streamedLength,
+          promptTokens: promptTokens2,
+          completionTokens: completionTokens2,
+          totalTokens: totalTokens2
         });
         response.write("data: [DONE]\n\n");
       }
@@ -1006,18 +1238,28 @@ ${lesson.realCodeSnippet || ""}`;
         error: data.error?.message || `Gemini kh\xF4ng tr\u1EA3 \u0111\u01B0\u1EE3c c\xE2u tr\u1EA3 l\u1EDDi (HTTP ${geminiResponse.status}).`
       });
     }
+    const promptTokens = data.usageMetadata?.promptTokenCount || estimatedPromptTokens;
+    const completionTokens = data.usageMetadata?.candidatesTokenCount || Math.max(1, Math.ceil(reply.length / 4));
+    const totalTokens = data.usageMetadata?.totalTokenCount || promptTokens + completionTokens;
     trace("INFO", "AI_RESPONSE_COMPLETE", {
+      requestedModel: model,
       actualModel: currentActiveModel,
+      isFallback: currentActiveModel !== model,
       durationMs: Date.now() - startedAt,
-      responseLength: reply.length
+      responseLength: reply.length,
+      promptTokens,
+      completionTokens,
+      totalTokens
     });
     return response.status(200).json({ reply });
   } catch (err) {
-    trace("ERROR", "AI_REQUEST_ERROR", {
-      actualModel: currentActiveModel,
-      durationMs: Date.now() - startedAt
-    });
     const errorMsg = err instanceof Error ? err.message : "Kh\xF4ng k\u1EBFt n\u1ED1i \u0111\u01B0\u1EE3c t\u1EDBi Gemini.";
+    trace("ERROR", "AI_REQUEST_ERROR", {
+      requestedModel: model,
+      actualModel: currentActiveModel,
+      durationMs: Date.now() - startedAt,
+      error: errorMsg
+    });
     if (isStream && typeof response.write === "function") {
       response.write(`data: ${JSON.stringify({ error: errorMsg })}
 

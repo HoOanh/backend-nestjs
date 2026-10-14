@@ -72,10 +72,11 @@ export const App: React.FC = () => {
     progressPercent,
     handleLessonCompleted,
     handleLessonCleared,
+    handleQuizSubmitted,
     handleSprintExamSubmitted,
     handleFinalExamSubmitted,
     handleRetakeFinalExam
-  } = useLearningProgress(studentUser);
+  } = useLearningProgress(activeUser);
 
   const {
     isTutorOpen,
@@ -95,7 +96,7 @@ export const App: React.FC = () => {
   const currentLessonId =
     route.type === 'lesson'
       ? route.lessonId
-      : state.currentLessonId || 'lesson-1';
+      : state.currentLessonId || 'c1-l1';
   const currentLesson = useMemo(() => {
     for (const sprint of CURRICULUM) {
       const lesson = sprint.lessons.find((item) => item.id === currentLessonId);
@@ -122,7 +123,20 @@ export const App: React.FC = () => {
     return (
       <div className="auth-portal-page">
         <div style={{ textAlign: 'center', color: '#0ea5e9' }}>
-          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔄</div>
+          <div style={{ marginBottom: '12px' }}>
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          </div>
           <h3>Đang xác thực phiên đăng nhập...</h3>
         </div>
       </div>
@@ -321,13 +335,39 @@ export const App: React.FC = () => {
                       className={`tab-btn ${activeTab === 'theory' ? 'active' : ''}`}
                       onClick={() => handleTabChange('theory')}
                     >
-                      📖 Lý Thuyết & Code Mẫu
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                      </svg>{' '}
+                      Lý Thuyết & Code Mẫu
                     </button>
                     <button
                       className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
                       onClick={() => handleTabChange('quiz')}
                     >
-                      📝 Trắc Nghiệm Ôn Luyện{' '}
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                      </svg>{' '}
+                      Trắc Nghiệm Ôn Luyện{' '}
                       <span className="tab-badge">
                         {currentLesson.quiz.length}
                       </span>
@@ -336,9 +376,24 @@ export const App: React.FC = () => {
                       className={`tab-btn ${activeTab === 'code' ? 'active' : ''}`}
                       onClick={() => handleTabChange('code')}
                     >
-                      💻 Bài Tập Code Sandbox{' '}
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="16 18 22 12 16 6" />
+                        <polyline points="8 6 2 12 8 18" />
+                      </svg>{' '}
+                      Bài Tập Code Sandbox{' '}
                       <span className="tab-badge">
-                        {currentLesson.codeChallenge.testCases.length} Tests
+                        {currentLesson.codeChallenges && currentLesson.codeChallenges.length > 1
+                          ? `${currentLesson.codeChallenges.length} Bài`
+                          : `${currentLesson.codeChallenge.testCases.length} Tests`}
                       </span>
                     </button>
                   </div>
@@ -348,6 +403,12 @@ export const App: React.FC = () => {
                       lesson={currentLesson}
                       onNextTab={() => handleTabChange('quiz')}
                       onOpenTutor={() => setIsTutorOpen(true)}
+                      onLessonCleared={() =>
+                        handleLessonCleared(
+                          currentLesson.id,
+                          currentLesson.title
+                        )
+                      }
                     />
                   )}
 
@@ -356,6 +417,7 @@ export const App: React.FC = () => {
                       lesson={currentLesson}
                       onPrevTab={() => handleTabChange('theory')}
                       onNextTab={() => handleTabChange('code')}
+                      onQuizSubmitted={handleQuizSubmitted}
                     />
                   )}
 
@@ -545,6 +607,9 @@ export const App: React.FC = () => {
           completedCount={completedCount}
           totalLessons={totalLessons}
           progressPercent={progressPercent}
+          completedLessons={state.completedLessons}
+          clearedLessons={state.clearedLessons}
+          quizScores={state.quizScores}
           sprintExamScores={state.sprintExamScores}
           finalExam={state.finalExam}
         />

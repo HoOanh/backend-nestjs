@@ -18,10 +18,10 @@ Trong một hệ thống Backend chịu tải cao, hàng nghìn giao dịch (Tra
   - Mức độ cô lập càng cao, dữ liệu càng chính xác nhưng chi phí khóa (Lock Overhead) càng lớn, nguy cơ bế tắc (Deadlock) càng cao và thông lượng hệ thống (TPS) càng suy giảm.
   - Ngược lại, mức độ cô lập càng thấp, hệ thống chạy càng nhanh nhưng nguy cơ phát sinh dữ liệu rác, thất thoát tiền bạc hoặc sai lệch báo cáo tài chính càng nghiêm trọng.
 * **Bản chất của 4 Hiện tượng Đọc Dị thường (Concurrency Read Anomalies):**
-  - **Dirty Read (Đọc rác):** Giao dịch A sửa đổi một dòng dữ liệu nhưng chưa COMMIT. Giao dịch B đọc dòng dữ liệu đó để tính toán. Ngay sau đó, Giao dịch A gặp lỗi và ROLLBACK. Dữ liệu mà Giao dịch B vừa xử lý thực chất chưa từng tồn tại hợp lệ trong cơ sở dữ liệu!
+  - **Dirty Read (Đọc rác):** Giao dịch A sửa đổi một dòng dữ liệu nhưng chưa COMMIT. Giao dịch B đọc dòng dữ liệu đó để tính toán. Ngay sau đó, Giao dịch A gặp lỗi và ROLLBACK. Dữ liệu mà Giao dịch B vừa xử lý thực chất chưa từng tồn tại hợp lệ trong cơ sở dữ liệu.
   - **Non-Repeatable Read (Đọc không thể lặp lại):** Giao dịch A đọc dòng $X$ được giá trị $100$. Trong khi Giao dịch A vẫn đang chạy, Giao dịch B thực hiện UPDATE dòng $X$ thành $200$ và COMMIT. Giao dịch A đọc lại dòng $X$ lần thứ hai và nhận được giá trị $200$! Dữ liệu bị biến đổi ngay trong cùng một ngữ cảnh giao dịch.
   - **Phantom Read (Bản ghi bóng ma):** Giao dịch A truy vấn một dải dữ liệu (\`SELECT COUNT(*) WHERE status = 'PENDING'\`) được $10$ dòng. Giao dịch B thực hiện INSERT thêm $1$ dòng mới thỏa mãn điều kiện đó và COMMIT. Giao dịch A chạy lại câu lệnh cũ và thấy kết quả là $11$ dòng! Dòng mới xuất hiện như một "bóng ma".
-  - **Write Skew (Lệch ghi do phụ thuộc chéo):** Hai giao dịch đồng thời đọc dữ liệu để kiểm tra một ràng buộc toàn vẹn chung (ví dụ: "Tổng số bác sĩ trực phải $\\ge 1$"). Giao dịch 1 đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ A sang nghỉ. Đồng thời, Giao dịch 2 cũng đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ B sang nghỉ. Cả hai giao dịch đều COMMIT thành công, dẫn đến kết quả: Không còn bác sĩ nào trực, vi phạm nghiêm trọng ràng buộc nghiệp vụ!
+  - **Write Skew (Lệch ghi do phụ thuộc chéo):** Hai giao dịch đồng thời đọc dữ liệu để kiểm tra một ràng buộc toàn vẹn chung (ví dụ: "Tổng số bác sĩ trực phải $\\ge 1$"). Giao dịch 1 đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ A sang nghỉ. Đồng thời, Giao dịch 2 cũng đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ B sang nghỉ. Cả hai giao dịch đều COMMIT thành công, dẫn đến kết quả: Không còn bác sĩ nào trực, vi phạm nghiêm trọng ràng buộc nghiệp vụ.
 * **Hiện thực trong PostgreSQL:** PostgreSQL loại bỏ hoàn toàn cấp độ \`Read Uncommitted\` (tự động nâng lên \`Read Committed\`), và hiện thực cấp độ \`Repeatable Read\` bằng cơ chế **Snapshot Isolation** (ngăn chặn triệt để cả Dirty Read, Non-repeatable Read và Phantom Read mà không cần khóa bảng).
 
 ---
@@ -48,10 +48,10 @@ Theo chuẩn ANSI/ISO SQL-92, có 4 hiện tượng dị thường (Phenomena / 
 *(Lưu ý của Kỹ sư Cấp cao: Trong PostgreSQL, \`Read Uncommitted\` được đối xử y hệt như \`Read Committed\`. PostgreSQL không bao giờ cho phép xảy ra Dirty Read dưới bất kỳ cấu hình nào).*
 
 ### 2.1 Bản Chất Của Từng Hiện Tượng Dị Thường
-1. **Dirty Read (Đọc dữ liệu rác):** Giao dịch A đọc dữ liệu được chỉnh sửa bởi Giao dịch B. Nhưng sau đó Giao dịch B bị lỗi và ROLLBACK. Giao dịch A đã xử lý trên dữ liệu chưa từng tồn tại!
-2. **Non-repeatable Read (Đọc không lặp lại được):** Giao dịch A đọc dòng X có giá trị \`100\`. Giao dịch B cập nhật dòng X thành \`200\` và COMMIT. Giao dịch A đọc lại dòng X và thấy giá trị đã biến thành \`200\`. Hai lần đọc trong cùng một transaction lại ra 2 kết quả khác nhau!
-3. **Phantom Read (Bóng ma xuất hiện):** Giao dịch A đếm số đơn hàng \`WHERE user_id = 1\` ra 5 dòng. Giao dịch B chèn thêm một đơn hàng mới cho user 1 và COMMIT. Giao dịch A thực hiện lại câu lệnh đếm thì bất ngờ thấy 6 dòng!
-4. **Write Skew (Lệch ghi nguy hiểm):** Xảy ra trong bài toán "Ít nhất một bác sĩ phải trực đêm": Có 2 bác sĩ A và B đang trực. Cả hai cùng làm đơn xin nghỉ phép cùng lúc. Hệ thống kiểm tra: Nếu số bác sĩ trực $\ge 2$ thì cho phép nghỉ. Giao dịch 1 thấy có 2 người -> cho A nghỉ. Giao dịch 2 thấy có 2 người -> cho B nghỉ. Cả hai cùng commit thành công -> **Bệnh viện không còn bác sĩ nào trực đêm!** Chỉ có \`Serializable\` mới chặn được Write Skew.
+1. **Dirty Read (Đọc dữ liệu rác):** Giao dịch A đọc dữ liệu được chỉnh sửa bởi Giao dịch B. Nhưng sau đó Giao dịch B bị lỗi và ROLLBACK. Giao dịch A đã xử lý trên dữ liệu chưa từng tồn tại.
+2. **Non-repeatable Read (Đọc không lặp lại được):** Giao dịch A đọc dòng X có giá trị \`100\`. Giao dịch B cập nhật dòng X thành \`200\` và COMMIT. Giao dịch A đọc lại dòng X và thấy giá trị đã biến thành \`200\`. Hai lần đọc trong cùng một transaction lại ra 2 kết quả khác nhau.
+3. **Phantom Read (Bóng ma xuất hiện):** Giao dịch A đếm số đơn hàng \`WHERE user_id = 1\` ra 5 dòng. Giao dịch B chèn thêm một đơn hàng mới cho user 1 và COMMIT. Giao dịch A thực hiện lại câu lệnh đếm thì bất ngờ thấy 6 dòng.
+4. **Write Skew (Lệch ghi nguy hiểm):** Xảy ra trong bài toán "Ít nhất một bác sĩ phải trực đêm": Có 2 bác sĩ A và B đang trực. Cả hai cùng làm đơn xin nghỉ phép cùng lúc. Hệ thống kiểm tra: Nếu số bác sĩ trực $\ge 2$ thì cho phép nghỉ. Giao dịch 1 thấy có 2 người -> cho A nghỉ. Giao dịch 2 thấy có 2 người -> cho B nghỉ. Cả hai cùng commit thành công -> **Bệnh viện không còn bác sĩ nào trực đêm.** Chỉ có \`Serializable\` mới chặn được Write Skew.
 
 ---
 
@@ -68,13 +68,12 @@ await this.dataSource.transaction('REPEATABLE READ', async (manager) => {
 });
 \`\`\`
 
-> **Quy Tắc Xử Lý Lỗi Repeatable Read & Serializable:** Khi chạy ở mức \`REPEATABLE READ\` hoặc \`SERIALIZABLE\`, nếu xảy ra xung đột ghi đồng thời, PostgreSQL sẽ ném ra lỗi mã **\`40001 (serialization_failure)\`**. Mã nguồn NestJS bắt buộc phải bắt mã lỗi này và thực hiện cơ chế **Tự Động Thử Lại (Retry Loop)**!
-
+> **Quy Tắc Xử Lý Lỗi Repeatable Read & Serializable:** Khi chạy ở mức \`REPEATABLE READ\` hoặc \`SERIALIZABLE\`, nếu xảy ra xung đột ghi đồng thời, PostgreSQL sẽ ném ra lỗi mã **\`40001 (serialization_failure)\`**. Mã nguồn NestJS bắt buộc phải bắt mã lỗi này và thực hiện cơ chế **Tự Động Thử Lại (Retry Loop)**.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Tầng Bảo Vệ Toàn Vẹn Giao Dịch (Integrity Perimeter Map)
+### 4.1 Sơ đồ 1: Phân Phối Tầng Bảo Vệ Toàn Vẹn Giao Dịch (Integrity Perimeter Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          TẦNG ỨNG DỤNG (NESTJS RUNTIME)                     │
@@ -91,7 +90,7 @@ await this.dataSource.transaction('REPEATABLE READ', async (manager) => {
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Kịch Bản Xung Đột Serialization Failure & Retry (Retry Flowchart)
+### 4.2 Sơ đồ 2: Kịch Bản Xung Đột Serialization Failure & Retry (Retry Flowchart)
 \`\`\`diagram
 [ NestJS Transaction Bắt Đầu: SERIALIZABLE ]
                      │
@@ -113,7 +112,7 @@ await this.dataSource.transaction('REPEATABLE READ', async (manager) => {
                                       └──► Quay lại Bắt Đầu từ đầu!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Chọn Isolation Level (Level Selection Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Chọn Isolation Level (Level Selection Tree)
 \`\`\`diagram
 BẠN ĐANG XÂY DỰNG NGHIỆP VỤ NÀO CHO HỆ THỐNG?
 │
@@ -130,7 +129,7 @@ BẠN ĐANG XÂY DỰNG NGHIỆP VỤ NÀO CHO HỆ THỐNG?
         └──► CHỌN: Serializable (Bắt buộc phải bọc trong Retry Loop)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cấp Độ Cô Lập | Khả Năng Xảy Ra Dị Thường | Độ Trễ (Latency) | Khả Năng Gặp Lỗi 40001 | Mức Tiêu Tốn CPU/RAM |
 | :--- | :--- | :--- | :--- | :--- |
 | **Read Committed** | Bị Non-repeatable, Phantom Read | Cực thấp (Tối ưu nhất) | Hoàn toàn không bao giờ bị| Thấp nhất |
@@ -395,8 +394,7 @@ Trong các hệ cơ sở dữ liệu quan hệ thế hệ cũ sử dụng cơ ch
 * **Vai Trò Sống Còn của Tiến Trình AutoVacuum:**
   - Chạy ngầm trong hệ thống để thu dọn Dead Tuples mà không khóa bảng (Zero-downtime maintenance).
   - Cập nhật **Free Space Map (FSM)** để các lệnh INSERT/UPDATE tương lai có thể tái sử dụng các ô trống trong khối 8KB.
-  - Cập nhật **Visibility Map (VM)** giúp câu truy vấn đạt được **Index-Only Scan** (bỏ qua việc đọc Heap nếu toàn bộ trang đã được đánh dấu an toàn), đồng thời đóng băng (Freeze) Transaction ID cũ để chống thảm họa **Transaction ID Wraparound Disaster** (khi bộ đếm 32-bit $2^{31}$ bị tràn)!
-
+  - Cập nhật **Visibility Map (VM)** giúp câu truy vấn đạt được **Index-Only Scan** (bỏ qua việc đọc Heap nếu toàn bộ trang đã được đánh dấu an toàn), đồng thời đóng băng (Freeze) Transaction ID cũ để chống sự cố nghiêm trọng **Transaction ID Wraparound Disaster** (khi bộ đếm 32-bit $2^{31}$ bị tràn).
 ---
 
 # 2. BẢN CHẤT KỸ THUẬT: HAI CỘT ẨN XMIN VÀ XMAX TRONG TUPLE HEADER
@@ -417,12 +415,12 @@ Trong PostgreSQL, mỗi dòng bản ghi (Tuple) đều có một Header cố đ�
 \`\`\`
 
 ### 2.1 Bản Chất Của Lệnh UPDATE Dưới Tầng Vật Lý
-Trong PostgreSQL: **UPDATE THỰC CHẤT LÀ MỘT LỆNH DELETE KẾT HỢP VỚI MỘT LỆNH INSERT!**
+Trong PostgreSQL: **UPDATE THỰC CHẤT LÀ MỘT LỆNH DELETE KẾT HỢP VỚI MỘT LỆNH INSERT.**
 \`\`\`sql
 -- Khi chạy lệnh:
 UPDATE users SET balance = 500 WHERE id = 1;
 \`\`\`
-1. PostgreSQL **không hề ghi đè** lên vùng nhớ cũ!
+1. PostgreSQL **không hề ghi đè** lên vùng nhớ cũ.
 2. Dòng cũ: Gán giá trị \`xmax = current_tx_id\` (Đánh dấu đã bị xóa).
 3. Dòng mới: Chèn một Heap Tuple mới toanh vào cuối Page với \`xmin = current_tx_id\` và \`xmax = 0\`.
 4. Cập nhật con trỏ \`t_ctid\` của dòng cũ trỏ sang địa chỉ vật lý của dòng mới.
@@ -432,7 +430,7 @@ UPDATE users SET balance = 500 WHERE id = 1;
 # 3. NỖI ÁM ẢNH TABLE BLOAT & VAI TRÒ CỦA TIẾN TRÌNH AUTOVACUUM
 
 Vì mọi lệnh UPDATE và DELETE đều để lại các Dead Tuples trên đĩa cứng:
-* Nếu một bảng có 1 triệu dòng, mỗi ngày có 10 triệu lượt UPDATE: Nếu không dọn dẹp, dung lượng bảng sẽ phình to từ 100MB lên **50 Gigabytes** toàn là xác bản ghi chết (**Hiện tượng Table Bloat**)!
+* Nếu một bảng có 1 triệu dòng, mỗi ngày có 10 triệu lượt UPDATE: Nếu không dọn dẹp, dung lượng bảng sẽ phình to từ 100MB lên **50 Gigabytes** toàn là xác bản ghi chết (**Hiện tượng Table Bloat**).
 * Tốc độ quét bảng (Seq Scan) chậm đi hàng trăm lần vì phải đọc qua hàng triệu xác chết vô nghĩa.
 
 \`\`\`diagram
@@ -451,13 +449,12 @@ Vì mọi lệnh UPDATE và DELETE đều để lại các Dead Tuples trên đ�
 
 ### 3.1 Phân Biệt VACUUM Thường vs VACUUM FULL
 1. **VACUUM (Tiến trình AutoVacuum chạy ngầm):** Chỉ dọn dẹp các Dead Tuples và cập nhật Free Space Map (FSM) để các lệnh INSERT tương lai chèn đè vào các khoảng trống đó. **Hoàn toàn KHÔNG khóa bảng**, ứng dụng vẫn đọc ghi bình thường.
-2. **VACUUM FULL:** Sao chép toàn bộ các dòng còn sống sang một tệp tin mới trên đĩa và giải phóng triệt để dung lượng trả lại cho OS. **CỰC KỲ NGUY HIỂM:** Chiếm giữ khóa độc quyền cấp cao (\`ACCESS EXCLUSIVE LOCK\`), khóa cứng toàn bộ bảng, cấm tiệt mọi câu lệnh đọc ghi của ứng dụng cho đến khi chạy xong!
-
+2. **VACUUM FULL:** Sao chép toàn bộ các dòng còn sống sang một tệp tin mới trên đĩa và giải phóng triệt để dung lượng trả lại cho OS. **RẤT NGUY HIỂM:** Chiếm giữ khóa độc quyền cấp cao (\`ACCESS EXCLUSIVE LOCK\`), khóa cứng toàn bộ bảng, cấm tiệt mọi câu lệnh đọc ghi của ứng dụng cho đến khi chạy xong.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Kiểm Tra Tính Khả Kiến (Visibility Check Map)
+### 4.1 Sơ đồ 1: Bản Đồ Kiểm Tra Tính Khả Kiến (Visibility Check Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     QUY TẮC XÁC ĐỊNH TUPLE CÓ ĐƯỢC NHÌN THẤY?               │
@@ -472,7 +469,7 @@ Vì mọi lệnh UPDATE và DELETE đều để lại các Dead Tuples trên đ�
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Vòng Đời Tiến Hóa Của Tuple Qua Các Phiên Bản (Tuple Evolution Lifecycle)
+### 4.2 Sơ đồ 2: Vòng Đời Tiến Hóa Của Tuple Qua Các Phiên Bản (Tuple Evolution Lifecycle)
 \`\`\`diagram
 1. INSERT: Tạo Tuple A (xmin: 100, xmax: 0)
    │
@@ -487,7 +484,7 @@ Vì mọi lệnh UPDATE và DELETE đều để lại các Dead Tuples trên đ�
 4. AutoVacuum thức giấc: Dọn dẹp xác của Tuple A và B, trả khoảng trống lại cho FSM
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý Hiện Tượng Table Bloat (Bloat Mitigation Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý Hiện Tượng Table Bloat (Bloat Mitigation Tree)
 \`\`\`diagram
 PHÁT HIỆN BẢNG DỮ LIỆU BỊ PHÌNH TO DUNG LƯỢNG (BLOAT > 40%)?
 │
@@ -506,7 +503,7 @@ PHÁT HIỆN BẢNG DỮ LIỆU BỊ PHÌNH TO DUNG LƯỢNG (BLOAT > 40%)?
     └──► TÌM VÀ KILL NGAY: SELECT pg_terminate_backend(pid) FROM pg_stat_activity
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược Dọn Rác | Mức Độ Khóa Bảng (Locking) | Trả Lại Dung Lượng Cho Ổ Cứng | Ảnh Hưởng Hiệu Năng Hệ Thống | Ứng Dụng Khuyên Dùng |
 | :--- | :--- | :--- | :--- | :--- |
 | **AutoVacuum (Mặc định)**| $0\\%$ (Không khóa bảng) | Không (Giữ cho DB tái dùng) | Rất nhẹ, chạy background | Duy trì hệ thống vận hành 24/7 |
@@ -593,7 +590,7 @@ export class DatabaseVacuumDiagnosticsService {
             'Vì tiến trình AutoVacuum bắt buộc phải xin phép người dùng thông qua giao diện dòng lệnh mỗi khi muốn dọn dẹp các bảng lớn.'
           ],
           correctIndex: 0,
-          explanation: 'Một transaction mở nhưng bị treo (Idle in transaction) giữ một Snapshot với Transaction ID cũ. AutoVacuum bắt buộc phải tôn trọng Snapshot này: Nó tuyệt đối không được phép dọn dẹp bất kỳ Dead Tuple nào sinh ra sau thời điểm transaction đó bắt đầu, vì transaction đó vẫn có quyền đọc chúng. Kết quả là Dead Tuples tích tụ khổng lồ, gây Bloat toàn bộ DB.'
+          explanation: 'Một transaction mở nhưng bị treo (Idle in transaction) giữ một Snapshot với Transaction ID cũ. AutoVacuum bắt buộc phải tôn trọng Snapshot này: Nó không được phép dọn dẹp bất kỳ Dead Tuple nào sinh ra sau thời điểm transaction đó bắt đầu, vì transaction đó vẫn có quyền đọc chúng. Kết quả là Dead Tuples tích tụ khổng lồ, gây Bloat toàn bộ DB.'
         },
         {
           id: 'c6-l2-q3',
@@ -617,7 +614,7 @@ export class DatabaseVacuumDiagnosticsService {
             'Tự động chuyển đổi các bảng dữ liệu quan hệ sang định dạng tệp tin nhị phân không thể giải mã để nâng cao tính bảo mật.'
           ],
           correctIndex: 2,
-          explanation: 'Thông thường mỗi khi có tuple mới, tất cả các Index của bảng đều phải chèn thêm con trỏ trỏ tới tuple mới đó. Kỹ thuật HOT (Heap-Only Tuple) cho phép: Nếu câu UPDATE không làm thay đổi các cột có đánh Index và Page 8KB hiện tại còn chỗ trống, PostgreSQL sẽ đặt dòng mới ngay trong Page đó và nối con trỏ từ dòng cũ sang dòng mới, hoàn toàn không cần chạm vào Index!'
+          explanation: 'Thông thường mỗi khi có tuple mới, tất cả các Index của bảng đều phải chèn thêm con trỏ trỏ tới tuple mới đó. Kỹ thuật HOT (Heap-Only Tuple) cho phép: Nếu câu UPDATE không làm thay đổi các cột có đánh Index và Page 8KB hiện tại còn chỗ trống, PostgreSQL sẽ đặt dòng mới ngay trong Page đó và nối con trỏ từ dòng cũ sang dòng mới, hoàn toàn không cần chạm vào Index.'
         },
         {
           id: 'c6-l2-q5',
@@ -653,7 +650,7 @@ export class DatabaseVacuumDiagnosticsService {
             'Tăng kích thước khối đĩa của PostgreSQL từ 8KB lên 64KB.'
           ],
           correctIndex: 2,
-          explanation: 'Mặc định autovacuum_vacuum_scale_factor = 0.2 nghĩa là phải có 20% bản ghi chết thì AutoVacuum mới chạy. Với bảng 50 triệu dòng, 20% là 10 triệu dead tuples - quá muộn và gây bloat khổng lồ. Giảm scale factor xuống 0.05 hoặc dùng autovacuum_vacuum_threshold số lượng tuyệt đối kết hợp tăng cost limit sẽ giúp dọn rác liên tục, giữ bảng nhỏ gọn.'
+          explanation: 'Mặc định autovacuum_vacuum_scale_factor = 0.2 nghĩa là phải có 20% bản ghi chết thì AutoVacuum mới chạy. Với bảng 50 triệu dòng, 20% là 10 triệu dead tuples - quá muộn và gây bloat khổng lồ. Giảm scale factor xuống 0.05 hoặc dùng autovacuum_vacuum_threshold số lượng hoàn toàn kết hợp tăng cost limit sẽ giúp dọn rác liên tục, giữ bảng nhỏ gọn.'
         },
         {
           id: 'c6-l2-q8',
@@ -750,18 +747,17 @@ Trong các kịch bản kinh doanh chịu tải đỉnh (Flash Sale, Đặt ch�
 * **Khóa Bi Quan (Pessimistic Locking - Explicit Row-level Locks):**
   - Giả định rằng xung đột chắc chắn sẽ xảy ra (\`SELECT ... FOR UPDATE\`).
   - Giao dịch đầu tiên đọc dòng dữ liệu sẽ chiếm giữ một **Exclusive Row Lock** trong bộ nhớ chia sẻ (\`Lock Space\`). Mọi giao dịch khác muốn đọc có khóa hoặc muốn UPDATE/DELETE dòng đó đều bị chặn (Blocked) và buộc phải xếp hàng chờ đợi cho đến khi giao dịch ban đầu gọi \`COMMIT\` hoặc \`ROLLBACK\`.
-  - **Khi nào bắt buộc dùng:** Khi dữ liệu có tính nhạy cảm tài chính tuyệt đối, tỉ lệ tranh chấp cực cao, và chi phí nếu thất bại là không thể đảo ngược (ví dụ: trừ tồn kho mặt hàng chỉ còn đúng 1 sản phẩm cuối cùng giữa hàng nghìn người mua).
-  - **Điểm yếu chí mạng:** Làm giảm thông lượng đồng thời (Throughput), kéo dài độ trễ giữ kết nối DB, và nếu logic giao dịch chứa các lệnh I/O mạng chậm bên ngoài (Third-party HTTP calls), nó sẽ giam lỏng Connection Pool làm sập toàn bộ dịch vụ!
+  - **Khi nào bắt buộc dùng:** Khi dữ liệu có tính nhạy cảm tài chính hoàn toàn, tỉ lệ tranh chấp cực cao, và chi phí nếu thất bại là không thể đảo ngược (ví dụ: trừ tồn kho mặt hàng chỉ còn đúng 1 sản phẩm cuối cùng giữa hàng nghìn người mua).
+  - **Điểm yếu chí mạng:** Làm giảm thông lượng đồng thời (Throughput), kéo dài độ trễ giữ kết nối DB, và nếu logic giao dịch chứa các lệnh I/O mạng chậm bên ngoài (Third-party HTTP calls), nó sẽ giam lỏng Connection Pool làm sập toàn bộ dịch vụ.
 * **Khóa Lạc Quan (Optimistic Locking - Version-based Validation):**
-  - Giả định rằng xung đột hiếm khi xảy ra. Không hề sử dụng bất kỳ câu lệnh khóa vật lý nào của cơ sở dữ liệu!
+  - Giả định rằng xung đột hiếm khi xảy ra. Không hề sử dụng bất kỳ câu lệnh khóa vật lý nào của cơ sở dữ liệu.
   - Thay vào đó, bảng dữ liệu được bổ sung một cột phiên bản (ví dụ: \`version INT DEFAULT 1\` hoặc \`updated_at TIMESTAMP\`).
   - Khi cập nhật, ứng dụng chạy lệnh kiểm tra có điều kiện: \`UPDATE products SET stock = stock - 1, version = version + 1 WHERE id = 10 AND version = current_version;\`.
   - Nếu số dòng bị ảnh hưởng (\`affectedRows\`) bằng $0$, ứng dụng nhận biết đã có giao dịch khác can thiệp trước, lập tức ném ngoại lệ \`OptimisticLockVersionMismatchError\` để phía Client hoặc Retry Logic tự xử lý.
   - **Khi nào tối ưu nhất:** Hệ thống có tỉ lệ Đọc chiếm $95\\%$ (Read-heavy), mức độ tranh chấp thấp (chỉnh sửa bài viết blog, cập nhật hồ sơ người dùng), cho phép đạt thông lượng tối đa mà không gây nghẽn hàng đợi.
 * **Bản chất của Deadlock & Giải thuật Giải Phóng Chu Trình:**
   - Deadlock xảy ra khi Giao dịch 1 đang giữ Khóa A và chờ Khóa B, trong khi Giao dịch 2 đang giữ Khóa B và chờ Khóa A (Chu trình phụ thuộc vòng tròn - Circular Wait).
-  - PostgreSQL sở hữu một tiến trình phát hiện bế tắc ngầm. Sau khi một tiến trình bị chặn quá ngưỡng **\`deadlock_timeout\`** (mặc định 1 giây), PostgreSQL sẽ quét Đồ thị Chờ Khóa (Wait-for-Graph), phát hiện chu trình, và **chủ động khai tử (Kill/Abort)** một trong hai giao dịch kèm mã lỗi \`40P01 (deadlock_detected)\` để giải phóng toàn bộ hệ thống!
-
+  - PostgreSQL sở hữu một tiến trình phát hiện bế tắc ngầm. Sau khi một tiến trình bị chặn quá ngưỡng **\`deadlock_timeout\`** (mặc định 1 giây), PostgreSQL sẽ quét Đồ thị Chờ Khóa (Wait-for-Graph), phát hiện chu trình, và **chủ động khai tử (Kill/Abort)** một trong hai giao dịch kèm mã lỗi \`40P01 (deadlock_detected)\` để giải phóng toàn bộ hệ thống.
 ---
 
 # 2. KHÓA BI QUAN (PESSIMISTIC LOCKING) & CÁC BIẾN THỂ
@@ -788,7 +784,7 @@ Trong SQL chuẩn, khóa bi quan được thực hiện bằng mệnh đề khó
 └─────────────────────┴──────────────────┴────────────────────────────────────┘
 \`\`\`
 
-### 2.1 Vũ Khí Tối Thượng Cho Hàng Đợi Message: FOR UPDATE SKIP LOCKED
+### 2.1 Cơ Chế Trọng Tâm Cho Hàng Đợi Message: FOR UPDATE SKIP LOCKED
 Khi xây dựng hệ thống Job Queue bằng cơ sở dữ liệu quan hệ (chẳng hạn nhiều Worker cùng tranh nhau lấy công việc từ bảng \`tasks\`):
 \`\`\`sql
 SELECT * FROM tasks 
@@ -797,8 +793,7 @@ ORDER BY id ASC
 LIMIT 1 
 FOR UPDATE SKIP LOCKED;
 \`\`\`
-Nếu 10 Worker chạy cùng lúc: Worker 1 khóa Task 1, Worker 2 thấy Task 1 bị khóa liền **tự động nhảy qua Task 2 mà không hề bị block 1 mili giây nào!** 10 Worker xử lý song song 10 Task với hiệu năng tương đương Redis Queue!
-
+Nếu 10 Worker chạy cùng lúc: Worker 1 khóa Task 1, Worker 2 thấy Task 1 bị khóa liền **tự động nhảy qua Task 2 mà không hề bị block 1 mili giây nào.** 10 Worker xử lý song song 10 Task với hiệu năng tương đương Redis Queue.
 ---
 
 # 3. HIỂM HỌA DEADLOCK & NGUYÊN TẮC PHÒNG CHỐNG
@@ -823,7 +818,7 @@ Deadlock (Khóa chết) xảy ra khi có sự phụ thuộc vòng tròn giữa 2
 
 ### 3.1 Nguyên Tắc Vàng Phòng Chống Deadlock: SẮP XẾP THỨ TỰ KHÓA (LOCK ORDERING)
 Để triệt tiêu Deadlock $100\\%$ trong các bài toán chuyển tiền giữa 2 tài khoản (A chuyển cho B):
-> **Quy Tắc Bất Di Bất Dịch:** Luôn luôn sắp xếp thứ tự các khóa cần chiếm giữ theo chiều tăng dần của ID (\`id_min\` khóa trước, \`id_max\` khóa sau)!
+> **Quy Tắc Bất Di Bất Dịch:** Luôn luôn sắp xếp thứ tự các khóa cần chiếm giữ theo chiều tăng dần của ID (\`id_min\` khóa trước, \`id_max\` khóa sau).
 \`\`\`typescript
 const firstId = Math.min(fromAccountId, toAccountId);
 const secondId = Math.max(fromAccountId, toAccountId);
@@ -836,9 +831,9 @@ await manager.findOne(Account, { where: { id: secondId }, lock: { mode: 'pessimi
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Khóa Hệ Thống (Lock Hierarchy Map)
+### 4.1 Sơ đồ 1: Bản Đồ Khóa Hệ Thống (Lock Hierarchy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          CÁC CẤP ĐỘ KHÓA TRONG DATABASE                     │
@@ -858,7 +853,7 @@ await manager.findOne(Account, { where: { id: secondId }, lock: { mode: 'pessimi
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: So Sánh Dòng Chảy Lạc Quan vs Bi Quan (Optimistic vs Pessimistic Flow)
+### 4.2 Sơ đồ 2: So Sánh Dòng Chảy Lạc Quan vs Bi Quan (Optimistic vs Pessimistic Flow)
 \`\`\`diagram
 KHÓA BI QUAN (PESSIMISTIC):
 Client A: SELECT ... FOR UPDATE ──► [ GIỮ KHÓA HÀNG ]
@@ -874,7 +869,7 @@ Client B: UPDATE ... SET version = 2 WHERE version = 1 ──► [ THẤT BÀI (
 Client B: Ném ngoại lệ OptimisticLockException ──► Bắt buộc thử lại hoặc báo lỗi người dùng.
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Chiến Lược Khóa (Locking Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Chiến Lược Khóa (Locking Decision Tree)
 \`\`\`diagram
 BẠN ĐANG XỬ LÝ TRANH CHẤP DỮ LIỆU ĐỒNG THỜI?
 │
@@ -890,7 +885,7 @@ BẠN ĐANG XỬ LÝ TRANH CHẤP DỮ LIỆU ĐỒNG THỜI?
     └──► CHỌN: SELECT ... FOR UPDATE SKIP LOCKED
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược Khóa | Mức Độ Khóa DB | Khả Năng Mở Rộng (Throughput) | Nguy Cơ Gây Deadlock | Kịch Bản Lý Tưởng |
 | :--- | :--- | :--- | :--- | :--- |
 | **Pessimistic (FOR UPDATE)** | Khóa dòng vật lý | Thấp hơn khi tranh chấp cao | Có nguy cơ nếu không sắp thứ tự | Ngân hàng, trừ tiền, vé máy bay |
@@ -1031,7 +1026,7 @@ export class HighConcurrencyTransferService {
             'FOR UPDATE NOWAIT cho phép đọc dữ liệu bẩn chưa commit, còn SKIP LOCKED thì không.'
           ],
           correctIndex: 0,
-          explanation: 'Cả hai đều không đứng chờ (non-blocking). Tuy nhiên NOWAIT sẽ quăng lỗi ngay nếu gặp dòng bị khóa (fail-fast), thích hợp cho việc từ chối nhanh nếu tài nguyên bận. Còn SKIP LOCKED không quăng lỗi mà bỏ qua dòng đó để lấy dòng khác, cực kỳ lý tưởng cho hệ thống hàng đợi công việc nhiều worker.'
+          explanation: 'Cả hai đều không đứng chờ (non-blocking). Tuy nhiên NOWAIT sẽ quăng lỗi ngay nếu gặp dòng bị khóa (fail-fast), thích hợp cho việc từ chối nhanh nếu tài nguyên bận. Còn SKIP LOCKED không quăng lỗi mà bỏ qua dòng đó để lấy dòng khác, rất lý tưởng cho hệ thống hàng đợi công việc nhiều worker.'
         },
         {
           id: 'c6-l3-q6',
@@ -1055,7 +1050,7 @@ export class HighConcurrencyTransferService {
             'Cơ sở dữ liệu sẽ tự động chuyển đổi sang giao thức WebSocket.'
           ],
           correctIndex: 2,
-          explanation: 'Tuyệt đối cấm thực hiện I/O mạng chậm (gọi HTTP API, gửi mail, nén file) bên trong transaction đang giữ khóa DB. Nếu API bên thứ 3 bị chậm vài giây, hàng trăm transaction sẽ giữ chặt connection và row locks, làm tê liệt toàn bộ connection pool của backend và gây hiệu ứng sụp đổ dây chuyền (Cascading Failure).'
+          explanation: 'Hoàn toàn cấm thực hiện I/O mạng chậm (gọi HTTP API, gửi mail, nén file) bên trong transaction đang giữ khóa DB. Nếu API bên thứ 3 bị chậm vài giây, hàng trăm transaction sẽ giữ chặt connection và row locks, làm tê liệt toàn bộ connection pool của backend và gây hiệu ứng sụp đổ dây chuyền (Cascading Failure).'
         },
         {
           id: 'c6-l3-q8',

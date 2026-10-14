@@ -18,7 +18,7 @@ Khi một hệ thống phần mềm vượt quá giới hạn của một máy c
   - Trong môi trường mạng thực tế (đặc biệt là Cloud Data Centers), việc đứt kết nối cáp quang, nghẽn switch, độ trễ tăng vọt hoặc sập DNS giữa các vùng khả dụng (Availability Zones) là sự kiện chắc chắn sẽ xảy ra theo thời gian.
   - Khi một phân vùng mạng xuất hiện, cụm máy chủ bị chia cắt thành các phân vùng độc lập không thể trao đổi thông tin với nhau.
 * **Sự Lựa Chọn Bắt Buộc Giữa CP và AP:**
-  - **Hệ Thống CP (Consistency + Partition Tolerance):** Ưu tiên tính đúng đắn toán học tuyệt đối của dữ liệu. Nếu một Node bị cô lập khỏi mạng hoặc không thể đạt được sự đồng thuận Quorum (đa số phiếu bầu) từ cụm, Node đó sẽ **từ chối phục vụ (Fast-fail hoặc Timeout)** để ngăn chặn thảm họa Split-Brain và sai lệch số dư. Đại diện: PostgreSQL Clustered, ZooKeeper, etcd, Redis Sentinel/Cluster Master.
+  - **Hệ Thống CP (Consistency + Partition Tolerance):** Ưu tiên tính đúng đắn toán học hoàn toàn của dữ liệu. Nếu một Node bị cô lập khỏi mạng hoặc không thể đạt được sự đồng thuận Quorum (đa số phiếu bầu) từ cụm, Node đó sẽ **từ chối phục vụ (Fast-fail hoặc Timeout)** để ngăn chặn sự cố nghiêm trọng Split-Brain và sai lệch số dư. Đại diện: PostgreSQL Clustered, ZooKeeper, etcd, Redis Sentinel/Cluster Master.
   - **Hệ Thống AP (Availability + Partition Tolerance):** Ưu tiên tính sẵn sàng phục vụ người dùng. Dù bị chia cắt mạng, từng phân vùng vẫn tiếp tục tiếp nhận thao tác đọc và ghi, chấp nhận rằng các Node ở các vùng khác nhau có thể tạm thời chứa các trạng thái dữ liệu mâu thuẫn nhau. Dữ liệu sẽ dần dần được đồng bộ hội tụ về một trạng thái đồng nhất sau khi mạng được khôi phục thông qua cơ chế **Tính Nhất Quán Cuối Cùng (Eventual Consistency)** và các giải thuật giải quyết xung đột như Vector Clocks hoặc Last-Write-Wins (LWW). Đại diện: Apache Cassandra, Amazon DynamoDB, CouchDB.
 * **Định Lý Mở Rộng PACELC:**
   - Định lý CAP chỉ giải thích hành vi khi có sự cố mạng ($P$). Định lý **PACELC** của Daniel Abadi mở rộng: **P** (nếu có Partition) chọn giữa **A** và **C**; **E**lse (trong điều kiện vận hành bình thường không có lỗi mạng), hệ thống buộc phải đánh đổi giữa **L**atency (Độ trễ phản hồi) và **C**onsistency (Tính nhất quán của dữ liệu đọc).
@@ -60,13 +60,12 @@ $$\\text{If } \\mathbf{P} \\text{ (Partition) } \\longrightarrow \\text{Choose }
 
 Trong Microservices, chúng ta không thể dùng câu lệnh \`BEGIN TRANSACTION\` của SQL để khóa xuyên suốt 4 dịch vụ độc lập (Order, Payment, Inventory, Shipping):
 * **Saga Pattern:** Chia giao dịch lớn thành một chuỗi các **Giao dịch cục bộ (Local Transactions)**.
-* **Compensating Transactions (Giao dịch bù trừ / Hoàn tác logic):** Nếu bước 3 (Trừ kho) thất bại: Hệ thống không thể "Rollback" bước 2 (Đã trừ tiền thẻ tín dụng Stripe). Thay vào đó, nó kích hoạt **Giao dịch bù trừ: Gọi API Stripe Refund lại tiền** cho khách hàng!
-
+* **Compensating Transactions (Giao dịch bù trừ / Hoàn tác logic):** Nếu bước 3 (Trừ kho) thất bại: Hệ thống không thể "Rollback" bước 2 (Đã trừ tiền thẻ tín dụng Stripe). Thay vào đó, nó kích hoạt **Giao dịch bù trừ: Gọi API Stripe Refund lại tiền** cho khách hàng.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Kiến Trúc Phân Tán (Distributed Ecosystem Map)
+### 4.1 Sơ đồ 1: Phân Phối Kiến Trúc Phân Tán (Distributed Ecosystem Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          MÔ HÌNH HỆ THỐNG PHÂN TÁN                          │
@@ -82,7 +81,7 @@ Trong Microservices, chúng ta không thể dùng câu lệnh \`BEGIN TRANSACTIO
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Giao Dịch Bù Trừ Của Saga Pattern (Compensating Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Giao Dịch Bù Trừ Của Saga Pattern (Compensating Flow)
 \`\`\`diagram
 [ Khách Hàng Đặt Mua Hàng ]
             │
@@ -99,7 +98,7 @@ Trong Microservices, chúng ta không thể dùng câu lệnh \`BEGIN TRANSACTIO
             └── 5. Bù trừ 2: Order Service ◄──── ĐỔI TRẠNG THÁI: CANCELLED
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Kiến Trúc Nhất Quán (Consistency Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Kiến Trúc Nhất Quán (Consistency Decision Tree)
 \`\`\`diagram
 BẠN ĐANG THIẾT KẾ LƯU TRỮ PHÂN TÁN CHO TÀI NGUYÊN NÀO?
 │
@@ -110,7 +109,7 @@ BẠN ĐANG THIẾT KẾ LƯU TRỮ PHÂN TÁN CHO TÀI NGUYÊN NÀO?
     └──► CHỌN: AP (Eventual Consistency: Cho phép hiển thị chậm vài giây để đạt High Scale)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Hệ Quản Trị / Cơ Chế | Phân Loại CAP | Đặc Tính Bình Thường (PACELC) | Phù Hợp Nghiệp Vụ | Điểm Cần Chú Ý |
 | :--- | :--- | :--- | :--- | :--- |
 | **PostgreSQL Master** | CP | PC/EC (Ưu tiên nhất quán) | Tài chính, kế toán, hóa đơn | Không scale ghi đa vùng (Multi-write) |
@@ -253,7 +252,7 @@ export class SagaOrderOrchestrator {
             'Tất cả các giao dịch tài chính bắt buộc phải có sự phê duyệt thủ công bằng văn bản giấy tờ có chữ ký của giám đốc.',
           ],
           correctIndex: 2,
-          explanation: 'Eventual Consistency là mô hình nhất quán trong đó các bản sao (Replicas) không đảm bảo phản ánh dữ liệu mới nhất ngay lập tức tại cùng một mili giây. Tuy nhiên, nếu không có cập nhật mới nào phát sinh, sau một khoảng thời gian ngắn (vài ms đến vài giây để sync qua mạng), toàn bộ các bản sao sẽ hội tụ và đạt được sự đồng nhất hoàn hảo 100%.'
+          explanation: 'Eventual Consistency là mô hình nhất quán trong đó các bản sao (Replicas) không đảm bảo phản ánh dữ liệu mới nhất ngay lập tức tại cùng một mili giây. Tuy nhiên, nếu không có cập nhật mới nào phát sinh, sau một khoảng thời gian ngắn (vài ms đến vài giây để sync qua mạng), toàn bộ các bản sao sẽ hội tụ và đạt được sự đồng nhất toàn vẹn 100%.'
         },
         {
           id: 'c10-l1-q5',
@@ -277,7 +276,7 @@ export class SagaOrderOrchestrator {
             'Khi các kỹ sư backend vô tình đẩy hai phiên bản mã nguồn khác nhau lên cùng một nhánh Git.',
           ],
           correctIndex: 2,
-          explanation: 'Split-Brain là thảm họa khi phân vùng mạng cắt đôi cụm 5 node thành 2 nhóm: nhóm 3 node và nhóm 2 node. Nếu không có Quorum, nhóm 2 node cũng có thể tự bầu Leader và tiếp tục ghi dữ liệu, dẫn đến hai nhánh dữ liệu mâu thuẫn hoàn toàn. Nhờ quy tắc Quorum > 50%: chỉ nhóm 3 node đạt đa số mới được bầu Leader và ghi dữ liệu, nhóm 2 node buộc phải chuyển sang chế độ Read-only hoặc từ chối phục vụ.'
+          explanation: 'Split-Brain là sự cố nghiêm trọng khi phân vùng mạng cắt đôi cụm 5 node thành 2 nhóm: nhóm 3 node và nhóm 2 node. Nếu không có Quorum, nhóm 2 node cũng có thể tự bầu Leader và tiếp tục ghi dữ liệu, dẫn đến hai nhánh dữ liệu mâu thuẫn hoàn toàn. Nhờ quy tắc Quorum > 50%: chỉ nhóm 3 node đạt đa số mới được bầu Leader và ghi dữ liệu, nhóm 2 node buộc phải chuyển sang chế độ Read-only hoặc từ chối phục vụ.'
         },
         {
           id: 'c10-l1-q7',
@@ -433,10 +432,10 @@ Trong kiến trúc Microservices phân tán gồm hàng chục dịch vụ phụ
 * **Hiểm Họa Cạn Kiệt Tài Nguyên Do Dịch Vụ Cấp Dưới Suy Thoái (Downstream Degradation & Resource Exhaustion):**
   - Giả sử Cổng thanh toán đối tác bị chậm và mất 30 giây mới phản hồi hoặc bị timeout.
   - Khi người dùng gửi yêu cầu, mỗi kết nối HTTP tới cổng thanh toán sẽ giam lỏng một Socket kết nối, một luồng bộ đệm và một kết nối trong Hồ bơi kết nối (Connection Pool).
-  - Với lưu lượng vài nghìn requests, toàn bộ tài nguyên CPU, bộ nhớ RAM và Connection Pool của dịch vụ phía trên (Upstream Service) bị vắt kiệt. Hậu quả: Dịch vụ chính bị tê liệt hoàn toàn, không thể phục vụ ngay cả những tính năng cơ bản không liên quan đến thanh toán!
+  - Với lưu lượng vài nghìn requests, toàn bộ tài nguyên CPU, bộ nhớ RAM và Connection Pool của dịch vụ phía trên (Upstream Service) bị vắt kiệt. Hậu quả: Dịch vụ chính bị tê liệt hoàn toàn, không thể phục vụ ngay cả những tính năng cơ bản không liên quan đến thanh toán.
 * **Mẫu Hình Ngắt Mạch Tự Động (Circuit Breaker Pattern):**
   - Giám sát tỉ lệ lỗi và độ trễ phản hồi của các lệnh gọi dịch vụ bên ngoài trong một cửa sổ thời gian trượt (Sliding Time Window).
-  - Khi tỉ lệ lỗi vượt ngưỡng tới hạn (ví dụ $> 50\\%$), Circuit Breaker lập tức chuyển sang trạng thái **\`OPEN\` (Mở mạch / Ngắt cầu chì)**: Mọi yêu cầu tiếp theo bị từ chối ngay lập tức tại chỗ trong $0\\text{ ms}$ (**Fast-fail**), bảo vệ tuyệt đối Connection Pool và bộ nhớ của hệ thống.
+  - Khi tỉ lệ lỗi vượt ngưỡng tới hạn (ví dụ $> 50\\%$), Circuit Breaker lập tức chuyển sang trạng thái **\`OPEN\` (Mở mạch / Ngắt cầu chì)**: Mọi yêu cầu tiếp theo bị từ chối ngay lập tức tại chỗ trong $0\\text{ ms}$ (**Fast-fail**), bảo vệ hoàn toàn Connection Pool và bộ nhớ của hệ thống.
   - Sau một khoảng thời gian chờ hồi phục (\`sleepWindowInMilliseconds\`), Circuit Breaker chuyển sang trạng thái **\`HALF-OPEN\` (Nửa mở)**: Cho phép một lượng nhỏ request thăm dò đi qua. Nếu các request này thành công, mạch tự động đóng lại (**\`CLOSED\`**); nếu vẫn thất bại, mạch tiếp tục ngắt để bảo vệ hệ thống.
 * **Mẫu Hình Phân Vùng Cách Ly Tài Nguyên (Bulkhead Pattern):**
   - Lấy cảm hứng từ các vách ngăn kín nước trong thân tàu thủy: Ngăn không cho nước từ một khoang bị thủng tràn sang làm chìm toàn bộ con tàu.
@@ -475,7 +474,7 @@ Trong kiến trúc Microservices phân tán gồm hàng chục dịch vụ phụ
 # 3. THUẬT TOÁN GIỚI HẠN TỐC ĐỘ: SLIDING WINDOW LOG VỚI REDIS ZSET
 
 So với thuật toán Fixed Window bị lỗi x2 tải ở ranh giới phút:
-**Sliding Window Log (Cửa sổ trượt chính xác tuyệt đối)** dùng Redis Sorted Set:
+**Sliding Window Log (Cửa sổ trượt chính xác hoàn toàn)** dùng Redis Sorted Set:
 
 \`\`\`diagram
 [ REDIS SORTED SET: rate_limit:user_123 ]
@@ -496,9 +495,9 @@ Keys: User IP/ID | Members: uuid | Scores: Timestamp hiện tại (Epoch Millis)
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Các Mẫu Hình Chịu Lỗi Hệ Thống (Resiliency Patterns Map)
+### 4.1 Sơ đồ 1: Bản Đồ Các Mẫu Hình Chịu Lỗi Hệ Thống (Resiliency Patterns Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          KIẾN TRÚC HỆ THỐNG TỰ PHỤC HỒI                     │
@@ -516,7 +515,7 @@ Keys: User IP/ID | Members: uuid | Scores: Timestamp hiện tại (Epoch Millis)
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Quyết Định Của Sliding Window Rate Limiter (Limiter Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Quyết Định Của Sliding Window Rate Limiter (Limiter Flow)
 \`\`\`diagram
 Request từ IP: 1.2.3.4 gửi đến
    │
@@ -535,7 +534,7 @@ Lấy tổng số request trong cửa sổ: count = ZCARD key
           └── Chuyển tiếp request vào Controller xử lý bình thường!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Thuật Toán Rate Limiting (Limiter Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Thuật Toán Rate Limiting (Limiter Decision Tree)
 \`\`\`diagram
 BẠN CẦN GIỚI HẠN TỐC ĐỘ TRUY CẬP (RATE LIMITING)?
 │
@@ -549,11 +548,11 @@ BẠN CẦN GIỚI HẠN TỐC ĐỘ TRUY CẬP (RATE LIMITING)?
     └──► DÙNG: Fixed Window Counter (INCR key + EXPIRE 60)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cơ Chế Chịu Lỗi | Tiêu Tốn Bộ Nhớ | Mức Độ Bảo Vệ Máy Chủ | Độ Phức Tạp Thuật Toán | Kịch Bản Khuyên Dùng |
 | :--- | :--- | :--- | :--- | :--- |
 | **Circuit Breaker** | Cực thấp (Đếm lỗi) | Bảo vệ 100% chống sập dây chuyền| Trung bình (State Machine)| Mọi lời gọi HTTP/RPC ngoại vi |
-| **Sliding Window Log** | Cao hơn (Lưu timestamp ZSET)| Hoàn hảo nhất | Trung bình (Lua Script) | Bảo vệ cổng Payment, Login |
+| **Sliding Window Log** | Cao hơn (Lưu timestamp ZSET)| Toàn diện nhất | Trung bình (Lua Script) | Bảo vệ cổng Payment, Login |
 | **Token Bucket** | Cực thấp (Chỉ lưu 2 số) | Xuất sắc, hỗ trợ traffic burst| Thấp | Rate Limit API Gateway tổng |
 | **Bulkhead Pool** | Cần chia nhỏ tài nguyên | Ngăn chặn cạn kiệt tài nguyên chéo| Rất dễ cấu hình | Tách Pool cho tác vụ VIP và thường |
 `,
@@ -648,7 +647,7 @@ export class CircuitBreakerService {
             'Do các bảng dữ liệu trong cơ sở dữ liệu quan hệ bị thiếu các khóa ngoại; ngăn chặn bằng cách viết lại các câu lệnh CREATE TABLE.',
           ],
           correctIndex: 0,
-          explanation: 'Cascading Failure xảy ra khi Service C bị chậm/chết. Service B gọi C phải chờ timeout (ví dụ 30s). Hàng nghìn request dồn vào B làm cạn kiệt toàn bộ luồng và RAM của B khiến B sập. Tiếp tục Service A gọi B cũng bị sập theo, làm toàn bộ hệ thống sụp đổ dây chuyền. Circuit Breaker chặn đứng thảm họa này bằng cách tự động ngắt mạch (OPEN), trả lỗi ngay lập tức mà không chờ đợi, cứu sống các service phía trước.'
+          explanation: 'Cascading Failure xảy ra khi Service C bị chậm/chết. Service B gọi C phải chờ timeout (ví dụ 30s). Hàng nghìn request dồn vào B làm cạn kiệt toàn bộ luồng và RAM của B khiến B sập. Tiếp tục Service A gọi B cũng bị sập theo, làm toàn bộ hệ thống sụp đổ dây chuyền. Circuit Breaker chặn đứng sự cố nghiêm trọng này bằng cách tự động ngắt mạch (OPEN), trả lỗi ngay lập tức mà không chờ đợi, cứu sống các service phía trước.'
         },
         {
           id: 'c10-l2-q2',
@@ -660,7 +659,7 @@ export class CircuitBreakerService {
             'Chuyển đổi toàn bộ các yêu cầu HTTP bị từ chối thành các thông báo quảng cáo thương mại có trả phí cho doanh nghiệp.',
           ],
           correctIndex: 2,
-          explanation: 'Với Fixed Window (ví dụ giới hạn 100 req/phút): Nếu người dùng gửi 100 request ở giây thứ 59, và tiếp tục gửi 100 request ở giây thứ 01 của phút tiếp theo, thì trong khoảng thời gian chỉ 2 giây hệ thống phải chịu tới 200 requests (gấp đôi giới hạn!). Sliding Window Log tính toán chính xác cửa sổ 60 giây trượt liên tục theo thời gian thực, triệt tiêu hoàn toàn lỗi ranh giới này.'
+          explanation: 'Với Fixed Window (ví dụ giới hạn 100 req/phút): Nếu người dùng gửi 100 request ở giây thứ 59, và tiếp tục gửi 100 request ở giây thứ 01 của phút tiếp theo, thì trong khoảng thời gian chỉ 2 giây hệ thống phải chịu tới 200 requests (gấp đôi giới hạn). Sliding Window Log tính toán chính xác cửa sổ 60 giây trượt liên tục theo thời gian thực, triệt tiêu hoàn toàn lỗi ranh giới này.'
         },
         {
           id: 'c10-l2-q3',
@@ -814,7 +813,7 @@ Khi một hệ thống phân tán bao gồm hàng chục dịch vụ chạy trê
 * **Ba Trụ Cột Của Khả Năng Quan Sát Toàn Diện (The Three Pillars of Observability):**
   - **1. Structured Logging (Ghi log có cấu trúc chuẩn hóa):** Toàn bộ nhật ký ứng dụng bắt buộc phải xuất ra định dạng JSON chuẩn: \`{ timestamp, level, traceId, spanId, service, userId, durationMs, error }\`. Cho phép các hệ thống thu thập log tập trung (Grafana Loki, Elasticsearch/ELK, Datadog) lập chỉ mục trường dữ liệu, vẽ biểu đồ cảnh báo và lọc lỗi trong nháy mắt.
   - **2. Metrics (Chỉ số đo lường hiệu năng):** Các bộ đếm định lượng (Counters, Gauges, Histograms) phản ánh sức khỏe hệ thống: Tần suất yêu cầu (RPS), tỉ lệ lỗi ($4\\text{xx}/5\\text{xx}$ Rate), mức tiêu thụ CPU/RAM, và độ trễ phân vị (**P95/P99 Latency**) cung cấp qua endpoint Prometheus (\`/metrics\`).
-  - **3. Distributed Tracing (Truy vết phân tán theo chuẩn W3C TraceContext):** Khi một HTTP Request chạm vào API Gateway, một định danh duy nhất (**\`traceId\`**) được sinh ra. Mã định danh này được truyền tuần tự qua mọi gói tin mạng (qua HTTP Header \`traceparent\`), xuyên suốt các dịch vụ: \`Gateway -> OrderService -> PaymentService -> Database -> Redis\`. Thông qua công cụ chuẩn hóa **OpenTelemetry (OTel)** và Jaeger, kỹ sư có thể quan sát một biểu đồ Gantt chi tiết: Biết chính xác câu lệnh SQL nào ở tầng cuối cùng chiếm mất $1.2$ giây trong tổng số $1.5$ giây của toàn bộ luồng yêu cầu!
+  - **3. Distributed Tracing (Truy vết phân tán theo chuẩn W3C TraceContext):** Khi một HTTP Request chạm vào API Gateway, một định danh duy nhất (**\`traceId\`**) được sinh ra. Mã định danh này được truyền tuần tự qua mọi gói tin mạng (qua HTTP Header \`traceparent\`), xuyên suốt các dịch vụ: \`Gateway -> OrderService -> PaymentService -> Database -> Redis\`. Thông qua công cụ chuẩn hóa **OpenTelemetry (OTel)** và Jaeger, kỹ sư có thể quan sát một biểu đồ Gantt chi tiết: Biết chính xác câu lệnh SQL nào ở tầng cuối cùng chiếm mất $1.2$ giây trong tổng số $1.5$ giây của toàn bộ luồng yêu cầu.
 * **Kubernetes Health Probes (Cơ Chế Phục Hồi Tự Động):**
   - **Liveness Probe:** Giám sát xem tiến trình Node.js có bị kẹt (Deadlock, Event Loop Lag vô hạn) hay không. Nếu Liveness Probe thất bại, Kubernetes lập tức khai tử và tái sinh Container (Pod Restart).
   - **Readiness Probe:** Giám sát xem Pod đã sẵn sàng tiếp nhận lưu lượng mạng từ người dùng hay chưa (đã kết nối xong Database, nạp xong Cache và tải xong cấu hình). Nếu Readiness Probe thất bại, Pod tạm thời bị rút khỏi Load Balancer (Service Endpoint), ngăn chặn việc người dùng nhận lỗi $502/503$ trong quá trình khởi động hoặc triển khai phiên bản mới (Zero-Downtime Rolling Deployment).
@@ -840,7 +839,7 @@ Khi một hệ thống phân tán bao gồm hàng chục dịch vụ chạy trê
 
 # 3. KUBERNETES PROBES: LIVENESS VS READINESS VS STARTUP
 
-Trong môi trường container hóa (Docker / K8s), nếu không hiểu rõ 3 loại Probe, máy chủ của bạn sẽ bị khởi động lại liên tục hoặc làm mất kết nối của khách hàng:
+Trong môi trường container hóa (Docker / K8s), nếu không hiểu rõ 3 loại Probe, máy chủ của kỹ sư sẽ bị khởi động lại liên tục hoặc làm mất kết nối của khách hàng:
 
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -859,13 +858,12 @@ Trong môi trường container hóa (Docker / K8s), nếu không hiểu rõ 3 lo
 └─────────────────┴──────────────────────────────────┴────────────────────────┘
 \`\`\`
 
-> **Quy Tắc Sống Còn Của Kỹ Sư Hạ Tầng:** Tuyệt đối KHÔNG kiểm tra kết nối Database bên trong \`Liveness Probe\`! Nếu Database bị nghẽn chậm 5 giây, Kubernetes sẽ tưởng toàn bộ 50 Pods Node.js đều bị chết và đồng loạt **Restart sạch cả 50 Pods cùng lúc**, biến một sự cố database nhỏ thành thảm họa sập toàn diện hệ thống! Kết nối Database chỉ được kiểm tra trong \`Readiness Probe\`!
-
+> **Quy Tắc Sống Còn Của Kỹ Sư Hạ Tầng:** không kiểm tra kết nối Database bên trong \`Liveness Probe\`! Nếu Database bị nghẽn chậm 5 giây, Kubernetes sẽ tưởng toàn bộ 50 Pods Node.js đều bị chết và đồng loạt **Restart sạch cả 50 Pods cùng lúc**, biến một sự cố database nhỏ thành sự cố nghiêm trọng sập toàn diện hệ thống! Kết nối Database chỉ được kiểm tra trong \`Readiness Probe\`.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Ba Trụ Cột Của Khả Năng Quan Sát (Three Pillars of Observability)
+### 4.1 Sơ đồ 1: Ba Trụ Cột Của Khả Năng Quan Sát (Three Pillars of Observability)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          3 TRỤ CỘT OBSERVABILITY TOÀN DIỆN                  │
@@ -881,7 +879,7 @@ Trong môi trường container hóa (Docker / K8s), nếu không hiểu rõ 3 lo
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Lan Truyền Ngữ Cảnh Truy Vết (Context Propagation Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Lan Truyền Ngữ Cảnh Truy Vết (Context Propagation Flow)
 \`\`\`diagram
 Client gửi HTTP GET /checkout
    │
@@ -902,7 +900,7 @@ Client gửi HTTP GET /checkout
    └── Mọi chỉ số thời gian được đẩy về OpenTelemetry Collector hiển thị đồ thị!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xây Dựng Health Check (Health Check Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xây Dựng Health Check (Health Check Decision Tree)
 \`\`\`diagram
 BẠN ĐANG THIẾT KẾ HEALTH CHECK ENDPOINT CHO KUBERNETES?
 │
@@ -917,7 +915,7 @@ BẠN ĐANG THIẾT KẾ HEALTH CHECK ENDPOINT CHO KUBERNETES?
     └──► KIỂM TRA: Đã chạy xong Migration, nạp xong Model AI / Cache
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Thành Phần | Định Dạng Chuẩn | Tần Suất Thu Thập | Tiêu Hao Băng Thông | Giá Trị Khi Xảy Ra Sự Cố |
 | :--- | :--- | :--- | :--- | :--- |
 | **Metrics** | Time-series (Gauge, Counter) | Mỗi 10s - 15s | Rất thấp | Phát hiện bất thường sớm nhất qua Alert |
@@ -1055,7 +1053,7 @@ export class EnterpriseObservabilityService {
             'Là thời gian chính xác tính bằng pico giây mà tại đó máy chủ bắt đầu nạp tệp tin cấu hình package.json.',
           ],
           correctIndex: 0,
-          explanation: 'Trace ID là một chuỗi định danh duy nhất 16-byte (32 ký tự hex) đại diện cho toàn bộ một hành trình giao dịch (End-to-End Transaction). Dù request có đi qua 10 microservices khác nhau và sinh ra hàng chục Span ID cục bộ, tất cả các log và span đó đều mang chung một Trace ID, cho phép kỹ sư gom toàn bộ lịch sử của request đó lại trên một màn hình duy nhất.'
+          explanation: 'Trace ID là một chuỗi định danh duy nhất 16-byte (32 ký tự hex) đại diện cho toàn bộ một quy trình giao dịch (End-to-End Transaction). Dù request có đi qua 10 microservices khác nhau và sinh ra hàng chục Span ID cục bộ, tất cả các log và span đó đều mang chung một Trace ID, cho phép kỹ sư gom toàn bộ lịch sử của request đó lại trên một màn hình duy nhất.'
         },
         {
           id: 'c10-l3-q3',

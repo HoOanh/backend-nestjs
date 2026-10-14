@@ -1,114 +1,250 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CURRICULUM } from '../data/curriculum.ts';
 import { apiClient } from '../services/apiClient.ts';
-import { STORAGE_KEYS } from '../constants/storage.ts';
 import type { UserProfile, UserProgressState } from '../types/user.ts';
 
 const INITIAL_PROGRESS: UserProgressState = {
-  currentLessonId: 'lesson-1',
+  currentLessonId: 'c1-l1',
   completedLessons: {},
   sprintExamScores: {},
   finalExam: null,
   streakDays: 1,
   lastActiveDate: new Date().toISOString().split('T')[0],
-  clearedLessons: {}
+  clearedLessons: {},
+  quizScores: {}
 };
 
-export function useLearningProgress(activeUser: UserProfile | null) {
-  const [state, setState] = useState<UserProgressState>(() => {
-    if (activeUser?.id) {
-      try {
-        const local = localStorage.getItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${activeUser.id}`);
-        if (local) return JSON.parse(local) as UserProgressState;
-      } catch {}
+function hydrateQuizScoresFromLocalStorage(base: UserProgressState): UserProgressState {
+  if (typeof window === 'undefined' || !window.localStorage) return base;
+  const quizScores = { ...(base.quizScores || {}) };
+  const clearedLessons = { ...(base.clearedLessons || {}) };
+  try {
+    for (const sprint of CURRICULUM) {
+      for (const lesson of sprint.lessons) {
+        const raw = localStorage.getItem(`arc_quiz_result_${lesson.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as {
+            score?: number;
+            passed?: boolean;
+            submittedAt?: string;
+          };
+          if (typeof parsed.score === 'number') {
+            const passed = Boolean(parsed.passed ?? parsed.score >= 70);
+            quizScores[lesson.id] = {
+              score: parsed.score,
+              passed,
+              completedAt: parsed.submittedAt || new Date().toISOString()
+            };
+            if (passed) {
+              clearedLessons[lesson.id] = true;
+            }
+          }
+        }
+      }
     }
-    return INITIAL_PROGRESS;
+  } catch {}
+  return {
+    ...base,
+    quizScores,
+    clearedLessons
+  };
+}
+
+export function useLearningProgress(activeUser: UserProfile | null) {
+  const userKey = activeUser?.id || 'guest';
+  const hydratedKeyRef = useRef<string | null>(null);
+
+  const [state, setState] = useState<UserProgressState>(() => {
+    const local = apiClient.readLocalProgress(userKey);
+    const guest = userKey !== 'guest' ? apiClient.readLocalProgress('guest') : null;
+    const merged = apiClient.mergeProgress(guest, local);
+    return hydrateQuizScoresFromLocalStorage(merged || INITIAL_PROGRESS);
   });
 
-  // Load progress from SQLite Backend when user changes
+  // Load progress from localStorage + Backend when user changes
   useEffect(() => {
-    if (activeUser?.id && activeUser.role !== 'admin') {
-      void apiClient.getProgress(activeUser.id).then((savedProgress) => {
-        if (savedProgress) {
-          setState(savedProgress);
-        }
-      });
-    }
-  }, [activeUser?.id, activeUser?.role]);
+    let cancelled = false;
+    hydratedKeyRef.current = null;
 
-  // Save progress to SQLite Backend
-  useEffect(() => {
-    if (activeUser?.id && activeUser.role !== 'admin') {
-      void apiClient.saveProgress(activeUser.id, state);
+    const local = apiClient.readLocalProgress(userKey);
+    const guest = userKey !== 'guest' ? apiClient.readLocalProgress('guest') : null;
+    const initialMerged = hydrateQuizScoresFromLocalStorage(
+      apiClient.mergeProgress(guest, local)
+    );
+    setState(initialMerged);
+
+    if (activeUser?.id) {
+      void apiClient.getProgress(activeUser.id).then((savedProgress) => {
+        if (cancelled) return;
+        setState((prev) => {
+          const combined = hydrateQuizScoresFromLocalStorage(
+            apiClient.mergeProgress(prev, savedProgress)
+          );
+          apiClient.writeLocalProgress(activeUser.id, combined);
+          return combined;
+        });
+        hydratedKeyRef.current = activeUser.id;
+      });
+    } else {
+      hydratedKeyRef.current = 'guest';
     }
-  }, [state, activeUser?.id, activeUser?.role]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userKey, activeUser?.id]);
+
+  // Save progress only AFTER hydration for the current userKey has completed
+  useEffect(() => {
+    if (hydratedKeyRef.current !== userKey) return;
+    if (activeUser?.id) {
+      void apiClient.saveProgress(activeUser.id, state);
+    } else {
+      apiClient.writeLocalProgress('guest', state);
+    }
+  }, [state, userKey, activeUser?.id]);
 
   const totalLessons = CURRICULUM.reduce((acc, sp) => acc + sp.lessons.length, 0);
   const completedCount = Object.keys(state.completedLessons).length;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
   const handleLessonCompleted = (lessonId: string, currentLessonTitle?: string) => {
-    setState((prev) => ({
-      ...prev,
-      completedLessons: {
-        ...prev.completedLessons,
-        [lessonId]: { completedAt: new Date().toISOString() }
-      }
-    }));
+    const now = new Date().toISOString();
+    setState((prev) => {
+      const next: UserProgressState = {
+        ...prev,
+        completedLessons: {
+          ...prev.completedLessons,
+          [lessonId]: prev.completedLessons[lessonId] || { completedAt: now }
+        },
+        clearedLessons: {
+          ...prev.clearedLessons,
+          [lessonId]: true
+        },
+        lastActiveDate: now.split('T')[0]
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
 
-    if (activeUser) {
-      void apiClient.addHistory({
-        userId: activeUser.id,
-        lessonId,
-        lessonTitle: currentLessonTitle || lessonId,
-        action: 'code_passed',
-        details: 'Đã hoàn thành xuất sắc bài tập Code Sandbox'
-      });
-    }
+    void apiClient.addHistory({
+      userId: userKey,
+      lessonId,
+      lessonTitle: currentLessonTitle || lessonId,
+      action: 'code_passed',
+      score: 100,
+      details: 'Hoàn thành bài tập thực hành Code Sandbox (vượt qua toàn bộ test cases)'
+    });
   };
 
   const handleLessonCleared = (lessonId: string, currentLessonTitle?: string) => {
-    setState((prev) => ({
-      ...prev,
-      clearedLessons: {
-        ...prev.clearedLessons,
-        [lessonId]: true
-      }
-    }));
+    const alreadyCleared = Boolean(state.clearedLessons[lessonId]);
+    setState((prev) => {
+      const next: UserProgressState = {
+        ...prev,
+        clearedLessons: {
+          ...prev.clearedLessons,
+          [lessonId]: true
+        },
+        lastActiveDate: new Date().toISOString().split('T')[0]
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
 
-    if (activeUser) {
+    if (!alreadyCleared) {
       void apiClient.addHistory({
-        userId: activeUser.id,
+        userId: userKey,
         lessonId,
         lessonTitle: currentLessonTitle || lessonId,
         action: 'theory_read',
-        details: 'Đã đọc hiểu lý thuyết & code mẫu'
+        details: 'Hoàn thành đọc lý thuyết và kiến trúc hệ thống của bài học'
       });
     }
   };
 
-  const handleSprintExamSubmitted = async (sprintId: number, score: number, passed: boolean) => {
-    setState((prev) => ({
-      ...prev,
-      sprintExamScores: {
-        ...prev.sprintExamScores,
-        [sprintId]: { score, passed, completedAt: new Date().toISOString() }
-      }
-    }));
+  const handleQuizSubmitted = (
+    lessonId: string,
+    currentLessonTitle: string,
+    score: number,
+    passed: boolean,
+    correctCount?: number,
+    totalQuestions?: number
+  ) => {
+    const now = new Date().toISOString();
+    setState((prev) => {
+      const existingQuiz = prev.quizScores?.[lessonId];
+      const bestScore = existingQuiz ? Math.max(existingQuiz.score, score) : score;
+      const everPassed = Boolean(existingQuiz?.passed || passed);
+      const next: UserProgressState = {
+        ...prev,
+        clearedLessons: everPassed
+          ? { ...prev.clearedLessons, [lessonId]: true }
+          : prev.clearedLessons,
+        quizScores: {
+          ...(prev.quizScores || {}),
+          [lessonId]: {
+            score: bestScore,
+            passed: everPassed,
+            completedAt: now
+          }
+        },
+        lastActiveDate: now.split('T')[0]
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
 
-    if (activeUser) {
+    const detailRatio =
+      typeof correctCount === 'number' && typeof totalQuestions === 'number'
+        ? `đúng ${correctCount}/${totalQuestions} câu (${score}%)`
+        : `điểm ${score}%`;
+
+    void apiClient.addHistory({
+      userId: userKey,
+      lessonId,
+      lessonTitle: currentLessonTitle || lessonId,
+      action: passed ? 'quiz_passed' : 'quiz_failed',
+      score,
+      details: `Khảo thí trắc nghiệm: ${detailRatio} · ${passed ? 'Đạt yêu cầu' : 'Chưa đạt'}`
+    });
+  };
+
+  const handleSprintExamSubmitted = async (sprintId: number, score: number, passed: boolean) => {
+    setState((prev) => {
+      const existing = prev.sprintExamScores[sprintId];
+      const next: UserProgressState = {
+        ...prev,
+        sprintExamScores: {
+          ...prev.sprintExamScores,
+          [sprintId]: {
+            score: existing ? Math.max(existing.score, score) : score,
+            passed: Boolean(existing?.passed || passed),
+            completedAt: new Date().toISOString()
+          }
+        }
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
+
+    if (activeUser?.id) {
       await apiClient.submitSprintExam(activeUser.id, sprintId, score, passed);
     }
   };
 
   const handleFinalExamSubmitted = async (score: number, passed: boolean, studentName: string) => {
     const studentDisplayName = studentName || activeUser?.name || 'Kỹ Sư Arc Irobot';
-    if (activeUser) {
+    if (activeUser?.id) {
       const res = await apiClient.submitFinalExam(activeUser.id, studentDisplayName, score, passed);
-      setState((prev) => ({
-        ...prev,
-        finalExam: res.finalResult
-      }));
+      setState((prev) => {
+        const next = {
+          ...prev,
+          finalExam: res.finalResult
+        };
+        apiClient.writeLocalProgress(userKey, next);
+        return next;
+      });
     }
   };
 
@@ -127,6 +263,7 @@ export function useLearningProgress(activeUser: UserProfile | null) {
     progressPercent,
     handleLessonCompleted,
     handleLessonCleared,
+    handleQuizSubmitted,
     handleSprintExamSubmitted,
     handleFinalExamSubmitted,
     handleRetakeFinalExam

@@ -17,11 +17,10 @@ Trong an toàn thông tin Backend cấp doanh nghiệp, mật mã học không p
 * **Bản Chất Của Hàm Băm Mật Khẩu (One-Way Cryptographic Hashing):**
   - Mật khẩu người dùng không bao giờ được phép lưu trữ dưới dạng thô hoặc mã hóa có thể đảo ngược (Two-way Encryption). Nó phải được băm một chiều qua các hàm toán học sao cho từ giá trị Hash không thể đảo ngược (infeasible) về mật khẩu gốc.
   - Các hàm băm thô (MD5, SHA-256) chỉ tốn chu kỳ xung nhịp CPU, hoàn toàn bị vô hiệu hóa trước các giàn máy đào GPU và mạch tích hợp chuyên dụng ASIC với năng lực thử hàng chục tỷ phép băm mỗi giây. Thuật toán Bcrypt phổ biến trong quá khứ cũng bộc lộ điểm yếu: Giới hạn độ dài mật khẩu chỉ 72 bytes và tiêu tốn rất ít bộ nhớ RAM, khiến nó vẫn có thể bị bẻ khóa bằng card đồ họa phân tán.
-  - **Argon2id - Tiêu Chuẩn Vàng Hiện Đại:** Vô địch cuộc thi Password Hashing Competition (PHC). Argon2id kết hợp khả năng chống tấn công kênh bên (Side-channel Timing Attacks) của Argon2i và chống tấn công dò tìm phân tán GPU của Argon2d. Thuộc tính cốt tử của Argon2id là **Memory-Hardness**: Ép mỗi phép băm phải cấp phát và điền đầy hàng trăm megabyte RAM, khiến các bộ xử lý song song trên GPU bị cạn kiệt băng thông bộ nhớ và giảm tốc độ tấn công hàng triệu lần!
+  - **Argon2id - Tiêu Chuẩn Vàng Hiện Đại:** Vô địch cuộc thi Password Hashing Competition (PHC). Argon2id kết hợp khả năng chống tấn công kênh bên (Side-channel Timing Attacks) của Argon2i và chống tấn công dò tìm phân tán GPU của Argon2d. Thuộc tính cốt tử của Argon2id là **Memory-Hardness**: Ép mỗi phép băm phải cấp phát và điền đầy hàng trăm megabyte RAM, khiến các bộ xử lý song song trên GPU bị cạn kiệt băng thông bộ nhớ và giảm tốc độ tấn công hàng triệu lần.
 * **Kiến Trúc Ký Khóa Token: Đối Xứng (HS256) vs Bất Đối Xứng (RS256 / ES256):**
-  - **Lỗ Hổng Của Khóa Đối Xứng HS256:** Cả bên ký (Auth Server) và bên thẩm định (Resource Services) đều dùng chung một chuỗi bí mật (Shared Secret). Trong hệ thống Microservices gồm hàng chục dịch vụ độc lập, nếu chỉ một dịch vụ cấp thấp bị lộ chuỗi bí mật trong tệp tin \`.env\`, kẻ tấn công có thể tự đóng giả làm Auth Server để ký giả mạo Token cho bất kỳ tài khoản quản trị nào!
-  - **Cơ Chế Khóa Bất Đối Xứng Chuẩn Mực RS256/ES256:** Auth Server nắm giữ **Khóa Bí Mật (Private Key)** được bảo vệ nghiêm ngặt trong Hardware Security Module (HSM) hoặc Vault để ký Access Token. Tất cả các dịch vụ nội bộ và bên ngoài chỉ nắm giữ **Khóa Công Khai (Public Key)** (được công bố qua endpoint JWKS: \`/.well-known/jwks.json\`) để giải mã và thẩm định chữ ký. Kẻ tấn công dù chiếm đoạt được Public Key cũng tuyệt đối không thể tự sinh ra một Token giả mạo hợp lệ!
-
+  - **Lỗ Hổng Của Khóa Đối Xứng HS256:** Cả bên ký (Auth Server) và bên thẩm định (Resource Services) đều dùng chung một chuỗi bí mật (Shared Secret). Trong hệ thống Microservices gồm hàng chục dịch vụ độc lập, nếu chỉ một dịch vụ cấp thấp bị lộ chuỗi bí mật trong tệp tin \`.env\`, kẻ tấn công có thể tự đóng giả làm Auth Server để ký giả mạo Token cho bất kỳ tài khoản quản trị nào.
+  - **Cơ Chế Khóa Bất Đối Xứng Chuẩn Mực RS256/ES256:** Auth Server nắm giữ **Khóa Bí Mật (Private Key)** được bảo vệ nghiêm ngặt trong Hardware Security Module (HSM) hoặc Vault để ký Access Token. Tất cả các dịch vụ nội bộ và bên ngoài chỉ nắm giữ **Khóa Công Khai (Public Key)** (được công bố qua endpoint JWKS: \`/.well-known/jwks.json\`) để giải mã và thẩm định chữ ký. Kẻ tấn công dù chiếm đoạt được Public Key cũng không thể tự sinh ra một Token giả mạo hợp lệ.
 ---
 
 # 2. CUỘC CHIẾN BĂM MẬT KHẨU: TẠI SAO BCRYPT BỊ ARGON2ID VƯỢT MẶT?
@@ -73,13 +72,12 @@ const hash = await argon2.hash(plainPassword, {
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-> **Cảnh báo Lỗ hổng Nguy hiểm - "None" Algorithm & Key Confusion Attack:** Khi gọi hàm verify token, nếu đại ca không chỉ định rõ \`algorithms: ['RS256']\`, kẻ tấn công có thể sửa Header thành \`"alg": "none"\` (bỏ qua xác minh chữ ký) hoặc dùng chính Public Key của bạn để ký giả mạo bằng thuật toán HS256!
-
+> **Cảnh báo Lỗ hổng Nguy hiểm - "None" Algorithm & Key Confusion Attack:** Khi gọi hàm verify token, nếu đại ca không chỉ định rõ \`algorithms: ['RS256']\`, kẻ tấn công có thể sửa Header thành \`"alg": "none"\` (bỏ qua xác minh chữ ký) hoặc dùng chính Public Key của kỹ sư để ký giả mạo bằng thuật toán HS256.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Mật Mã Học Ứng Dụng (Cryptography Map)
+### 4.1 Sơ đồ 1: Phân Phối Mật Mã Học Ứng Dụng (Cryptography Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          MẬT MÃ HỌC ỨNG DỤNG CHO BACKEND                     │
@@ -97,7 +95,7 @@ const hash = await argon2.hash(plainPassword, {
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Ký Và Xác Minh JWT Token Bất Đối Xứng (JWT RS256 Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Ký Và Xác Minh JWT Token Bất Đối Xứng (JWT RS256 Flow)
 \`\`\`diagram
 [ NGƯỜI DÙNG ĐĂNG NHẬP: POST /auth/login ]
                     │
@@ -118,7 +116,7 @@ Nạp Private Key (PEM) ──► Ký JWT: Sign(Header + Payload, PrivateKey)
      └── [ KHÔNG KHỚP ] ─► Ném lỗi 401 Unauthorized trục xuất ngay!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Thuật Toán Ký Token (Algorithm Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Thuật Toán Ký Token (Algorithm Tree)
 \`\`\`diagram
 BẠN CẦN CHỌN THUẬT TOÁN KÝ TOKEN CHO HỆ THỐNG?
 │
@@ -132,7 +130,7 @@ BẠN CẦN CHỌN THUẬT TOÁN KÝ TOKEN CHO HỆ THỐNG?
         └──► DÙNG: ES256 (ECDSA P-256) hoặc Ed25519
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Thuật Toán | Kiểu Khóa | Tốc Độ Verify | Kích Thước Chữ Ký | Rủi Ro Rò Rỉ Khóa |
 | :--- | :--- | :--- | :--- | :--- |
 | **HS256** | Đối xứng (Shared Secret) | Siêu nhanh | Nhỏ gọn | Rất cao (Lộ secret ở 1 service là toang cả cụm) |
@@ -382,7 +380,7 @@ Khi quy mô nghiệp vụ của một tổ chức mở rộng, bài toán phân 
 * **Sự Bùng Nổ Vai Trò (Role Explosion) Của Mô Hình RBAC Truyền Thống:**
   - Mô hình Phân quyền Dựa trên Vai trò (Role-Based Access Control - RBAC) gán quyền hạn tĩnh vào các chức danh: \`ADMIN\`, \`MANAGER\`, \`USER\`.
   - Khi xuất hiện các yêu cầu phân quyền theo phân vùng dữ liệu và quan hệ sở hữu (ví dụ: Kế toán chi nhánh Đà Nẵng chỉ được xem hóa đơn của Đà Nẵng; người dùng chỉ được sửa bài viết do chính mình tạo ra; hoặc quản lý chỉ được duyệt đơn hàng có giá trị dưới 100 triệu), RBAC hoàn toàn bất lực.
-  - Nếu cố chấp sử dụng RBAC, hệ thống sẽ rơi vào thảm họa **Role Explosion**: Sinh ra hàng trăm vai trò rời rạc như \`ACCOUNTANT_DN\`, \`ACCOUNTANT_HN\`, \`POST_OWNER\`, \`ORDER_APPROVER_TIER_1\`... khiến ma trận phân quyền trở nên hỗn loạn, không thể bảo trì và cực kỳ dễ phát sinh lỗ hổng bảo mật rò rỉ dữ liệu chéo (Cross-tenant Data Leak).
+  - Nếu cố chấp sử dụng RBAC, hệ thống sẽ rơi vào sự cố nghiêm trọng **Role Explosion**: Sinh ra hàng trăm vai trò rời rạc như \`ACCOUNTANT_DN\`, \`ACCOUNTANT_HN\`, \`POST_OWNER\`, \`ORDER_APPROVER_TIER_1\`... khiến ma trận phân quyền trở nên hỗn loạn, không thể bảo trì và rất dễ phát sinh lỗ hổng bảo mật rò rỉ dữ liệu chéo (Cross-tenant Data Leak).
 * **Mô Hình Phân Quyền Theo Thuộc Tính (Attribute-Based Access Control - ABAC):**
   - Đánh giá quyền truy cập động tại thời điểm chạy (Runtime Policy Evaluation) dựa trên 4 chiều thuộc tính:
     1. **Thuộc tính Chủ thể (Subject Attributes):** ID người dùng, phòng ban, chi nhánh, cấp bậc bảo mật.
@@ -391,9 +389,8 @@ Khi quy mô nghiệp vụ của một tổ chức mở rộng, bài toán phân 
     4. **Thuộc tính Ngữ cảnh Môi trường (Environment Context):** Địa chỉ IP nội bộ, thời gian trong giờ hành chính, thiết bị truy cập có xác thực mTLS hay không.
   - Sử dụng các thư viện Policy Engine như **CASL**, hệ thống định nghĩa các luật kiểm soát quyền truy cập linh hoạt, chặt chẽ và có thể kiểm thử tự động một cách độc lập.
 * **Nghịch Lý Token Vô Trạng Thái & Cơ Chế Thu Hồi (Stateless Token Revocation):**
-  - JSON Web Token (JWT) được thiết kế vô trạng thái (Stateless) để không phải truy vấn Database mỗi lần xác thực. Nhưng đây cũng là điểm yếu chết người: Khi một nhân viên bị chấm dứt hợp đồng hoặc lộ Token, chiếc Access Token đã cấp vẫn có hiệu lực cho đến khi hết hạn (ví dụ sau 1-2 giờ)!
-  - **Giải Pháp Enterprise Chuẩn Mực:** Kết hợp Access Token có thời gian sống siêu ngắn (10-15 phút) với **Token Revocation Blocklist** trên Redis (lưu danh sách các \`jti\` - JWT ID bị vô hiệu hóa hoặc mốc thời gian \`passwordChangedAt\`). Khi người dùng đăng xuất hoặc bị khóa tài khoản, Redis chỉ lưu vết trong đúng khoảng thời gian còn lại của Token, vừa bảo đảm tính tức thì vừa không làm nặng bộ nhớ đệm!
-
+  - JSON Web Token (JWT) được thiết kế vô trạng thái (Stateless) để không phải truy vấn Database mỗi lần xác thực. Nhưng đây cũng là điểm yếu chết người: Khi một nhân viên bị chấm dứt hợp đồng hoặc lộ Token, chiếc Access Token đã cấp vẫn có hiệu lực cho đến khi hết hạn (ví dụ sau 1-2 giờ).
+  - **Giải Pháp Enterprise Chuẩn Mực:** Kết hợp Access Token có thời gian sống siêu ngắn (10-15 phút) với **Token Revocation Blocklist** trên Redis (lưu danh sách các \`jti\` - JWT ID bị vô hiệu hóa hoặc mốc thời gian \`passwordChangedAt\`). Khi người dùng đăng xuất hoặc bị khóa tài khoản, Redis chỉ lưu vết trong đúng khoảng thời gian còn lại của Token, vừa bảo đảm tính tức thì vừa không làm nặng bộ nhớ đệm.
 ---
 
 # 2. KIẾN TRÚC ABAC VỚI THƯ VIỆN CASL TRONG NESTJS
@@ -445,9 +442,9 @@ Làm thế nào để thu hồi ngay lập tức một Access Token vô trạng 
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Cấp Các Cơ Chế Kiểm Soát Truy Cập (Access Control Taxonomy)
+### 4.1 Sơ đồ 1: Phân Cấp Các Cơ Chế Kiểm Soát Truy Cập (Access Control Taxonomy)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          HỆ THỐNG KIỂM SOÁT TRUY CẬP                        │
@@ -465,7 +462,7 @@ Làm thế nào để thu hồi ngay lập tức một Access Token vô trạng 
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Thẩm Định Quyền Hạn ABAC (Policy Decision Point Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Thẩm Định Quyền Hạn ABAC (Policy Decision Point Flow)
 \`\`\`diagram
 User gửi request: PATCH /articles/42
    │
@@ -484,7 +481,7 @@ Kiểm tra: ability.can('update', subject('Article', targetArticle))
           └──► Ném lỗi 403 Forbidden: "Bạn không có quyền chỉnh sửa tài nguyên này!"
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Mô Hình Phân Quyền (Authz Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Mô Hình Phân Quyền (Authz Decision Tree)
 \`\`\`diagram
 BẠN CẦN THIẾT KẾ HỆ THỐNG PHÂN QUYỀN?
 │
@@ -495,10 +492,10 @@ BẠN CẦN THIẾT KẾ HỆ THỐNG PHÂN QUYỀN?
     └──► BẮT BUỘC DÙNG: ABAC (Attribute-Based với CASL hoặc Open Policy Agent)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Mô Hình Phân Quyền | Tính Linh Hoạt | Độ Phức Tạp Triển Khai | Chi Phí Truy Vấn DB | Rủi Ro Vận Hành |
 | :--- | :--- | :--- | :--- | :--- |
-| **RBAC Đơn Giản** | Rất thấp (Cứng nhắc) | Cực kỳ đơn giản | 0% (Lưu sẵn trong Token) | Bùng nổ số lượng Role (Role Explosion) |
+| **RBAC Đơn Giản** | Rất thấp (Cứng nhắc) | Rất đơn giản | 0% (Lưu sẵn trong Token) | Bùng nổ số lượng Role (Role Explosion) |
 | **ABAC (CASL)** | Tối đa, không giới hạn | Trung bình / Cao | Cần query thêm đối tượng để check| Cần viết unit test chính sách chặt chẽ |
 | **JWT Blacklist Redis**| Thu hồi token tức thì | Thấp | Tốn 1 lần GET Redis mỗi request | Phụ thuộc vào độ ổn định của Redis |
 | **Token Versioning** | Thu hồi toàn bộ thiết bị| Rất thấp | Chỉ check số nguyên version | Không thu hồi được lẻ 1 thiết bị |
@@ -629,7 +626,7 @@ export class EnterpriseAuthzGuard implements CanActivate, OnModuleDestroy {
             'Ngăn chặn người dùng nhập sai mật khẩu quá 3 lần bằng cách khóa máy tính.',
           ],
           correctIndex: 0,
-          explanation: 'ReBAC mô hình hóa quyền hạn dưới dạng một đồ thị các mối quan hệ (Tuples: object#relation@user). Trong các hệ thống như Google Docs/Drive hay GitHub, việc một người có quyền truy cập vào một tài nguyên thường thừa kế qua cây phân cấp thư mục hoặc nhóm lồng nhau (Transitive Group Membership), điều mà ReBAC xử lý cực kỳ xuất sắc và có thể mở rộng tới hàng tỷ quan hệ.'
+          explanation: 'ReBAC mô hình hóa quyền hạn dưới dạng một đồ thị các mối quan hệ (Tuples: object#relation@user). Trong các hệ thống như Google Docs/Drive hay GitHub, việc một người có quyền truy cập vào một tài nguyên thường thừa kế qua cây phân cấp thư mục hoặc nhóm lồng nhau (Transitive Group Membership), điều mà ReBAC xử lý rất xuất sắc và có thể mở rộng tới hàng tỷ quan hệ.'
         },
         {
           id: 'c9-l2-q6',
@@ -763,7 +760,7 @@ Trong tư duy của một Kỹ sư Backend chuyên nghiệp, mọi dữ liệu n
 
 ---
 
-# 2. BẢO VỆ TUYỆT ĐỐI CHỐNG MASS ASSIGNMENT VỚI NESTJS VALIDATIONPIPE
+# 2. BẢO VỆ TOÀN DIỆN CHỐNG MASS ASSIGNMENT VỚI NESTJS VALIDATIONPIPE
 
 Trong NestJS, lỗ hổng Mass Assignment xảy ra khi ta không thanh lọc các trường dữ liệu ngoài ý muốn.
 Giải pháp chuẩn quốc tế là cấu hình **\`ValidationPipe\`** với 2 cờ bảo mật bắt buộc:
@@ -785,8 +782,7 @@ app.useGlobalPipes(
 Tại sao Parameterized Query (Truy vấn có tham số hóa) lại miễn nhiễm $100\\%$ với SQL Injection?
 * **Cơ chế hoạt động:** Trình biên dịch SQL tách rời hoàn toàn 2 giai đoạn:
   1. **Giai đoạn phân tích cú pháp (Parsing Phase):** Database nhận câu lệnh \`SELECT * FROM users WHERE email = $1\`. Cây cú pháp (AST) được đóng băng cứng ngắc.
-  2. **Giai đoạn truyền dữ liệu (Data Binding Phase):** Giá trị của \`$1\` được đưa vào như một chuỗi byte văn bản thuần túy, tuyệt đối không bao giờ được thông dịch thành mã lệnh!
-
+  2. **Giai đoạn truyền dữ liệu (Data Binding Phase):** Giá trị của \`$1\` được đưa vào như một chuỗi byte văn bản thuần túy, không bao giờ được thông dịch thành mã lệnh.
 \`\`\`typescript
 // TUYỆT ĐỐI CẤM (Vulnerable SQL Injection):
 await db.query(\`SELECT * FROM users WHERE email = '\${userInput}'\`);
@@ -797,9 +793,9 @@ await db.query('SELECT * FROM users WHERE email = $1', [userInput]);
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Các Tầng Phòng Ngự Ứng Dụng (Application Defense-in-Depth Map)
+### 4.1 Sơ đồ 1: Bản Đồ Các Tầng Phòng Ngự Ứng Dụng (Application Defense-in-Depth Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          TẦNG MẠNG & HEADER BẢO MẬT                         │
@@ -816,7 +812,7 @@ await db.query('SELECT * FROM users WHERE email = $1', [userInput]);
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: So Sánh Xử Lý Câu Lệnh Ghép Chuỗi vs Parameterized Query
+### 4.2 Sơ đồ 2: So Sánh Xử Lý Câu Lệnh Ghép Chuỗi vs Parameterized Query
 \`\`\`diagram
 GHÉP CHUỖI NGUY HIỂM:
 Input: 'admin@b.com' OR '1'='1'
@@ -830,7 +826,7 @@ SQL Parser: Đi tìm đúng người có địa chỉ email là toàn bộ chu�
 (Không ai có email như vậy -> KẾT QUẢ RỖNG, AN TOÀN TUYỆT ĐỐI 100%).
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý Dữ Liệu Đầu Vào (Input Sanitization Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý Dữ Liệu Đầu Vào (Input Sanitization Tree)
 \`\`\`diagram
 DỮ LIỆU ĐƯỢC GỬI LÊN TỪ CLIENT QUA HTTP BODY / QUERY?
 │
@@ -844,7 +840,7 @@ DỮ LIỆU ĐƯỢC GỬI LÊN TỪ CLIENT QUA HTTP BODY / QUERY?
     └──► BẬT BỘ BA: HttpOnly=true + Secure=true + SameSite='Strict' (Chống CSRF)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Lỗ Hổng / Kỹ Thuật | Phương Thức Tấn Công | Giải Pháp Chuẩn Bắt Buộc | Độ Phức Tạp |
 | :--- | :--- | :--- | :--- |
 | **SQL Injection** | Chèn ký tự nháy đơn phá vỡ cú pháp | Parameterized Queries ($1, $2) | Cực thấp (Viết đúng chuẩn) |
@@ -971,7 +967,7 @@ export class EnterpriseSecuritySanitizationService {
             'Khóa bàn phím của người dùng nếu phát hiện có hành vi sao chép văn bản từ trang web khác.',
           ],
           correctIndex: 2,
-          explanation: 'CSRF khai thác việc trình duyệt tự động đính kèm cookie của nạn nhân khi một trang web độc hại bí mật gửi request tới server. Với SameSite=Strict, trình duyệt tuyệt đối không bao giờ gửi cookie nếu nguồn gốc (origin) của trang web gọi khác với trang đích. Với SameSite=Lax (mặc định trình duyệt hiện đại), cookie chỉ được gửi với các thao tác chuyển trang GET an toàn, chặn hoàn toàn các lệnh POST/PUT chéo nguồn.'
+          explanation: 'CSRF khai thác việc trình duyệt tự động đính kèm cookie của nạn nhân khi một trang web độc hại bí mật gửi request tới server. Với SameSite=Strict, trình duyệt không bao giờ gửi cookie nếu nguồn gốc (origin) của trang web gọi khác với trang đích. Với SameSite=Lax (mặc định trình duyệt hiện đại), cookie chỉ được gửi với các thao tác chuyển trang GET an toàn, chặn hoàn toàn các lệnh POST/PUT chéo nguồn.'
         },
         {
           id: 'c9-l3-q6',
@@ -983,7 +979,7 @@ export class EnterpriseSecuritySanitizationService {
             'Lỗ hổng này chỉ ảnh hưởng đến các ứng dụng viết bằng ngôn ngữ C++.',
           ],
           correctIndex: 0,
-          explanation: 'First-order SQLi xảy ra ngay lập tức khi nhận input từ HTTP request. Second-order SQLi tinh vi hơn: Hacker đăng ký tài khoản với username là admin\'--. Câu lệnh INSERT dùng Parameterized nên lưu thành công vào DB. Sau đó, một tác vụ nền hoặc một trang Admin lấy username này ra và ghép chuỗi thô vào câu SQL khác: "SELECT * FROM audit WHERE user = " + username -> Kích hoạt injection tại bước thứ hai!'
+          explanation: 'First-order SQLi xảy ra ngay lập tức khi nhận input từ HTTP request. Second-order SQLi tinh vi hơn: Hacker đăng ký tài khoản với username là admin\'--. Câu lệnh INSERT dùng Parameterized nên lưu thành công vào DB. Sau đó, một tác vụ nền hoặc một trang Admin lấy username này ra và ghép chuỗi thô vào câu SQL khác: "SELECT * FROM audit WHERE user = " + username -> Kích hoạt injection tại bước thứ hai.'
         },
         {
           id: 'c9-l3-q7',

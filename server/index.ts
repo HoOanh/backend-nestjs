@@ -12,6 +12,8 @@ import {
 } from './data-operations.ts';
 import {
   DEFAULT_MODEL,
+  FALLBACK_MODELS,
+  MODEL_QUOTA_SPECS,
   SYSTEM_PROMPT,
   PROMPT_VERSION
 } from './tutor-config.ts';
@@ -70,6 +72,7 @@ export interface DbProgress {
   streak_days: number;
   last_active_date: string;
   cleared_lessons: string;
+  quiz_scores?: string;
   updated_at: string;
 }
 
@@ -316,6 +319,7 @@ interface StoreState {
   chat_messages: ChatMessage[];
   chat_logs: Array<ChatLog & { userId: string }>;
   users: DbUser[];
+  deleted_users?: string[];
   sessions: DbSession[];
   revoked_tokens?: string[];
   plans: DbPlan[];
@@ -352,6 +356,7 @@ let store: StoreState = {
   chat_messages: [],
   chat_logs: [],
   users: [],
+  deleted_users: [],
   sessions: [],
   revoked_tokens: [],
   plans: [],
@@ -367,41 +372,21 @@ function loadStore(): void {
       const raw = fs.readFileSync(filePath, 'utf-8');
       if (raw.trim()) {
         const parsed = JSON.parse(raw) as Partial<StoreState>;
-        const diskSessions = parsed.chat_sessions || [];
-        const diskMessages = parsed.chat_messages || [];
-
-        const sessionMap = new Map<string, ChatSession>();
-        for (const s of diskSessions) sessionMap.set(s.id, s);
-        for (const s of store.chat_sessions) {
-          const onDisk = sessionMap.get(s.id);
-          if (
-            !onDisk ||
-            (s.updatedAt && s.updatedAt >= (onDisk.updatedAt || ''))
-          ) {
-            sessionMap.set(s.id, s);
-          }
-        }
-
-        const messageMap = new Map<string, ChatMessage>();
-        for (const m of diskMessages) messageMap.set(m.id, m);
-        for (const m of store.chat_messages) {
-          if (!messageMap.has(m.id)) messageMap.set(m.id, m);
-        }
-
         store = {
           entitlements: [],
           audit_logs: [],
+          chat_sessions: [],
+          chat_messages: [],
           chat_logs: [],
           users: [],
+          deleted_users: [],
           sessions: [],
           revoked_tokens: [],
           plans: [],
           user_progress: [],
           learning_history: [],
           certificates: [],
-          ...parsed,
-          chat_sessions: Array.from(sessionMap.values()),
-          chat_messages: Array.from(messageMap.values())
+          ...parsed
         };
       }
     }
@@ -750,6 +735,7 @@ export const dbService = {
     // reliably revoke tokens or validate user versions across instances.
     const payload = verifyJwt(token);
     if (payload) {
+      if (store.deleted_users?.includes(payload.userId)) return null;
       const user = store.users.find((u) => u.id === payload.userId);
       if (user?.status === 'suspended') return null;
       if (user && (payload.authVersion || 0) !== (user.auth_version || 0)) return null;
@@ -776,6 +762,7 @@ export const dbService = {
       (s) => s.token === token && new Date(s.expires_at) > new Date()
     );
     if (session) {
+      if (store.deleted_users?.includes(session.user_id)) return null;
       return (
         store.users.find(
           (u) => u.id === session.user_id && u.status !== 'suspended'
@@ -877,6 +864,9 @@ export const dbService = {
       last_login_at: now
     };
 
+    if (store.deleted_users) {
+      store.deleted_users = store.deleted_users.filter((uid) => uid !== user.id);
+    }
     store.users.push(newUser);
     saveStore();
     return newUser;
@@ -906,6 +896,10 @@ export const dbService = {
     );
     store.chat_logs = store.chat_logs.filter((l) => l.userId !== id);
     store.users = store.users.filter((u) => u.id !== id);
+    if (!store.deleted_users) store.deleted_users = [];
+    if (!store.deleted_users.includes(id)) {
+      store.deleted_users.push(id);
+    }
     store.sessions = store.sessions.filter((s) => s.user_id !== id);
     store.user_progress = store.user_progress.filter((p) => p.user_id !== id);
     store.learning_history = store.learning_history.filter(
@@ -956,16 +950,21 @@ export const dbService = {
       return store.learning_history
         .filter((h) => h.user_id === userId)
         .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-        .slice(0, 100);
+        .slice(0, 1000);
     }
     return [...store.learning_history]
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, 200);
+      .slice(0, 1000);
   },
 
   addLearningHistory(history: DbHistory): DbHistory {
     loadStore();
-    store.learning_history.push(history);
+    const existingIdx = store.learning_history.findIndex((h) => h.id === history.id);
+    if (existingIdx !== -1) {
+      store.learning_history[existingIdx] = history;
+    } else {
+      store.learning_history.push(history);
+    }
     saveStore();
     return history;
   },
@@ -1046,9 +1045,13 @@ function getTokenFromCookie(req: ApiRequest): string | null {
 
 function setSessionCookie(res: ApiResponse, token: string): void {
   if (typeof res.setHeader === 'function') {
+    const isProd = Boolean(
+      process.env.VERCEL || process.env.NODE_ENV === 'production'
+    );
+    const secureFlag = isProd ? '; Secure' : '';
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`
+      `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly${secureFlag}`
     );
   }
 }
@@ -1094,9 +1097,13 @@ function setTutorProofCookie(
 
 function clearSessionCookie(res: ApiResponse): void {
   if (typeof res.setHeader === 'function') {
+    const isProd = Boolean(
+      process.env.VERCEL || process.env.NODE_ENV === 'production'
+    );
+    const secureFlag = isProd ? '; Secure' : '';
     res.setHeader(
       'Set-Cookie',
-      `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure`
+      `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly${secureFlag}`
     );
   }
 }
@@ -1135,19 +1142,350 @@ export function authorizeTutorRequest(
 ): 401 | 403 | null {
   const request = { headers };
   if (!sessionId) return 401;
-  const token = getTokenFromCookie(request);
-  const actor = token ? verifyJwt(token) : null;
+  const token = getBearerToken(request) || getTokenFromCookie(request);
+  const actor = token ? dbService.getAuthUser(token) : null;
+  if (!actor) return 401;
   const proofToken = getTutorProofFromCookie(request, sessionId);
   const proof = proofToken ? verifyTutorProof(proofToken) : null;
   if (
-    !actor ||
-    !proof ||
-    proof.sessionId !== sessionId ||
-    proof.userId !== actor.userId
+    proof &&
+    proof.sessionId === sessionId &&
+    proof.userId === actor.id
   ) {
-    return 401;
+    return null;
   }
-  return null;
+  loadStore();
+  const session = store.chat_sessions.find((s) => s.id === sessionId);
+  if (session) {
+    if (session.userId !== actor.id && actor.role !== 'admin') return 403;
+    return null;
+  }
+  return 401;
+}
+
+export function getPersistedModelCooldowns(now = Date.now()): Map<string, number> {
+  loadStore();
+  const cooldownMap = new Map<string, number>();
+  const fiveMinAgoIso = new Date(now - 300_000).toISOString();
+  for (const log of store.chat_logs) {
+    if (!log.timestamp || log.timestamp < fiveMinAgoIso) continue;
+    const meta = (log.metadata || {}) as Record<string, unknown>;
+    if (log.event === 'AI_PROVIDER_ACCEPTED') {
+      const m = String(meta.actualModel || '');
+      if (m) cooldownMap.delete(m);
+    } else if (log.event === 'AI_PROVIDER_REJECTED') {
+      const m = String(meta.model || '');
+      const status = Number(meta.status || 0);
+      const ts = Date.parse(log.timestamp);
+      if (!m || !Number.isFinite(ts)) continue;
+      const durationMs =
+        status === 429
+          ? 60_000
+          : status === 503
+            ? 30_000
+            : status === 404
+              ? 300_000
+              : 0;
+      if (durationMs > 0 && ts + durationMs > now) {
+        cooldownMap.set(m, ts + durationMs);
+      }
+    }
+  }
+  return cooldownMap;
+}
+
+function computeModelQuotaSnapshot(
+  modelId: string,
+  now = Date.now(),
+  currentEvent?: string
+) {
+  const spec = MODEL_QUOTA_SPECS.find((s) => s.id === modelId) || {
+    id: modelId,
+    label: modelId,
+    priority: 99,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 250000,
+    tierNote: 'Model tùy chỉnh / Legacy'
+  };
+  const oneMinAgoIso = new Date(now - 60_000).toISOString();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartIso = dayStart.toISOString();
+
+  let rpmUsed = 0;
+  let rpdUsed = 0;
+
+  for (const log of store.chat_logs) {
+    if (!log.timestamp || log.timestamp < dayStartIso) continue;
+    const meta = (log.metadata || {}) as Record<string, unknown>;
+    const isAttempt =
+      (log.event === 'AI_PROVIDER_ACCEPTED' && meta.actualModel === modelId) ||
+      ((log.event === 'AI_PROVIDER_REJECTED' ||
+        log.event === 'AI_PROVIDER_NETWORK_ERROR') &&
+        meta.model === modelId);
+    if (!isAttempt) continue;
+    rpdUsed++;
+    if (log.timestamp >= oneMinAgoIso) {
+      rpmUsed++;
+    }
+  }
+
+  if (
+    currentEvent === 'AI_PROVIDER_ACCEPTED' ||
+    currentEvent === 'AI_PROVIDER_REJECTED' ||
+    currentEvent === 'AI_PROVIDER_NETWORK_ERROR'
+  ) {
+    rpmUsed++;
+    rpdUsed++;
+  }
+
+  return {
+    rpmLimit: spec.rpmLimit,
+    rpmUsed,
+    rpmRemaining: Math.max(0, spec.rpmLimit - rpmUsed),
+    rpdLimit: spec.rpdLimit,
+    rpdUsed,
+    rpdRemaining: Math.max(0, spec.rpdLimit - rpdUsed)
+  };
+}
+
+export function computeAdminAiTelemetry(now = Date.now()) {
+  loadStore();
+  const oneMinAgoIso = new Date(now - 60_000).toISOString();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartIso = dayStart.toISOString();
+  const cooldownMap = getPersistedModelCooldowns(now);
+  const userMap = new Map(store.users.map((u) => [u.id, u]));
+
+  const models = MODEL_QUOTA_SPECS.map((spec) => {
+    let rpmUsed = 0;
+    let rpdUsed = 0;
+    let tpmUsed = 0;
+    let tokensToday = 0;
+    let successToday = 0;
+    let fallbackInToday = 0;
+    let error429Today = 0;
+    let error503Today = 0;
+    let errorOtherToday = 0;
+    let durationSum = 0;
+    let durationCount = 0;
+    let lastUsedAt: string | null = null;
+    let lastError: string | null = null;
+
+    for (const log of store.chat_logs) {
+      if (!log.timestamp) continue;
+      const meta = (log.metadata || {}) as Record<string, unknown>;
+      const isTargetAccepted =
+        log.event === 'AI_PROVIDER_ACCEPTED' && meta.actualModel === spec.id;
+      const isTargetRejected =
+        (log.event === 'AI_PROVIDER_REJECTED' ||
+          log.event === 'AI_PROVIDER_NETWORK_ERROR') &&
+        meta.model === spec.id;
+      const isTargetComplete =
+        (log.event === 'AI_STREAM_COMPLETE' ||
+          log.event === 'AI_RESPONSE_COMPLETE') &&
+        meta.actualModel === spec.id;
+
+      if (isTargetAccepted || isTargetRejected || isTargetComplete) {
+        if (!lastUsedAt || log.timestamp > lastUsedAt) {
+          lastUsedAt = log.timestamp;
+        }
+      }
+
+      if (isTargetRejected) {
+        const status = Number(meta.status || 0);
+        const errStr = typeof meta.error === 'string' ? meta.error : `HTTP ${status || 'ERR'}`;
+        lastError = `${errStr} (${new Date(log.timestamp).toLocaleTimeString('vi-VN')})`;
+      }
+
+      if (log.timestamp < dayStartIso) continue;
+
+      if (isTargetAccepted || isTargetRejected) {
+        rpdUsed++;
+        if (log.timestamp >= oneMinAgoIso) {
+          rpmUsed++;
+        }
+      }
+
+      if (isTargetAccepted) {
+        if (meta.isFallback || (meta.requestedModel && meta.requestedModel !== spec.id)) {
+          fallbackInToday++;
+        }
+      }
+
+      if (isTargetRejected) {
+        const status = Number(meta.status || 0);
+        if (status === 429) error429Today++;
+        else if (status === 503) error503Today++;
+        else errorOtherToday++;
+      }
+
+      if (isTargetComplete) {
+        successToday++;
+        const tok = Number(meta.totalTokens || 0);
+        if (Number.isFinite(tok) && tok > 0) {
+          tokensToday += tok;
+          if (log.timestamp >= oneMinAgoIso) {
+            tpmUsed += tok;
+          }
+        }
+        const dur = Number(meta.durationMs || 0);
+        if (Number.isFinite(dur) && dur > 0) {
+          durationSum += dur;
+          durationCount++;
+        }
+      }
+    }
+
+    const rpmRemaining = Math.max(0, spec.rpmLimit - rpmUsed);
+    const rpdRemaining = Math.max(0, spec.rpdLimit - rpdUsed);
+    const tpmRemaining = Math.max(0, spec.tpmLimit - tpmUsed);
+    const rpmPercent = Math.min(100, Math.round((rpmUsed / spec.rpmLimit) * 100));
+    const rpdPercent = Math.min(100, Math.round((rpdUsed / spec.rpdLimit) * 100));
+    const cooldownUntil = cooldownMap.get(spec.id) || 0;
+    const cooldownRemainingSec =
+      cooldownUntil > now ? Math.ceil((cooldownUntil - now) / 1000) : 0;
+
+    let status: 'healthy' | 'cooldown' | 'warning' | 'exhausted' = 'healthy';
+    if (rpmRemaining === 0 || rpdRemaining === 0) {
+      status = 'exhausted';
+    } else if (cooldownRemainingSec > 0) {
+      status = 'cooldown';
+    } else if (rpmPercent >= 80 || rpdPercent >= 80) {
+      status = 'warning';
+    }
+
+    return {
+      ...spec,
+      rpmUsed,
+      rpmRemaining,
+      rpmPercent,
+      rpdUsed,
+      rpdRemaining,
+      rpdPercent,
+      tpmUsed,
+      tpmRemaining,
+      tokensToday,
+      requestsToday: rpdUsed,
+      successToday,
+      fallbackInToday,
+      error429Today,
+      error503Today,
+      errorOtherToday,
+      avgDurationMs: durationCount > 0 ? Math.round(durationSum / durationCount) : 0,
+      status,
+      cooldownRemainingSec,
+      lastUsedAt,
+      lastError
+    };
+  });
+
+  const totalRpmLimit = models.reduce((acc, m) => acc + m.rpmLimit, 0);
+  const totalRpmUsed = models.reduce((acc, m) => acc + m.rpmUsed, 0);
+  const totalRpmRemaining = models.reduce((acc, m) => acc + m.rpmRemaining, 0);
+  const totalRpdLimit = models.reduce((acc, m) => acc + m.rpdLimit, 0);
+  const totalRpdUsed = models.reduce((acc, m) => acc + m.rpdUsed, 0);
+  const totalRpdRemaining = models.reduce((acc, m) => acc + m.rpdRemaining, 0);
+  const totalTpmLimit = models.reduce((acc, m) => acc + m.tpmLimit, 0);
+  const totalTpmUsed = models.reduce((acc, m) => acc + m.tpmUsed, 0);
+  const totalTokensToday = models.reduce((acc, m) => acc + m.tokensToday, 0);
+  const totalSuccessToday = models.reduce((acc, m) => acc + m.successToday, 0);
+  const totalFallbackToday = models.reduce((acc, m) => acc + m.fallbackInToday, 0);
+  const rejected429Today = models.reduce((acc, m) => acc + m.error429Today, 0);
+  const rejected503Today = models.reduce((acc, m) => acc + m.error503Today, 0);
+  const totalFailedToday = store.chat_logs.filter(
+    (l) =>
+      l.timestamp >= dayStartIso &&
+      (l.event === 'AI_REQUEST_FAILED' || l.event === 'AI_REQUEST_ERROR')
+  ).length;
+  const totalCompletedOrFailed = totalSuccessToday + totalFailedToday;
+  const successRateToday =
+    totalCompletedOrFailed > 0
+      ? Math.round((totalSuccessToday / totalCompletedOrFailed) * 100)
+      : 100;
+
+  const recentLogs = store.chat_logs
+    .filter((l) => l.event.startsWith('AI_') || l.event === 'PROMPT_SENT')
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, 60)
+    .map((l) => {
+      const meta = (l.metadata || {}) as Record<string, unknown>;
+      const u = userMap.get(l.userId);
+      const requestedModel = String(meta.requestedModel || meta.model || '');
+      const actualModel = String(meta.actualModel || meta.model || '');
+      const quota = (meta.quota || null) as {
+        rpmLimit?: number;
+        rpmUsed?: number;
+        rpmRemaining?: number;
+        rpdLimit?: number;
+        rpdUsed?: number;
+        rpdRemaining?: number;
+      } | null;
+      return {
+        id: l.id,
+        timestamp: l.timestamp,
+        level: l.level,
+        event: l.event,
+        userId: l.userId,
+        userName: u?.name || 'Học viên',
+        userEmail: u?.email || l.userId,
+        sessionId: l.sessionId,
+        lessonId: l.lessonId,
+        requestedModel,
+        actualModel,
+        isFallback: Boolean(
+          meta.isFallback ||
+            (requestedModel && actualModel && requestedModel !== actualModel)
+        ),
+        status: typeof meta.status === 'number' ? meta.status : null,
+        durationMs: typeof meta.durationMs === 'number' ? meta.durationMs : null,
+        promptTokens:
+          typeof meta.promptTokens === 'number' ? meta.promptTokens : null,
+        completionTokens:
+          typeof meta.completionTokens === 'number'
+            ? meta.completionTokens
+            : null,
+        totalTokens:
+          typeof meta.totalTokens === 'number' ? meta.totalTokens : null,
+        responseLength:
+          typeof meta.responseLength === 'number' ? meta.responseLength : null,
+        error: typeof meta.error === 'string' ? meta.error : null,
+        quota
+      };
+    });
+
+  return {
+    configured: Boolean(process.env.GEMINI_API_KEY),
+    defaultModel: DEFAULT_MODEL,
+    fallbackModels: FALLBACK_MODELS,
+    prompt: SYSTEM_PROMPT,
+    promptVersion: PROMPT_VERSION,
+    generatedAt: new Date(now).toISOString(),
+    summary: {
+      totalRpmLimit,
+      totalRpmUsed,
+      totalRpmRemaining,
+      totalRpdLimit,
+      totalRpdUsed,
+      totalRpdRemaining,
+      totalTpmLimit,
+      totalTpmUsed,
+      totalTokensToday,
+      totalRequestsToday: totalRpdUsed,
+      totalSuccessToday,
+      totalFallbackToday,
+      totalFailedToday,
+      rejected429Today,
+      rejected503Today,
+      successRateToday,
+      healthyModelsCount: models.filter((m) => m.status === 'healthy').length,
+      totalModelsCount: models.length
+    },
+    models,
+    recentLogs
+  };
 }
 
 export function recordTutorTrace(
@@ -1181,6 +1519,15 @@ export function recordTutorTrace(
       store.chat_sessions.push(owned);
       saveStore();
     }
+    const targetModel = String(
+      metadata.actualModel || metadata.model || metadata.requestedModel || ''
+    );
+    const enrichedMetadata = targetModel
+      ? {
+          ...metadata,
+          quota: computeModelQuotaSnapshot(targetModel, Date.now(), event)
+        }
+      : metadata;
     store.chat_logs.push({
       id: crypto.randomUUID(),
       userId: actor.id,
@@ -1189,7 +1536,7 @@ export function recordTutorTrace(
       level,
       event,
       message: event,
-      metadata,
+      metadata: enrichedMetadata,
       timestamp: new Date().toISOString()
     });
     saveStore();
@@ -1879,12 +2226,7 @@ async function handleApiRequestInner(
           return;
         }
         if (pathname === '/api/admin/ai' && method === 'GET') {
-          res.status(200).json({
-            configured: Boolean(process.env.GEMINI_API_KEY),
-            defaultModel: DEFAULT_MODEL,
-            prompt: SYSTEM_PROMPT,
-            promptVersion: PROMPT_VERSION
-          });
+          res.status(200).json(computeAdminAiTelemetry());
           return;
         }
         const tables: Record<string, unknown[]> = {
@@ -1969,13 +2311,21 @@ async function handleApiRequestInner(
         id: string,
         lessonId?: string,
         title?: string
-      ): ChatSession {
-        let existing = store.chat_sessions.find(
-          (s) => s.id === id && (isAdmin || s.userId === actor.id)
-        );
-        if (!existing && id && id.length >= 8) {
+      ): ChatSession | undefined {
+        const existingAny = store.chat_sessions.find((s) => s.id === id);
+        if (existingAny) {
+          return isAdmin || existingAny.userId === actor.id
+            ? existingAny
+            : undefined;
+        }
+        const canAutoCreate =
+          pathname === '/api/chat/sessions/tutor-proof' ||
+          (pathname === '/api/chat/messages' &&
+            method === 'POST' &&
+            typeof reqBody.lessonId === 'string');
+        if (canAutoCreate && id && id.length >= 8) {
           const now = new Date().toISOString();
-          existing = {
+          const created: ChatSession = {
             id,
             userId: actor.id,
             lessonId: lessonId || 'c1-l1',
@@ -1985,10 +2335,11 @@ async function handleApiRequestInner(
             createdAt: now,
             updatedAt: now
           };
-          store.chat_sessions.push(existing);
+          store.chat_sessions.push(created);
           saveStore();
+          return created;
         }
-        return existing!;
+        return undefined;
       }
       const owned =
         ownedSessions.find((s) => s.id === sessionId) ||
@@ -2381,9 +2732,13 @@ async function handleApiRequestInner(
       }
       if (
         pathname === '/api/history' &&
-        !['theory_read', 'quiz_passed', 'code_passed'].includes(
-          String(reqBody.action)
-        )
+        ![
+          'theory_read',
+          'quiz_passed',
+          'quiz_failed',
+          'code_passed',
+          'lesson_completed'
+        ].includes(String(reqBody.action))
       ) {
         res.status(400).json({
           error: 'Sự kiện thi và chứng chỉ chỉ được ghi bởi nghiệp vụ server'
@@ -2479,6 +2834,7 @@ async function handleApiRequestInner(
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
+        token: session.token,
         user: formatUserResponse(user)
       });
       return;
@@ -2535,6 +2891,7 @@ async function handleApiRequestInner(
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
+        token: session.token,
         user: formatUserResponse(updatedUser)
       });
       return;
@@ -2604,6 +2961,7 @@ async function handleApiRequestInner(
       setSessionCookie(res, session.token);
       res.status(201).json({
         success: true,
+        token: session.token,
         user: formatUserResponse(newUser)
       });
       return;
@@ -2611,7 +2969,7 @@ async function handleApiRequestInner(
 
     // 4. AUTH: Me
     if (pathname === '/api/auth/me' && method === 'GET') {
-      const token = getTokenFromCookie(req);
+      const token = getBearerToken(req) || getTokenFromCookie(req);
       if (!token) {
         res.status(401).json({ error: 'Chưa đăng nhập (thiếu token)' });
         return;
@@ -2634,7 +2992,7 @@ async function handleApiRequestInner(
 
     // 5. AUTH: Logout
     if (pathname === '/api/auth/logout' && method === 'POST') {
-      const token = getTokenFromCookie(req);
+      const token = getBearerToken(req) || getTokenFromCookie(req);
       if (token) {
         dbService.deleteSession(token);
       }
@@ -2913,13 +3271,14 @@ async function handleApiRequestInner(
         res.status(200).json({
           success: true,
           progress: {
-            currentLessonId: 'lesson-1',
+            currentLessonId: 'c1-l1',
             completedLessons: {},
             sprintExamScores: {},
             finalExam: null,
             streakDays: 1,
             lastActiveDate: new Date().toISOString().split('T')[0],
-            clearedLessons: {}
+            clearedLessons: {},
+            quizScores: {}
           }
         });
         return;
@@ -2928,13 +3287,14 @@ async function handleApiRequestInner(
       res.status(200).json({
         success: true,
         progress: {
-          currentLessonId: p.current_lesson_id,
+          currentLessonId: p.current_lesson_id || 'c1-l1',
           completedLessons: JSON.parse(p.completed_lessons || '{}'),
           sprintExamScores: JSON.parse(p.sprint_exam_scores || '{}'),
           finalExam: p.final_exam ? JSON.parse(p.final_exam) : null,
           streakDays: p.streak_days,
           lastActiveDate: p.last_active_date,
-          clearedLessons: JSON.parse(p.cleared_lessons || '{}')
+          clearedLessons: JSON.parse(p.cleared_lessons || '{}'),
+          quizScores: JSON.parse(p.quiz_scores || '{}')
         }
       });
       return;
@@ -2952,24 +3312,122 @@ async function handleApiRequestInner(
         return;
       }
 
+      const isReset = reqBody.reset === true;
       const verified = dbService.getUserProgress(userId);
+
+      let existingCompleted: Record<string, unknown> = {};
+      let existingCleared: Record<string, boolean> = {};
+      let existingQuizScores: Record<string, unknown> = {};
+      if (!isReset && verified) {
+        try {
+          existingCompleted = JSON.parse(verified.completed_lessons || '{}');
+        } catch {}
+        try {
+          existingCleared = JSON.parse(verified.cleared_lessons || '{}');
+        } catch {}
+        try {
+          existingQuizScores = JSON.parse(verified.quiz_scores || '{}');
+        } catch {}
+      }
+
+      const incomingCompleted =
+        progress.completedLessons && typeof progress.completedLessons === 'object'
+          ? (progress.completedLessons as Record<string, unknown>)
+          : {};
+      const incomingCleared =
+        progress.clearedLessons && typeof progress.clearedLessons === 'object'
+          ? (progress.clearedLessons as Record<string, boolean>)
+          : {};
+      const incomingQuizScores =
+        progress.quizScores && typeof progress.quizScores === 'object'
+          ? (progress.quizScores as Record<string, unknown>)
+          : {};
+
+      const mergedCompleted = { ...existingCompleted, ...incomingCompleted };
+      const mergedCleared = { ...existingCleared, ...incomingCleared };
+      const mergedQuizScores: Record<string, unknown> = { ...existingQuizScores };
+      for (const [k, v] of Object.entries(incomingQuizScores)) {
+        const prevEntry = mergedQuizScores[k] as
+          | { score?: number; passed?: boolean; completedAt?: string }
+          | number
+          | undefined;
+        if (
+          prevEntry &&
+          typeof prevEntry === 'object' &&
+          v &&
+          typeof v === 'object'
+        ) {
+          const nextEntry = v as {
+            score?: number;
+            passed?: boolean;
+            completedAt?: string;
+          };
+          const prevScore = typeof prevEntry.score === 'number' ? prevEntry.score : 0;
+          const nextScore = typeof nextEntry.score === 'number' ? nextEntry.score : 0;
+          mergedQuizScores[k] = {
+            ...prevEntry,
+            ...nextEntry,
+            score: Math.max(prevScore, nextScore),
+            passed: Boolean(prevEntry.passed || nextEntry.passed)
+          };
+        } else {
+          mergedQuizScores[k] = v;
+        }
+      }
+
+      const incomingLessonId =
+        typeof progress.currentLessonId === 'string' && progress.currentLessonId
+          ? progress.currentLessonId
+          : undefined;
+      const isDefaultUnhydratedLesson =
+        (incomingLessonId === 'lesson-1' || incomingLessonId === 'c1-l1') &&
+        Object.keys(incomingCompleted).length === 0 &&
+        Object.keys(existingCompleted).length > 0;
+      const resolvedLessonId =
+        incomingLessonId && !isDefaultUnhydratedLesson && incomingLessonId !== 'lesson-1'
+          ? incomingLessonId
+          : verified?.current_lesson_id && verified.current_lesson_id !== 'lesson-1'
+            ? verified.current_lesson_id
+            : incomingLessonId || 'c1-l1';
+
+      const incomingStreak =
+        typeof progress.streakDays === 'number' && progress.streakDays > 0
+          ? progress.streakDays
+          : 1;
+      const resolvedStreak = isReset
+        ? incomingStreak
+        : Math.max(verified?.streak_days || 1, incomingStreak);
+
       const dbPayload: DbProgress = {
         user_id: userId,
-        current_lesson_id: (progress.currentLessonId as string) || 'lesson-1',
-        completed_lessons: JSON.stringify(progress.completedLessons || {}),
+        current_lesson_id: resolvedLessonId,
+        completed_lessons: JSON.stringify(mergedCompleted),
         sprint_exam_scores: verified?.sprint_exam_scores || '{}',
         final_exam: verified?.final_exam || '',
-        streak_days:
-          typeof progress.streakDays === 'number' ? progress.streakDays : 1,
+        streak_days: resolvedStreak,
         last_active_date:
           (progress.lastActiveDate as string) ||
+          verified?.last_active_date ||
           new Date().toISOString().split('T')[0],
-        cleared_lessons: JSON.stringify(progress.clearedLessons || {}),
+        cleared_lessons: JSON.stringify(mergedCleared),
+        quiz_scores: JSON.stringify(mergedQuizScores),
         updated_at: new Date().toISOString()
       };
 
       dbService.saveUserProgress(dbPayload);
-      res.status(200).json({ success: true });
+      res.status(200).json({
+        success: true,
+        progress: {
+          currentLessonId: dbPayload.current_lesson_id,
+          completedLessons: mergedCompleted,
+          sprintExamScores: JSON.parse(dbPayload.sprint_exam_scores || '{}'),
+          finalExam: dbPayload.final_exam ? JSON.parse(dbPayload.final_exam) : null,
+          streakDays: dbPayload.streak_days,
+          lastActiveDate: dbPayload.last_active_date,
+          clearedLessons: mergedCleared,
+          quizScores: mergedQuizScores
+        }
+      });
       return;
     }
 
@@ -3012,13 +3470,14 @@ async function handleApiRequestInner(
 
       dbService.saveUserProgress({
         user_id: userId,
-        current_lesson_id: currentProg?.current_lesson_id || 'lesson-1',
+        current_lesson_id: currentProg?.current_lesson_id || 'c1-l1',
         completed_lessons: currentProg?.completed_lessons || '{}',
         sprint_exam_scores: JSON.stringify(sprintScores),
         final_exam: currentProg?.final_exam || '',
         streak_days: currentProg?.streak_days || 1,
         last_active_date: new Date().toISOString().split('T')[0],
         cleared_lessons: currentProg?.cleared_lessons || '{}',
+        quiz_scores: currentProg?.quiz_scores || '{}',
         updated_at: new Date().toISOString()
       });
 
@@ -3086,13 +3545,14 @@ async function handleApiRequestInner(
 
       dbService.saveUserProgress({
         user_id: userId,
-        current_lesson_id: currentProg?.current_lesson_id || 'lesson-1',
+        current_lesson_id: currentProg?.current_lesson_id || 'c1-l1',
         completed_lessons: currentProg?.completed_lessons || '{}',
         sprint_exam_scores: currentProg?.sprint_exam_scores || '{}',
         final_exam: JSON.stringify(finalResult),
         streak_days: currentProg?.streak_days || 1,
         last_active_date: now.split('T')[0],
         cleared_lessons: currentProg?.cleared_lessons || '{}',
+        quiz_scores: currentProg?.quiz_scores || '{}',
         updated_at: now
       });
 
@@ -3153,20 +3613,31 @@ async function handleApiRequestInner(
         typeof reqBody.score === 'number' ? reqBody.score : undefined;
       const details =
         typeof reqBody.details === 'string' ? reqBody.details : undefined;
+      const customId =
+        typeof reqBody.id === 'string' &&
+        /^[A-Za-z0-9_-]{6,100}$/.test(reqBody.id)
+          ? reqBody.id
+          : undefined;
+      const customTimestamp =
+        typeof reqBody.timestamp === 'string' &&
+        Number.isFinite(Date.parse(reqBody.timestamp))
+          ? new Date(reqBody.timestamp).toISOString()
+          : new Date().toISOString();
 
       const newRecord: DbHistory = {
         id:
+          customId ||
           'hist_' +
-          Date.now() +
-          '_' +
-          Math.random().toString(36).substring(2, 6),
+            Date.now() +
+            '_' +
+            Math.random().toString(36).substring(2, 6),
         user_id: userId,
         lesson_id: lessonId,
         lesson_title: lessonTitle,
         action,
         score,
         details,
-        timestamp: new Date().toISOString()
+        timestamp: customTimestamp
       };
       dbService.addLearningHistory(newRecord);
       res.status(201).json({ success: true, record: newRecord });

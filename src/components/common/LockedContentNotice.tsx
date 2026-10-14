@@ -27,14 +27,28 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
   return (
     <div className="locked-content-container">
       <div className="locked-card">
-        <div className="locked-icon-badge">🔒</div>
+        <div className="locked-icon-badge">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
 
         <div className="locked-badge-label">
           {type === 'lesson'
             ? 'BÀI HỌC CHƯA MỞ KHÓA'
             : type === 'sprint-exam'
-            ? 'KỲ THI SPRINT CHƯA MỞ KHÓA'
-            : 'KỲ THI TỐT NGHIỆP ĐANG BỊ KHÓA'}
+              ? 'KỲ THI SPRINT CHƯA MỞ KHÓA'
+              : 'KỲ THI TỐT NGHIỆP ĐANG BỊ KHÓA'}
         </div>
 
         <h2 className="locked-title">{title}</h2>
@@ -42,7 +56,7 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
         <p className="locked-desc">
           {type === 'lesson' && requiredPreviousLesson && (
             <>
-              Để mở khóa bài học này, bạn cần hoàn thành bài học trước đó:{' '}
+              Để mở khóa bài học này, đại ca cần hoàn thành bài học trước đó:{' '}
               <strong style={{ color: 'var(--accent-primary)' }}>
                 {requiredPreviousLesson.title}
               </strong>
@@ -52,52 +66,63 @@ export const LockedContentNotice: React.FC<LockedContentNoticeProps> = ({
 
           {type === 'sprint-exam' && missingLessons && (
             <>
-              Kỳ thi Sprint này yêu cầu bạn phải hoàn thành tất cả các bài học trong Sprint. Hiện còn{' '}
-              <strong style={{ color: '#ef4444' }}>{missingLessons.length} bài chưa học xong</strong>:
+              Kỳ thi Sprint này yêu cầu hoàn thành tất cả các bài học trong
+              Sprint. Hiện còn{' '}
+              <strong style={{ color: '#ef4444' }}>
+                {missingLessons.length} bài chưa học xong
+              </strong>
+              :
             </>
           )}
 
           {type === 'final-exam' && missingSprints && (
             <>
-              Kỳ thi Tốt nghiệp Toàn khóa yêu cầu bạn phải thi đạt <strong>100% (6/6) kỳ thi Sprint</strong>.
-              Hiện bạn còn{' '}
-              <strong style={{ color: '#ef4444' }}>{missingSprints.length} kỳ thi Sprint chưa đạt</strong>:
+              Kỳ thi Tốt nghiệp Toàn khóa yêu cầu thi đạt{' '}
+              <strong>100% (6/6) kỳ thi Sprint</strong>. Hiện còn{' '}
+              <strong style={{ color: '#ef4444' }}>
+                {missingSprints.length} kỳ thi Sprint chưa đạt
+              </strong>
+              :
             </>
           )}
         </p>
 
         {/* Missing Sprint Lessons List */}
-        {type === 'sprint-exam' && missingLessons && missingLessons.length > 0 && (
-          <div className="locked-requirements-list">
-            {missingLessons.map((l) => (
-              <div key={l.id} className="locked-req-item">
-                <span>⚪</span>
-                <span>{l.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {type === 'sprint-exam' &&
+          missingLessons &&
+          missingLessons.length > 0 && (
+            <div className="locked-requirements-list">
+              {missingLessons.map((l) => (
+                <div key={l.id} className="locked-req-item">
+                  <span>—</span>
+                  <span>{l.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
         {/* Missing Sprints List */}
-        {type === 'final-exam' && missingSprints && missingSprints.length > 0 && (
-          <div className="locked-requirements-list">
-            {missingSprints.map((s) => (
-              <div key={s.sprintId} className="locked-req-item">
-                <span>🎯</span>
-                <span>{s.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {type === 'final-exam' &&
+          missingSprints &&
+          missingSprints.length > 0 && (
+            <div className="locked-requirements-list">
+              {missingSprints.map((s) => (
+                <div key={s.sprintId} className="locked-req-item">
+                  <span>—</span>
+                  <span>{s.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
         <div className="locked-actions">
           <button className="btn btn-primary" onClick={onNavigateToAvailable}>
-            👉 Chuyển Đến Bài Học Tiếp Theo Cần Làm
+            Chuyển Đến Bài Học Tiếp Theo Cần Làm
           </button>
 
           {isAdmin && (
             <button className="btn btn-secondary" onClick={onBypassLock}>
-              ⚡ Mở Khóa Chế Độ Preview (Quyền Admin)
+              Mở Khóa Chế Độ Preview (Quyền Admin)
             </button>
           )}
         </div>

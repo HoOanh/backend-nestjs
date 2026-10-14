@@ -277,20 +277,28 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
         <div className="auth-tabs">
           <button
             className={`auth-tab-btn ${tab === 'login' ? 'active' : ''}`}
-            onClick={() => { setTab('login'); setError(''); setInfo(''); }}
+            onClick={() => {
+              setTab('login');
+              setError('');
+              setInfo('');
+            }}
           >
-            🔑 Đăng Nhập Học Viên
+            Đăng Nhập Học Viên
           </button>
           <button
             className={`auth-tab-btn ${tab === 'register' ? 'active' : ''}`}
-            onClick={() => { setTab('register'); setError(''); setInfo(''); }}
+            onClick={() => {
+              setTab('register');
+              setError('');
+              setInfo('');
+            }}
           >
-            ✨ Đăng Ký Tài Khoản
+            Đăng Ký Tài Khoản
           </button>
         </div>
 
-        {error && <div className="auth-alert error">⚠️ {error}</div>}
-        {info && <div className="auth-alert success">🔄 {info}</div>}
+        {error && <div className="auth-alert error">{error}</div>}
+        {info && <div className="auth-alert success">{info}</div>}
 
         {tab === 'login' ? (
           <form className="auth-form" onSubmit={handleEmailLogin}>
@@ -315,8 +323,14 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
               />
             </div>
 
-            <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
-              {loading ? 'Đang xác thực bảo mật PBKDF2...' : 'Đăng Nhập Vào Khóa Học ➡️'}
+            <button
+              type="submit"
+              className="btn btn-primary auth-submit-btn"
+              disabled={loading}
+            >
+              {loading
+                ? 'Đang xác thực bảo mật PBKDF2...'
+                : 'Đăng Nhập Vào Khóa Học'}
             </button>
           </form>
         ) : (
@@ -353,15 +367,28 @@ export const StudentAuthScreen: React.FC<StudentAuthScreenProps> = ({ onLoginSuc
             </div>
             <div className="form-group">
               <label>Gói Khóa Học Muốn Học</label>
-              <select value={planId} onChange={(e) => setPlanId(e.target.value as 'free' | 'pro' | 'enterprise')}>
-                <option value="pro">⭐ Gói Pro Master (Trọn gói 6 Sprints + AI 24/7)</option>
+              <select
+                value={planId}
+                onChange={(e) =>
+                  setPlanId(e.target.value as 'free' | 'pro' | 'enterprise')
+                }
+              >
+                <option value="pro">
+                  Gói Pro Master (Trọn gói 6 Sprints + AI 24/7)
+                </option>
                 <option value="free">Trải nghiệm Miễn Phí (Sprint 1)</option>
-                <option value="enterprise">🏢 Doanh Nghiệp (Nhóm Kỹ Sư)</option>
+                <option value="enterprise">Doanh Nghiệp (Nhóm Kỹ Sư)</option>
               </select>
             </div>
 
-            <button type="submit" className="btn btn-success auth-submit-btn" disabled={loading}>
-              {loading ? 'Đang tạo tài khoản vào SQLite...' : 'Đăng Ký & Bắt Đầu Học ✨'}
+            <button
+              type="submit"
+              className="btn btn-success auth-submit-btn"
+              disabled={loading}
+            >
+              {loading
+                ? 'Đang tạo tài khoản vào hệ thống...'
+                : 'Đăng Ký & Bắt Đầu Học'}
             </button>
           </form>
         )}

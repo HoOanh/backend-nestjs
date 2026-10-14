@@ -195,16 +195,42 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
       {/* Header Banner */}
       <div className="sprint-ai-header">
         <div className="ai-header-left">
-          <span className="ai-bot-avatar">🤖</span>
+          <span className="ai-bot-avatar">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <line x1="9" y1="1" x2="9" y2="4" />
+              <line x1="15" y1="1" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="23" />
+              <line x1="15" y1="20" x2="15" y2="23" />
+              <line x1="20" y1="9" x2="23" y2="9" />
+              <line x1="20" y1="14" x2="23" y2="14" />
+              <line x1="1" y1="9" x2="4" y2="9" />
+              <line x1="1" y1="14" x2="4" y2="14" />
+            </svg>
+          </span>
           <div>
             <h3>ĐÁNH GIÁ CHUYÊN MÔN TỪ AI TUTOR (ENGINEERING REVIEW)</h3>
             <span className="ai-sub-text">
-              Phân tích telemetry bài thi Sprint {sprintId} theo chuẩn kỹ thuật Senior Backend NestJS
+              Phân tích telemetry bài thi Sprint {sprintId} theo chuẩn kỹ thuật
+              Senior Backend NestJS
             </span>
           </div>
         </div>
 
-        <div className="ai-level-pill" style={{ borderColor: levelColor, color: levelColor }}>
+        <div
+          className="ai-level-pill"
+          style={{ borderColor: levelColor, color: levelColor }}
+        >
           <span>{levelBadge}</span>
         </div>
       </div>
@@ -214,7 +240,6 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
         {/* Pillar 1: Strengths */}
         <div className="ai-synthesis-card strength-card">
           <div className="synthesis-card-title">
-            <span className="icon">🌟</span>
             <strong>Điểm Mạnh Kiến Trúc (Key Strengths)</strong>
           </div>
           <ul className="synthesis-list">
@@ -227,8 +252,9 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
         {/* Pillar 2: Vulnerabilities */}
         <div className="ai-synthesis-card risk-card">
           <div className="synthesis-card-title">
-            <span className="icon">⚠️</span>
-            <strong>Lỗ Hổng Cần Khắc Phục (Vulnerabilities & Production Risks)</strong>
+            <strong>
+              Lỗ Hổng Cần Khắc Phục (Vulnerabilities & Production Risks)
+            </strong>
           </div>
           <ul className="synthesis-list">
             {vulnerabilities.map((item, idx) => (
@@ -240,7 +266,6 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
         {/* Pillar 3: Actionable Roadmap */}
         <div className="ai-synthesis-card roadmap-card">
           <div className="synthesis-card-title">
-            <span className="icon">🎯</span>
             <strong>Khuyến Nghị Hành Động (Actionable Next Steps)</strong>
           </div>
           <ul className="synthesis-list">
@@ -258,12 +283,14 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
             className="btn btn-primary ai-consult-btn"
             onClick={requestLiveAIReview}
           >
-            🤖 Nhận Phân Tích Chuyên Sâu Trực Tiếp Từ AI Tutor (Live Deep Dive)
+            Nhận Phân Tích Chuyên Sâu Trực Tiếp Từ AI Tutor (Live Deep Dive)
           </button>
         ) : (
           <div className="ai-live-output-card">
             <div className="ai-live-card-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
                 <span className="live-dot" />
                 <strong>Báo Cáo Phân Tích Chi Tiết Của AI Tutor</strong>
               </div>
@@ -279,14 +306,20 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
             {isLiveLoading && !liveReviewText && (
               <div className="ai-live-loading">
                 <span className="spinner" />
-                <span>AI Tutor đang phân tích telemetry bài làm và mã nguồn của đại ca...</span>
+                <span>
+                  AI Tutor đang phân tích telemetry bài làm và mã nguồn của đại
+                  ca...
+                </span>
               </div>
             )}
 
             {liveError && (
               <div className="ai-live-error">
-                <span>⚠️ {liveError}</span>
-                <button className="btn btn-secondary btn-sm" onClick={requestLiveAIReview}>
+                <span>{liveError}</span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={requestLiveAIReview}
+                >
                   Thử lại
                 </button>
               </div>
@@ -295,7 +328,9 @@ Nhờ AI Tutor đánh giá chuyên môn sâu sắc:
             {liveReviewText && (
               <div
                 className="ai-live-content-markdown"
-                dangerouslySetInnerHTML={{ __html: formatChatMarkdown(liveReviewText) }}
+                dangerouslySetInnerHTML={{
+                  __html: formatChatMarkdown(liveReviewText)
+                }}
               />
             )}
           </div>

@@ -329,13 +329,90 @@ async function runE2ETests() {
           finalExam: null,
           streakDays: 2,
           lastActiveDate: new Date().toISOString().split('T')[0],
-          clearedLessons: { 'lesson-1': true }
+          clearedLessons: { 'lesson-1': true },
+          quizScores: { 'lesson-1': { score: 8, total: 10 } }
         }
       }
     },
     res
   );
   assert('3.2 Progress saved to server store', res.statusCode === 200);
+
+  // 3.2b: Monotonic merge prevents unhydrated empty payload from wiping completed/cleared lessons
+  res = createMockResponse();
+  await handleApiRequest(
+    {
+      method: 'POST',
+      url: '/api/progress',
+      headers: { cookie: `arc_session=${studentCookieToken}` },
+      body: {
+        userId: studentUserId,
+        progress: {
+          currentLessonId: 'c1-l1',
+          completedLessons: {},
+          clearedLessons: {},
+          quizScores: { 'lesson-1': { score: 5, total: 10 } },
+          streakDays: 1
+        }
+      }
+    },
+    res
+  );
+  res = createMockResponse();
+  await handleApiRequest(
+    {
+      method: 'GET',
+      url: `/api/progress?userId=${studentUserId}`,
+      headers: { cookie: `arc_session=${studentCookieToken}` }
+    },
+    res
+  );
+  const fetchedProgress = (res.data as Record<string, unknown>)?.progress as
+    | Record<string, unknown>
+    | undefined;
+  assert(
+    '3.2b Monotonic merge preserves completedLessons, clearedLessons & best quizScores',
+    res.statusCode === 200 &&
+      Boolean(
+        (fetchedProgress?.completedLessons as Record<string, unknown>)?.[
+          'lesson-1'
+        ]
+      ) &&
+      Boolean(
+        (fetchedProgress?.clearedLessons as Record<string, unknown>)?.[
+          'lesson-1'
+        ]
+      ) &&
+      ((
+        (fetchedProgress?.quizScores as Record<string, unknown>)?.[
+          'lesson-1'
+        ] as Record<string, number>
+      )?.score === 8) &&
+      fetchedProgress?.currentLessonId === 'lesson-2'
+  );
+
+  // 3.2c: Log lesson_completed and quiz_failed actions
+  res = createMockResponse();
+  await handleApiRequest(
+    {
+      method: 'POST',
+      url: '/api/history',
+      headers: { cookie: `arc_session=${studentCookieToken}` },
+      body: {
+        id: 'hist-lesson-1-completed',
+        userId: studentUserId,
+        lessonId: 'lesson-1',
+        lessonTitle: 'Bài 01: Core Architecture',
+        action: 'lesson_completed',
+        details: 'Hoàn thành bài học Bài 01: Core Architecture'
+      }
+    },
+    res
+  );
+  assert(
+    '3.2c lesson_completed history action recorded with idempotency',
+    res.statusCode === 201
+  );
 
   // 3.3: Sprint exam submission
   res = createMockResponse();

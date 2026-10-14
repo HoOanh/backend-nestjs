@@ -199,28 +199,120 @@ export const apiClient = {
   },
 
   // 8. PROGRESS
-  async getProgress(userId: string): Promise<UserProgressState | null> {
+  readLocalProgress(userId: string): UserProgressState | null {
     try {
-      const data = await apiFetch<{ success: boolean; progress: UserProgressState }>(`/progress?userId=${encodeURIComponent(userId)}`);
-      return data.progress || null;
+      if (typeof window === 'undefined' || !window.localStorage) return null;
+      const raw = localStorage.getItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${userId}`);
+      if (raw) return JSON.parse(raw) as UserProgressState;
+    } catch {}
+    return null;
+  },
+
+  writeLocalProgress(userId: string, progress: UserProgressState): void {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      localStorage.setItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${userId}`, JSON.stringify(progress));
+    } catch {}
+  },
+
+  mergeProgress(
+    local: UserProgressState | null,
+    remote: UserProgressState | null
+  ): UserProgressState {
+    const today = new Date().toISOString().split('T')[0];
+    const base: UserProgressState = {
+      currentLessonId: 'c1-l1',
+      completedLessons: {},
+      sprintExamScores: {},
+      finalExam: null,
+      streakDays: 1,
+      lastActiveDate: today,
+      clearedLessons: {},
+      quizScores: {}
+    };
+    if (!local && !remote) return base;
+    if (!local) return { ...base, ...remote };
+    if (!remote) return { ...base, ...local };
+
+    const completedLessons = {
+      ...(remote.completedLessons || {}),
+      ...(local.completedLessons || {})
+    };
+    const clearedLessons = {
+      ...(remote.clearedLessons || {}),
+      ...(local.clearedLessons || {})
+    };
+    const quizScores = {
+      ...(remote.quizScores || {}),
+      ...(local.quizScores || {})
+    };
+    const sprintExamScores = {
+      ...(local.sprintExamScores || {}),
+      ...(remote.sprintExamScores || {})
+    };
+    const currentLessonId =
+      local.currentLessonId && local.currentLessonId !== 'lesson-1'
+        ? local.currentLessonId
+        : remote.currentLessonId && remote.currentLessonId !== 'lesson-1'
+          ? remote.currentLessonId
+          : 'c1-l1';
+
+    return {
+      currentLessonId,
+      completedLessons,
+      sprintExamScores,
+      finalExam: remote.finalExam || local.finalExam || null,
+      streakDays: Math.max(local.streakDays || 1, remote.streakDays || 1),
+      lastActiveDate:
+        (local.lastActiveDate || '') >= (remote.lastActiveDate || '')
+          ? local.lastActiveDate || today
+          : remote.lastActiveDate || today,
+      clearedLessons,
+      quizScores
+    };
+  },
+
+  async getProgress(userId: string): Promise<UserProgressState | null> {
+    const local = this.readLocalProgress(userId);
+    const guest = userId !== 'guest' ? this.readLocalProgress('guest') : null;
+    const combinedLocal = this.mergeProgress(guest, local);
+    try {
+      const data = await apiFetch<{ success: boolean; progress: UserProgressState }>(
+        `/progress?userId=${encodeURIComponent(userId)}`
+      );
+      const remote = data.progress || null;
+      const merged = this.mergeProgress(combinedLocal, remote);
+      this.writeLocalProgress(userId, merged);
+
+      const remoteCompletedCount = Object.keys(remote?.completedLessons || {}).length;
+      const mergedCompletedCount = Object.keys(merged.completedLessons || {}).length;
+      const remoteClearedCount = Object.keys(remote?.clearedLessons || {}).length;
+      const mergedClearedCount = Object.keys(merged.clearedLessons || {}).length;
+      if (
+        mergedCompletedCount > remoteCompletedCount ||
+        mergedClearedCount > remoteClearedCount
+      ) {
+        void this.saveProgress(userId, merged);
+      }
+      return merged;
     } catch {
-      // Fallback to local storage if offline
-      try {
-        const local = localStorage.getItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${userId}`);
-        if (local) return JSON.parse(local) as UserProgressState;
-      } catch {}
-      return null;
+      return combinedLocal;
     }
   },
 
-  async saveProgress(userId: string, progress: UserProgressState, options: { requireServer?: boolean } = {}): Promise<void> {
-    try {
-      localStorage.setItem(`${STORAGE_KEYS.PROGRESS_PREFIX}${userId}`, JSON.stringify(progress));
-    } catch {}
+  async saveProgress(
+    userId: string,
+    progress: UserProgressState,
+    options: { requireServer?: boolean } = {}
+  ): Promise<void> {
+    const existingLocal = this.readLocalProgress(userId);
+    const merged = this.mergeProgress(progress, existingLocal);
+    merged.currentLessonId = progress.currentLessonId || merged.currentLessonId;
+    this.writeLocalProgress(userId, merged);
     try {
       await apiFetch('/progress', {
         method: 'POST',
-        body: JSON.stringify({ userId, progress })
+        body: JSON.stringify({ userId, progress: merged })
       });
     } catch (error) {
       if (options.requireServer) throw error;
@@ -244,17 +336,133 @@ export const apiClient = {
   },
 
   // 10. HISTORY
-  async getHistory(userId?: string): Promise<LearningHistoryRecord[]> {
-    const path = userId ? `/history?userId=${encodeURIComponent(userId)}` : `/history`;
-    const data = await apiFetch<{ success: boolean; history: LearningHistoryRecord[] }>(path);
-    return data.history || [];
+  readLocalHistory(userId: string): LearningHistoryRecord[] {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return [];
+      const raw = localStorage.getItem(`${STORAGE_KEYS.HISTORY_PREFIX}${userId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed as LearningHistoryRecord[];
+      }
+    } catch {}
+    return [];
   },
 
-  async addHistory(payload: { userId: string; lessonId?: string; lessonTitle?: string; action: string; score?: number; details?: string }): Promise<void> {
-    await apiFetch('/history', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
+  writeLocalHistory(userId: string, records: LearningHistoryRecord[]): void {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      localStorage.setItem(
+        `${STORAGE_KEYS.HISTORY_PREFIX}${userId}`,
+        JSON.stringify(records.slice(0, 1000))
+      );
+    } catch {}
+  },
+
+  async getHistory(userId?: string): Promise<LearningHistoryRecord[]> {
+    const localRecords = userId ? this.readLocalHistory(userId) : [];
+    const guestRecords =
+      userId && userId !== 'guest'
+        ? this.readLocalHistory('guest').map((r) => ({ ...r, userId }))
+        : [];
+    const combinedLocal = [...localRecords, ...guestRecords];
+    try {
+      const path = userId ? `/history?userId=${encodeURIComponent(userId)}` : `/history`;
+      const data = await apiFetch<{ success: boolean; history: LearningHistoryRecord[] }>(path);
+      const remoteRecords = data.history || [];
+
+      const byId = new Map<string, LearningHistoryRecord>();
+      const bySignature = new Set<string>();
+      for (const r of remoteRecords) {
+        byId.set(r.id, r);
+        bySignature.add(`${r.action}:${r.lessonId || ''}:${(r.timestamp || '').slice(0, 16)}`);
+      }
+
+      const missingOnServer: LearningHistoryRecord[] = [];
+      for (const localRec of combinedLocal) {
+        const sig = `${localRec.action}:${localRec.lessonId || ''}:${(localRec.timestamp || '').slice(0, 16)}`;
+        if (!byId.has(localRec.id) && !bySignature.has(sig)) {
+          byId.set(localRec.id, localRec);
+          bySignature.add(sig);
+          if (
+            userId &&
+            [
+              'theory_read',
+              'quiz_passed',
+              'quiz_failed',
+              'code_passed',
+              'lesson_completed'
+            ].includes(localRec.action)
+          ) {
+            missingOnServer.push(localRec);
+          }
+        }
+      }
+
+      const merged = Array.from(byId.values()).sort((a, b) =>
+        (b.timestamp || '').localeCompare(a.timestamp || '')
+      );
+      if (userId) {
+        this.writeLocalHistory(userId, merged);
+      }
+
+      for (const rec of missingOnServer.slice(0, 30)) {
+        void apiFetch('/history', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: rec.id,
+            userId: rec.userId,
+            lessonId: rec.lessonId,
+            lessonTitle: rec.lessonTitle,
+            action: rec.action,
+            score: rec.score,
+            details: rec.details,
+            timestamp: rec.timestamp
+          })
+        }).catch(() => {});
+      }
+
+      return merged;
+    } catch {
+      return combinedLocal.sort((a, b) =>
+        (b.timestamp || '').localeCompare(a.timestamp || '')
+      );
+    }
+  },
+
+  async addHistory(payload: {
+    userId: string;
+    lessonId?: string;
+    lessonTitle?: string;
+    action: string;
+    score?: number;
+    details?: string;
+  }): Promise<void> {
+    const id = `hist_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const timestamp = new Date().toISOString();
+    const record: LearningHistoryRecord = {
+      id,
+      userId: payload.userId,
+      lessonId: payload.lessonId,
+      lessonTitle: payload.lessonTitle,
+      action: payload.action,
+      score: payload.score,
+      details: payload.details,
+      timestamp
+    };
+
+    const existing = this.readLocalHistory(payload.userId);
+    this.writeLocalHistory(payload.userId, [record, ...existing]);
+
+    if (payload.userId === 'guest') return;
+
+    try {
+      await apiFetch('/history', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, id, timestamp })
+      });
+    } catch {
+      // Kept in localStorage and will auto-sync on next getHistory
+    }
   },
 
   // 11. STATS

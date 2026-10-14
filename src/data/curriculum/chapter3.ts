@@ -24,8 +24,7 @@ Khi lập trình viên frontend thực hiện một lời gọi API đơn giản
   - HTTP/2 ra đời với đột phá kỹ thuật **Ghép luồng nhị phân (Binary Multiplexing)**: Cho phép hàng trăm request/response chạy song song trên cùng một kết nối TCP duy nhất, xóa bỏ giới hạn 6 kết nối TCP của HTTP/1.1.
   - Tuy nhiên, điểm yếu chết người của HTTP/2 nằm ở chính tầng truyền vận TCP bên dưới: TCP coi toàn bộ dữ liệu trên kết nối là một dòng byte liên tục có thứ tự nghiêm ngặt (In-order Byte Stream).
   - **Kịch bản mất gói (Packet Loss):** Khi có một gói tin TCP bị rớt trên đường truyền (do sóng Wifi chập chờn hoặc nghẽn router), toàn bộ nhân hệ điều hành (Kernel TCP Stack) buộc phải dừng lại, giữ toàn bộ các gói tin tiếp theo trong bộ nhớ đệm (Receive Buffer) để chờ gói tin mất được truyền lại (TCP Retransmission).
-  - **Hệ quả kiến trúc:** Mặc dù 99 stream khác hoàn toàn không bị lỗi, chúng đều bị đóng băng chung trong kết nối TCP đó!
-
+  - **Hệ quả kiến trúc:** Mặc dù 99 stream khác hoàn toàn không bị lỗi, chúng đều bị đóng băng chung trong kết nối TCP đó.
 * **Đột phá Giao Thức HTTP/3 trên nền tảng QUIC (UDP):**
   - Để giải quyết dứt điểm rào cản 30 năm của TCP, giao thức HTTP/3 loại bỏ hoàn toàn TCP và chuyển sang chạy trên **QUIC (nền tảng UDP)**.
   - QUIC quản lý các luồng độc lập ở cấp độ giao thức ứng dụng: Mỗi stream HTTP/3 sở hữu bộ điều khiển luồng (Flow Control) và kiểm soát mất gói riêng biệt. Việc rớt packet ở Stream A hoàn toàn không ảnh hưởng tới Stream B, đưa độ trễ bắt tay mạng về mức tối ưu $0\text{-RTT}$ (Zero Round Trip Time) khi tái kết nối.
@@ -56,10 +55,9 @@ Mọi yêu cầu HTTP/1.1 hoặc HTTP/2 đều bắt đầu bằng giao vận TC
 
 ### 2.1 Chi Phí Vật Lý Của Round Trip Time (RTT)
 * Nếu người dùng ở London gửi request đến server tại Singapore: RTT đường truyền cáp quang biển tối thiểu là **~150ms**.
-* Với TCP + TLS 1.2 cũ: Cần 3 RTT = **450ms chỉ để bắt tay**, người dùng phải chờ gần nửa giây trước khi server nhận được request!
+* Với TCP + TLS 1.2 cũ: Cần 3 RTT = **450ms chỉ để bắt tay**, người dùng phải chờ gần nửa giây trước khi server nhận được request.
 * Với TLS 1.3: Rút ngắn handshake xuống còn 1 RTT.
-* Với HTTP/3 (QUIC 0-RTT Reconnection): Nếu client đã từng kết nối trước đó, dữ liệu HTTP có thể được gửi đi ngay trong gói tin đầu tiên ($0\\text{ RTT}$)!
-
+* Với HTTP/3 (QUIC 0-RTT Reconnection): Nếu client đã từng kết nối trước đó, dữ liệu HTTP có thể được gửi đi ngay trong gói tin đầu tiên ($0\\text{ RTT}$).
 ---
 
 # 3. TIẾN HÓA TỪ HTTP/1.1, HTTP/2 ĐẾN HTTP/3
@@ -84,14 +82,14 @@ Mọi yêu cầu HTTP/1.1 hoặc HTTP/2 đều bắt đầu bằng giao vận TC
 
 ### 3.1 Khắc Phục Multiplexing Của HTTP/2
 Trong HTTP/1.1, để tải 10 ảnh đồng thời, trình duyệt phải mở 6 kết nối TCP riêng biệt. Trong HTTP/2, chỉ cần **1 kết nối TCP duy nhất** chứa hàng trăm luồng nhị phân (Binary Streams).
-Tuy nhiên, vì HTTP/2 vẫn chạy trên nền TCP: Nếu 1 packet bị mất trên đường truyền internet, **toàn bộ các stream khác trên kết nối TCP đó đều bị dừng lại chờ truyền lại (TCP HoL Blocking)**!
+Tuy nhiên, vì HTTP/2 vẫn chạy trên nền TCP: Nếu 1 packet bị mất trên đường truyền internet, **toàn bộ các stream khác trên kết nối TCP đó đều bị dừng lại chờ truyền lại (TCP HoL Blocking)**.
 HTTP/3 giải quyết triệt để vấn đề này bằng cách chuyển nền tảng sang UDP kết hợp bộ máy QUIC kiểm soát lỗi độc lập trên từng Stream.
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Tầng Giao Thức Mạng (Network Protocol Stack Map)
+### 4.1 Sơ đồ 1: Phân Phối Tầng Giao Thức Mạng (Network Protocol Stack Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 1. APPLICATION LAYER (Ứng dụng)                                             │
@@ -108,7 +106,7 @@ HTTP/3 giải quyết triệt để vấn đề này bằng cách chuyển nền
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: So Sánh Xử Lý Khi Mất Gói Tin (Packet Loss Behavior)
+### 4.2 Sơ đồ 2: So Sánh Xử Lý Khi Mất Gói Tin (Packet Loss Behavior)
 \`\`\`diagram
 HTTP/2 TRÊN NỀN TCP:
 Gói 1 (Stream A) ──► Thành công
@@ -123,7 +121,7 @@ Gói 3 (Stream C) ──► Bàn giao ngay lập tức cho Application xử lý!
 (Các Stream hoạt động độc lập hoàn toàn, không gây nghẽn chéo).
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Giao Thức (Protocol Selection Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Giao Thức (Protocol Selection Tree)
 \`\`\`diagram
 BẠN ĐANG THIẾT KẾ GIAO TIẾP MẠNG CHO HỆ THỐNG NÀO?
 │
@@ -143,7 +141,7 @@ BẠN ĐANG THIẾT KẾ GIAO TIẾP MẠNG CHO HỆ THỐNG NÀO?
     └──► WebSockets (TCP Full-duplex) hoặc WebTransport (QUIC Datagrams)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Tiêu Chí Kỹ Thuật | HTTP/1.1 | HTTP/2 | HTTP/3 (QUIC) |
 | :--- | :--- | :--- | :--- |
 | **Định dạng dữ liệu** | Văn bản thô (Plaintext Text) | Nhị phân (Binary Frames) | Nhị phân (Binary Frames + QPACK) |
@@ -281,7 +279,7 @@ export class Http2MultiplexClientService implements OnModuleDestroy {
             'Tăng kích thước gói tin tối đa lên 100MB, nhưng có thể làm tràn bộ nhớ đệm router mạng nội bộ.'
           ],
           correctIndex: 0,
-          explanation: 'Với 0-RTT, client dùng lại khóa phiên cũ (Pre-Shared Key / Session Ticket) để mã hóa dữ liệu gửi ngay trong gói tin đầu tiên (tiết kiệm hoàn toàn 1 RTT). Tuy nhiên, kẻ tấn công có thể nghe lén và gửi lại chính gói tin 0-RTT đó (Replay Attack). Do đó, chuẩn RFC khuyến cáo chỉ cho phép 0-RTT cho các phương thức Safe/Idempotent (như GET), tuyệt đối không áp dụng cho POST thanh toán nếu không có cơ chế Anti-replay token.'
+          explanation: 'Với 0-RTT, client dùng lại khóa phiên cũ (Pre-Shared Key / Session Ticket) để mã hóa dữ liệu gửi ngay trong gói tin đầu tiên (tiết kiệm hoàn toàn 1 RTT). Tuy nhiên, kẻ tấn công có thể nghe lén và gửi lại chính gói tin 0-RTT đó (Replay Attack). Do đó, chuẩn RFC khuyến cáo chỉ cho phép 0-RTT cho các phương thức Safe/Idempotent (như GET), không áp dụng cho POST thanh toán nếu không có cơ chế Anti-replay token.'
         },
         {
           id: 'c3-l1-q4',
@@ -443,15 +441,14 @@ export class Http2MultiplexClientService implements OnModuleDestroy {
       theory: `
 # 1. BỐI CẢNH KỸ THUẬT: NGUYÊN LÝ BẤT BIẾN (IDEMPOTENCY) TRONG HỆ THỐNG PHÂN TÁN
 
-Trong một kiến trúc mạng phân tán không hoàn hảo (Unreliable Distributed Network), việc một HTTP request bị thất bại hoặc mất gói giữa chừng là điều hiển nhiên xảy ra:
+Trong một kiến trúc mạng phân tán không toàn vẹn (Unreliable Distributed Network), việc một HTTP request bị thất bại hoặc mất gói giữa chừng là điều hiển nhiên xảy ra:
 
 * **Sự cố Mập Mờ Trạng Thái (The Two-Generals Network Paradox):**
   - Khi Client gửi một request trừ tiền hoặc tạo đơn hàng và gặp lỗi \`Socket Hang Up\` hoặc \`504 Gateway Timeout\`, Client hoàn toàn không thể biết được:
     1. Request chưa hề tới được Server (Server chưa làm gì).
-    2. Hay Server đã xử lý thành công, trừ tiền trong DB xong xuôi, nhưng gói tin HTTP Response trên đường bay về Client bị rớt mạng!
-
-* **Thảm họa Trừ Tiền Kép khi Retry (Double Billing Disaster):**
-  - Nếu Client (hoặc Retry Interceptor của Axios) tự động gửi lại request đó lần 2 mà API không được thiết kế có tính Idempotent: Server sẽ thực hiện trừ tiền một lần nữa trong tài khoản người dùng!
+    2. Hay Server đã xử lý thành công, trừ tiền trong DB xong xuôi, nhưng gói tin HTTP Response trên đường bay về Client bị rớt mạng.
+* **Sự cố nghiêm trọng Trừ Tiền Kép khi Retry (Double Billing Disaster):**
+  - Nếu Client (hoặc Retry Interceptor của Axios) tự động gửi lại request đó lần 2 mà API không được thiết kế có tính Idempotent: Server sẽ thực hiện trừ tiền một lần nữa trong tài khoản người dùng.
   - Trong các hệ thống Fintech, Thương mại điện tử hoặc Đặt phòng, việc không đảm bảo tính Idempotency sẽ gây thất thoát tài chính và vi phạm nghiêm trọng tính toàn vẹn dữ liệu.
 
 * **Giải pháp Chuẩn Mực: Khóa Bất Biến (Idempotency Key Architecture):**
@@ -512,15 +509,14 @@ Theo chuẩn RFC 9110 (HTTP Semantics), các phương thức được phân lo�
     │◄─ 9. Trả về ngay kết quả cũ (Cached 200) ──┤ (KHÔNG TRỪ TIỀN LẦN HAI!)     │
 \`\`\`
 
-### 3.1 Xử Lý Các Trạng Thái Biên (Edge Cases) Cực Kỳ Nguy Hiểm
+### 3.1 Xử Lý Các Trạng Thái Biên (Edge Cases) Rất Nguy Hiểm
 1. **Trạng thái Đang Xử Lý (Concurrent In-flight Request):** Nếu request 1 đang chạy (chưa xong), request 2 gửi đến cùng key: API phải trả về ngay mã **\`409 Conflict\`** kèm thông báo *"Giao dịch đang được xử lý, vui lòng không gửi lại"*.
-2. **Payload Mismatch Attack:** Nếu kẻ tấn công dùng lại \`Idempotency-Key\` cũ nhưng thay đổi số tiền từ 10,000đ thành 10,000,000đ: API phải băm SHA-256 Request Body và lưu cùng key trong Redis. Nếu phát hiện Body Hash khác nhau, lập tức ném ra lỗi **\`422 Unprocessable Entity\`**!
-
+2. **Payload Mismatch Attack:** Nếu kẻ tấn công dùng lại \`Idempotency-Key\` cũ nhưng thay đổi số tiền từ 10,000đ thành 10,000,000đ: API phải băm SHA-256 Request Body và lưu cùng key trong Redis. Nếu phát hiện Body Hash khác nhau, lập tức ném ra lỗi **\`422 Unprocessable Entity\`**.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Phối Kiến Trúc Khóa Lũy Kế (Idempotency Taxonomy Map)
+### 4.1 Sơ đồ 1: Phân Phối Kiến Trúc Khóa Lũy Kế (Idempotency Taxonomy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    KIẾN TRÚC BẢO VỆ GIAO DỊCH PHÂN TÁN                      │
@@ -538,7 +534,7 @@ Theo chuẩn RFC 9110 (HTTP Semantics), các phương thức được phân lo�
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Ra Quyết Định Của Idempotency Interceptor (Lifecycle Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Ra Quyết Định Của Idempotency Interceptor (Lifecycle Flow)
 \`\`\`diagram
 Request đến kèm Header 'x-idempotency-key'
    │
@@ -561,7 +557,7 @@ Khóa đã tồn tại trong Redis chưa?
           └── Trả kết quả về cho Client
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Triển Khai Idempotency (Implementation Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Triển Khai Idempotency (Implementation Tree)
 \`\`\`diagram
 API NÀY CÓ CẦN BẢO VỆ BẰNG IDEMPOTENCY KEY KHÔNG?
 │
@@ -578,13 +574,13 @@ API NÀY CÓ CẦN BẢO VỆ BẰNG IDEMPOTENCY KEY KHÔNG?
         └──► Có thể dùng cơ chế Rate Limiting đơn giản để hạn chế spam
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cơ Chế Chống Trùng | Độ Phức Tạp Triển Khai | Mức Độ An Toàn Dữ Liệu | Tiêu Hao Tài Nguyên | Độ Trễ Bổ Sung (Overhead) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Bỏ qua (Không xử lý)**| $0\\%$ (Không code) | Cực kỳ nguy hiểm, mất tiền | $0\\%$ | $0$ ms |
+| **Bỏ qua (Không xử lý)**| $0\\%$ (Không code) | Rất nguy hiểm, mất tiền | $0\\%$ | $0$ ms |
 | **Unique DB Constraint**| Thấp (Duy nhất 1 cột DB) | Tốt cho tạo bản ghi, khó cache | Tăng tải kiểm tra Index DB | ~2ms - 5ms (DB Roundtrip) |
-| **Redis Distributed Key**| Trung bình (Interceptor/Guard)| Hoàn hảo cho hệ thống lớn | Cần cụm Redis lưu trữ RAM | ~1ms (In-memory lookup) |
-| **Two-Phase Commit (2PC)**| Rất cao (Distributed Tx) | An toàn tuyệt đối đa database | Khóa tài nguyên lâu, giảm throughput | ~50ms - 200ms |
+| **Redis Distributed Key**| Trung bình (Interceptor/Guard)| Toàn diện cho hệ thống lớn | Cần cụm Redis lưu trữ RAM | ~1ms (In-memory lookup) |
+| **Two-Phase Commit (2PC)**| Rất cao (Distributed Tx) | An toàn hoàn toàn đa database | Khóa tài nguyên lâu, giảm throughput | ~50ms - 200ms |
 `,
       realCodeSnippet: `// File: src/modules/common/interceptors/idempotency.interceptor.ts
 // Trích dẫn từ kiến trúc Enterprise NestJS - Distributed Idempotency Protection
@@ -718,7 +714,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
             'Sử dụng biến toàn cục Map trong bộ nhớ của từng instance máy chủ để ghi nhận request đã xử lý.'
           ],
           correctIndex: 1,
-          explanation: 'Lệnh SETNX (Set if Not Exists) của Redis có tính nguyên tử tuyệt đối (atomic). Request nào đến trước mili giây đó sẽ chiếm được lock và ghi trạng thái "PROCESSING". Request đến sau sẽ thất bại khi gọi SETNX, phát hiện giao dịch đang được xử lý và lập tức trả về mã HTTP 409 Conflict, triệt tiêu hoàn toàn race condition trừ tiền hai lần.'
+          explanation: 'Lệnh SETNX (Set if Not Exists) của Redis có tính nguyên tử hoàn toàn (atomic). Request nào đến trước mili giây đó sẽ chiếm được lock và ghi trạng thái "PROCESSING". Request đến sau sẽ thất bại khi gọi SETNX, phát hiện giao dịch đang được xử lý và lập tức trả về mã HTTP 409 Conflict, triệt tiêu hoàn toàn race condition trừ tiền hai lần.'
         },
         {
           id: 'c3-l2-q4',
@@ -935,8 +931,7 @@ Trình duyệt phân loại request thành 2 nhóm:
           │◄─ 4. Trả về kết quả 201 Created ───────────────────────┤
 \`\`\`
 
-> **Cảnh báo Lỗ hổng Nguy hiểm:** TUYỆT ĐỐI KHÔNG dùng \`Access-Control-Allow-Origin: *\` khi bật \`credentials: true\`. Trình duyệt sẽ lập tức chặn đứng kết nối vì vi phạm chính sách bảo mật thông tin xác thực!
-
+> **Cảnh báo Lỗ hổng Nguy hiểm:** không dùng \`Access-Control-Allow-Origin: *\` khi bật \`credentials: true\`. Trình duyệt sẽ lập tức chặn đứng kết nối vì vi phạm chính sách bảo mật thông tin xác thực.
 ---
 
 # 3. BẢO VỆ PHIÊN ĐĂNG NHẬP VỚI COOKIE SECURITY FLAGS
@@ -953,15 +948,15 @@ res.cookie('refreshToken', token, {
 \`\`\`
 
 ### 3.1 Phân Biệt Các Chế Độ SameSite (Lax, Strict, None)
-1. **SameSite=Strict:** Cookie chỉ được gửi đi nếu request xuất phát từ chính domain đó. An toàn tuyệt đối chống tấn công Cross-Site Request Forgery (CSRF).
+1. **SameSite=Strict:** Cookie chỉ được gửi đi nếu request xuất phát từ chính domain đó. An toàn hoàn toàn chống tấn công Cross-Site Request Forgery (CSRF).
 2. **SameSite=Lax (Mặc định của Chrome):** Cookie được gửi khi người dùng click vào một đường link điều hướng từ bên ngoài vào (Top-level navigation), nhưng bị chặn trong các request ngầm của iframe, ajax hoặc post form.
 3. **SameSite=None:** Bắt buộc phải có cờ \`Secure\` đi kèm. Dành cho các kịch bản nhúng iframe của bên thứ ba (Third-party widgets).
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Các Rào Chắn An Toàn Tầng Mạng (Network Security Perimeter Map)
+### 4.1 Sơ đồ 1: Bản Đồ Các Rào Chắn An Toàn Tầng Mạng (Network Security Perimeter Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          VÙNG KHÔNG GIAN BROWSER                            │
@@ -983,7 +978,7 @@ res.cookie('refreshToken', token, {
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Kiểm Duyệt CORS Tại Trình Duyệt (Browser Decision Flowchart)
+### 4.2 Sơ đồ 2: Dòng Chảy Kiểm Duyệt CORS Tại Trình Duyệt (Browser Decision Flowchart)
 \`\`\`diagram
 Client thực hiện gọi fetch('https://api.arc-irobot.tech/data')
    │
@@ -1008,7 +1003,7 @@ Có phải cùng Origin (Protocol + Domain + Port) không?
                  └── [ CÓ ] ─────► Cho phép gửi Request thực sự tiếp theo
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Nơi Lưu Trữ Token Xác Thực (Storage Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Nơi Lưu Trữ Token Xác Thực (Storage Decision Tree)
 \`\`\`diagram
 BẠN CẦN LƯU TRỮ ACCESS TOKEN / REFRESH TOKEN Ở CLIENT?
 │
@@ -1023,13 +1018,13 @@ BẠN CẦN LƯU TRỮ ACCESS TOKEN / REFRESH TOKEN Ở CLIENT?
         └──► HttpOnly=true + Secure=true + SameSite='Lax'
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Vị Trí Lưu Token | Khả Năng Chống XSS | Khả Năng Chống CSRF | Hỗ Trợ Đa Domain | Độ Phức Tạp Triển Khai |
 | :--- | :--- | :--- | :--- | :--- |
-| **LocalStorage** | Kém (Mất token nếu dính XSS) | Miễn nhiễm tự nhiên với CSRF| Rất dễ (Gửi qua Authorization Header)| Cực kỳ đơn giản |
+| **LocalStorage** | Kém (Mất token nếu dính XSS) | Miễn nhiễm tự nhiên với CSRF| Rất dễ (Gửi qua Authorization Header)| Rất đơn giản |
 | **HttpOnly Cookie (Lax)**| Miễn nhiễm hoàn toàn với XSS | Rất cao (Chặn POST từ site khác) | Cần cấu hình CORS withCredentials | Trung bình |
-| **HttpOnly Cookie (Strict)**| Miễn nhiễm hoàn toàn với XSS | Tuyệt đối (Không gửi khi đi link) | Khó (Bị logout nếu click link ngoài) | Trung bình |
-| **In-Memory Variable** | Tốt (Mất khi F5 lại trang) | Tuyệt đối chống CSRF | Dễ dàng | Cần Refresh Token ngầm để phục hồi |
+| **HttpOnly Cookie (Strict)**| Miễn nhiễm hoàn toàn với XSS | Hoàn toàn (Không gửi khi đi link) | Khó (Bị logout nếu click link ngoài) | Trung bình |
+| **In-Memory Variable** | Tốt (Mất khi F5 lại trang) | Hoàn toàn chống CSRF | Dễ dàng | Cần Refresh Token ngầm để phục hồi |
 `,
       realCodeSnippet: `// File: src/modules/security/configuration/security-configuration.service.ts
 // Trích dẫn từ kiến trúc Enterprise NestJS - Production Security Middleware & CORS Pipeline
@@ -1145,7 +1140,7 @@ export class SecurityConfigurationService {
             'Vì sự kết hợp này sẽ cho phép bất kỳ website độc hại nào trên Internet đều có thể gửi request ngầm kèm theo Cookie/Credentials của người dùng đến server và đọc trộm toàn bộ dữ liệu phản hồi riêng tư.'
           ],
           correctIndex: 3,
-          explanation: 'Nếu cho phép * đi cùng Credentials: true, bất kỳ website nào người dùng ghé thăm đều có thể gửi request AJAX mang theo cookie đăng nhập đến ngân hàng/mạng xã hội của nạn nhân và đọc toàn bộ dữ liệu trả về. Chuẩn CORS cấm tuyệt đối điều này: nếu cho phép Credentials, Origin bắt buộc phải là một domain cụ thể tường minh.'
+          explanation: 'Nếu cho phép * đi cùng Credentials: true, bất kỳ website nào người dùng ghé thăm đều có thể gửi request AJAX mang theo cookie đăng nhập đến ngân hàng/mạng xã hội của nạn nhân và đọc toàn bộ dữ liệu trả về. Chuẩn CORS cấm hoàn toàn điều này: nếu cho phép Credentials, Origin bắt buộc phải là một domain cụ thể tường minh.'
         },
         {
           id: 'c3-l3-q5',

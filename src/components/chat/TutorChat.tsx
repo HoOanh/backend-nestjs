@@ -422,7 +422,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({
   };
 
   const currentModelOption = MODEL_OPTIONS.find((m) => m.id === selectedModel) || MODEL_OPTIONS[0];
-  const currentModelShortLabel = currentModelOption?.shortLabel || currentModelOption?.label.replace('Gemini ', '') || '3.8 Flash';
+  const currentModelShortLabel = currentModelOption?.shortLabel || currentModelOption?.label.replace('Gemini ', '') || '3.5 Flash-Lite';
   const hasContent = Boolean(input.trim() || selectedImage);
 
   return (
@@ -599,9 +599,25 @@ export const TutorChat: React.FC<TutorChatProps> = ({
               <div className="history-drawer-list">
                 {sessions.length === 0 ? (
                   <div className="history-drawer-empty">
-                    <div className="drawer-empty-icon">💬</div>
+                    <div className="drawer-empty-icon">
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                    </div>
                     <h6>Chưa có phiên chat nào</h6>
-                    <p>Mọi đoạn trao đổi với Arc AI Co-Pilot sẽ được lưu trữ tự động tại đây.</p>
+                    <p>
+                      Mọi đoạn trao đổi với Arc AI Co-Pilot sẽ được lưu trữ tự
+                      động tại đây.
+                    </p>
                   </div>
                 ) : (
                   sessions.map((ses) => {
@@ -622,18 +638,37 @@ export const TutorChat: React.FC<TutorChatProps> = ({
                         }}
                       >
                         <div className="session-card-icon">
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <svg
+                            width="15"
+                            height="15"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                           </svg>
                         </div>
                         <div className="session-card-main">
                           <div className="session-card-title-row">
-                            <span className="session-card-title">{ses.title}</span>
-                            {isActive && <span className="session-active-pill">Đang mở</span>}
+                            <span className="session-card-title">
+                              {ses.title}
+                            </span>
+                            {isActive && (
+                              <span className="session-active-pill">
+                                Đang mở
+                              </span>
+                            )}
                           </div>
                           <div className="session-card-meta-row">
-                            <span className="session-card-time">{formatSessionTime(ses.updatedAt)}</span>
-                            <span className="session-card-count">{ses.messageCount} tin</span>
+                            <span className="session-card-time">
+                              {formatSessionTime(ses.updatedAt)}
+                            </span>
+                            <span className="session-card-count">
+                              {ses.messageCount} tin
+                            </span>
                           </div>
                         </div>
                         <button
@@ -643,12 +678,25 @@ export const TutorChat: React.FC<TutorChatProps> = ({
                           aria-label="Xóa phiên này"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm('ĐẠI CA có chắc muốn xóa phiên chat này không?')) {
+                            if (
+                              window.confirm(
+                                'ĐẠI CA có chắc muốn xóa phiên chat này không?'
+                              )
+                            ) {
                               void deleteSession(ses.id);
                             }
                           }}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                           </svg>
@@ -662,9 +710,16 @@ export const TutorChat: React.FC<TutorChatProps> = ({
           </>
         )}
 
-        <div className="tutor-messages" ref={messagesContainerRef} onClick={handleChatContainerClick}>
+        <div
+          className="tutor-messages"
+          ref={messagesContainerRef}
+          onClick={handleChatContainerClick}
+        >
           {messages.map((message, index) => (
-            <div key={message.id || `${message.role}-${index}`} className={`tutor-message ${message.role}`}>
+            <div
+              key={message.id || `${message.role}-${index}`}
+              className={`tutor-message ${message.role}`}
+            >
               <div className="tutor-avatar">
                 {message.role === 'assistant' ? (
                   <img src="/logo.png" alt="Arc" className="tutor-avatar-img" />
@@ -685,7 +740,9 @@ export const TutorChat: React.FC<TutorChatProps> = ({
                 {message.content && (
                   <div
                     className="tutor-bubble"
-                    dangerouslySetInnerHTML={{ __html: formatChatMarkdown(message.content) }}
+                    dangerouslySetInnerHTML={{
+                      __html: formatChatMarkdown(message.content)
+                    }}
                   />
                 )}
               </div>
@@ -700,34 +757,48 @@ export const TutorChat: React.FC<TutorChatProps> = ({
                 <button
                   type="button"
                   className="quick-chip"
-                  onClick={() => void sendMessage('ĐẠI CA tóm tắt giúp em 3 luận điểm cốt lõi nhất của bài này và ứng dụng thực tế trong NestJS.')}
+                  onClick={() =>
+                    void sendMessage(
+                      'ĐẠI CA tóm tắt giúp em 3 luận điểm cốt lõi nhất của bài này và ứng dụng thực tế trong NestJS.'
+                    )
+                  }
                 >
-                  📝 Tóm tắt 3 luận điểm cốt lõi
+                  Tóm tắt 3 luận điểm cốt lõi
                 </button>
                 <button
                   type="button"
                   className="quick-chip"
-                  onClick={() => void sendMessage('Đoạn sơ đồ kiến trúc trong bài giải thích cơ chế gì? Vì sao lại thiết kế như vậy?')}
+                  onClick={() =>
+                    void sendMessage(
+                      'Đoạn sơ đồ kiến trúc trong bài giải thích cơ chế gì? Vì sao lại thiết kế như vậy?'
+                    )
+                  }
                 >
-                  🏗️ Giải thích sơ đồ kiến trúc
+                  Giải thích sơ đồ kiến trúc
                 </button>
                 <button
                   type="button"
                   className="quick-chip"
-                  onClick={() => void sendMessage('Đoạn code mẫu trong bài có điểm gì đặc biệt cần lưu ý về hiệu năng và chống rò rỉ bộ nhớ?')}
+                  onClick={() =>
+                    void sendMessage(
+                      'Đoạn code mẫu trong bài có điểm gì đặc biệt cần lưu ý về hiệu năng và chống rò rỉ bộ nhớ?'
+                    )
+                  }
                 >
-                  ⚙️ Phân tích code mẫu & hiệu năng
+                  Phân tích code mẫu & hiệu năng
                 </button>
               </div>
             </div>
           )}
 
           {isLoading && !messages[messages.length - 1]?.content && (
-            <div className="tutor-typing">Arc AI đang suy luận và phân tích dữ liệu<span> ···</span></div>
+            <div className="tutor-typing">
+              Arc AI đang suy luận và phân tích dữ liệu<span> ···</span>
+            </div>
           )}
         </div>
 
-        {error && <div className="tutor-error">⚠️ {error}</div>}
+        {error && <div className="tutor-error">{error}</div>}
 
         {/* Hidden File Input for Image Upload */}
         <input
@@ -814,10 +885,10 @@ export const TutorChat: React.FC<TutorChatProps> = ({
                     <div className="gemini-popover-list">
                       {MODEL_OPTIONS.map((model) => {
                         const isSelected = selectedModel === model.id;
-                        const isAntigravity = model.id === 'antigravity';
+                        const showDivider = model.id === 'gemma-4-31b-it';
                         return (
                           <React.Fragment key={model.id}>
-                            {isAntigravity && <div className="gemini-popover-divider" />}
+                            {showDivider && <div className="gemini-popover-divider" />}
                             <button
                               type="button"
                               role="menuitem"

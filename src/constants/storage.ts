@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   TUTOR_MODE: 'arc_tutor_mode',
   TUTOR_DOCK_WIDTH: 'arc_tutor_dock_width',
   PROGRESS_PREFIX: 'arc_progress_',
+  HISTORY_PREFIX: 'arc_history_',
   TOKEN: 'arc_auth_token',
   USER: 'arc_auth_user'
 } as const;

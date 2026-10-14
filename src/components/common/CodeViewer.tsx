@@ -87,47 +87,46 @@ export function renderEditorHtml(code: string, lang: string = 'typescript', file
     'diagram.txt'
   );
 
-  const langIcon =
-    lang === 'typescript' || lang === 'ts' ? 'TS' :
-    lang === 'json' ? '{ }' :
-    lang === 'bash' || lang === 'sh' ? '>_' :
-    lang === 'sql' ? 'SQL' : '📄';
-
   const htmlLines = renderCodeLines(code, lang);
 
   return `
-    <div class="vs-code-editor">
-      <div class="vs-editor-titlebar">
-        <div class="vs-window-dots">
-          <span class="dot dot-red"></span>
-          <span class="dot dot-yellow"></span>
-          <span class="dot dot-green"></span>
+    <div class="code-viewer-card vs-code-editor">
+      <div class="code-viewer-header vs-editor-titlebar">
+        <div class="code-file-badge">
+          <svg class="code-file-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          <span class="code-filename">${escapeHtml(displayFilename)}</span>
         </div>
-        <div class="vs-editor-tabs">
-          <div class="vs-tab active">
-            <span class="vs-tab-badge">${langIcon}</span>
-            <span class="vs-tab-title">${escapeHtml(displayFilename)}</span>
-          </div>
-        </div>
-        <div class="vs-editor-actions">
-          <span class="vs-lang-badge">${escapeHtml(lang.toUpperCase())}</span>
-          <button class="vs-copy-btn" type="button" title="Sao chép mã nguồn">📋 Sao chép</button>
+        <div class="code-header-actions vs-editor-actions">
+          <span class="code-lang-pill vs-lang-badge">${escapeHtml(lang.toUpperCase())}</span>
+          <button class="code-copy-btn vs-copy-btn" type="button" title="Sao chép toàn bộ mã nguồn" aria-label="Sao chép mã nguồn">
+            <svg class="copy-svg-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="copy-text">Sao chép</span>
+          </button>
         </div>
       </div>
-      <div class="vs-editor-body">
+      <div class="code-viewer-body vs-editor-body">
         ${htmlLines}
       </div>
     </div>
   `;
 }
 
-export function renderDiagramHtml(diagramText: string, title: string = 'BẢN VẼ KIẾN TRÚC HỆ THỐNG (ARCHITECTURE BLUEPRINT)'): string {
+export function renderDiagramHtml(
+  diagramText: string,
+  title: string = 'BẢN VẼ KIẾN TRÚC HỆ THỐNG (ARCHITECTURE BLUEPRINT)'
+): string {
   const cleanDiagram = escapeHtml(diagramText.replace(/^\n+|\n+$/g, ''));
   return `
     <div class="technical-blueprint-box">
       <div class="blueprint-header">
         <div class="blueprint-badge">
-          <span class="blueprint-icon">📐</span>
+          <span class="blueprint-icon">ARCH</span>
           <span class="blueprint-title">${escapeHtml(title)}</span>
         </div>
         <div class="blueprint-actions">
@@ -141,7 +140,6 @@ export function renderDiagramHtml(diagramText: string, title: string = 'BẢN V�
   `;
 }
 
-
 export const CodeViewer: React.FC<CodeViewerProps> = ({
   code,
   language = 'typescript',
@@ -150,20 +148,30 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const displayFilename = filename || (
-    language === 'typescript' || language === 'ts' ? 'reference.service.ts' :
-    language === 'json' ? 'data.json' :
-    language === 'bash' || language === 'sh' ? 'terminal.sh' :
-    language === 'sql' ? 'query.sql' :
-    language === 'prisma' ? 'schema.prisma' :
-    'code.txt'
-  );
+  const displayFilename =
+    filename ||
+    (language === 'typescript' || language === 'ts'
+      ? 'reference.service.ts'
+      : language === 'json'
+        ? 'data.json'
+        : language === 'bash' || language === 'sh'
+          ? 'terminal.sh'
+          : language === 'sql'
+            ? 'query.sql'
+            : language === 'prisma'
+              ? 'schema.prisma'
+              : 'code.txt');
 
   const langIcon =
-    language === 'typescript' || language === 'ts' ? 'TS' :
-    language === 'json' ? '{ }' :
-    language === 'bash' || language === 'sh' ? '>_' :
-    language === 'sql' ? 'SQL' : '📄';
+    language === 'typescript' || language === 'ts'
+      ? 'TS'
+      : language === 'json'
+        ? '{ }'
+        : language === 'bash' || language === 'sh'
+          ? '>_'
+          : language === 'sql'
+            ? 'SQL'
+            : 'SRC';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -174,28 +182,44 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
   const htmlLines = renderCodeLines(code, language);
 
   return (
-    <div className="vs-code-editor">
-      <div className="vs-editor-titlebar">
-        <div className="vs-window-dots">
-          <span className="dot dot-red" />
-          <span className="dot dot-yellow" />
-          <span className="dot dot-green" />
+    <div className="code-viewer-card vs-code-editor">
+      <div className="code-viewer-header vs-editor-titlebar">
+        <div className="code-file-badge">
+          <svg className="code-file-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          <span className="code-filename">{displayFilename}</span>
         </div>
-        <div className="vs-editor-tabs">
-          <div className="vs-tab active">
-            <span className="vs-tab-badge">{langIcon}</span>
-            <span className="vs-tab-title">{displayFilename}</span>
-          </div>
-        </div>
-        <div className="vs-editor-actions">
-          <span className="vs-lang-badge">{language.toUpperCase()}</span>
-          <button className="vs-copy-btn" onClick={handleCopy} title="Sao chép mã nguồn">
-            {copied ? '✓ Đã chép' : '📋 Sao chép'}
+        <div className="code-header-actions vs-editor-actions">
+          <span className="code-lang-pill vs-lang-badge">{language.toUpperCase()}</span>
+          <button
+            className={`code-copy-btn vs-copy-btn ${copied ? 'copied' : ''}`}
+            onClick={handleCopy}
+            type="button"
+            title="Sao chép mã nguồn"
+          >
+            {copied ? (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span className="copy-text" style={{ color: '#10b981' }}>Đã chép</span>
+              </>
+            ) : (
+              <>
+                <svg className="copy-svg-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span className="copy-text">Sao chép</span>
+              </>
+            )}
           </button>
         </div>
       </div>
       <div
-        className="vs-editor-body"
+        className="code-viewer-body vs-editor-body"
         style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
         dangerouslySetInnerHTML={{ __html: htmlLines }}
       />

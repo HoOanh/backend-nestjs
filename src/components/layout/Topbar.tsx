@@ -81,18 +81,36 @@ export const Topbar: React.FC<TopbarProps> = ({
             onClick={onToggleAdminBypass}
             title="Bật/tắt chế độ xem trước toàn bộ bài học của Admin"
           >
-            <span>{isAdminBypass ? '⚡ Unlock All (Admin)' : '🔒 Student Mode'}</span>
+            <span>{isAdminBypass ? 'Unlock All (Admin)' : 'Student Mode'}</span>
           </button>
         )}
 
         {/* User Role Badge */}
         <div className={`user-role-badge ${currentUser?.role || 'student'}`}>
-          {isAdmin ? '👑 Quản Trị Viên' : currentUser?.role === 'instructor' ? '👨‍🏫 Giảng Viên' : '🎓 Học Viên'}
+          {isAdmin
+            ? 'Quản Trị Viên'
+            : currentUser?.role === 'instructor'
+              ? 'Giảng Viên'
+              : 'Học Viên'}
         </div>
 
         {/* Streak Badge */}
-        <div className="user-streak-badge" title={`Chuỗi học tập liên tiếp: ${streakDays} ngày`}>
-          <span>🔥</span>
+        <div
+          className="user-streak-badge"
+          title={`Chuỗi học tập liên tiếp: ${streakDays} ngày`}
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
           <span>{streakDays} ngày</span>
         </div>
 
@@ -109,26 +127,39 @@ export const Topbar: React.FC<TopbarProps> = ({
             >
               {(currentUser?.name || 'U').charAt(0).toUpperCase()}
             </span>
-            <span className="user-display-name">{currentUser?.name || 'Học Viên'}</span>
+            <span className="user-display-name">
+              {currentUser?.name || 'Học Viên'}
+            </span>
             <span className="user-menu-chevron">▾</span>
           </button>
 
           {isUserMenuOpen && (
             <>
-              <div className="user-menu-backdrop" onClick={() => setIsUserMenuOpen(false)} />
+              <div
+                className="user-menu-backdrop"
+                onClick={() => setIsUserMenuOpen(false)}
+              />
               <div className="user-dropdown-menu">
                 <div className="user-dropdown-header">
                   <span
                     className="dropdown-avatar"
-                    style={{ background: currentUser?.avatarColor || '#0ea5e9' }}
+                    style={{
+                      background: currentUser?.avatarColor || '#0ea5e9'
+                    }}
                   >
                     {(currentUser?.name || 'U').charAt(0).toUpperCase()}
                   </span>
                   <div>
-                    <div className="dropdown-user-name">{currentUser?.name || 'Học Viên'}</div>
-                    <div className="dropdown-user-email">{currentUser?.email || ''}</div>
+                    <div className="dropdown-user-name">
+                      {currentUser?.name || 'Học Viên'}
+                    </div>
+                    <div className="dropdown-user-email">
+                      {currentUser?.email || ''}
+                    </div>
                     <div className="dropdown-user-plan">
-                      {isAdmin ? 'SYSTEM ADMIN' : `${(currentUser?.planId || 'free').toUpperCase()} PLAN`}
+                      {isAdmin
+                        ? 'SYSTEM ADMIN'
+                        : `${(currentUser?.planId || 'free').toUpperCase()} PLAN`}
                     </div>
                   </div>
                 </div>
@@ -143,12 +174,18 @@ export const Topbar: React.FC<TopbarProps> = ({
                       onNavigateToAdmin();
                     }}
                   >
-                    <span>⚙️</span><span>Trang Quản Trị (Admin CMS)</span>
+                    <span>Trang Quản Trị (Admin CMS)</span>
                   </button>
                 )}
 
-                <button className="user-dropdown-item" onClick={() => { setIsUserMenuOpen(false); onOpenHistory(); }}>
-                  <span>📊</span><span>Hồ Sơ & Tiến Độ Học Tập</span>
+                <button
+                  className="user-dropdown-item"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    onOpenHistory();
+                  }}
+                >
+                  <span>Hồ Sơ & Tiến Độ Học Tập</span>
                 </button>
 
                 {isAdmin && onToggleAdminBypass && (
@@ -159,20 +196,34 @@ export const Topbar: React.FC<TopbarProps> = ({
                       onToggleAdminBypass();
                     }}
                   >
-                    <span>⚡</span>
-                    <span>{isAdminBypass ? 'Tắt Mở Khóa Preview' : 'Bật Mở Khóa Preview (Admin)'}</span>
+                    <span>
+                      {isAdminBypass
+                        ? 'Tắt Mở Khóa Preview'
+                        : 'Bật Mở Khóa Preview (Admin)'}
+                    </span>
                   </button>
                 )}
 
-                <button className="user-dropdown-item" onClick={() => { setIsUserMenuOpen(false); onToggleTheme(); }}>
-                  <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
+                <button
+                  className="user-dropdown-item"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    onToggleTheme();
+                  }}
+                >
                   <span>Giao diện {theme === 'dark' ? 'Sáng' : 'Tối'}</span>
                 </button>
 
                 <div className="user-dropdown-divider" />
 
-                <button className="user-dropdown-item logout" onClick={() => { setIsUserMenuOpen(false); onLogout(); }}>
-                  <span>🚪</span><span>Đăng Xuất</span>
+                <button
+                  className="user-dropdown-item logout"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    onLogout();
+                  }}
+                >
+                  <span>Đăng Xuất</span>
                 </button>
               </div>
             </>

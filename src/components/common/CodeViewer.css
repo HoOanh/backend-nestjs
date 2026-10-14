@@ -1,219 +1,362 @@
 /* ==========================================================================
-   VS Code Style Code Editor & Code Viewer
+   Modern Technical Documentation Code Viewer
+   (Adaptive Theme: GitHub Light / GitHub Dark Obsidian Standard)
    ========================================================================== */
-.vs-code-editor {
-  background: #181824;
-  border: 1px solid #2d3148;
-  border-radius: var(--radius-md);
-  margin: 16px 0 24px 0;
+
+/* Base Dark Mode (Default) */
+.code-viewer-card {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-md, 10px);
+  margin: 20px 0 26px 0;
   overflow: hidden;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.24);
   font-family: var(--font-mono);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.vs-editor-titlebar {
-  background: #12131c;
-  padding: 8px 14px;
+/* Header / Titlebar - Dark */
+.code-viewer-card .code-viewer-header,
+.code-viewer-card .vs-editor-titlebar {
+  background: #161b22;
+  padding: 0 16px;
+  height: 42px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #232638;
+  border-bottom: 1px solid #21262d;
   gap: 12px;
   user-select: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.vs-window-dots {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dot-red {
-  background: #ff5f56;
-  border: 1px solid #e0443e;
-}
-
-.dot-yellow {
-  background: #ffbd2e;
-  border: 1px solid #dea123;
-}
-
-.dot-green {
-  background: #27c93f;
-  border: 1px solid #1aab29;
-}
-
-.vs-editor-tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  overflow-x: auto;
-}
-
-.vs-tab {
-  background: #181824;
-  border: 1px solid #2d3148;
-  border-bottom: none;
-  padding: 4px 12px;
-  border-radius: 6px 6px 0 0;
+.code-viewer-card .code-file-badge {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: #f1f5f9;
 }
 
-.vs-tab-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: #0284c7;
-  color: white;
-  letter-spacing: 0.5px;
+.code-viewer-card .code-file-icon {
+  color: #38bdf8;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
 }
 
-.vs-tab-title {
+.code-viewer-card .code-filename {
+  font-family: var(--font-mono);
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: 0.2px;
+  transition: color 0.2s ease;
 }
 
-.vs-editor-actions {
+.code-viewer-card .code-header-actions,
+.code-viewer-card .vs-editor-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.vs-lang-badge {
-  font-size: 11px;
+.code-viewer-card .code-lang-pill,
+.code-viewer-card .vs-lang-badge {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 700;
-  color: #94a3b8;
+  color: #8b949e;
   background: rgba(255, 255, 255, 0.06);
   padding: 2px 8px;
   border-radius: 4px;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
 }
 
-.vs-copy-btn {
-  background: rgba(255, 255, 255, 0.08);
+.code-viewer-card .code-copy-btn,
+.code-viewer-card .vs-copy-btn {
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e2e8f0;
+  color: #c9d1d9;
+  font-family: var(--font-sans);
   font-size: 11.5px;
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
-.vs-copy-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: white;
+.code-viewer-card .code-copy-btn:hover,
+.code-viewer-card .vs-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
   border-color: rgba(255, 255, 255, 0.25);
 }
 
-/* Code Body & Editor Lines */
-.vs-editor-body {
-  background: #181824;
-  padding: 14px 0;
-  font-size: 13px;
-  line-height: 1.65;
-  color: #e2e8f0 !important;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #3b4261 #12131c;
-  font-family: var(--font-mono);
+.code-viewer-card .code-copy-btn.copied,
+.code-viewer-card .vs-copy-btn.copied {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
 }
 
-.vs-editor-body::-webkit-scrollbar {
+.code-viewer-card .copy-svg-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Code Body & Editor Lines - Dark */
+.code-viewer-card .code-viewer-body,
+.code-viewer-card .vs-editor-body {
+  background: #0d1117;
+  padding: 16px 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #e6edf3 !important;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #30363d #0d1117;
+  font-family: var(--font-mono);
+  transition: background-color 0.2s ease;
+}
+
+.code-viewer-card .code-viewer-body::-webkit-scrollbar,
+.code-viewer-card .vs-editor-body::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.vs-editor-body::-webkit-scrollbar-track {
-  background: #12131c;
+.code-viewer-card .code-viewer-body::-webkit-scrollbar-track,
+.code-viewer-card .vs-editor-body::-webkit-scrollbar-track {
+  background: #0d1117;
   border-radius: 4px;
 }
 
-.vs-editor-body::-webkit-scrollbar-thumb {
-  background: #3b4261;
+.code-viewer-card .code-viewer-body::-webkit-scrollbar-thumb,
+.code-viewer-card .vs-editor-body::-webkit-scrollbar-thumb {
+  background: #30363d;
   border-radius: 4px;
-  border: 1px solid #181824;
 }
 
-.editor-line {
+.code-viewer-card .editor-line {
   display: flex;
-  align-items: flex-start;
-  min-height: 22px;
+  align-items: baseline;
+  min-height: 23px;
   padding: 0 16px;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.12s ease;
 }
 
-.editor-line:hover {
+.code-viewer-card .editor-line:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.line-num {
-  width: 40px;
-  min-width: 40px;
+.code-viewer-card .line-num {
+  width: 38px;
+  min-width: 38px;
   text-align: right;
-  padding-right: 18px;
-  color: #64748b;
+  padding-right: 14px;
+  margin-right: 16px;
+  border-right: 1px solid #21262d;
+  color: #484f58;
   user-select: none;
   font-size: 12px;
-  opacity: 0.8;
+  transition: all 0.2s ease;
 }
 
-.line-text {
+.code-viewer-card .line-text {
   flex: 1;
   white-space: pre;
   word-break: normal;
-  color: #e2e8f0 !important;
+  color: #e6edf3 !important;
+  transition: color 0.2s ease;
 }
 
-/* Syntax Highlighting Tokens (One Dark Pro Theme) */
-.tok-comment {
-  color: #7f848e !important;
+/* Syntax Highlighting Tokens (Dark Mode - GitHub Dark Palette) */
+.code-viewer-card .tok-comment {
+  color: #8b949e !important;
   font-style: italic;
 }
 
-.tok-string {
-  color: #98c379 !important;
+.code-viewer-card .tok-string {
+  color: #a5d6ff !important;
 }
 
-.tok-decorator {
-  color: #e5c07b !important;
+.code-viewer-card .tok-decorator {
+  color: #ffa657 !important;
   font-weight: 600;
 }
 
-.tok-keyword {
-  color: #c678dd !important;
+.code-viewer-card .tok-keyword {
+  color: #ff7b72 !important;
   font-weight: 600;
 }
 
-.tok-type {
-  color: #4ec9b0 !important;
+.code-viewer-card .tok-type {
+  color: #7ee787 !important;
   font-weight: 600;
 }
 
-.tok-number {
-  color: #d19a66 !important;
+.code-viewer-card .tok-number {
+  color: #f2cc60 !important;
 }
 
-.tok-function {
-  color: #61afef !important;
+.code-viewer-card .tok-function {
+  color: #d2a8ff !important;
 }
 
-.tok-punct {
-  color: #abb2bf !important;
+.code-viewer-card .tok-punct {
+  color: #c9d1d9 !important;
+}
+
+/* ==========================================================================
+   LIGHT MODE: Technical Documentation Standard (GitHub / Tailwind Light)
+   Adapts automatically when [data-theme='light'] is active on the root document
+   ========================================================================== */
+
+[data-theme='light'] .code-viewer-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme='light'] .code-viewer-card .code-viewer-header,
+[data-theme='light'] .code-viewer-card .vs-editor-titlebar {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+[data-theme='light'] .code-viewer-card .code-file-icon {
+  color: #0284c7;
+}
+
+[data-theme='light'] .code-viewer-card .code-filename {
+  color: #0f172a;
+}
+
+[data-theme='light'] .code-viewer-card .code-lang-pill,
+[data-theme='light'] .code-viewer-card .vs-lang-badge {
+  color: #475569;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+}
+
+[data-theme='light'] .code-viewer-card .code-copy-btn,
+[data-theme='light'] .code-viewer-card .vs-copy-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+[data-theme='light'] .code-viewer-card .code-copy-btn:hover,
+[data-theme='light'] .code-viewer-card .vs-copy-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+[data-theme='light'] .code-viewer-card .code-copy-btn.copied,
+[data-theme='light'] .code-viewer-card .vs-copy-btn.copied {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme='light'] .code-viewer-card .code-viewer-body,
+[data-theme='light'] .code-viewer-card .vs-editor-body {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+[data-theme='light'] .code-viewer-card .code-viewer-body::-webkit-scrollbar-track,
+[data-theme='light'] .code-viewer-card .vs-editor-body::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+[data-theme='light'] .code-viewer-card .code-viewer-body::-webkit-scrollbar-thumb,
+[data-theme='light'] .code-viewer-card .vs-editor-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme='light'] .code-viewer-card .editor-line:hover {
+  background: rgba(15, 23, 42, 0.035);
+}
+
+[data-theme='light'] .code-viewer-card .line-num {
+  color: #94a3b8;
+  border-right: 1px solid #e2e8f0;
+}
+
+[data-theme='light'] .code-viewer-card .line-text {
+  color: #1e293b !important;
+}
+
+/* Syntax Highlighting Tokens (Light Mode - GitHub / VS Code Light Palette) */
+[data-theme='light'] .code-viewer-card .tok-comment {
+  color: #64748b !important;
+  font-style: italic;
+}
+
+[data-theme='light'] .code-viewer-card .tok-string {
+  color: #0369a1 !important;
+}
+
+[data-theme='light'] .code-viewer-card .tok-decorator {
+  color: #c2410c !important;
+  font-weight: 600;
+}
+
+[data-theme='light'] .code-viewer-card .tok-keyword {
+  color: #cf222e !important;
+  font-weight: 600;
+}
+
+[data-theme='light'] .code-viewer-card .tok-type {
+  color: #047857 !important;
+  font-weight: 600;
+}
+
+[data-theme='light'] .code-viewer-card .tok-number {
+  color: #0284c7 !important;
+}
+
+[data-theme='light'] .code-viewer-card .tok-function {
+  color: #7c3aed !important;
+  font-weight: 600;
+}
+
+[data-theme='light'] .code-viewer-card .tok-punct {
+  color: #334155 !important;
+}
+
+/* ==========================================================================
+   CODEX / CODE SANDBOX EDITOR: ALWAYS PRESERVE DARK IDE THEME
+   (Explicitly isolated so Light Mode never overrides the sandbox IDE)
+   ========================================================================== */
+.sandbox-ide,
+[data-theme='light'] .sandbox-ide,
+[data-theme='dark'] .sandbox-ide {
+  background: #181824 !important;
+  border-color: #2d3148 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme='light'] .sandbox-ide .vs-editor-titlebar,
+[data-theme='dark'] .sandbox-ide .vs-editor-titlebar {
+  background: #12131c !important;
+  border-bottom-color: #232638 !important;
+}
+
+[data-theme='light'] .sandbox-ide .sandbox-editor-wrapper,
+[data-theme='dark'] .sandbox-ide .sandbox-editor-wrapper {
+  background: #181824 !important;
+}
+
+[data-theme='light'] .sandbox-ide .sandbox-gutter,
+[data-theme='dark'] .sandbox-ide .sandbox-gutter {
+  background: #12131c !important;
+  border-right-color: #232638 !important;
 }

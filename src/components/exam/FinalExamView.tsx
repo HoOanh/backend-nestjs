@@ -261,25 +261,37 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
       {/* Exam Banner */}
       <div className="exam-banner">
         <div className="exam-info">
-          <h2>🏆 {exam.title}</h2>
+          <h2>{exam.title}</h2>
           <FormattedText content={exam.description} />
-          <p role="note">Kết quả luyện tập được chấm trong trình duyệt, chờ xác minh trên server. Điểm này chưa tự cấp chứng chỉ tốt nghiệp.</p>
+          <p role="note">
+            Kết quả luyện tập được chấm trong trình duyệt, chờ xác minh trên
+            server. Điểm này chưa tự cấp chứng chỉ tốt nghiệp.
+          </p>
           <div className="exam-badges-row">
             <span className="exam-pill">
-              📚 Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc <strong>{exam.questionCountToPick || 15} câu</strong>)
+              Ngân hàng: <strong>{exam.questions.length} câu</strong> (Bốc{' '}
+              <strong>{exam.questionCountToPick || 15} câu</strong>)
             </span>
             <span className="exam-pill">
-              💻 Thực hành: <strong>3 Capstone Labs</strong>
+              Thực hành: <strong>3 Capstone Labs</strong>
             </span>
             <span className="exam-pill">
-              🎯 Điểm đạt: <strong>≥ {exam.passingScore}%</strong>
+              Điểm đạt: <strong>≥ {exam.passingScore}%</strong>
             </span>
             <span className="exam-pill">
-              ⏱️ Thời gian: <strong>{exam.timeLimitMinutes} phút</strong>
+              Thời gian: <strong>{exam.timeLimitMinutes} phút</strong>
             </span>
             {attempts.length > 0 && (
-              <span className="exam-pill" style={{ borderColor: hasPassedEver ? '#10b981' : '#f59e0b' }}>
-                🏆 Cao nhất: <strong style={{ color: hasPassedEver ? '#10b981' : '#f59e0b' }}>{bestScore}% ({hasPassedEver ? 'TỐT NGHIỆP' : 'CHƯA ĐẠT'})</strong>
+              <span
+                className="exam-pill"
+                style={{ borderColor: hasPassedEver ? '#10b981' : '#f59e0b' }}
+              >
+                Cao nhất:{' '}
+                <strong
+                  style={{ color: hasPassedEver ? '#10b981' : '#f59e0b' }}
+                >
+                  {bestScore}% ({hasPassedEver ? 'TỐT NGHIỆP' : 'CHƯA ĐẠT'})
+                </strong>
               </span>
             )}
           </div>
@@ -293,10 +305,18 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
         ) : (
           <div className={`exam-timer ${hasPassedEver ? 'completed' : ''}`}>
             <div className="timer-digits">
-              {reviewData ? `${reviewData.finalScore}%` : (finalResult ? `${finalResult.score}%` : '--')}
+              {reviewData
+                ? `${reviewData.finalScore}%`
+                : finalResult
+                  ? `${finalResult.score}%`
+                  : '--'}
             </div>
             <div className="timer-label">
-              {hasPassedEver ? '🏆 TỐT NGHIỆP' : (isSubmitted ? '❌ CHƯA ĐẠT' : 'CHƯA THI')}
+              {hasPassedEver
+                ? 'TỐT NGHIỆP'
+                : isSubmitted
+                  ? 'CHƯA ĐẠT'
+                  : 'CHƯA THI'}
             </div>
           </div>
         )}
@@ -310,26 +330,30 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
               className={`mode-tab-btn ${activeTab === 'certificate' ? 'active' : ''}`}
               onClick={() => setActiveTab('certificate')}
             >
-              🎓 Chứng Chỉ Tốt Nghiệp
+              Chứng Chỉ Tốt Nghiệp
             </button>
           )}
           <button
             className={`mode-tab-btn ${activeTab === 'review' ? 'active' : ''}`}
             onClick={() => setActiveTab('review')}
           >
-            📊 Bảng Điểm & Sửa Bài (Review)
+            Bảng Điểm & Sửa Bài (Review)
           </button>
           <button
             className={`mode-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => setActiveTab('history')}
           >
-            📜 Lịch Sử Thi ({attempts.length} lần)
+            Lịch Sử Thi ({attempts.length} lần)
           </button>
           <button
             className={`mode-tab-btn ${activeTab === 'exam' ? 'active' : ''}`}
             onClick={() => {
               if (isSubmitted) {
-                if (window.confirm('Đại ca có muốn bắt đầu một lượt thi tốt nghiệp mới? Bộ đếm thời gian sẽ reset và 15 câu hỏi ngẫu nhiên mới cùng 3 bài Capstone sẽ được nạp lại.')) {
+                if (
+                  window.confirm(
+                    'Đại ca có muốn bắt đầu một lượt thi tốt nghiệp mới? Bộ đếm thời gian sẽ reset và 15 câu hỏi ngẫu nhiên mới cùng 3 bài Capstone sẽ được nạp lại.'
+                  )
+                ) {
                   onRetakeFinalExam();
                   startNewFinalExamSession();
                 }
@@ -338,7 +362,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
               }
             }}
           >
-            {isSubmitted ? '🔄 Thi Lại Đề Mới (Nâng Điểm)' : '✍️ Đang Làm Bài Thi'}
+            {isSubmitted ? 'Thi Lại Đề Mới (Nâng Điểm)' : 'Đang Làm Bài Thi'}
           </button>
         </div>
       )}
@@ -349,7 +373,11 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           <GraduationCertificate
             result={certResult}
             onRetake={() => {
-              if (window.confirm('Đại ca có chắc muốn thi lại bài tốt nghiệp để nâng cao điểm số không?')) {
+              if (
+                window.confirm(
+                  'Đại ca có chắc muốn thi lại bài tốt nghiệp để nâng cao điểm số không?'
+                )
+              ) {
                 onRetakeFinalExam();
                 startNewFinalExamSession();
               }
@@ -372,12 +400,17 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
             </div>
             <div className="attempt-stat-card">
               <span className="stat-label">Lần Thi Gần Nhất</span>
-              <span className="stat-value">{attempts[0]?.finalScore ?? '--'}%</span>
+              <span className="stat-value">
+                {attempts[0]?.finalScore ?? '--'}%
+              </span>
             </div>
             <div className="attempt-stat-card">
               <span className="stat-label">Trạng Thái Tốt Nghiệp</span>
-              <span className="stat-value" style={{ color: hasPassedEver ? '#10b981' : '#f87171' }}>
-                {hasPassedEver ? '🎓 ĐÃ TỐT NGHIỆP' : '❌ CHƯA ĐẠT'}
+              <span
+                className="stat-value"
+                style={{ color: hasPassedEver ? '#10b981' : '#f87171' }}
+              >
+                {hasPassedEver ? 'ĐÃ TỐT NGHIỆP' : 'CHƯA ĐẠT'}
               </span>
             </div>
           </div>
@@ -385,7 +418,10 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           <div className="attempts-table-container">
             {attempts.length === 0 ? (
               <div className="empty-attempts-notice">
-                <p>Đại ca chưa có lịch sử thi nào cho kỳ thi tốt nghiệp. Hãy hoàn thành bài thi để ghi nhận thành tích!</p>
+                <p>
+                  Đại ca chưa có lịch sử thi nào cho kỳ thi tốt nghiệp. Hãy hoàn
+                  thành bài thi để ghi nhận thành tích.
+                </p>
               </div>
             ) : (
               <table className="attempts-table">
@@ -405,13 +441,21 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                   {attempts.map((att) => (
                     <tr key={att.id}>
                       <td>
-                        <span className="attempt-badge-num">#{att.attemptNumber}</span>
+                        <span className="attempt-badge-num">
+                          #{att.attemptNumber}
+                        </span>
                       </td>
                       <td>
                         <div>
-                          <div>{new Date(att.submittedAt).toLocaleTimeString('vi-VN')}</div>
+                          <div>
+                            {new Date(att.submittedAt).toLocaleTimeString(
+                              'vi-VN'
+                            )}
+                          </div>
                           <small style={{ color: 'var(--text-muted)' }}>
-                            {new Date(att.submittedAt).toLocaleDateString('vi-VN')}
+                            {new Date(att.submittedAt).toLocaleDateString(
+                              'vi-VN'
+                            )}
                           </small>
                         </div>
                       </td>
@@ -419,17 +463,22 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                         <strong>{att.studentName}</strong>
                       </td>
                       <td>
-                        <strong>{att.quizScore}%</strong> ({att.correctCount}/{att.totalQuestions} câu)
+                        <strong>{att.quizScore}%</strong> ({att.correctCount}/
+                        {att.totalQuestions} câu)
                       </td>
                       <td>
                         <strong>{att.avgCodeScore}%</strong>
                       </td>
                       <td>
-                        <strong style={{ fontSize: '15px' }}>{att.finalScore}%</strong>
+                        <strong style={{ fontSize: '15px' }}>
+                          {att.finalScore}%
+                        </strong>
                       </td>
                       <td>
-                        <span className={`attempt-score-pill ${att.passed ? 'passed' : 'failed'}`}>
-                          {att.passed ? '🎓 TỐT NGHIỆP' : '✗ CHƯA ĐẠT'}
+                        <span
+                          className={`attempt-score-pill ${att.passed ? 'passed' : 'failed'}`}
+                        >
+                          {att.passed ? 'TỐT NGHIỆP' : 'CHƯA ĐẠT'}
                         </span>
                       </td>
                       <td>
@@ -444,7 +493,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                             setActiveTab('review');
                           }}
                         >
-                          👁️ Xem Lại
+                          Xem Lại
                         </button>
                       </td>
                     </tr>
@@ -459,7 +508,9 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
       {/* TAB: REVIEW MODE VIEW */}
       {activeTab === 'review' && reviewData && (
         <div className="exam-review-container">
-          <div className={`scorecard-hero ${reviewData.passed ? 'passed' : 'failed'}`}>
+          <div
+            className={`scorecard-hero ${reviewData.passed ? 'passed' : 'failed'}`}
+          >
             <div className="scorecard-main">
               <div className="score-circle">
                 <span className="score-num">{reviewData.finalScore}%</span>
@@ -468,18 +519,21 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
               <div className="scorecard-text">
                 <h3>
                   {reviewData.passed
-                    ? `🎓 CHÚC MỪNG KỸ SƯ ${reviewData.studentName.toUpperCase()} ĐÃ TỐT NGHIỆP DANH DỰ!`
-                    : '⚠️ RẤT TIẾC, ĐẠI CA CHƯA ĐẠT ĐIỂM TỐT NGHIỆP!'}
+                    ? `KỸ SƯ ${reviewData.studentName.toUpperCase()} ĐÃ TỐT NGHIỆP DANH DỰ`
+                    : 'CHƯA ĐẠT ĐIỂM TỐT NGHIỆP'}
                 </h3>
                 <p>
                   {reviewData.passed
-                    ? `Đại ca đã hoàn thành toàn bộ khóa học với số điểm ${reviewData.finalScore}% (vượt chuẩn ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}. Chứng chỉ tốt nghiệp danh dự Arc Irobot đã sẵn sàng trong Tab "Chứng Chỉ"!`
-                    : `Điểm số đạt được: ${reviewData.finalScore}% (yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết lỗi bên dưới và bấm nút "Thi Lại Đề Mới" để nâng cao điểm số nhé!`}
+                    ? `Đại ca đã hoàn thành toàn bộ khóa học với số điểm ${reviewData.finalScore}% (chuẩn ≥ ${exam.passingScore}%). Hoàn thành vào lúc ${new Date(reviewData.submittedAt).toLocaleTimeString('vi-VN')} ngày ${new Date(reviewData.submittedAt).toLocaleDateString('vi-VN')}. Chứng chỉ tốt nghiệp danh dự Arc Irobot đã sẵn sàng trong Tab "Chứng Chỉ".`
+                    : `Điểm số đạt được: ${reviewData.finalScore}% (yêu cầu ≥ ${exam.passingScore}%). Hãy xem lại chi tiết lỗi bên dưới và bấm nút "Thi Lại Đề Mới" để nâng cao điểm số.`}
                 </p>
                 <div className="score-breakdown-row">
                   <div className="score-item">
                     <span>Trắc Nghiệm (50%):</span>
-                    <strong>{reviewData.quizScore}% ({reviewData.correctCount}/{reviewData.totalQuestions} câu đúng)</strong>
+                    <strong>
+                      {reviewData.quizScore}% ({reviewData.correctCount}/
+                      {reviewData.totalQuestions} câu đúng)
+                    </strong>
                   </div>
                   <div className="score-item">
                     <span>3 Capstone Labs (50%):</span>
@@ -493,7 +547,11 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           {/* Section 1: Quiz Review */}
           <div className="review-section">
             <div className="review-section-header">
-              <h3>📝 Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc ({reviewData.correctCount}/{reviewData.totalQuestions} câu đúng — {reviewData.quizScore}%)</h3>
+              <h3>
+                Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc (
+                {reviewData.correctCount}/{reviewData.totalQuestions} câu đúng —{' '}
+                {reviewData.quizScore}%)
+              </h3>
             </div>
 
             <div className="review-questions-list">
@@ -502,10 +560,13 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                 const isCorrect = userChoice === q.correctIndex;
 
                 return (
-                  <div key={q.id} className={`review-question-card ${isCorrect ? 'is-correct' : 'is-wrong'}`}>
+                  <div
+                    key={q.id}
+                    className={`review-question-card ${isCorrect ? 'is-correct' : 'is-wrong'}`}
+                  >
                     <div className="review-question-header">
                       <div className="review-status-badge">
-                        {isCorrect ? '✅ ĐÚNG (+10đ)' : '❌ SAI (0đ)'}
+                        {isCorrect ? 'ĐÚNG (+10đ)' : 'SAI (0đ)'}
                       </div>
                       <div className="review-question-title">
                         <strong>Câu {idx + 1}:</strong>
@@ -520,7 +581,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
 
                         let optClass = 'review-opt';
                         if (isTheCorrectOne) optClass += ' correct-answer';
-                        if (isSelected && !isTheCorrectOne) optClass += ' user-wrong-choice';
+                        if (isSelected && !isTheCorrectOne)
+                          optClass += ' user-wrong-choice';
 
                         return (
                           <div key={optIdx} className={optClass}>
@@ -529,8 +591,16 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                             </div>
                             <div className="opt-content">
                               <FormattedText content={opt} />
-                              {isTheCorrectOne && <span className="answer-tag correct">✓ Đáp án chuẩn</span>}
-                              {isSelected && !isTheCorrectOne && <span className="answer-tag wrong">✗ Lựa chọn của đại ca</span>}
+                              {isTheCorrectOne && (
+                                <span className="answer-tag correct">
+                                  Đáp án chuẩn
+                                </span>
+                              )}
+                              {isSelected && !isTheCorrectOne && (
+                                <span className="answer-tag wrong">
+                                  Lựa chọn của đại ca
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
@@ -538,8 +608,13 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                     </div>
 
                     <div className="review-explanation-box">
-                      <div className="exp-badge">💡 Phân Tích Kỹ Thuật & Best Practices:</div>
-                      <FormattedText content={q.explanation} className="exp-text" />
+                      <div className="exp-badge">
+                        Phân Tích Kỹ Thuật & Best Practices:
+                      </div>
+                      <FormattedText
+                        content={q.explanation}
+                        className="exp-text"
+                      />
                     </div>
                   </div>
                 );
@@ -550,15 +625,23 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           {/* Section 2: 3 Capstones Review */}
           <div className="review-section">
             <div className="review-section-header">
-              <h3>💻 Phần 2: Đánh Giá 3 Bài Capstone Lab ({reviewData.avgCodeScore}%)</h3>
+              <h3>
+                Phần 2: Đánh Giá 3 Bài Capstone Lab ({reviewData.avgCodeScore}%)
+              </h3>
             </div>
 
             {exam.codeChallenges.map((challenge, cIdx) => {
               const outcome = reviewData.codeOutcomes[cIdx];
               return (
-                <div key={cIdx} className="review-code-card" style={{ marginBottom: '24px' }}>
+                <div
+                  key={cIdx}
+                  className="review-code-card"
+                  style={{ marginBottom: '24px' }}
+                >
                   <div className="code-challenge-title">
-                    <h4>Bài {cIdx + 1}: {challenge.title}</h4>
+                    <h4>
+                      Bài {cIdx + 1}: {challenge.title}
+                    </h4>
                     <FormattedText content={challenge.description} />
                   </div>
 
@@ -576,16 +659,31 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                         </thead>
                         <tbody>
                           {outcome.results.map((r, rIdx) => (
-                            <tr key={rIdx} className={r.passed ? 'row-pass' : 'row-fail'}>
+                            <tr
+                              key={rIdx}
+                              className={r.passed ? 'row-pass' : 'row-fail'}
+                            >
                               <td>{rIdx + 1}</td>
-                              <td>{r.description || `Test case ${rIdx + 1}`}</td>
                               <td>
-                                <span className={`status-pill ${r.passed ? 'pass' : 'fail'}`}>
+                                {r.description || `Test case ${rIdx + 1}`}
+                              </td>
+                              <td>
+                                <span
+                                  className={`status-pill ${r.passed ? 'pass' : 'fail'}`}
+                                >
                                   {r.passed ? 'PASSED' : 'FAILED'}
                                 </span>
                               </td>
-                              <td><code>{JSON.stringify(r.expected)}</code></td>
-                              <td><code>{r.error ? `Error: ${r.error}` : JSON.stringify(r.received)}</code></td>
+                              <td>
+                                <code>{JSON.stringify(r.expected)}</code>
+                              </td>
+                              <td>
+                                <code>
+                                  {r.error
+                                    ? `Error: ${r.error}`
+                                    : JSON.stringify(r.received)}
+                                </code>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -594,7 +692,9 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                   )}
 
                   <div className="submitted-code-viewer">
-                    <div className="code-viewer-label">Mã nguồn đại ca đã nộp cho bài {cIdx + 1}:</div>
+                    <div className="code-viewer-label">
+                      Mã nguồn đại ca đã nộp cho bài {cIdx + 1}:
+                    </div>
                     <pre className="code-snippet-pre">
                       <code>{reviewData.codes[cIdx]}</code>
                     </pre>
@@ -612,7 +712,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           {/* Student Name Input */}
           <div className="student-name-card">
             <label className="student-name-label">
-              👤 Họ và Tên Học Viên (Tên sẽ được in trang trọng trên Chứng Chỉ Tốt Nghiệp):
+              Họ và Tên Học Viên (Tên sẽ được in trang trọng trên Chứng Chỉ Tốt
+              Nghiệp):
             </label>
             <input
               type="text"
@@ -626,7 +727,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           {/* SECTION 1: QUIZ */}
           <div className="quiz-container" style={{ marginBottom: '32px' }}>
             <h3 className="section-title">
-              📝 Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc Toàn Diện ({activeQuestions.length} câu)
+              Phần 1: Khảo Thí Lý Thuyết & Kiến Trúc Toàn Diện (
+              {activeQuestions.length} câu)
             </h3>
             {activeQuestions.map((q, idx) => (
               <div key={q.id} className="question-card">
@@ -659,7 +761,7 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           {/* SECTION 2: 3 CAPSTONE CODE LABS */}
           <div style={{ marginBottom: '36px' }}>
             <h3 className="section-title">
-              💻 Phần 2: Thực Hành 3 Bài Capstone Lab
+              Phần 2: Thực Hành 3 Bài Capstone Lab
             </h3>
             {exam.codeChallenges.map((challenge, idx) => (
               <div key={idx} style={{ marginBottom: '32px' }}>
@@ -670,8 +772,8 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
                   fileName={`capstone_${idx + 1}.ts`}
                   filePath={`capstones > capstone-${idx + 1} > solution.ts`}
                   headerBadge={`Capstone Lab ${idx + 1} / 3: ${challenge.title}`}
-                  runVisibleButtonText={`▶️ Chạy Thử Bài ${idx + 1} (Visible Cases)`}
-                  submitButtonText={`🔍 Kiểm Tra Toàn Bộ Tests Bài ${idx + 1}`}
+                  runVisibleButtonText={`Chạy Thử Bài ${idx + 1} (Visible Cases)`}
+                  submitButtonText={`Kiểm Tra Toàn Bộ Tests Bài ${idx + 1}`}
                 />
               </div>
             ))}
@@ -681,10 +783,15 @@ export const FinalExamView: React.FC<FinalExamViewProps> = ({
           <div style={{ textAlign: 'center', marginBottom: '60px' }}>
             <button
               className="btn btn-primary btn-lg"
-              style={{ padding: '18px 56px', fontSize: '18px', borderRadius: '14px', boxShadow: '0 8px 24px rgba(14,165,233,0.35)' }}
+              style={{
+                padding: '18px 56px',
+                fontSize: '18px',
+                borderRadius: '14px',
+                boxShadow: '0 8px 24px rgba(14,165,233,0.35)'
+              }}
               onClick={handleSubmit}
             >
-              🎓 Nộp Bài Thi Tốt Nghiệp & Xem Kết Quả
+              Nộp Bài Thi Tốt Nghiệp & Xem Kết Quả
             </button>
           </div>
         </div>

@@ -9,6 +9,54 @@ declare global {
   }
 }
 
+interface MindmapBoardState {
+  activeTab: 'stack' | 'radial';
+  scale: number;
+  panX: number;
+  panY: number;
+  hasCustomTransform: boolean;
+  activeFilter: string;
+  collapsedTiers: Set<string>;
+  collapsedSubs: Set<string>;
+  selectedNodeId: string | null;
+}
+
+const boardStateStore = new Map<string, MindmapBoardState>();
+
+function getOrCreateBoardState(board: HTMLElement): MindmapBoardState {
+  const key = board.dataset.boardKey || board.id || 'default_arch_board';
+  const existing = boardStateStore.get(key);
+  if (existing) return existing;
+
+  const created: MindmapBoardState = {
+    activeTab: 'stack',
+    scale: 0.48,
+    panX: 0,
+    panY: 0,
+    hasCustomTransform: false,
+    activeFilter: 'all',
+    collapsedTiers: new Set<string>(),
+    collapsedSubs: new Set<string>(),
+    selectedNodeId: null,
+  };
+  boardStateStore.set(key, created);
+  return created;
+}
+
+function getSvgDimensions(board: HTMLElement): { width: number; height: number } {
+  const svg = board.querySelector<SVGSVGElement>('.mindmap-master-svg');
+  if (svg) {
+    const vb = svg.getAttribute('viewBox');
+    if (vb) {
+      const parts = vb.trim().split(/[\s,]+/).map(Number);
+      if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+        return { width: parts[2], height: parts[3] };
+      }
+    }
+  }
+  return { width: 2600, height: 1200 };
+}
+
 /**
  * Hàm toàn cục thu phóng sơ đồ vừa vặn với kích thước màn hình
  */
@@ -21,12 +69,12 @@ export function fitMindmapBoard(board: HTMLElement) {
   const rect = viewport.getBoundingClientRect();
   const vpWidth = rect.width || viewport.clientWidth || 1000;
   const vpHeight = rect.height || viewport.clientHeight || 700;
-  const svgWidth = 2400;
-  const svgHeight = 1080;
+  if (vpWidth < 50 || vpHeight < 50) return;
+
+  const { width: svgWidth, height: svgHeight } = getSvgDimensions(board);
   const scaleX = vpWidth / svgWidth;
   const scaleY = vpHeight / svgHeight;
-  // Fit 100% trong khung nhìn với lề an toàn 90%
-  const scale = Math.max(0.22, Math.min(1.0, Math.min(scaleX, scaleY) * 0.90));
+  const scale = Math.max(0.22, Math.min(1.15, Math.min(scaleX, scaleY) * 0.94));
   const panX = 0;
   const panY = 0;
 
@@ -35,10 +83,14 @@ export function fitMindmapBoard(board: HTMLElement) {
     zoomLevelBtn.textContent = `${Math.round(scale * 100)}%`;
   }
 
-  // Lưu state vào dataset để controller tiếp tục tương tác từ vị trí này
   board.dataset.mindmapScale = String(scale);
   board.dataset.mindmapPanX = '0';
   board.dataset.mindmapPanY = '0';
+
+  const state = getOrCreateBoardState(board);
+  state.scale = scale;
+  state.panX = 0;
+  state.panY = 0;
 }
 
 /**
@@ -48,24 +100,39 @@ export function switchArchTab(btn: HTMLElement, target: 'stack' | 'radial') {
   const board = btn.closest<HTMLElement>('.system-architecture-board');
   if (!board) return;
 
-  const stack = board.querySelector<HTMLElement>('.arch-stack-container');
-  const radial = board.querySelector<HTMLElement>('.arch-radial-container');
-  board.querySelectorAll('.arch-tab-btn').forEach((b) => b.classList.remove('active'));
-  btn.classList.add('active');
-
-  // Đảm bảo controller luôn được khởi tạo nếu chưa
   if (board.dataset.mindmapInit !== 'true') {
     initMindMapControllers(board);
   }
+
+  const state = getOrCreateBoardState(board);
+  state.activeTab = target;
+
+  const stack = board.querySelector<HTMLElement>('.arch-stack-container');
+  const radial = board.querySelector<HTMLElement>('.arch-radial-container');
+  board.querySelectorAll<HTMLElement>('.arch-tab-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.tabTarget === target);
+  });
 
   if (target === 'radial') {
     if (stack) stack.style.display = 'none';
     if (radial) {
       radial.style.display = 'flex';
-      // Gọi fit ngay khi tab mở ra
       requestAnimationFrame(() => {
-        fitMindmapBoard(board);
-        setTimeout(() => fitMindmapBoard(board), 60);
+        if (!state.hasCustomTransform) {
+          fitMindmapBoard(board);
+          setTimeout(() => {
+            if (!state.hasCustomTransform) fitMindmapBoard(board);
+          }, 60);
+        } else {
+          const stage = board.querySelector<HTMLElement>('.mindmap-stage');
+          const zoomLevelBtn = board.querySelector<HTMLElement>('.btn-zoom-level');
+          if (stage) {
+            stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+          }
+          if (zoomLevelBtn) {
+            zoomLevelBtn.textContent = `${Math.round(state.scale * 100)}%`;
+          }
+        }
       });
     }
   } else {
@@ -74,7 +141,6 @@ export function switchArchTab(btn: HTMLElement, target: 'stack' | 'radial') {
   }
 }
 
-// Gắn sẵn lên window để các nút inline HTML bấm được ngay lập tức
 if (typeof window !== 'undefined') {
   window.__switchArchTab = switchArchTab;
   window.__fitMindmapBoard = fitMindmapBoard;
@@ -87,13 +153,28 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
   const container = root || (typeof document !== 'undefined' ? document : null);
   if (!container) return () => {};
 
-  const boards = container.querySelectorAll<HTMLElement>('.system-architecture-board');
+  const boards: HTMLElement[] = [];
+  if (
+    typeof HTMLElement !== 'undefined' &&
+    container instanceof HTMLElement &&
+    container.classList.contains('system-architecture-board')
+  ) {
+    boards.push(container);
+  }
+  container.querySelectorAll<HTMLElement>('.system-architecture-board').forEach((b) => {
+    if (!boards.includes(b)) {
+      boards.push(b);
+    }
+  });
+
   const cleanups: Array<() => void> = [];
 
   boards.forEach((board) => {
     if (board.dataset.mindmapInit === 'true') return;
     board.dataset.mindmapInit = 'true';
 
+    const state = getOrCreateBoardState(board);
+    const stackContainer = board.querySelector<HTMLElement>('.arch-stack-container');
     const radialContainer = board.querySelector<HTMLElement>('.arch-radial-container');
     const viewport = board.querySelector<HTMLElement>('.mindmap-viewport');
     const stage = board.querySelector<HTMLElement>('.mindmap-stage');
@@ -101,7 +182,6 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
     const hintBadge = board.querySelector<HTMLElement>('.mindmap-interaction-hint');
     const chips = board.querySelectorAll<HTMLButtonElement>('.mindmap-chip');
 
-    // Các thành phần Deep Knowledge Inspector Drawer
     const inspectorDrawer = board.querySelector<HTMLElement>('.mindmap-inspector-drawer');
     const inspectorTag = board.querySelector<HTMLElement>('.inspector-tier-tag');
     const inspectorTitle = board.querySelector<HTMLElement>('.inspector-title');
@@ -112,12 +192,12 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
 
     if (!viewport || !stage) return;
 
-    let scale = parseFloat(board.dataset.mindmapScale || '0.45');
-    let panX = parseFloat(board.dataset.mindmapPanX || '0');
-    let panY = parseFloat(board.dataset.mindmapPanY || '0');
     let isDragging = false;
+    let dragMoved = false;
     let startX = 0;
     let startY = 0;
+    let pointerDownClientX = 0;
+    let pointerDownClientY = 0;
 
     const hideHint = () => {
       if (hintBadge && hintBadge.style.display !== 'none') {
@@ -128,27 +208,32 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       }
     };
 
-    const updateTransform = () => {
-      stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-      if (zoomLevelBtn) {
-        zoomLevelBtn.textContent = `${Math.round(scale * 100)}%`;
+    const applyTransform = (markCustom = true) => {
+      if (markCustom) {
+        state.hasCustomTransform = true;
       }
-      board.dataset.mindmapScale = String(scale);
-      board.dataset.mindmapPanX = String(panX);
-      board.dataset.mindmapPanY = String(panY);
+      stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+      if (zoomLevelBtn) {
+        zoomLevelBtn.textContent = `${Math.round(state.scale * 100)}%`;
+      }
+      board.dataset.mindmapScale = String(state.scale);
+      board.dataset.mindmapPanX = String(state.panX);
+      board.dataset.mindmapPanY = String(state.panY);
     };
 
-    const fitToScreen = () => {
+    const fitToScreen = (resetCustomFlag = false) => {
+      if (resetCustomFlag) {
+        state.hasCustomTransform = false;
+      }
       fitMindmapBoard(board);
-      scale = parseFloat(board.dataset.mindmapScale || '0.45');
-      panX = 0;
-      panY = 0;
     };
 
     // ===== 1. DEEP KNOWLEDGE INSPECTOR LOGIC =====
     const openInspector = (nodeId: string, nodeEl?: SVGElement | HTMLElement | null) => {
       const data = MINDMAP_KNOWLEDGE_BASE[nodeId];
       if (!data || !inspectorDrawer) return;
+
+      state.selectedNodeId = nodeId;
 
       if (inspectorTag) {
         inspectorTag.textContent = data.tierNumber;
@@ -157,7 +242,7 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       }
 
       if (inspectorTitle) {
-        inspectorTitle.textContent = `${data.icon} ${data.nodeTitle}`;
+        inspectorTitle.textContent = data.nodeTitle;
       }
 
       if (inspectorConcept) {
@@ -189,14 +274,17 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
         el.classList.remove('is-selected-node');
       });
 
-      if (nodeEl) {
-        nodeEl.classList.add('is-selected-node');
+      const targetEl =
+        nodeEl || stage.querySelector<SVGElement>(`[data-node-id="${nodeId}"]`);
+      if (targetEl) {
+        targetEl.classList.add('is-selected-node');
       }
 
       inspectorDrawer.classList.add('is-open');
     };
 
     const closeInspector = () => {
+      state.selectedNodeId = null;
       if (inspectorDrawer) {
         inspectorDrawer.classList.remove('is-open');
       }
@@ -205,62 +293,65 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       });
     };
 
-    // ===== 2. COLLAPSIBLE BRANCHES LOGIC THEO TỪNG CẤP (MINDMAPS.COM FLOW) =====
-    const onExpandAll = () => {
-      hideHint();
-      // 1. Mở tất cả 4 Tầng chính (Cấp 1)
+    // ===== 2. COLLAPSIBLE BRANCHES LOGIC =====
+    const syncCollapseDom = () => {
       const branches = stage.querySelectorAll<SVGElement>('.mindmap-tier-branch');
       branches.forEach((b) => {
-        b.classList.remove('is-collapsed');
+        const tierId = b.dataset.tierId || '';
+        const collapsed = state.collapsedTiers.has(tierId);
+        b.classList.toggle('is-collapsed', collapsed);
         const textEl = b.querySelector<SVGTextElement>('.toggle-text');
-        if (textEl) textEl.textContent = '−';
+        if (textEl) textEl.textContent = collapsed ? '+' : '−';
       });
 
-      // 2. Mở tất cả các Nhánh con (Cấp 2)
       const subGroups = stage.querySelectorAll<SVGElement>('.sub-branch-group');
       subGroups.forEach((sg) => {
-        sg.classList.remove('is-collapsed-sub');
+        const subId = sg.dataset.subId || '';
+        const collapsed = state.collapsedSubs.has(subId);
+        sg.classList.toggle('is-collapsed-sub', collapsed);
         const subTextEl = sg.querySelector<SVGTextElement>('.sub-toggle-text');
-        if (subTextEl) subTextEl.textContent = '−';
+        if (subTextEl) subTextEl.textContent = collapsed ? '+' : '−';
       });
+    };
+
+    const onExpandAll = () => {
+      hideHint();
+      state.collapsedTiers.clear();
+      state.collapsedSubs.clear();
+      syncCollapseDom();
     };
 
     const onCollapseAll = () => {
       hideHint();
-      // 1. Thu gọn toàn bộ các nhánh con (Cấp 2)
-      const subGroups = stage.querySelectorAll<SVGElement>('.sub-branch-group');
-      subGroups.forEach((sg) => {
-        sg.classList.add('is-collapsed-sub');
-        const subTextEl = sg.querySelector<SVGTextElement>('.sub-toggle-text');
-        if (subTextEl) subTextEl.textContent = '+';
+      stage.querySelectorAll<SVGElement>('.mindmap-tier-branch').forEach((b) => {
+        if (b.dataset.tierId) state.collapsedTiers.add(b.dataset.tierId);
       });
-
-      // 2. Thu gọn 4 Tầng chính (Cấp 1)
-      const branches = stage.querySelectorAll<SVGElement>('.mindmap-tier-branch');
-      branches.forEach((b) => {
-        b.classList.add('is-collapsed');
-        const textEl = b.querySelector<SVGTextElement>('.toggle-text');
-        if (textEl) textEl.textContent = '+';
+      stage.querySelectorAll<SVGElement>('.sub-branch-group').forEach((sg) => {
+        if (sg.dataset.subId) state.collapsedSubs.add(sg.dataset.subId);
       });
+      syncCollapseDom();
     };
 
-    const onChipClick = (chip: HTMLButtonElement) => {
-      chips.forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      const filter = chip.dataset.filter || 'all';
+    const applyFilter = (filter: string) => {
+      state.activeFilter = filter;
+      chips.forEach((c) => {
+        c.classList.toggle('active', (c.dataset.filter || 'all') === filter);
+      });
 
       const branches = stage.querySelectorAll<SVGElement>('.mindmap-tier-branch');
       branches.forEach((b) => {
         if (filter === 'all') {
           b.classList.remove('is-dimmed', 'is-highlighted');
-        } else {
-          if (b.classList.contains(`branch-${filter}`)) {
-            b.classList.remove('is-dimmed');
-            b.classList.add('is-highlighted');
-          } else {
-            b.classList.add('is-dimmed');
-            b.classList.remove('is-highlighted');
+        } else if (b.classList.contains(`branch-${filter}`)) {
+          b.classList.remove('is-dimmed');
+          b.classList.add('is-highlighted');
+          if (b.dataset.tierId && state.collapsedTiers.has(b.dataset.tierId)) {
+            state.collapsedTiers.delete(b.dataset.tierId);
+            syncCollapseDom();
           }
+        } else {
+          b.classList.add('is-dimmed');
+          b.classList.remove('is-highlighted');
         }
       });
     };
@@ -269,13 +360,37 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       const isFs = board.classList.toggle('is-fullscreen');
       const fullscreenBtn = board.querySelector<HTMLElement>('.btn-fullscreen');
       if (fullscreenBtn) {
-        fullscreenBtn.textContent = isFs ? '✕ Thu nhỏ' : '⛶ Toàn màn hình';
+        fullscreenBtn.textContent = isFs ? 'Thu nhỏ màn hình' : 'Toàn màn hình';
       }
-      setTimeout(fitToScreen, 100);
+      setTimeout(() => fitToScreen(true), 100);
     };
 
-    // ===== 3. ROBUST EVENT DELEGATION ON BOARD (FLOW MINDMAPS.COM: MỞ CÂY CON TỪNG CẤP) =====
+    // Restore persisted board state (survives Tutor Chat open/close & tab switches)
+    syncCollapseDom();
+    applyFilter(state.activeFilter);
+    if (state.selectedNodeId) {
+      openInspector(state.selectedNodeId);
+    }
+    if (state.activeTab === 'radial' && radialContainer) {
+      if (stackContainer) stackContainer.style.display = 'none';
+      radialContainer.style.display = 'flex';
+      board.querySelectorAll<HTMLElement>('.arch-tab-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.tabTarget === 'radial');
+      });
+      if (state.hasCustomTransform) {
+        applyTransform(false);
+      } else {
+        requestAnimationFrame(() => fitToScreen(false));
+      }
+    }
+
+    // ===== 3. ROBUST EVENT DELEGATION ON BOARD =====
     const onBoardClick = (e: MouseEvent) => {
+      if (dragMoved) {
+        dragMoved = false;
+        return;
+      }
+
       const target = e.target as HTMLElement | SVGElement | null;
       if (!target) return;
 
@@ -290,33 +405,33 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       // Zoom In
       if (target.closest('.btn-zoom-in')) {
         hideHint();
-        scale = Math.min(2.5, scale + 0.12);
-        updateTransform();
+        state.scale = Math.min(2.5, state.scale + 0.08);
+        applyTransform(true);
         return;
       }
 
       // Zoom Out
       if (target.closest('.btn-zoom-out')) {
         hideHint();
-        scale = Math.max(0.22, scale - 0.12);
-        updateTransform();
+        state.scale = Math.max(0.22, state.scale - 0.08);
+        applyTransform(true);
         return;
       }
 
-      // Zoom Reset
+      // Zoom Reset / 100%
       if (target.closest('.btn-zoom-reset') || target.closest('.btn-zoom-level')) {
         hideHint();
-        scale = 1.0;
-        panX = 0;
-        panY = 0;
-        updateTransform();
+        state.scale = 1.0;
+        state.panX = 0;
+        state.panY = 0;
+        applyTransform(true);
         return;
       }
 
       // Zoom Fit
       if (target.closest('.btn-zoom-fit')) {
         hideHint();
-        fitToScreen();
+        fitToScreen(true);
         return;
       }
 
@@ -341,68 +456,83 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       // Category chip
       const chip = target.closest<HTMLButtonElement>('.mindmap-chip');
       if (chip) {
-        onChipClick(chip);
+        applyFilter(chip.dataset.filter || 'all');
         return;
       }
 
-      // Close inspector (nếu có)
+      // Close inspector
       if (target.closest('.inspector-close-btn')) {
         closeInspector();
         return;
       }
 
-      // --- CẤP 0: CLICK CENTER HUB (Toggle toàn bộ 4 Tầng) ---
-      if (target.closest('.mindmap-hub')) {
-        hideHint();
-        const hasCollapsed = stage.querySelector('.mindmap-tier-branch.is-collapsed');
-        if (hasCollapsed) {
-          onExpandAll();
-        } else {
-          onCollapseAll();
-        }
+      // Ignore clicks inside inspector drawer body
+      if (target.closest('.mindmap-inspector-drawer')) {
         return;
       }
 
-      // --- CẤP 2: CLICK SUB-BRANCH (Nút tròn sub-toggle-badge hoặc tiêu đề sub-cat-title) ---
+      // --- CẤP 2 TOGGLE BADGE: Đóng/mở nhánh con ---
       const subToggleBadge = target.closest<SVGElement>('.sub-toggle-badge');
-      const subTitleTrigger = target.closest<SVGElement>('.sub-title-trigger');
-      if (subToggleBadge || subTitleTrigger) {
+      if (subToggleBadge) {
         hideHint();
-        const subGroup = (subToggleBadge || subTitleTrigger)?.closest<SVGElement>('.sub-branch-group');
-        if (subGroup) {
-          const isNowCollapsedSub = subGroup.classList.toggle('is-collapsed-sub');
-          const subTextEl = subGroup.querySelector<SVGTextElement>('.sub-toggle-text');
-          if (subTextEl) {
-            subTextEl.textContent = isNowCollapsedSub ? '+' : '−';
+        const subGroup = subToggleBadge.closest<SVGElement>('.sub-branch-group');
+        if (subGroup && subGroup.dataset.subId) {
+          const subId = subGroup.dataset.subId;
+          if (state.collapsedSubs.has(subId)) {
+            state.collapsedSubs.delete(subId);
+          } else {
+            state.collapsedSubs.add(subId);
           }
+          syncCollapseDom();
         }
         return;
       }
 
-      // --- CẤP 1: CLICK TIER CARD (Nút tier-toggle-badge hoặc bấm vào Card Tier) ---
+      // --- CẤP 1 TOGGLE BADGE: Đóng/mở Tầng chính ---
       const tierBadge = target.closest<SVGElement>('.tier-toggle-badge');
-      const tierCard = target.closest<SVGElement>('.tier-card-trigger');
-      if (tierBadge || tierCard) {
+      if (tierBadge) {
         hideHint();
-        const tierBranch = (tierBadge || tierCard)?.closest<SVGElement>('.mindmap-tier-branch');
-        if (tierBranch) {
-          const isNowCollapsed = tierBranch.classList.toggle('is-collapsed');
-          const textEl = tierBranch.querySelector<SVGTextElement>('.toggle-text');
-          if (textEl) {
-            textEl.textContent = isNowCollapsed ? '+' : '−';
+        const tierBranch = tierBadge.closest<SVGElement>('.mindmap-tier-branch');
+        if (tierBranch && tierBranch.dataset.tierId) {
+          const tierId = tierBranch.dataset.tierId;
+          if (state.collapsedTiers.has(tierId)) {
+            state.collapsedTiers.delete(tierId);
+          } else {
+            state.collapsedTiers.add(tierId);
           }
+          syncCollapseDom();
         }
         return;
       }
 
-      // --- CẤP 3: CLICK LEAF (Chỉ highlight nhẹ nhàng, KHÔNG bật Drawer che màn hình) ---
-      const leafNode = target.closest<SVGElement>('.leaf-svg-text');
-      if (leafNode) {
+      // --- INTERACTIVE NODE CLICK (Hub, Tier Card, Sub-Branch Card, Leaf Card) ---
+      const interactiveNode = target.closest<SVGElement>('[data-node-id]');
+      if (interactiveNode) {
         hideHint();
-        stage.querySelectorAll('.leaf-svg-text.is-active-leaf').forEach((el) => {
-          el.classList.remove('is-active-leaf');
-        });
-        leafNode.classList.add('is-active-leaf');
+        const nodeId = interactiveNode.getAttribute('data-node-id');
+        if (nodeId) {
+          // If clicking a collapsed Tier Card or Sub-Branch Card, also expand it so user sees its children
+          const parentTier = interactiveNode.closest<SVGElement>('.mindmap-tier-branch');
+          if (
+            interactiveNode.classList.contains('tier-card-trigger') &&
+            parentTier?.dataset.tierId &&
+            state.collapsedTiers.has(parentTier.dataset.tierId)
+          ) {
+            state.collapsedTiers.delete(parentTier.dataset.tierId);
+            syncCollapseDom();
+          }
+          const parentSub = interactiveNode.closest<SVGElement>('.sub-branch-group');
+          if (
+            interactiveNode.classList.contains('sub-node-card') &&
+            parentSub?.dataset.subId &&
+            state.collapsedSubs.has(parentSub.dataset.subId)
+          ) {
+            state.collapsedSubs.delete(parentSub.dataset.subId);
+            syncCollapseDom();
+          }
+
+          openInspector(nodeId, interactiveNode);
+        }
         return;
       }
     };
@@ -412,27 +542,36 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
 
     // ===== 4. PAN & ZOOM GESTURES =====
     const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
       const target = e.target as HTMLElement | SVGElement | null;
       if (
         target &&
-        target.closest(
-          '.mindmap-ctrl-btn, .mindmap-chip, .mindmap-inspector-drawer, .tier-toggle-badge, .mindmap-interactive-node'
-        )
+        target.closest('.mindmap-ctrl-btn, .mindmap-chip, .mindmap-inspector-drawer')
       ) {
         return;
       }
       isDragging = true;
-      startX = e.clientX - panX;
-      startY = e.clientY - panY;
-      viewport.style.cursor = 'grabbing';
-      hideHint();
+      dragMoved = false;
+      pointerDownClientX = e.clientX;
+      pointerDownClientY = e.clientY;
+      startX = e.clientX - state.panX;
+      startY = e.clientY - state.panY;
     };
 
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      panX = e.clientX - startX;
-      panY = e.clientY - startY;
-      updateTransform();
+      const dx = e.clientX - pointerDownClientX;
+      const dy = e.clientY - pointerDownClientY;
+      if (!dragMoved && Math.hypot(dx, dy) > 5) {
+        dragMoved = true;
+        viewport.style.cursor = 'grabbing';
+        hideHint();
+      }
+      if (dragMoved) {
+        state.panX = e.clientX - startX;
+        state.panY = e.clientY - startY;
+        applyTransform(true);
+      }
     };
 
     const onMouseUp = () => {
@@ -447,9 +586,13 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       if (target && target.closest('.mindmap-inspector-drawer')) return;
       e.preventDefault();
       hideHint();
-      const zoomFactor = e.deltaY < 0 ? 0.08 : -0.08;
-      scale = Math.min(2.5, Math.max(0.22, scale + zoomFactor));
-      updateTransform();
+      const rawDelta =
+        e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 100 : e.deltaY;
+      const sensitivity = e.ctrlKey ? 0.004 : 0.0012;
+      const zoomFactor = Math.max(-0.035, Math.min(0.035, -rawDelta * sensitivity));
+      if (Math.abs(zoomFactor) < 0.0005) return;
+      state.scale = Math.min(2.5, Math.max(0.22, state.scale + zoomFactor));
+      applyTransform(true);
     };
 
     // Touch Support
@@ -462,33 +605,44 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
       hideHint();
       if (e.touches.length === 1) {
         isDragging = true;
-        startX = e.touches[0].clientX - panX;
-        startY = e.touches[0].clientY - panY;
+        dragMoved = false;
+        pointerDownClientX = e.touches[0].clientX;
+        pointerDownClientY = e.touches[0].clientY;
+        startX = e.touches[0].clientX - state.panX;
+        startY = e.touches[0].clientY - state.panY;
       } else if (e.touches.length === 2) {
         isDragging = false;
         touchStartDist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
-        initialTouchScale = scale;
+        initialTouchScale = state.scale;
       }
     };
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 1 && isDragging) {
-        e.preventDefault();
-        panX = e.touches[0].clientX - startX;
-        panY = e.touches[0].clientY - startY;
-        updateTransform();
+        const dx = e.touches[0].clientX - pointerDownClientX;
+        const dy = e.touches[0].clientY - pointerDownClientY;
+        if (!dragMoved && Math.hypot(dx, dy) > 5) {
+          dragMoved = true;
+        }
+        if (dragMoved) {
+          e.preventDefault();
+          state.panX = e.touches[0].clientX - startX;
+          state.panY = e.touches[0].clientY - startY;
+          applyTransform(true);
+        }
       } else if (e.touches.length === 2 && touchStartDist > 0) {
         e.preventDefault();
         const dist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
-        const ratio = dist / touchStartDist;
-        scale = Math.min(2.5, Math.max(0.22, initialTouchScale * ratio));
-        updateTransform();
+        const rawRatio = dist / touchStartDist;
+        const dampedRatio = 1 + (rawRatio - 1) * 0.65;
+        state.scale = Math.min(2.5, Math.max(0.22, initialTouchScale * dampedRatio));
+        applyTransform(true);
       }
     };
 
@@ -506,18 +660,22 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
         if (board.classList.contains('is-fullscreen')) {
           board.classList.remove('is-fullscreen');
           const fullscreenBtn = board.querySelector<HTMLElement>('.btn-fullscreen');
-          if (fullscreenBtn) fullscreenBtn.textContent = '⛶ Toàn màn hình';
-          setTimeout(fitToScreen, 100);
+          if (fullscreenBtn) fullscreenBtn.textContent = 'Toàn màn hình';
+          setTimeout(() => fitToScreen(false), 100);
         }
       }
     };
 
-    // ResizeObserver tự động căn chỉnh
     let resizeObserver: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
-        if (radialContainer && radialContainer.style.display !== 'none' && !isDragging) {
-          fitToScreen();
+        if (
+          radialContainer &&
+          radialContainer.style.display !== 'none' &&
+          !isDragging &&
+          !state.hasCustomTransform
+        ) {
+          fitToScreen(false);
         }
       });
       resizeObserver.observe(viewport);
@@ -532,9 +690,8 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
     viewport.addEventListener('touchend', onTouchEnd);
     window.addEventListener('keydown', onKeyDown);
 
-    // Tự động fit ban đầu nếu radialContainer đang hiển thị
-    if (radialContainer && radialContainer.style.display !== 'none') {
-      fitToScreen();
+    if (radialContainer && radialContainer.style.display !== 'none' && !state.hasCustomTransform) {
+      fitToScreen(false);
     }
 
     cleanups.push(() => {
@@ -556,7 +713,6 @@ export function initMindMapControllers(root?: HTMLElement | Document | null): ()
   };
 }
 
-// Khai báo hook toàn cục
 if (typeof window !== 'undefined') {
   window.initMindMapControllers = initMindMapControllers;
 }

@@ -1,5 +1,9 @@
-import { recordTutorTrace, authorizeTutorRequest } from './index.ts';
-import { DEFAULT_MODEL, SYSTEM_PROMPT } from './tutor-config.ts';
+import {
+  recordTutorTrace,
+  authorizeTutorRequest,
+  getPersistedModelCooldowns
+} from './index.ts';
+import { DEFAULT_MODEL, FALLBACK_MODELS, SYSTEM_PROMPT } from './tutor-config.ts';
 
 interface TutorMessage {
   role: 'user' | 'assistant';
@@ -29,9 +33,18 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
+const LEGACY_MODEL_ALIASES: Record<string, string> = {
+  antigravity: 'gemini-3.8-flash',
+  'gemini-3.7-flash': 'gemini-3.8-flash',
+  'gemini-3.5-flash': 'gemini-3.6-flash',
+  'gemma-4-31b': 'gemma-4-31b-it'
+};
+
+const modelCooldownUntil = new Map<string, number>();
+
 function sanitizeModel(model?: string): string {
   if (model && /^[a-zA-Z0-9.\-_]+$/.test(model)) {
-    return model;
+    return LEGACY_MODEL_ALIASES[model] || model;
   }
   return DEFAULT_MODEL;
 }
@@ -160,20 +173,31 @@ export default async function handler(
       .json({ error: 'Không tìm thấy câu hỏi hợp lệ từ học viên.' });
   }
   const prompt = `${SYSTEM_PROMPT}\n\nLESSON_CONTEXT:\nTitle: ${lesson.title}\nTag: ${lesson.tag || ''}\n\n${lesson.theory || ''}\n\nREAL_CODE:\n${lesson.realCodeSnippet || ''}`;
+  const estimatedPromptTokens = Math.max(
+    1,
+    Math.ceil((prompt.length + JSON.stringify(contents).length) / 4)
+  );
 
-  const FALLBACK_MODELS = [
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
-    'antigravity',
-    'gemini-2.5-flash-lite',
-    'gemma-4-31b'
-  ];
   // Keep enough time for streaming before Vercel's 30-second function limit.
-  const modelChain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)].slice(0, 3);
+  const now = Date.now();
+  try {
+    const persistedCooldowns = getPersistedModelCooldowns(now);
+    for (const [m, until] of persistedCooldowns.entries()) {
+      const existing = modelCooldownUntil.get(m) ?? 0;
+      if (until > existing) modelCooldownUntil.set(m, until);
+    }
+  } catch {}
+  const baseCandidates = [
+    model,
+    ...FALLBACK_MODELS.filter((m) => m !== model)
+  ];
+  const healthyCandidates = baseCandidates.filter(
+    (m) => (modelCooldownUntil.get(m) ?? 0) <= now
+  );
+  const cooledDownCandidates = baseCandidates.filter(
+    (m) => (modelCooldownUntil.get(m) ?? 0) > now
+  );
+  const modelChain = [...healthyCandidates, ...cooledDownCandidates].slice(0, 3);
   const requestDeadline = AbortSignal.timeout(24_000);
 
   let currentActiveModel = model;
@@ -216,9 +240,12 @@ export default async function handler(
         }
 
         if (candidateResponse.ok) {
+          modelCooldownUntil.delete(candidate);
           trace('INFO', 'AI_PROVIDER_ACCEPTED', {
             requestedModel: model,
             actualModel: candidate,
+            isFallback: candidate !== model,
+            attempt: i + 1,
             status: candidateResponse.status
           });
           currentActiveModel = candidate;
@@ -229,6 +256,18 @@ export default async function handler(
             );
           }
           break;
+        }
+
+        let cooldownMs = 0;
+        if (candidateResponse.status === 429) {
+          cooldownMs = 60_000;
+          modelCooldownUntil.set(candidate, Date.now() + cooldownMs);
+        } else if (candidateResponse.status === 503) {
+          cooldownMs = 30_000;
+          modelCooldownUntil.set(candidate, Date.now() + cooldownMs);
+        } else if (candidateResponse.status === 404) {
+          cooldownMs = 300_000;
+          modelCooldownUntil.set(candidate, Date.now() + cooldownMs);
         }
 
         const errorText = await candidateResponse.text();
@@ -242,17 +281,27 @@ export default async function handler(
           }
         } catch {}
         trace('WARN', 'AI_PROVIDER_REJECTED', {
+          requestedModel: model,
           model: candidate,
-          status: candidateResponse.status
+          attempt: i + 1,
+          status: candidateResponse.status,
+          error: parsedMsg,
+          cooldownMs
         });
         lastErrorMsg = `[${candidate}] HTTP ${candidateResponse.status}: ${parsedMsg}`;
         console.warn(
-          `Gemini model ${candidate} failed (${candidateResponse.status}): ${parsedMsg}. Trying next 3.x fallback...`
+          `Gemini model ${candidate} failed (${candidateResponse.status}): ${parsedMsg}. Trying next fallback...`
         );
       } catch (subErr) {
-        lastErrorMsg =
+        const netMsg =
           subErr instanceof Error ? subErr.message : 'Network error';
-        trace('WARN', 'AI_PROVIDER_NETWORK_ERROR', { model: candidate });
+        lastErrorMsg = netMsg;
+        trace('WARN', 'AI_PROVIDER_NETWORK_ERROR', {
+          requestedModel: model,
+          model: candidate,
+          attempt: i + 1,
+          error: netMsg
+        });
         console.warn(`Failed to connect to ${candidate}:`, subErr);
       }
     }
@@ -260,7 +309,8 @@ export default async function handler(
     if (!activeGeminiResponse) {
       trace('ERROR', 'AI_REQUEST_FAILED', {
         requestedModel: model,
-        durationMs: Date.now() - startedAt
+        durationMs: Date.now() - startedAt,
+        error: lastErrorMsg
       });
       return response.status(503).json({
         error: `Máy chủ AI Google đang quá tải tạm thời (${lastErrorMsg}). ĐẠI CA vui lòng thử lại sau giây lát.`
@@ -292,6 +342,10 @@ export default async function handler(
 
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let streamedLength = 0;
+      let providerPromptTokens = 0;
+      let providerCompletionTokens = 0;
+      let providerTotalTokens = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -312,11 +366,29 @@ export default async function handler(
               candidates?: Array<{
                 content?: { parts?: Array<{ text?: string }> };
               }>;
+              usageMetadata?: {
+                promptTokenCount?: number;
+                candidatesTokenCount?: number;
+                totalTokenCount?: number;
+              };
             };
+            if (parsed.usageMetadata) {
+              if (parsed.usageMetadata.promptTokenCount) {
+                providerPromptTokens = parsed.usageMetadata.promptTokenCount;
+              }
+              if (parsed.usageMetadata.candidatesTokenCount) {
+                providerCompletionTokens =
+                  parsed.usageMetadata.candidatesTokenCount;
+              }
+              if (parsed.usageMetadata.totalTokenCount) {
+                providerTotalTokens = parsed.usageMetadata.totalTokenCount;
+              }
+            }
             const text = parsed.candidates?.[0]?.content?.parts
               ?.map((p) => p.text || '')
               .join('');
             if (text && response.write) {
+              streamedLength += text.length;
               response.write(`data: ${JSON.stringify({ text })}\n\n`);
             }
           } catch {
@@ -332,20 +404,49 @@ export default async function handler(
             candidates?: Array<{
               content?: { parts?: Array<{ text?: string }> };
             }>;
+            usageMetadata?: {
+              promptTokenCount?: number;
+              candidatesTokenCount?: number;
+              totalTokenCount?: number;
+            };
           };
+          if (parsed.usageMetadata) {
+            if (parsed.usageMetadata.promptTokenCount) {
+              providerPromptTokens = parsed.usageMetadata.promptTokenCount;
+            }
+            if (parsed.usageMetadata.candidatesTokenCount) {
+              providerCompletionTokens =
+                parsed.usageMetadata.candidatesTokenCount;
+            }
+            if (parsed.usageMetadata.totalTokenCount) {
+              providerTotalTokens = parsed.usageMetadata.totalTokenCount;
+            }
+          }
           const text = parsed.candidates?.[0]?.content?.parts
             ?.map((p) => p.text || '')
             .join('');
           if (text && response.write) {
+            streamedLength += text.length;
             response.write(`data: ${JSON.stringify({ text })}\n\n`);
           }
         } catch {}
       }
 
       if (response.write) {
+        const promptTokens = providerPromptTokens || estimatedPromptTokens;
+        const completionTokens =
+          providerCompletionTokens || Math.max(1, Math.ceil(streamedLength / 4));
+        const totalTokens =
+          providerTotalTokens || promptTokens + completionTokens;
         trace('INFO', 'AI_STREAM_COMPLETE', {
+          requestedModel: model,
           actualModel: currentActiveModel,
-          durationMs: Date.now() - startedAt
+          isFallback: currentActiveModel !== model,
+          durationMs: Date.now() - startedAt,
+          responseLength: streamedLength,
+          promptTokens,
+          completionTokens,
+          totalTokens
         });
         response.write('data: [DONE]\n\n');
       }
@@ -359,6 +460,11 @@ export default async function handler(
     const responseText = await geminiResponse.text();
     let data: {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
       error?: { message?: string };
     } = {};
     try {
@@ -383,19 +489,33 @@ export default async function handler(
             `Gemini không trả được câu trả lời (HTTP ${geminiResponse.status}).`
         });
     }
+    const promptTokens =
+      data.usageMetadata?.promptTokenCount || estimatedPromptTokens;
+    const completionTokens =
+      data.usageMetadata?.candidatesTokenCount ||
+      Math.max(1, Math.ceil(reply.length / 4));
+    const totalTokens =
+      data.usageMetadata?.totalTokenCount || promptTokens + completionTokens;
     trace('INFO', 'AI_RESPONSE_COMPLETE', {
+      requestedModel: model,
       actualModel: currentActiveModel,
+      isFallback: currentActiveModel !== model,
       durationMs: Date.now() - startedAt,
-      responseLength: reply.length
+      responseLength: reply.length,
+      promptTokens,
+      completionTokens,
+      totalTokens
     });
     return response.status(200).json({ reply });
   } catch (err) {
-    trace('ERROR', 'AI_REQUEST_ERROR', {
-      actualModel: currentActiveModel,
-      durationMs: Date.now() - startedAt
-    });
     const errorMsg =
       err instanceof Error ? err.message : 'Không kết nối được tới Gemini.';
+    trace('ERROR', 'AI_REQUEST_ERROR', {
+      requestedModel: model,
+      actualModel: currentActiveModel,
+      durationMs: Date.now() - startedAt,
+      error: errorMsg
+    });
     if (isStream && typeof response.write === 'function') {
       response.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
       if (typeof response.end === 'function') response.end();

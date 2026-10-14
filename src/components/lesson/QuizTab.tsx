@@ -8,6 +8,7 @@ interface QuizTabProps {
   lesson: Lesson;
   onPrevTab: () => void;
   onNextTab: () => void;
+  onQuizSubmitted?: (lessonId: string, lessonTitle: string, score: number, passed: boolean) => void;
 }
 
 interface SavedQuizResult {
@@ -20,7 +21,12 @@ interface SavedQuizResult {
   submittedAt: string;
 }
 
-export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }) => {
+export const QuizTab: React.FC<QuizTabProps> = ({
+  lesson,
+  onPrevTab,
+  onNextTab,
+  onQuizSubmitted,
+}) => {
   const STORAGE_KEY = `arc_quiz_result_${lesson.id}`;
 
   const [activeQuestions, setActiveQuestions] = useState<RandomizedQuestion[]>([]);
@@ -28,34 +34,46 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
-  // Initialize or restore session when lesson.id changes
+  // Initialize or restore session (both submitted results AND in-progress draft answers) when lesson.id changes
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as SavedQuizResult;
-        if (parsed.isSubmitted && parsed.questions && parsed.questions.length > 0) {
+        if (parsed.questions && parsed.questions.length === lesson.quiz.length) {
           setActiveQuestions(parsed.questions);
           setSelectedAnswers(parsed.selectedAnswers || {});
-          setIsSubmitted(true);
+          setIsSubmitted(Boolean(parsed.isSubmitted));
+          setShowConfirmModal(false);
           return;
         }
       }
     } catch {}
 
-    // Initialize with randomized options distribution across A, B, C, D
     const shuffled = lesson.quiz.map((q, idx) => shuffleQuestionOptions(q, idx));
     setActiveQuestions(shuffled);
     setSelectedAnswers({});
     setIsSubmitted(false);
     setShowConfirmModal(false);
-  }, [lesson.id]);
+
+    try {
+      const initialDraft: SavedQuizResult = {
+        selectedAnswers: {},
+        questions: shuffled,
+        isSubmitted: false,
+        score: 0,
+        correctCount: 0,
+        totalQuestions: shuffled.length,
+        submittedAt: '',
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialDraft));
+    } catch {}
+  }, [lesson.id, STORAGE_KEY, lesson.quiz]);
 
   const totalQuestions = activeQuestions.length;
   const answeredCount = Object.keys(selectedAnswers).length;
   const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
-  // Calculate score
   let correctCount = 0;
   activeQuestions.forEach((q) => {
     if (selectedAnswers[q.id] === q.correctIndex) {
@@ -66,11 +84,26 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
   const isPassed = scorePercent >= 70;
 
   const handleSelect = (questionId: string, optionIdx: number) => {
-    if (isSubmitted) return; // Cannot modify after submission
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionIdx
-    }));
+    if (isSubmitted) return;
+    setSelectedAnswers((prev) => {
+      const next = {
+        ...prev,
+        [questionId]: optionIdx,
+      };
+      try {
+        const draftPayload: SavedQuizResult = {
+          selectedAnswers: next,
+          questions: activeQuestions,
+          isSubmitted: false,
+          score: 0,
+          correctCount: 0,
+          totalQuestions,
+          submittedAt: '',
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(draftPayload));
+      } catch {}
+      return next;
+    });
   };
 
   const handlePreSubmit = () => {
@@ -86,7 +119,6 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
     setShowConfirmModal(false);
     setIsSubmitted(true);
 
-    // Save to localStorage
     try {
       const payload: SavedQuizResult = {
         selectedAnswers,
@@ -95,24 +127,36 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
         score: scorePercent,
         correctCount,
         totalQuestions,
-        submittedAt: new Date().toISOString()
+        submittedAt: new Date().toISOString(),
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
       console.error('Failed to save quiz result:', e);
     }
+
+    if (onQuizSubmitted) {
+      onQuizSubmitted(lesson.id, lesson.title, scorePercent, isPassed);
+    }
   };
 
   const handleRetake = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    // Re-shuffle options for new practice attempt
     const shuffled = lesson.quiz.map((q, idx) => shuffleQuestionOptions(q, idx));
     setActiveQuestions(shuffled);
     setSelectedAnswers({});
     setIsSubmitted(false);
     setShowConfirmModal(false);
+    try {
+      const nextDraft: SavedQuizResult = {
+        selectedAnswers: {},
+        questions: shuffled,
+        isSubmitted: false,
+        score: 0,
+        correctCount: 0,
+        totalQuestions: shuffled.length,
+        submittedAt: '',
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextDraft));
+    } catch {}
   };
 
   return (
@@ -122,11 +166,11 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
         <div className="quiz-header-card">
           <div className="quiz-header-info">
             <div className="quiz-header-title-row">
-              <h3>📝 Khảo Thí Trắc Nghiệm Ôn Luyện</h3>
+              <h3>Khảo Thí Trắc Nghiệm Ôn Luyện</h3>
               <span className="quiz-badge-count">{totalQuestions} câu hỏi chuyên sâu</span>
             </div>
             <p className="quiz-header-desc">
-              Bộ câu hỏi được thiết kế theo chuẩn phỏng vấn & thiết kế hệ thống Senior Backend. ĐẠI CA hãy đọc kỹ câu hỏi và tư duy bản chất trước khi nộp bài.
+              Bộ câu hỏi đánh giá kiến thức kiến trúc hệ thống và cơ chế thực thi Senior Backend. ĐẠI CA đọc kỹ câu hỏi trước khi nộp bài.
             </p>
           </div>
 
@@ -148,7 +192,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
         <div className={`quiz-result-banner ${isPassed ? 'is-passed' : 'is-failed'}`}>
           <div className="result-main-col">
             <div className="result-badge-row">
-              <span className="result-badge-icon">{isPassed ? '🏆' : '⚠️'}</span>
+              <span className="result-badge-icon">{isPassed ? 'PASS' : 'REVIEW'}</span>
               <span className="result-badge-text">
                 {isPassed ? 'ĐẠT TIÊU CHUẨN KỸ THUẬT (PASS)' : 'CHƯA ĐẠT TIÊU CHUẨN (NEED REVIEW)'}
               </span>
@@ -163,19 +207,19 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
                 <strong>{correctCount} / {totalQuestions} câu chính xác</strong>
                 <p>
                   {isPassed
-                    ? 'Xuất sắc! ĐẠI CA đã nắm rất vững kiến thức lý thuyết và cơ chế runtime chuyên sâu của bài học này.'
-                    : 'ĐẠI CA cần rà soát lại các câu sai để tránh gặp lỗi kiến trúc hoặc rò rỉ bộ nhớ trong môi trường Production.'}
+                    ? 'ĐẠI CA đã nắm vững kiến thức lý thuyết và cơ chế runtime của bài học này.'
+                    : 'ĐẠI CA cần rà soát lại các câu sai để nắm chắc cơ chế vận hành trước khi triển khai thực tế.'}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="result-actions-col">
-            <button className="btn btn-secondary retake-btn" onClick={handleRetake}>
-              🔄 Làm Lại Bài Trắc Nghiệm
+            <button className="btn btn-secondary retake-btn" onClick={handleRetake} type="button">
+              Làm Lại Bài Trắc Nghiệm
             </button>
-            <button className="btn btn-primary" onClick={onNextTab}>
-              💻 Sang Bài Tập Code Sandbox ➡️
+            <button className="btn btn-primary" onClick={onNextTab} type="button">
+              Sang Bài Tập Code Sandbox →
             </button>
           </div>
         </div>
@@ -184,9 +228,9 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
       {/* 3. Section Title for Review Mode */}
       {isSubmitted && (
         <div className="quiz-review-section-title">
-          <h4>📖 Chi Tiết Sửa Bài & Phân Tích Kỹ Thuật (Review Mode)</h4>
+          <h4>Chi Tiết Sửa Bài & Phân Tích Kỹ Thuật (Review Mode)</h4>
           <span className="quiz-review-note">
-            Đối chiếu chi tiết phương án của đại ca với cơ chế hoạt động thực tế của Node.js / NestJS runtime
+            Đối chiếu chi tiết phương án đã chọn với cơ chế hoạt động của Node.js / NestJS runtime
           </span>
         </div>
       )}
@@ -210,10 +254,10 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
                 <div className="review-question-header">
                   <div className="review-status-badge">
                     {!hasAnswered
-                      ? '⚪ CHƯA TRẢ LỜI (0đ)'
+                      ? 'CHƯA TRẢ LỜI (0đ)'
                       : isCorrect
-                      ? '✅ ĐÚNG (+1đ)'
-                      : '❌ SAI (0đ)'}
+                      ? '✓ ĐÚNG (+1đ)'
+                      : '✗ SAI (0đ)'}
                   </div>
                   <div className="review-question-title">
                     <span className="question-idx-tag">Câu {idx + 1}:</span>
@@ -254,7 +298,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
 
                 {/* Deep Technical Explanation Box */}
                 <div className="review-explanation-box">
-                  <div className="exp-badge">💡 Phân Tích & Giải Thích Kỹ Thuật Chuyên Sâu:</div>
+                  <div className="exp-badge">Phân Tích & Giải Thích Kỹ Thuật Chuyên Sâu:</div>
                   <FormattedText content={q.explanation} className="exp-text" />
                 </div>
               </div>
@@ -300,24 +344,25 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
 
       {/* 5. Footer Navigation & Submit Button */}
       <div className="quiz-footer-row">
-        <button className="btn btn-secondary" onClick={onPrevTab}>
-          ⬅️ Quay lại Lý thuyết
+        <button className="btn btn-secondary" onClick={onPrevTab} type="button">
+          ← Quay lại Lý thuyết
         </button>
 
         {!isSubmitted ? (
           <button
             className="btn btn-success quiz-submit-btn"
             onClick={handlePreSubmit}
+            type="button"
           >
-            🚀 Nộp Bài Trắc Nghiệm ({answeredCount}/{totalQuestions} câu)
+            Nộp Bài Trắc Nghiệm ({answeredCount}/{totalQuestions} câu)
           </button>
         ) : (
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button className="btn btn-secondary" onClick={handleRetake}>
-              🔄 Làm Lại Bài
+            <button className="btn btn-secondary" onClick={handleRetake} type="button">
+              Làm Lại Bài
             </button>
-            <button className="btn btn-primary" onClick={onNextTab}>
-              Chuyển sang Bài Tập Code Sandbox ➡️
+            <button className="btn btn-primary" onClick={onNextTab} type="button">
+              Chuyển sang Bài Tập Code Sandbox →
             </button>
           </div>
         )}
@@ -328,7 +373,7 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
         <div className="quiz-confirm-backdrop">
           <div className="quiz-confirm-modal">
             <div className="modal-header">
-              <span className="modal-icon">⚠️</span>
+              <span className="modal-icon">!</span>
               <h3>Xác Nhận Nộp Bài Trắc Nghiệm</h3>
             </div>
             <p className="modal-body">
@@ -341,12 +386,14 @@ export const QuizTab: React.FC<QuizTabProps> = ({ lesson, onPrevTab, onNextTab }
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowConfirmModal(false)}
+                type="button"
               >
                 Tiếp tục làm bài
               </button>
               <button
                 className="btn btn-success"
                 onClick={executeSubmit}
+                type="button"
               >
                 Nộp bài luôn & Sửa bài
               </button>

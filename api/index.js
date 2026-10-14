@@ -86,7 +86,81 @@ function purgeArchive(storePath, id, fingerprint) {
 }
 
 // server/tutor-config.ts
-var DEFAULT_MODEL = "gemini-3.8-flash";
+var DEFAULT_MODEL = "gemini-3.5-flash-lite";
+var FALLBACK_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
+  "gemma-4-31b-it",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash"
+];
+var MODEL_QUOTA_SPECS = [
+  {
+    id: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash Lite",
+    priority: 1,
+    rpmLimit: 30,
+    rpdLimit: 1500,
+    tpmLimit: 25e4,
+    tierNote: "M\u1EB7c \u0111\u1ECBnh \xB7 Bucket r\u1ED9ng nh\u1EA5t (15\u201330 RPM)"
+  },
+  {
+    id: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
+    priority: 2,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "Suy lu\u1EADn s\xE2u \xB7 G\u1ED9p chung bucket 3.7-flash"
+  },
+  {
+    id: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    priority: 3,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "C\xE2n b\u1EB1ng \xB7 G\u1ED9p chung bucket 3.5-flash"
+  },
+  {
+    id: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    priority: 4,
+    rpmLimit: 30,
+    rpdLimit: 1500,
+    tpmLimit: 25e4,
+    tierNote: "D\u1EF1 ph\xF2ng t\u1EA3i cao \xB7 Ph\u1EA3n h\u1ED3i si\xEAu t\u1ED1c"
+  },
+  {
+    id: "gemma-4-31b-it",
+    label: "Gemma 4 31B IT",
+    priority: 5,
+    rpmLimit: 15,
+    rpdLimit: 1500,
+    tpmLimit: 15e4,
+    tierNote: "Open-weights 31B \xB7 100% Free Tier"
+  },
+  {
+    id: "gemini-2.5-flash-lite",
+    label: "Gemini 2.5 Flash Lite",
+    priority: 6,
+    rpmLimit: 15,
+    rpdLimit: 1500,
+    tpmLimit: 25e4,
+    tierNote: "Th\u1EBF h\u1EC7 2.5 Lite \xB7 \u1ED4n \u0111\u1ECBnh, \u0111\u1ED9 tr\u1EC5 th\u1EA5p"
+  },
+  {
+    id: "gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    priority: 7,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "Ch\u1ED1t ch\u1EB7n cu\u1ED1i \xB7 C\u1EE5m h\u1EA1 t\u1EA7ng 2.5 \u0111\u1ED9c l\u1EADp"
+  }
+];
 var PROMPT_VERSION = "academy-tutor-v1";
 var SYSTEM_PROMPT = `Em l\xE0 m\u1ED9t tutor k\u1EF9 thu\u1EADt c\u1EE7a Arc Irobot Academy.
 Nhi\u1EC7m v\u1EE5: gi\xFAp h\u1ECDc vi\xEAn hi\u1EC3u th\u1EADt ch\u1EAFc b\xE0i h\u1ECDc hi\u1EC7n t\u1EA1i tr\u01B0\u1EDBc khi l\xE0m tr\u1EAFc nghi\u1EC7m.
@@ -255,6 +329,7 @@ var store = {
   chat_messages: [],
   chat_logs: [],
   users: [],
+  deleted_users: [],
   sessions: [],
   revoked_tokens: [],
   plans: [],
@@ -269,35 +344,21 @@ function loadStore() {
       const raw = fs2.readFileSync(filePath, "utf-8");
       if (raw.trim()) {
         const parsed = JSON.parse(raw);
-        const diskSessions = parsed.chat_sessions || [];
-        const diskMessages = parsed.chat_messages || [];
-        const sessionMap = /* @__PURE__ */ new Map();
-        for (const s of diskSessions) sessionMap.set(s.id, s);
-        for (const s of store.chat_sessions) {
-          const onDisk = sessionMap.get(s.id);
-          if (!onDisk || s.updatedAt && s.updatedAt >= (onDisk.updatedAt || "")) {
-            sessionMap.set(s.id, s);
-          }
-        }
-        const messageMap = /* @__PURE__ */ new Map();
-        for (const m of diskMessages) messageMap.set(m.id, m);
-        for (const m of store.chat_messages) {
-          if (!messageMap.has(m.id)) messageMap.set(m.id, m);
-        }
         store = {
           entitlements: [],
           audit_logs: [],
+          chat_sessions: [],
+          chat_messages: [],
           chat_logs: [],
           users: [],
+          deleted_users: [],
           sessions: [],
           revoked_tokens: [],
           plans: [],
           user_progress: [],
           learning_history: [],
           certificates: [],
-          ...parsed,
-          chat_sessions: Array.from(sessionMap.values()),
-          chat_messages: Array.from(messageMap.values())
+          ...parsed
         };
       }
     }
@@ -585,6 +646,7 @@ var dbService = {
     if (store.revoked_tokens?.includes(token)) return null;
     const payload = verifyJwt(token);
     if (payload) {
+      if (store.deleted_users?.includes(payload.userId)) return null;
       const user = store.users.find((u) => u.id === payload.userId);
       if (user?.status === "suspended") return null;
       if (user && (payload.authVersion || 0) !== (user.auth_version || 0)) return null;
@@ -609,6 +671,7 @@ var dbService = {
       (s) => s.token === token && new Date(s.expires_at) > /* @__PURE__ */ new Date()
     );
     if (session) {
+      if (store.deleted_users?.includes(session.user_id)) return null;
       return store.users.find(
         (u) => u.id === session.user_id && u.status !== "suspended"
       ) || null;
@@ -681,6 +744,9 @@ var dbService = {
       created_at: now,
       last_login_at: now
     };
+    if (store.deleted_users) {
+      store.deleted_users = store.deleted_users.filter((uid) => uid !== user.id);
+    }
     store.users.push(newUser);
     saveStore();
     return newUser;
@@ -708,6 +774,10 @@ var dbService = {
     );
     store.chat_logs = store.chat_logs.filter((l) => l.userId !== id);
     store.users = store.users.filter((u) => u.id !== id);
+    if (!store.deleted_users) store.deleted_users = [];
+    if (!store.deleted_users.includes(id)) {
+      store.deleted_users.push(id);
+    }
     store.sessions = store.sessions.filter((s) => s.user_id !== id);
     store.user_progress = store.user_progress.filter((p) => p.user_id !== id);
     store.learning_history = store.learning_history.filter(
@@ -750,13 +820,18 @@ var dbService = {
   getLearningHistory(userId) {
     loadStore();
     if (userId) {
-      return store.learning_history.filter((h) => h.user_id === userId).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 100);
+      return store.learning_history.filter((h) => h.user_id === userId).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 1e3);
     }
-    return [...store.learning_history].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 200);
+    return [...store.learning_history].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 1e3);
   },
   addLearningHistory(history) {
     loadStore();
-    store.learning_history.push(history);
+    const existingIdx = store.learning_history.findIndex((h) => h.id === history.id);
+    if (existingIdx !== -1) {
+      store.learning_history[existingIdx] = history;
+    } else {
+      store.learning_history.push(history);
+    }
     saveStore();
     return history;
   },
@@ -812,9 +887,13 @@ function getTokenFromCookie(req) {
 }
 function setSessionCookie(res, token) {
   if (typeof res.setHeader === "function") {
+    const isProd = Boolean(
+      process.env.VERCEL || process.env.NODE_ENV === "production"
+    );
+    const secureFlag = isProd ? "; Secure" : "";
     res.setHeader(
       "Set-Cookie",
-      `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly; Secure`
+      `${COOKIE_NAME}=${token}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly${secureFlag}`
     );
   }
 }
@@ -844,9 +923,13 @@ function setTutorProofCookie(res, sessionId, userId) {
 }
 function clearSessionCookie(res) {
   if (typeof res.setHeader === "function") {
+    const isProd = Boolean(
+      process.env.VERCEL || process.env.NODE_ENV === "production"
+    );
+    const secureFlag = isProd ? "; Secure" : "";
     res.setHeader(
       "Set-Cookie",
-      `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly; Secure`
+      `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly${secureFlag}`
     );
   }
 }
@@ -875,14 +958,274 @@ function formatUserResponse(u) {
 function authorizeTutorRequest(headers, sessionId) {
   const request = { headers };
   if (!sessionId) return 401;
-  const token = getTokenFromCookie(request);
-  const actor = token ? verifyJwt(token) : null;
+  const token = getBearerToken(request) || getTokenFromCookie(request);
+  const actor = token ? dbService.getAuthUser(token) : null;
+  if (!actor) return 401;
   const proofToken = getTutorProofFromCookie(request, sessionId);
   const proof = proofToken ? verifyTutorProof(proofToken) : null;
-  if (!actor || !proof || proof.sessionId !== sessionId || proof.userId !== actor.userId) {
-    return 401;
+  if (proof && proof.sessionId === sessionId && proof.userId === actor.id) {
+    return null;
   }
-  return null;
+  loadStore();
+  const session = store.chat_sessions.find((s) => s.id === sessionId);
+  if (session) {
+    if (session.userId !== actor.id && actor.role !== "admin") return 403;
+    return null;
+  }
+  return 401;
+}
+function getPersistedModelCooldowns(now = Date.now()) {
+  loadStore();
+  const cooldownMap = /* @__PURE__ */ new Map();
+  const fiveMinAgoIso = new Date(now - 3e5).toISOString();
+  for (const log of store.chat_logs) {
+    if (!log.timestamp || log.timestamp < fiveMinAgoIso) continue;
+    const meta = log.metadata || {};
+    if (log.event === "AI_PROVIDER_ACCEPTED") {
+      const m = String(meta.actualModel || "");
+      if (m) cooldownMap.delete(m);
+    } else if (log.event === "AI_PROVIDER_REJECTED") {
+      const m = String(meta.model || "");
+      const status = Number(meta.status || 0);
+      const ts = Date.parse(log.timestamp);
+      if (!m || !Number.isFinite(ts)) continue;
+      const durationMs = status === 429 ? 6e4 : status === 503 ? 3e4 : status === 404 ? 3e5 : 0;
+      if (durationMs > 0 && ts + durationMs > now) {
+        cooldownMap.set(m, ts + durationMs);
+      }
+    }
+  }
+  return cooldownMap;
+}
+function computeModelQuotaSnapshot(modelId, now = Date.now(), currentEvent) {
+  const spec = MODEL_QUOTA_SPECS.find((s) => s.id === modelId) || {
+    id: modelId,
+    label: modelId,
+    priority: 99,
+    rpmLimit: 15,
+    rpdLimit: 500,
+    tpmLimit: 25e4,
+    tierNote: "Model t\xF9y ch\u1EC9nh / Legacy"
+  };
+  const oneMinAgoIso = new Date(now - 6e4).toISOString();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartIso = dayStart.toISOString();
+  let rpmUsed = 0;
+  let rpdUsed = 0;
+  for (const log of store.chat_logs) {
+    if (!log.timestamp || log.timestamp < dayStartIso) continue;
+    const meta = log.metadata || {};
+    const isAttempt = log.event === "AI_PROVIDER_ACCEPTED" && meta.actualModel === modelId || (log.event === "AI_PROVIDER_REJECTED" || log.event === "AI_PROVIDER_NETWORK_ERROR") && meta.model === modelId;
+    if (!isAttempt) continue;
+    rpdUsed++;
+    if (log.timestamp >= oneMinAgoIso) {
+      rpmUsed++;
+    }
+  }
+  if (currentEvent === "AI_PROVIDER_ACCEPTED" || currentEvent === "AI_PROVIDER_REJECTED" || currentEvent === "AI_PROVIDER_NETWORK_ERROR") {
+    rpmUsed++;
+    rpdUsed++;
+  }
+  return {
+    rpmLimit: spec.rpmLimit,
+    rpmUsed,
+    rpmRemaining: Math.max(0, spec.rpmLimit - rpmUsed),
+    rpdLimit: spec.rpdLimit,
+    rpdUsed,
+    rpdRemaining: Math.max(0, spec.rpdLimit - rpdUsed)
+  };
+}
+function computeAdminAiTelemetry(now = Date.now()) {
+  loadStore();
+  const oneMinAgoIso = new Date(now - 6e4).toISOString();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayStartIso = dayStart.toISOString();
+  const cooldownMap = getPersistedModelCooldowns(now);
+  const userMap = new Map(store.users.map((u) => [u.id, u]));
+  const models = MODEL_QUOTA_SPECS.map((spec) => {
+    let rpmUsed = 0;
+    let rpdUsed = 0;
+    let tpmUsed = 0;
+    let tokensToday = 0;
+    let successToday = 0;
+    let fallbackInToday = 0;
+    let error429Today = 0;
+    let error503Today = 0;
+    let errorOtherToday = 0;
+    let durationSum = 0;
+    let durationCount = 0;
+    let lastUsedAt = null;
+    let lastError = null;
+    for (const log of store.chat_logs) {
+      if (!log.timestamp) continue;
+      const meta = log.metadata || {};
+      const isTargetAccepted = log.event === "AI_PROVIDER_ACCEPTED" && meta.actualModel === spec.id;
+      const isTargetRejected = (log.event === "AI_PROVIDER_REJECTED" || log.event === "AI_PROVIDER_NETWORK_ERROR") && meta.model === spec.id;
+      const isTargetComplete = (log.event === "AI_STREAM_COMPLETE" || log.event === "AI_RESPONSE_COMPLETE") && meta.actualModel === spec.id;
+      if (isTargetAccepted || isTargetRejected || isTargetComplete) {
+        if (!lastUsedAt || log.timestamp > lastUsedAt) {
+          lastUsedAt = log.timestamp;
+        }
+      }
+      if (isTargetRejected) {
+        const status2 = Number(meta.status || 0);
+        const errStr = typeof meta.error === "string" ? meta.error : `HTTP ${status2 || "ERR"}`;
+        lastError = `${errStr} (${new Date(log.timestamp).toLocaleTimeString("vi-VN")})`;
+      }
+      if (log.timestamp < dayStartIso) continue;
+      if (isTargetAccepted || isTargetRejected) {
+        rpdUsed++;
+        if (log.timestamp >= oneMinAgoIso) {
+          rpmUsed++;
+        }
+      }
+      if (isTargetAccepted) {
+        if (meta.isFallback || meta.requestedModel && meta.requestedModel !== spec.id) {
+          fallbackInToday++;
+        }
+      }
+      if (isTargetRejected) {
+        const status2 = Number(meta.status || 0);
+        if (status2 === 429) error429Today++;
+        else if (status2 === 503) error503Today++;
+        else errorOtherToday++;
+      }
+      if (isTargetComplete) {
+        successToday++;
+        const tok = Number(meta.totalTokens || 0);
+        if (Number.isFinite(tok) && tok > 0) {
+          tokensToday += tok;
+          if (log.timestamp >= oneMinAgoIso) {
+            tpmUsed += tok;
+          }
+        }
+        const dur = Number(meta.durationMs || 0);
+        if (Number.isFinite(dur) && dur > 0) {
+          durationSum += dur;
+          durationCount++;
+        }
+      }
+    }
+    const rpmRemaining = Math.max(0, spec.rpmLimit - rpmUsed);
+    const rpdRemaining = Math.max(0, spec.rpdLimit - rpdUsed);
+    const tpmRemaining = Math.max(0, spec.tpmLimit - tpmUsed);
+    const rpmPercent = Math.min(100, Math.round(rpmUsed / spec.rpmLimit * 100));
+    const rpdPercent = Math.min(100, Math.round(rpdUsed / spec.rpdLimit * 100));
+    const cooldownUntil = cooldownMap.get(spec.id) || 0;
+    const cooldownRemainingSec = cooldownUntil > now ? Math.ceil((cooldownUntil - now) / 1e3) : 0;
+    let status = "healthy";
+    if (rpmRemaining === 0 || rpdRemaining === 0) {
+      status = "exhausted";
+    } else if (cooldownRemainingSec > 0) {
+      status = "cooldown";
+    } else if (rpmPercent >= 80 || rpdPercent >= 80) {
+      status = "warning";
+    }
+    return {
+      ...spec,
+      rpmUsed,
+      rpmRemaining,
+      rpmPercent,
+      rpdUsed,
+      rpdRemaining,
+      rpdPercent,
+      tpmUsed,
+      tpmRemaining,
+      tokensToday,
+      requestsToday: rpdUsed,
+      successToday,
+      fallbackInToday,
+      error429Today,
+      error503Today,
+      errorOtherToday,
+      avgDurationMs: durationCount > 0 ? Math.round(durationSum / durationCount) : 0,
+      status,
+      cooldownRemainingSec,
+      lastUsedAt,
+      lastError
+    };
+  });
+  const totalRpmLimit = models.reduce((acc, m) => acc + m.rpmLimit, 0);
+  const totalRpmUsed = models.reduce((acc, m) => acc + m.rpmUsed, 0);
+  const totalRpmRemaining = models.reduce((acc, m) => acc + m.rpmRemaining, 0);
+  const totalRpdLimit = models.reduce((acc, m) => acc + m.rpdLimit, 0);
+  const totalRpdUsed = models.reduce((acc, m) => acc + m.rpdUsed, 0);
+  const totalRpdRemaining = models.reduce((acc, m) => acc + m.rpdRemaining, 0);
+  const totalTpmLimit = models.reduce((acc, m) => acc + m.tpmLimit, 0);
+  const totalTpmUsed = models.reduce((acc, m) => acc + m.tpmUsed, 0);
+  const totalTokensToday = models.reduce((acc, m) => acc + m.tokensToday, 0);
+  const totalSuccessToday = models.reduce((acc, m) => acc + m.successToday, 0);
+  const totalFallbackToday = models.reduce((acc, m) => acc + m.fallbackInToday, 0);
+  const rejected429Today = models.reduce((acc, m) => acc + m.error429Today, 0);
+  const rejected503Today = models.reduce((acc, m) => acc + m.error503Today, 0);
+  const totalFailedToday = store.chat_logs.filter(
+    (l) => l.timestamp >= dayStartIso && (l.event === "AI_REQUEST_FAILED" || l.event === "AI_REQUEST_ERROR")
+  ).length;
+  const totalCompletedOrFailed = totalSuccessToday + totalFailedToday;
+  const successRateToday = totalCompletedOrFailed > 0 ? Math.round(totalSuccessToday / totalCompletedOrFailed * 100) : 100;
+  const recentLogs = store.chat_logs.filter((l) => l.event.startsWith("AI_") || l.event === "PROMPT_SENT").sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 60).map((l) => {
+    const meta = l.metadata || {};
+    const u = userMap.get(l.userId);
+    const requestedModel = String(meta.requestedModel || meta.model || "");
+    const actualModel = String(meta.actualModel || meta.model || "");
+    const quota = meta.quota || null;
+    return {
+      id: l.id,
+      timestamp: l.timestamp,
+      level: l.level,
+      event: l.event,
+      userId: l.userId,
+      userName: u?.name || "H\u1ECDc vi\xEAn",
+      userEmail: u?.email || l.userId,
+      sessionId: l.sessionId,
+      lessonId: l.lessonId,
+      requestedModel,
+      actualModel,
+      isFallback: Boolean(
+        meta.isFallback || requestedModel && actualModel && requestedModel !== actualModel
+      ),
+      status: typeof meta.status === "number" ? meta.status : null,
+      durationMs: typeof meta.durationMs === "number" ? meta.durationMs : null,
+      promptTokens: typeof meta.promptTokens === "number" ? meta.promptTokens : null,
+      completionTokens: typeof meta.completionTokens === "number" ? meta.completionTokens : null,
+      totalTokens: typeof meta.totalTokens === "number" ? meta.totalTokens : null,
+      responseLength: typeof meta.responseLength === "number" ? meta.responseLength : null,
+      error: typeof meta.error === "string" ? meta.error : null,
+      quota
+    };
+  });
+  return {
+    configured: Boolean(process.env.GEMINI_API_KEY),
+    defaultModel: DEFAULT_MODEL,
+    fallbackModels: FALLBACK_MODELS,
+    prompt: SYSTEM_PROMPT,
+    promptVersion: PROMPT_VERSION,
+    generatedAt: new Date(now).toISOString(),
+    summary: {
+      totalRpmLimit,
+      totalRpmUsed,
+      totalRpmRemaining,
+      totalRpdLimit,
+      totalRpdUsed,
+      totalRpdRemaining,
+      totalTpmLimit,
+      totalTpmUsed,
+      totalTokensToday,
+      totalRequestsToday: totalRpdUsed,
+      totalSuccessToday,
+      totalFallbackToday,
+      totalFailedToday,
+      rejected429Today,
+      rejected503Today,
+      successRateToday,
+      healthyModelsCount: models.filter((m) => m.status === "healthy").length,
+      totalModelsCount: models.length
+    },
+    models,
+    recentLogs
+  };
 }
 function recordTutorTrace(headers, sessionId, level, event, metadata) {
   try {
@@ -909,6 +1252,13 @@ function recordTutorTrace(headers, sessionId, level, event, metadata) {
       store.chat_sessions.push(owned);
       saveStore();
     }
+    const targetModel = String(
+      metadata.actualModel || metadata.model || metadata.requestedModel || ""
+    );
+    const enrichedMetadata = targetModel ? {
+      ...metadata,
+      quota: computeModelQuotaSnapshot(targetModel, Date.now(), event)
+    } : metadata;
     store.chat_logs.push({
       id: crypto2.randomUUID(),
       userId: actor.id,
@@ -917,7 +1267,7 @@ function recordTutorTrace(headers, sessionId, level, event, metadata) {
       level,
       event,
       message: event,
-      metadata,
+      metadata: enrichedMetadata,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
     saveStore();
@@ -1029,12 +1379,14 @@ async function handleApiRequestInner(req, res) {
     }
     if (pathname.startsWith("/api/chat/") || pathname.startsWith("/api/admin/")) {
       let resolveOrCreateSession = function(id, lessonId, title) {
-        let existing = store.chat_sessions.find(
-          (s) => s.id === id && (isAdmin || s.userId === actor.id)
-        );
-        if (!existing && id && id.length >= 8) {
+        const existingAny = store.chat_sessions.find((s) => s.id === id);
+        if (existingAny) {
+          return isAdmin || existingAny.userId === actor.id ? existingAny : void 0;
+        }
+        const canAutoCreate = pathname === "/api/chat/sessions/tutor-proof" || pathname === "/api/chat/messages" && method === "POST" && typeof reqBody.lessonId === "string";
+        if (canAutoCreate && id && id.length >= 8) {
           const now = (/* @__PURE__ */ new Date()).toISOString();
-          existing = {
+          const created = {
             id,
             userId: actor.id,
             lessonId: lessonId || "c1-l1",
@@ -1044,10 +1396,11 @@ async function handleApiRequestInner(req, res) {
             createdAt: now,
             updatedAt: now
           };
-          store.chat_sessions.push(existing);
+          store.chat_sessions.push(created);
           saveStore();
+          return created;
         }
-        return existing;
+        return void 0;
       };
       const token = getBearerToken(req) || getTokenFromCookie(req);
       const session = token ? dbService.getSessionByToken(token) : null;
@@ -1458,12 +1811,7 @@ async function handleApiRequestInner(req, res) {
           return;
         }
         if (pathname === "/api/admin/ai" && method === "GET") {
-          res.status(200).json({
-            configured: Boolean(process.env.GEMINI_API_KEY),
-            defaultModel: DEFAULT_MODEL,
-            prompt: SYSTEM_PROMPT,
-            promptVersion: PROMPT_VERSION
-          });
+          res.status(200).json(computeAdminAiTelemetry());
           return;
         }
         const tables = {
@@ -1809,9 +2157,13 @@ async function handleApiRequestInner(req, res) {
         res.status(400).json({ error: "\u0110i\u1EC3m ph\u1EA3i trong kho\u1EA3ng 0\u2013100" });
         return;
       }
-      if (pathname === "/api/history" && !["theory_read", "quiz_passed", "code_passed"].includes(
-        String(reqBody.action)
-      )) {
+      if (pathname === "/api/history" && ![
+        "theory_read",
+        "quiz_passed",
+        "quiz_failed",
+        "code_passed",
+        "lesson_completed"
+      ].includes(String(reqBody.action))) {
         res.status(400).json({
           error: "S\u1EF1 ki\u1EC7n thi v\xE0 ch\u1EE9ng ch\u1EC9 ch\u1EC9 \u0111\u01B0\u1EE3c ghi b\u1EDFi nghi\u1EC7p v\u1EE5 server"
         });
@@ -1875,6 +2227,7 @@ async function handleApiRequestInner(req, res) {
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
+        token: session.token,
         user: formatUserResponse(user)
       });
       return;
@@ -1913,6 +2266,7 @@ async function handleApiRequestInner(req, res) {
       setSessionCookie(res, session.token);
       res.status(200).json({
         success: true,
+        token: session.token,
         user: formatUserResponse(updatedUser)
       });
       return;
@@ -1970,12 +2324,13 @@ async function handleApiRequestInner(req, res) {
       setSessionCookie(res, session.token);
       res.status(201).json({
         success: true,
+        token: session.token,
         user: formatUserResponse(newUser)
       });
       return;
     }
     if (pathname === "/api/auth/me" && method === "GET") {
-      const token = getTokenFromCookie(req);
+      const token = getBearerToken(req) || getTokenFromCookie(req);
       if (!token) {
         res.status(401).json({ error: "Ch\u01B0a \u0111\u0103ng nh\u1EADp (thi\u1EBFu token)" });
         return;
@@ -1992,7 +2347,7 @@ async function handleApiRequestInner(req, res) {
       return;
     }
     if (pathname === "/api/auth/logout" && method === "POST") {
-      const token = getTokenFromCookie(req);
+      const token = getBearerToken(req) || getTokenFromCookie(req);
       if (token) {
         dbService.deleteSession(token);
       }
@@ -2207,13 +2562,14 @@ async function handleApiRequestInner(req, res) {
         res.status(200).json({
           success: true,
           progress: {
-            currentLessonId: "lesson-1",
+            currentLessonId: "c1-l1",
             completedLessons: {},
             sprintExamScores: {},
             finalExam: null,
             streakDays: 1,
             lastActiveDate: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-            clearedLessons: {}
+            clearedLessons: {},
+            quizScores: {}
           }
         });
         return;
@@ -2221,13 +2577,14 @@ async function handleApiRequestInner(req, res) {
       res.status(200).json({
         success: true,
         progress: {
-          currentLessonId: p.current_lesson_id,
+          currentLessonId: p.current_lesson_id || "c1-l1",
           completedLessons: JSON.parse(p.completed_lessons || "{}"),
           sprintExamScores: JSON.parse(p.sprint_exam_scores || "{}"),
           finalExam: p.final_exam ? JSON.parse(p.final_exam) : null,
           streakDays: p.streak_days,
           lastActiveDate: p.last_active_date,
-          clearedLessons: JSON.parse(p.cleared_lessons || "{}")
+          clearedLessons: JSON.parse(p.cleared_lessons || "{}"),
+          quizScores: JSON.parse(p.quiz_scores || "{}")
         }
       });
       return;
@@ -2239,20 +2596,78 @@ async function handleApiRequestInner(req, res) {
         res.status(400).json({ error: "D\u1EEF li\u1EC7u kh\xF4ng h\u1EE3p l\u1EC7" });
         return;
       }
+      const isReset = reqBody.reset === true;
       const verified = dbService.getUserProgress(userId);
+      let existingCompleted = {};
+      let existingCleared = {};
+      let existingQuizScores = {};
+      if (!isReset && verified) {
+        try {
+          existingCompleted = JSON.parse(verified.completed_lessons || "{}");
+        } catch {
+        }
+        try {
+          existingCleared = JSON.parse(verified.cleared_lessons || "{}");
+        } catch {
+        }
+        try {
+          existingQuizScores = JSON.parse(verified.quiz_scores || "{}");
+        } catch {
+        }
+      }
+      const incomingCompleted = progress.completedLessons && typeof progress.completedLessons === "object" ? progress.completedLessons : {};
+      const incomingCleared = progress.clearedLessons && typeof progress.clearedLessons === "object" ? progress.clearedLessons : {};
+      const incomingQuizScores = progress.quizScores && typeof progress.quizScores === "object" ? progress.quizScores : {};
+      const mergedCompleted = { ...existingCompleted, ...incomingCompleted };
+      const mergedCleared = { ...existingCleared, ...incomingCleared };
+      const mergedQuizScores = { ...existingQuizScores };
+      for (const [k, v] of Object.entries(incomingQuizScores)) {
+        const prevEntry = mergedQuizScores[k];
+        if (prevEntry && typeof prevEntry === "object" && v && typeof v === "object") {
+          const nextEntry = v;
+          const prevScore = typeof prevEntry.score === "number" ? prevEntry.score : 0;
+          const nextScore = typeof nextEntry.score === "number" ? nextEntry.score : 0;
+          mergedQuizScores[k] = {
+            ...prevEntry,
+            ...nextEntry,
+            score: Math.max(prevScore, nextScore),
+            passed: Boolean(prevEntry.passed || nextEntry.passed)
+          };
+        } else {
+          mergedQuizScores[k] = v;
+        }
+      }
+      const incomingLessonId = typeof progress.currentLessonId === "string" && progress.currentLessonId ? progress.currentLessonId : void 0;
+      const isDefaultUnhydratedLesson = (incomingLessonId === "lesson-1" || incomingLessonId === "c1-l1") && Object.keys(incomingCompleted).length === 0 && Object.keys(existingCompleted).length > 0;
+      const resolvedLessonId = incomingLessonId && !isDefaultUnhydratedLesson && incomingLessonId !== "lesson-1" ? incomingLessonId : verified?.current_lesson_id && verified.current_lesson_id !== "lesson-1" ? verified.current_lesson_id : incomingLessonId || "c1-l1";
+      const incomingStreak = typeof progress.streakDays === "number" && progress.streakDays > 0 ? progress.streakDays : 1;
+      const resolvedStreak = isReset ? incomingStreak : Math.max(verified?.streak_days || 1, incomingStreak);
       const dbPayload = {
         user_id: userId,
-        current_lesson_id: progress.currentLessonId || "lesson-1",
-        completed_lessons: JSON.stringify(progress.completedLessons || {}),
+        current_lesson_id: resolvedLessonId,
+        completed_lessons: JSON.stringify(mergedCompleted),
         sprint_exam_scores: verified?.sprint_exam_scores || "{}",
         final_exam: verified?.final_exam || "",
-        streak_days: typeof progress.streakDays === "number" ? progress.streakDays : 1,
-        last_active_date: progress.lastActiveDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-        cleared_lessons: JSON.stringify(progress.clearedLessons || {}),
+        streak_days: resolvedStreak,
+        last_active_date: progress.lastActiveDate || verified?.last_active_date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        cleared_lessons: JSON.stringify(mergedCleared),
+        quiz_scores: JSON.stringify(mergedQuizScores),
         updated_at: (/* @__PURE__ */ new Date()).toISOString()
       };
       dbService.saveUserProgress(dbPayload);
-      res.status(200).json({ success: true });
+      res.status(200).json({
+        success: true,
+        progress: {
+          currentLessonId: dbPayload.current_lesson_id,
+          completedLessons: mergedCompleted,
+          sprintExamScores: JSON.parse(dbPayload.sprint_exam_scores || "{}"),
+          finalExam: dbPayload.final_exam ? JSON.parse(dbPayload.final_exam) : null,
+          streakDays: dbPayload.streak_days,
+          lastActiveDate: dbPayload.last_active_date,
+          clearedLessons: mergedCleared,
+          quizScores: mergedQuizScores
+        }
+      });
       return;
     }
     if (pathname === "/api/exams/submit-sprint" && method === "POST") {
@@ -2284,13 +2699,14 @@ async function handleApiRequestInner(req, res) {
       };
       dbService.saveUserProgress({
         user_id: userId,
-        current_lesson_id: currentProg?.current_lesson_id || "lesson-1",
+        current_lesson_id: currentProg?.current_lesson_id || "c1-l1",
         completed_lessons: currentProg?.completed_lessons || "{}",
         sprint_exam_scores: JSON.stringify(sprintScores),
         final_exam: currentProg?.final_exam || "",
         streak_days: currentProg?.streak_days || 1,
         last_active_date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
         cleared_lessons: currentProg?.cleared_lessons || "{}",
+        quiz_scores: currentProg?.quiz_scores || "{}",
         updated_at: (/* @__PURE__ */ new Date()).toISOString()
       });
       dbService.addLearningHistory({
@@ -2342,13 +2758,14 @@ async function handleApiRequestInner(req, res) {
       };
       dbService.saveUserProgress({
         user_id: userId,
-        current_lesson_id: currentProg?.current_lesson_id || "lesson-1",
+        current_lesson_id: currentProg?.current_lesson_id || "c1-l1",
         completed_lessons: currentProg?.completed_lessons || "{}",
         sprint_exam_scores: currentProg?.sprint_exam_scores || "{}",
         final_exam: JSON.stringify(finalResult),
         streak_days: currentProg?.streak_days || 1,
         last_active_date: now.split("T")[0],
         cleared_lessons: currentProg?.cleared_lessons || "{}",
+        quiz_scores: currentProg?.quiz_scores || "{}",
         updated_at: now
       });
       dbService.addLearningHistory({
@@ -2393,15 +2810,17 @@ async function handleApiRequestInner(req, res) {
       const action = typeof reqBody.action === "string" ? reqBody.action : "activity";
       const score = typeof reqBody.score === "number" ? reqBody.score : void 0;
       const details = typeof reqBody.details === "string" ? reqBody.details : void 0;
+      const customId = typeof reqBody.id === "string" && /^[A-Za-z0-9_-]{6,100}$/.test(reqBody.id) ? reqBody.id : void 0;
+      const customTimestamp = typeof reqBody.timestamp === "string" && Number.isFinite(Date.parse(reqBody.timestamp)) ? new Date(reqBody.timestamp).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
       const newRecord = {
-        id: "hist_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+        id: customId || "hist_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
         user_id: userId,
         lesson_id: lessonId,
         lesson_title: lessonTitle,
         action,
         score,
         details,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        timestamp: customTimestamp
       };
       dbService.addLearningHistory(newRecord);
       res.status(201).json({ success: true, record: newRecord });
@@ -2482,9 +2901,11 @@ async function handler(req, res) {
 export {
   authorizeTutorRequest,
   bootstrapAdmin,
+  computeAdminAiTelemetry,
   dbService,
   handler as default,
   generateSessionToken,
+  getPersistedModelCooldowns,
   handleApiRequest,
   hashPassword,
   recordTutorTrace,

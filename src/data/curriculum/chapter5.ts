@@ -3,7 +3,7 @@ import type { Sprint } from './types.ts';
 export const chapter5: Sprint = {
   sprintId: 5,
   sprintTitle: 'Chương 5: Cơ Sở Dữ Liệu Quan Hệ: PostgreSQL Engine, B-Tree Internals & Query Optimizer',
-  sprintDesc: 'Khám phá trái tim lưu trữ dữ liệu: Cấu trúc 8KB Page, WAL & Checkpoints, Cơ chế vận hành B-Tree Index, Page Splits và Kỹ thuật đọc EXPLAIN (ANALYZE, BUFFERS)',
+  sprintDesc: 'Phân tích cơ chế lõi lưu trữ dữ liệu: Cấu trúc 8KB Page, WAL & Checkpoints, Cơ chế vận hành B-Tree Index, Page Splits và Kỹ thuật đọc EXPLAIN (ANALYZE, BUFFERS)',
   lessons: [
     {
       id: 'c5-l1',
@@ -22,11 +22,10 @@ Hiệu năng và độ tin cậy của một hệ quản trị cơ sở dữ li�
 * **Cơ chế Write-Ahead Logging (WAL) & Tính Bền vững ACID:** Để đảm bảo tính bền vững (Durability) mà vẫn đạt thông lượng hàng chục nghìn giao dịch mỗi giây (TPS):
   - Khi một giao dịch thực hiện sửa đổi, PostgreSQL **không ghi đè ngay xuống Data File trên đĩa**. Dòng dữ liệu được sửa đổi trực tiếp trên bộ nhớ RAM đệm (**\`Shared Buffers\`**) và biến trang đó thành một **"Dirty Page"** (Trang bẩn).
   - Đồng thời, toàn bộ nhật ký thay đổi nhị phân tối giản được ghi tuần tự vào tệp nhật ký ghi trước (**\`Write-Ahead Log - WAL\`**) theo cơ chế **Append-only Sequential Write** và được gọi lệnh đồng bộ đĩa \`fsync()\`. Ghi tuần tự trên đĩa nhanh hơn hàng nghìn lần so với ghi ngẫu nhiên.
-  - Ngay sau khi WAL được ghi xuống đĩa, hệ thống thông báo COMMIT thành công cho Client!
+  - Ngay sau khi WAL được ghi xuống đĩa, hệ thống thông báo COMMIT thành công cho Client.
 * **Tiến trình Checkpoint & Khả năng Phục hồi sau Sự cố (Crash Recovery):**
   - Định kỳ (theo \`checkpoint_timeout\` hoặc khi dung lượng WAL vượt \`max_wal_size\`), tiến trình **Checkpointer** sẽ chạy ngầm quét toàn bộ \`Shared Buffers\` và xả (flush) các Dirty Pages xuống tệp tin dữ liệu chính thức.
-  - Nếu máy chủ bị sập nguồn đột ngột (Kernel Panic, mất điện): Toàn bộ Dirty Pages trong RAM bị mất. Khi khởi động lại, PostgreSQL chỉ việc mở tệp \`global/pg_control\` để tìm mốc **Checkpoint gần nhất**, sau đó đọc các bản ghi WAL phát sinh sau mốc đó để phát lại (REDO Phase / Replay changes). Hệ thống khôi phục hoàn hảo trạng thái nhất quán $100\\%$ mà không mất một byte dữ liệu đã commit nào!
-
+  - Nếu máy chủ bị sập nguồn đột ngột (Kernel Panic, mất điện): Toàn bộ Dirty Pages trong RAM bị mất. Khi khởi động lại, PostgreSQL chỉ việc mở tệp \`global/pg_control\` để tìm mốc **Checkpoint gần nhất**, sau đó đọc các bản ghi WAL phát sinh sau mốc đó để phát lại (REDO Phase / Replay changes). Hệ thống khôi phục toàn vẹn trạng thái nhất quán $100\\%$ mà không mất một byte dữ liệu đã commit nào.
 ---
 
 # 2. CẤU TRÚC CHI TIẾT CỦA MỘT 8KB DATA PAGE TRONG POSTGRESQL
@@ -57,8 +56,7 @@ Trong mã nguồn C của PostgreSQL (\`src/include/storage/bufpage.h\`), mỗi 
 ### 2.1 Con Trỏ Bản Ghi ctid (Current Tuple ID)
 Mỗi dòng trong bảng PostgreSQL được định danh vật lý bằng một cặp số:
 $$\\text{ctid} = (\\text{Page Number}, \\text{Line Pointer Index})$$
-Ví dụ: \`ctid = (42, 5)\` nghĩa là bản ghi này nằm ở **Page thứ 42** trên đĩa cứng, và được trỏ bởi **Line Pointer thứ 5** trong header của Page đó. Chỉ mục (Index) thực chất chỉ là một cây lưu trữ ánh xạ: \`Giá trị tìm kiếm -> ctid\`!
-
+Ví dụ: \`ctid = (42, 5)\` nghĩa là bản ghi này nằm ở **Page thứ 42** trên đĩa cứng, và được trỏ bởi **Line Pointer thứ 5** trong header của Page đó. Chỉ mục (Index) thực chất chỉ là một cây lưu trữ ánh xạ: \`Giá trị tìm kiếm -> ctid\`.
 ---
 
 # 3. WRITE-AHEAD LOGGING (WAL) & QUY TRÌNH CHECKPOINT
@@ -90,13 +88,12 @@ Nếu máy chủ bị rút phích cắm đột ngột: Toàn bộ Dirty Pages tr
 Khi máy chủ bật lại:
 1. PostgreSQL tìm vị trí **Checkpoint gần nhất** được ghi trong file \`global/pg_control\`.
 2. Đọc toàn bộ các bản ghi nhật ký WAL phát sinh từ thời điểm Checkpoint đó đến thời điểm sập nguồn (REDO phase).
-3. Áp dụng lại (Replay) toàn bộ các thay đổi lên các Data Pages. Cơ sở dữ liệu trở lại trạng thái nhất quán hoàn hảo $100\\%$!
-
+3. Áp dụng lại (Replay) toàn bộ các thay đổi lên các Data Pages. Cơ sở dữ liệu trở lại trạng thái nhất quán toàn vẹn $100\\%$.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Bộ Nhớ Và Tệp Tin PostgreSQL (Memory & Disk Taxonomy Map)
+### 4.1 Sơ đồ 1: Bản Đồ Bộ Nhớ Và Tệp Tin PostgreSQL (Memory & Disk Taxonomy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          BỘ NHỚ CHIA SẺ (SHARED MEMORY)                     │
@@ -113,7 +110,7 @@ Khi máy chủ bật lại:
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Vòng Đời Một Câu Lệnh INSERT (Lifecycle of an Insert Query)
+### 4.2 Sơ đồ 2: Vòng Đời Một Câu Lệnh INSERT (Lifecycle of an Insert Query)
 \`\`\`diagram
 1. Client gửi INSERT INTO users (name) VALUES ('Ho Oanh')
    │
@@ -130,7 +127,7 @@ Khi máy chủ bật lại:
 7. Định kỳ (5 phút): Tiến trình Checkpointer xả Dirty Page xuống Data File chính
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Tinh Chỉnh Tham Số Lưu Trữ (DB Tuning Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Tinh Chỉnh Tham Số Lưu Trữ (DB Tuning Decision Tree)
 \`\`\`diagram
 HỆ THỐNG GẶP NGHẼN I/O GHI DỮ LIỆU POSTGRESQL?
 │
@@ -144,12 +141,12 @@ HỆ THỐNG GẶP NGHẼN I/O GHI DỮ LIỆU POSTGRESQL?
     └──► THIẾT LẬP: shared_buffers = 25% tổng dung lượng RAM của máy chủ
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Cơ Chế / Tham Số | Tối Ưu Tốc Độ Ghi | Mức Tiêu Hao RAM / Ổ Cứng | Thời Gian Phục Hồi Khi Sập Nguồn | Đánh Đổi Kỹ Thuật |
 | :--- | :--- | :--- | :--- | :--- |
 | **max_wal_size nhỏ (1GB)** | Ghi đĩa dồn dập (Chậm hơn) | Tiết kiệm ổ cứng pg_wal | Cực nhanh (<30 giây) | Phù hợp máy chủ cấu hình thấp |
 | **max_wal_size lớn (32GB)**| Tối ưu ghi tối đa (Ít Flush) | Tốn nhiều GB ổ cứng | Lâu hơn khi crash (vài phút replay)| Chuẩn cho máy chủ Production cao cấp |
-| **synchronous_commit = on** | ~1,000 - 3,000 TPS | Bình thường | An toàn tuyệt đối $0\\%$ mất dữ liệu | Đợi fsync từng commit |
+| **synchronous_commit = on** | ~1,000 - 3,000 TPS | Bình thường | An toàn hoàn toàn $0\\%$ mất dữ liệu | Đợi fsync từng commit |
 | **synchronous_commit = off**| Tăng vọt lên >30,000 TPS | Tiêu tốn ít I/O | Có thể mất vài trăm ms dữ liệu cuối | Dành cho log, sensor, analytics |
 `,
       realCodeSnippet: `
@@ -408,7 +405,7 @@ export class PostgresStorageMetricsService {
 Trong thiết kế hệ thống dữ liệu, chỉ mục (Index) là công cụ cơ bản nhất để chuyển đổi độ phức tạp tìm kiếm từ Quét Toàn Bảng (Sequential Scan - $O(N)$ Disk I/O) sang Duyệt Cây Chỉ Mục ($O(\\log N)$). Tuy nhiên, việc lạm dụng Index mà không hiểu bản chất cấu trúc lưu trữ sẽ làm tê liệt hiệu năng ghi của hệ thống:
 * **Tại sao RDBMS sử dụng $B^+$-Tree thay vì Cây Nhị Phân Cân Bằng (AVL / Red-Black Tree)?**
   - Cây nhị phân có hệ số rẽ nhánh (Fan-out) chỉ bằng 2. Với 10 triệu bản ghi, độ sâu của cây nhị phân lên tới $\\approx 24$ tầng. Mỗi lần tìm kiếm đòi hỏi 24 lần nhảy đĩa ngẫu nhiên (Random Disk Lookups).
-  - Ngược lại, **$B^+$-Tree** là cây đa phân tự cân bằng (Multi-way Balanced Tree) được thiết kế riêng biệt để khớp hoàn hảo với kích thước khối đĩa 8KB. Mỗi Node 8KB có thể chứa hàng trăm khóa (Fan-out từ $100$ đến $300$). Nhờ đó, với 10 triệu bản ghi, độ sâu của cây $B^+$-Tree chỉ từ **3 đến 4 tầng**! Toàn bộ các tầng trên (Root & Internal Nodes) thường được nằm trọn trong RAM (\`Shared Buffers\`), giúp việc tìm kiếm chỉ tiêu tốn đúng 1 lần đọc đĩa duy nhất tại Leaf Node!
+  - Ngược lại, **$B^+$-Tree** là cây đa phân tự cân bằng (Multi-way Balanced Tree) được thiết kế riêng biệt để khớp toàn vẹn với kích thước khối đĩa 8KB. Mỗi Node 8KB có thể chứa hàng trăm khóa (Fan-out từ $100$ đến $300$). Nhờ đó, với 10 triệu bản ghi, độ sâu của cây $B^+$-Tree chỉ từ **3 đến 4 tầng**! Toàn bộ các tầng trên (Root & Internal Nodes) thường được nằm trọn trong RAM (\`Shared Buffers\`), giúp việc tìm kiếm chỉ tiêu tốn đúng 1 lần đọc đĩa duy nhất tại Leaf Node.
 * **Bản chất của Hiện tượng B-Tree Page Split (Vỡ trang chỉ mục):**
   - Mỗi Leaf Node trong $B^+$-Tree là một trang 8KB cố định, lưu trữ các khóa theo thứ tự sắp xếp tăng dần.
   - Khi chèn một khóa mới vào một trang đã kín dung lượng ($100\\%$ Full), PostgreSQL không thể mở rộng trang đó. Hệ thống bắt buộc phải thực hiện thao tác **Page Split**:
@@ -416,9 +413,8 @@ Trong thiết kế hệ thống dữ liệu, chỉ mục (Index) là công cụ 
     2. Di chuyển $50\\%$ số khóa từ trang cũ sang trang mới.
     3. Chèn khóa mới vào đúng vị trí logic.
     4. Cập nhật con trỏ danh sách liên kết đôi (Doubly-Linked List) giữa các trang lá.
-    5. Đẩy (Promote) khóa phân chia lên Node cha (Internal Node) - nếu Node cha cũng đầy, Page Split sẽ lan truyền ngược lên trên (Cascading Split)!
-  - **Hệ quả trên Production:** Thao tác Page Split làm phát sinh thêm các lệnh ghi đĩa ngẫu nhiên, sinh thêm các bản ghi nhật ký WAL khổng lồ (Full Page Image), và để lại các trang chỉ mục bị rỗng $50\\%$ gây lãng phí bộ nhớ đệm RAM (**Hiện tượng Index Bloat**). Đây chính là lý do vì sao việc dùng UUID v4 ngẫu nhiên làm Primary Key là thảm họa đối với các hệ thống ghi thông lượng lớn!
-
+    5. Đẩy (Promote) khóa phân chia lên Node cha (Internal Node) - nếu Node cha cũng đầy, Page Split sẽ lan truyền ngược lên trên (Cascading Split).
+  - **Hệ quả trên Production:** Thao tác Page Split làm phát sinh thêm các lệnh ghi đĩa ngẫu nhiên, sinh thêm các bản ghi nhật ký WAL khổng lồ (Full Page Image), và để lại các trang chỉ mục bị rỗng $50\\%$ gây lãng phí bộ nhớ đệm RAM (**Hiện tượng Index Bloat**). Đây chính là lý do vì sao việc dùng UUID v4 ngẫu nhiên làm Primary Key là sự cố nghiêm trọng đối với các hệ thống ghi thông lượng lớn.
 ---
 
 # 2. CẤU TRÚC ĐA TẦNG CỦA B-TREE TRONG POSTGRESQL
@@ -450,18 +446,16 @@ Tất cả các Leaf Pages ở đáy cây đều được liên kết với nhau
 \`\`\`sql
 SELECT * FROM orders WHERE amount BETWEEN 100 AND 500;
 \`\`\`
-Chỉ cần tìm kiếm $O(\\log N)$ đến giá trị \`100\` tại Leaf Page đầu tiên, sau đó **chỉ việc đi bộ ngang (Sequential Traverse) qua con trỏ \`next_page\`** để lấy toàn bộ các giá trị cho đến \`500\` mà không cần phải leo ngược lại gốc cây!
-
+Chỉ cần tìm kiếm $O(\\log N)$ đến giá trị \`100\` tại Leaf Page đầu tiên, sau đó **chỉ việc đi bộ ngang (Sequential Traverse) qua con trỏ \`next_page\`** để lấy toàn bộ các giá trị cho đến \`500\` mà không cần phải leo ngược lại gốc cây.
 ---
 
 # 3. KỸ THUẬT SENIOR: COVERING INDEX & INDEX-ONLY SCAN
 
-Một hiểu lầm kinh điển: Tìm kiếm bằng Index luôn luôn nhanh nhất.
+Một hiểu lầm điển hình: Tìm kiếm bằng Index luôn luôn nhanh nhất.
 * **Thực tế:** Khi tìm kiếm qua Index, cơ sở dữ liệu làm 2 bước:
   1. Đọc B-Tree Index để lấy ra con trỏ \`ctid\` (Ví dụ \`(Page 42, Tuple 5)\`).
   2. Dùng \`ctid\` nhảy sang Heap Data File để đọc toàn bộ dòng dữ liệu đó (**Random Heap Read**).
-  Nếu câu truy vấn trả về 10,000 dòng, cơ sở dữ liệu phải thực hiện 10,000 lần Random I/O nhảy vào Heap Table, làm câu lệnh chậm không kém gì Sequential Scan!
-
+  Nếu câu truy vấn trả về 10,000 dòng, cơ sở dữ liệu phải thực hiện 10,000 lần Random I/O nhảy vào Heap Table, làm câu lệnh chậm không kém gì Sequential Scan.
 ### 3.1 Giải Pháp Triệt Để: Covering Index với Mệnh Đề INCLUDE
 Từ PostgreSQL 11+, ta có thể tạo **Chỉ mục bao phủ (Covering Index)**:
 \`\`\`sql
@@ -475,14 +469,13 @@ INCLUDE (full_name, phone_number);
 \`\`\`sql
 SELECT full_name, phone_number FROM users WHERE email = 'oanh@arc-irobot.tech';
 \`\`\`
-Database đọc thẳng dữ liệu từ Leaf Node của Index và trả về luôn cho Client!
-Nó kích hoạt trạng thái thần thánh: **\`Index Only Scan\` ($0\\text{ Heap Lookups}$)**, nhanh gấp 10 lần Index thông thường!
-
+Database đọc thẳng dữ liệu từ Leaf Node của Index và trả về luôn cho Client.
+Nó kích hoạt trạng thái vạn năng: **\`Index Only Scan\` ($0\\text{ Heap Lookups}$)**, nhanh gấp 10 lần Index thông thường.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Loại Các Kiểu Index Trong PostgreSQL (Index Taxonomy Map)
+### 4.1 Sơ đồ 1: Phân Loại Các Kiểu Index Trong PostgreSQL (Index Taxonomy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          HỆ THỐNG CHỈ MỤC POSTGRESQL                        │
@@ -500,7 +493,7 @@ Nó kích hoạt trạng thái thần thánh: **\`Index Only Scan\` ($0\\text{ H
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Truy Vấn Index-Only Scan vs Index Scan Thường
+### 4.2 Sơ đồ 2: Dòng Chảy Truy Vấn Index-Only Scan vs Index Scan Thường
 \`\`\`diagram
 CÂU LỆNH: SELECT email, full_name FROM users WHERE email = 'a@b.com'
 │
@@ -518,7 +511,7 @@ CÂU LỆNH: SELECT email, full_name FROM users WHERE email = 'a@b.com'
     └── 4. Trả về kết quả ngay lập tức: [Index Only Scan - CỰC NHANH!]
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Tạo Index Chuẩn Mực (Indexing Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Tạo Index Chuẩn Mực (Indexing Decision Tree)
 \`\`\`diagram
 BẢNG DỮ LIỆU CÓ CẦN THÊM INDEX KHÔNG?
 │
@@ -538,7 +531,7 @@ BẢNG DỮ LIỆU CÓ CẦN THÊM INDEX KHÔNG?
     └──► DÙNG COVERING INDEX: CREATE INDEX ON t (col1) INCLUDE (col2)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chỉ Mục (Index) | Tốc Độ Truy Vấn SELECT | Tốc Độ Ghi INSERT/UPDATE | Dung Lượng Ổ Cứng & RAM | Rủi Ro Vận Hành |
 | :--- | :--- | :--- | :--- | :--- |
 | **Không có Index** | $O(N)$ (Rất chậm khi dữ liệu lớn)| $O(1)$ (Cực nhanh, chỉ append)| Tối thiểu | Quá tải CPU khi quét toàn bảng |
@@ -798,7 +791,7 @@ Khi một câu lệnh SQL được gửi tới máy chủ PostgreSQL, hệ thố
   - Kế hoạch thực thi (Execution Plan) nào có tổng chi phí ước tính (\`Total Cost\`) thấp nhất sẽ được chọn để đưa xuống Executor.
 * **Chiến lược Quét Dữ Liệu: Đánh đổi giữa Sequential Scan, Index Scan và Bitmap Scan:**
   - **Sequential Scan ($O(N)$):** Quét tuần tự toàn bộ các khối 8KB từ đầu đến cuối bảng. Tận dụng tối đa băng thông đọc đĩa tuần tự và cơ chế đọc trước của hệ điều hành (Kernel Read-Ahead Buffer). Tối ưu vượt trội khi bảng dữ liệu nhỏ (< vài nghìn dòng) hoặc câu truy vấn cần lấy một lượng lớn dữ liệu (> $15\\% - 20\\%$ tổng số dòng).
-  - **Index Scan ($O(\\log N)$):** Duyệt cây $B^+$-Tree để lấy con trỏ \`ctid\`, sau đó ngay lập tức thực hiện một lệnh Random Disk I/O nhảy vào Heap Data Page để lấy dòng tương ứng. Cực kỳ tối ưu khi chỉ lấy từ 1 đến vài dòng cụ thể (Point Queries / High Cardinality). Nhưng nếu áp dụng cho hàng nghìn dòng, hàng nghìn lượt Random I/O sẽ bóp nghẹt Disk Controller!
+  - **Index Scan ($O(\\log N)$):** Duyệt cây $B^+$-Tree để lấy con trỏ \`ctid\`, sau đó ngay lập tức thực hiện một lệnh Random Disk I/O nhảy vào Heap Data Page để lấy dòng tương ứng. Rất tối ưu khi chỉ lấy từ 1 đến vài dòng cụ thể (Point Queries / High Cardinality). Nhưng nếu áp dụng cho hàng nghìn dòng, hàng nghìn lượt Random I/O sẽ bóp nghẹt Disk Controller.
   - **Bitmap Index Scan (Kỹ thuật Lai Đẳng Cấp):** Giải quyết tình trạng khó xử khi kết quả lọc chiếm từ $1\\%$ đến $15\\%$ bảng. Optimizer duyệt B-Tree để lấy danh sách \`ctid\`, nhưng **chưa nhảy vào đọc Heap ngay**. Nó dựng một mảng Bitmap trong RAM (mỗi bit đại diện cho một 8KB Page). Sau đó, nó sắp xếp các con trỏ theo đúng thứ tự vị trí vật lý trên đĩa cứng rồi mới thực hiện đọc một vòng tuần tự (**Sequential Heap Read**) các Page có đánh dấu bit! Tránh được $100\\%$ việc đầu đọc đĩa nhảy qua nhảy lại hỗn loạn.
 
 ---
@@ -833,8 +826,7 @@ SELECT * FROM orders WHERE user_id = 42 AND status = 'COMPLETED';
 2. **actual time=0.045..0.120:** Thời gian thực tế được đo bằng đồng hồ microsecond (Chỉ xuất hiện khi có cờ \`ANALYZE\`).
 3. **Buffers: shared hit=8 read=2:**
    - \`shared hit=8\`: Đã đọc 8 Pages (64KB) từ trong **RAM (Shared Buffers)** ($0\\text{ ms}$ Disk I/O).
-   - \`shared read=2\`: Phải đọc 2 Pages (16KB) từ **Ổ cứng vật lý (Disk Read)**!
-
+   - \`shared read=2\`: Phải đọc 2 Pages (16KB) từ **Ổ cứng vật lý (Disk Read)**.
 ---
 
 # 3. BA CHIẾN THẦN QUÉT DỮ LIỆU: SEQ SCAN VS INDEX SCAN VS BITMAP SCAN
@@ -854,15 +846,15 @@ SELECT * FROM orders WHERE user_id = 42 AND status = 'COMPLETED';
 \`\`\`
 
 ### 3.1 Bẫy Nguy Hiểm: Tại Sao Có Index Nhưng Optimizer Vẫn Chọn Seq Scan?
-1. **Bảng quá nhỏ (< vài trăm dòng):** Toàn bộ bảng nằm trọn trong 1 hoặc 2 Pages (16KB). Đọc thẳng 1 Page vào RAM nhanh hơn nhiều so với việc đọc Page của Index rồi mới đọc Page của Table!
-2. **Dữ liệu lọc không đủ tính chọn lọc:** Nếu điều kiện \`WHERE is_active = true\` mà $90\\%$ người dùng đều là \`true\`, dùng Index sẽ gây ra hàng triệu lượt Random I/O, chậm gấp 5 lần đọc tuần tự!
+1. **Bảng quá nhỏ (< vài trăm dòng):** Toàn bộ bảng nằm trọn trong 1 hoặc 2 Pages (16KB). Đọc thẳng 1 Page vào RAM nhanh hơn nhiều so với việc đọc Page của Index rồi mới đọc Page của Table.
+2. **Dữ liệu lọc không đủ tính chọn lọc:** Nếu điều kiện \`WHERE is_active = true\` mà $90\\%$ người dùng đều là \`true\`, dùng Index sẽ gây ra hàng triệu lượt Random I/O, chậm gấp 5 lần đọc tuần tự.
 3. **Thống kê dữ liệu bị sai lệch (Outdated Statistics):** Nếu bảng vừa được chèn 1 triệu dòng mới nhưng tiến trình AutoVacuum chưa chạy \`ANALYZE\`, Optimizer tưởng bảng vẫn rỗng nên chọn nhầm kế hoạch tồi tệ! Khắc phục: Chạy ngay lệnh \`ANALYZE table_name;\`.
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Phân Cấp Các Nút Thực Thi Kế Hoạch (Plan Nodes Taxonomy)
+### 4.1 Sơ đồ 1: Phân Cấp Các Nút Thực Thi Kế Hoạch (Plan Nodes Taxonomy)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          CÁC LOẠI PHÉP TOÁN KẾ HOẠCH (NODES)                │
@@ -881,7 +873,7 @@ SELECT * FROM orders WHERE user_id = 42 AND status = 'COMPLETED';
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Quyết Định Của Bộ Tối Ưu Hóa (Cost Optimizer Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Quyết Định Của Bộ Tối Ưu Hóa (Cost Optimizer Flow)
 \`\`\`diagram
 Câu lệnh SQL được gửi đến
    │
@@ -899,7 +891,7 @@ Query Optimizer:
 Executor: Chạy kế hoạch thực tế và trả dữ liệu về cho ứng dụng
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Chẩn Đoán Query Chậm (Query Diagnostics Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Chẩn Đoán Query Chậm (Query Diagnostics Tree)
 \`\`\`diagram
 CÂU QUERY CHẠY CHẬM TRÊN PRODUCTION (>500MS)?
 │
@@ -919,7 +911,7 @@ CÂU QUERY CHẠY CHẬM TRÊN PRODUCTION (>500MS)?
 │            └──► Tăng kích thước shared_buffers của máy chủ!
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Chiến Lược Quét | Kiểu Truy Xuất Ổ Cứng | Tốc Độ Cho Dữ Liệu Nhỏ | Tốc Độ Cho Dữ Liệu Lớn | Sử Dụng RAM Bổ Sung |
 | :--- | :--- | :--- | :--- | :--- |
 | **Sequential Scan** | Tuần tự (Sequential Read)| Cực nhanh | Rất chậm nếu bảng hàng chục GB| $0\\%$ RAM phụ trợ |

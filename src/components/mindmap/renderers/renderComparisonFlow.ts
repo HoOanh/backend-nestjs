@@ -1,10 +1,17 @@
 import { escapeHtml } from '../../common/CodeViewer.tsx';
 
+function stripEmojis(input: string): string {
+  return input
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Renderer: So Sánh Mô Hình Kiến Trúc 2 Cột (Side-by-side Comparison Matrix)
  */
 export function renderComparisonFlow(text: string, title?: string): string {
-  const displayTitle = title || 'SO SÁNH MÔ HÌNH KIẾN TRÚC & DÒNG CHẢY THỰC THI';
+  const displayTitle = stripEmojis(title || '') || 'SO SÁNH MÔ HÌNH KIẾN TRÚC & DÒNG CHẢY THỰC THI';
 
   // Trường hợp đặc thù Sơ đồ 2 Chapter 1: Thread-per-request vs Event loop
   if (text.includes('THREAD-PER-REQUEST') || text.includes('APACHE / PHP-FPM')) {
@@ -12,7 +19,9 @@ export function renderComparisonFlow(text: string, title?: string): string {
       <div class="mindmap-container mindmap-comparison">
         <div class="mindmap-header">
           <div class="mindmap-title-wrap">
-            <span class="mindmap-type-icon">🔄</span>
+            <span class="mindmap-type-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </span>
             <span class="mindmap-main-title">${escapeHtml(displayTitle)}</span>
           </div>
           <span class="mindmap-badge badge-comparison">COMPARISON MATRIX</span>
@@ -22,24 +31,24 @@ export function renderComparisonFlow(text: string, title?: string): string {
             <!-- CỘT TRUYỀN THỐNG -->
             <div class="comparison-column col-legacy">
               <div class="comparison-col-header header-legacy">
-                <span class="col-status-icon">⚠️</span>
+                <span class="col-status-icon">−</span>
                 <div>
                   <div class="col-title">MÔ HÌNH CŨ: THREAD-PER-REQUEST (APACHE / PHP-FPM)</div>
-                  <div class="col-sub">Mỗi client kết nối ngốn 1 luồng hệ điều hành riêng biệt (1-2MB Stack)</div>
+                  <div class="col-sub">Mỗi client kết nối chiếm 1 luồng hệ điều hành riêng biệt (1-2MB Stack)</div>
                 </div>
               </div>
               <div class="comparison-col-content">
                 <div class="comparison-point-row">
-                  <span class="point-icon">❌</span>
-                  <span class="point-text"><strong>Client 1 ──► [ OS Thread 1 (2MB Stack) ] ──► Chờ I/O:</strong> CPU bị khóa cứng (Block) không làm gì trong lúc chờ đĩa/mạng.</span>
+                  <span class="point-icon">×</span>
+                  <span class="point-text"><strong>Client 1 → [ OS Thread 1 (2MB Stack) ] → Chờ I/O:</strong> Luồng bị khóa cứng (Block) trong lúc chờ đĩa hoặc mạng.</span>
                 </div>
                 <div class="comparison-point-row">
-                  <span class="point-icon">❌</span>
-                  <span class="point-text"><strong>Client 2 ──► [ OS Thread 2 (2MB Stack) ] ──► Chờ I/O:</strong> CPU tiếp tục bị nghẽn, lãng phí hàng chục triệu chu kỳ xung nhịp.</span>
+                  <span class="point-icon">×</span>
+                  <span class="point-text"><strong>Client 2 → [ OS Thread 2 (2MB Stack) ] → Chờ I/O:</strong> Cấp phát thêm luồng mới, tăng chi phí chuyển ngữ cảnh CPU.</span>
                 </div>
                 <div class="comparison-point-row">
-                  <span class="point-icon">💥</span>
-                  <span class="point-text"><strong>Rào cản C10K sụp đổ:</strong> 10,000 Users = Lãng phí 20GB RAM chỉ để giữ các Call Stack của luồng đang ngủ! Chi phí Context Switching tốn 70% CPU.</span>
+                  <span class="point-icon">!</span>
+                  <span class="point-text"><strong>Giới hạn C10K:</strong> 10,000 kết nối đồng thời tiêu tốn ~20GB RAM chỉ để giữ Call Stack của các luồng đang chờ I/O.</span>
                 </div>
               </div>
             </div>
@@ -47,24 +56,24 @@ export function renderComparisonFlow(text: string, title?: string): string {
             <!-- CỘT HIỆN ĐẠI -->
             <div class="comparison-column col-modern">
               <div class="comparison-col-header header-modern">
-                <span class="col-status-icon">🚀</span>
+                <span class="col-status-icon">+</span>
                 <div>
                   <div class="col-title">MÔ HÌNH HIỆN ĐẠI: EVENT LOOP & NON-BLOCKING I/O</div>
-                  <div class="col-sub">1 Main Thread duy nhất tiếp nhận tất cả kết nối, ủy thác I/O cho Linux Kernel</div>
+                  <div class="col-sub">1 Main Thread duy nhất tiếp nhận kết nối, ủy thác I/O cho Linux Kernel</div>
                 </div>
               </div>
               <div class="comparison-col-content">
                 <div class="comparison-point-row">
-                  <span class="point-icon">✅</span>
-                  <span class="point-text"><strong>Client 1, 2, 3... ──► [ 1 Main Thread Duy Nhất ]:</strong> Tiếp nhận kết nối tức thì và giao việc chờ I/O cho Kernel thông qua \`epoll\`.</span>
+                  <span class="point-icon">✓</span>
+                  <span class="point-text"><strong>Client 1, 2, 3... → [ 1 Main Thread Duy Nhất ]:</strong> Tiếp nhận kết nối tức thì và đăng ký sự kiện I/O với Kernel qua epoll.</span>
                 </div>
                 <div class="comparison-point-row">
-                  <span class="point-icon">✅</span>
-                  <span class="point-text"><strong>Không bao giờ ngủ (Never Sleep):</strong> Main Thread lập tức rảnh tay quay lại Event Loop đón tiếp Client 4, 5, 6...</span>
+                  <span class="point-icon">✓</span>
+                  <span class="point-text"><strong>Phi chặn (Non-blocking):</strong> Main Thread quay lại Event Loop xử lý ngay các kết nối tiếp theo mà không chờ I/O hoàn tất.</span>
                 </div>
                 <div class="comparison-point-row">
-                  <span class="point-icon">🏆</span>
-                  <span class="point-text"><strong>Bứt phá hiệu năng:</strong> 10,000 Users chỉ tốn vài chục MB RAM. 0% chi phí chuyển đổi ngữ cảnh (Context Switching Overhead = 0).</span>
+                  <span class="point-icon">✓</span>
+                  <span class="point-text"><strong>Tối ưu tài nguyên:</strong> 10,000 kết nối đồng thời chỉ tiêu tốn vài chục MB RAM, giảm thiểu chi phí Context Switching.</span>
                 </div>
               </div>
             </div>
@@ -75,7 +84,10 @@ export function renderComparisonFlow(text: string, title?: string): string {
   }
 
   // Parser tổng quát cho các so sánh khác
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith('┌') && !l.startsWith('└') && !l.startsWith('├'));
+  const lines = text
+    .split('\n')
+    .map((l) => stripEmojis(l.trim()))
+    .filter((l) => l.length > 0 && !l.startsWith('┌') && !l.startsWith('└') && !l.startsWith('├'));
 
   const mid = Math.ceil(lines.length / 2);
   const leftLines = lines.slice(0, mid);
@@ -86,7 +98,7 @@ export function renderComparisonFlow(text: string, title?: string): string {
       .map((line) => {
         const clean = line.replace(/^[│├──└──\[\]\s\─►]+/, '').trim();
         if (!clean) return '';
-        const icon = isDanger ? '❌' : '✅';
+        const icon = isDanger ? '×' : '✓';
         return `
           <div class="comparison-point-row">
             <span class="point-icon">${icon}</span>
@@ -101,7 +113,9 @@ export function renderComparisonFlow(text: string, title?: string): string {
     <div class="mindmap-container mindmap-comparison">
       <div class="mindmap-header">
         <div class="mindmap-title-wrap">
-          <span class="mindmap-type-icon">🔄</span>
+          <span class="mindmap-type-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </span>
           <span class="mindmap-main-title">${escapeHtml(displayTitle)}</span>
         </div>
         <span class="mindmap-badge badge-comparison">COMPARISON MATRIX</span>
@@ -110,7 +124,7 @@ export function renderComparisonFlow(text: string, title?: string): string {
         <div class="comparison-grid">
           <div class="comparison-column col-legacy">
             <div class="comparison-col-header header-legacy">
-              <span class="col-status-icon">⚠️</span>
+              <span class="col-status-icon">−</span>
               <div>
                 <div class="col-title">MÔ HÌNH TRUYỀN THỐNG / RỦI RO NGHẼN</div>
                 <div class="col-sub">Hạn chế về tài nguyên & chi phí I/O cao</div>
@@ -123,7 +137,7 @@ export function renderComparisonFlow(text: string, title?: string): string {
 
           <div class="comparison-column col-modern">
             <div class="comparison-col-header header-modern">
-              <span class="col-status-icon">🚀</span>
+              <span class="col-status-icon">+</span>
               <div>
                 <div class="col-title">MÔ HÌNH HIỆN ĐẠI TỐI ƯU (RECOMMENDED)</div>
                 <div class="col-sub">Non-blocking, Event-Driven & Hiệu năng cao</div>

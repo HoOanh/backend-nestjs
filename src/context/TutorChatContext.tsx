@@ -12,15 +12,13 @@ export interface ModelOption {
 }
 
 export const MODEL_OPTIONS: readonly ModelOption[] = [
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', shortLabel: '3.8 Flash', desc: 'Trợ giúp toàn diện', isNew: true },
-  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', shortLabel: '3.7 Flash', desc: 'Suy luận chuyên sâu & hybrid code' },
-  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', shortLabel: '3.6 Flash', desc: 'Cân bằng tốc độ và chất lượng' },
-  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', shortLabel: '3.5 Flash', desc: 'Xử lý đa tác vụ nhanh chóng' },
-  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', shortLabel: '3.5 Flash-Lite', desc: 'Câu trả lời nhanh nhất' },
-  { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', shortLabel: '3.1 Flash-Lite', desc: 'Phản hồi siêu tốc, tiết kiệm token' },
-  { id: 'antigravity', label: 'Antigravity', shortLabel: 'Antigravity', desc: 'Tư duy mở rộng, giải quyết vấn đề phức tạp', isNew: true },
-  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', shortLabel: '2.5 Flash-Lite', desc: 'Gọn nhẹ cơ bản, độ trễ thấp' },
-  { id: 'gemma-4-31b', label: 'Gemma 4 31B', shortLabel: 'Gemma 4', desc: 'Mã nguồn mở thế hệ mới tối ưu' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', shortLabel: '3.5 Flash-Lite', desc: 'Mặc định: 15–30 RPM, tốc độ cao & quota rộng nhất', isNew: true },
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', shortLabel: '3.8 Flash', desc: 'Suy luận chuyên sâu, hỗ trợ toàn diện', isNew: true },
+  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', shortLabel: '3.6 Flash', desc: 'Cân bằng tốc độ, chất lượng & bucket độc lập' },
+  { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', shortLabel: '3.1 Flash-Lite', desc: 'Phản hồi siêu tốc, dự phòng tải cao (30 RPM)' },
+  { id: 'gemma-4-31b-it', label: 'Gemma 4 31B IT', shortLabel: 'Gemma 4 31B', desc: 'Open-weights 31B, 100% Free Tier (~1,500 RPD)', isNew: true },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', shortLabel: '2.5 Flash-Lite', desc: 'Gọn nhẹ ổn định, độ trễ cực thấp' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', shortLabel: '2.5 Flash', desc: 'Bản ổn định thế hệ 2.5, chống nghẽn cuối chuỗi' },
 ] as const;
 
 export interface SelectedImageAttachment {

@@ -752,3 +752,30 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.admin-quota-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--admin-raised);
+  border: 1px solid var(--admin-border);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.admin-quota-fill {
+  height: 100%;
+  background: var(--admin-success);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+.admin-quota-fill.warning {
+  background: var(--admin-warning);
+}
+
+.admin-ai-error-note {
+  color: var(--admin-error);
+  font-size: 12px;
+}
+

@@ -45,50 +45,157 @@
   border-radius: 999px;
 }
 
-/* Theory & Real Code Section */
+/* Theory & Real Code Section (Formal Technical Report Layout) */
 .theory-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 28px;
+  padding: 32px 36px;
   margin-bottom: 28px;
 }
 
-.theory-content h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 20px 0 10px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.theory-lesson-header {
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-subtle);
 }
 
-.theory-content h3:first-child {
+.theory-lesson-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.theory-lesson-tag {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent-primary);
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+[data-theme='light'] .theory-lesson-tag {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+.theory-lesson-duration {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.theory-lesson-main-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.32;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.theory-content h1 {
+  font-size: 20.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 34px 0 16px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  line-height: 1.38;
+}
+
+.theory-content h2 {
+  font-size: 18.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 30px 0 14px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  line-height: 1.4;
+  letter-spacing: -0.1px;
+}
+
+.theory-content h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 28px 0 12px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent-primary);
+  line-height: 1.45;
+}
+
+.theory-content h4 {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  margin: 22px 0 10px 0;
+  line-height: 1.45;
+}
+
+.theory-content h1:first-child,
+.theory-content h2:first-child,
+.theory-content h3:first-child,
+.theory-content h4:first-child {
   margin-top: 0;
 }
 
 .theory-content p {
   color: var(--text-secondary);
   font-size: 15px;
-  line-height: 1.7;
+  line-height: 1.72;
   margin-bottom: 16px;
 }
 
 .theory-content ul,
 .theory-content ol {
-  margin-left: 24px;
+  margin-left: 22px;
   margin-bottom: 16px;
   color: var(--text-secondary);
 }
 
 .theory-content li {
-  margin-bottom: 8px;
-  line-height: 1.6;
+  margin-bottom: 10px;
+  line-height: 1.68;
+}
+
+.theory-content li.nested-li {
+  margin-left: 26px;
+  list-style-type: circle;
+}
+
+.theory-content li.ordered-li {
+  list-style: none;
+  margin-left: -18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.theory-content .ordered-li-num {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--accent-primary);
+  min-width: 22px;
+}
+
+.theory-content .ordered-li-body {
+  flex: 1;
 }
 
 .theory-content strong {
   color: var(--text-primary);
+  font-weight: 700;
 }
 
 .theory-content code {
@@ -99,6 +206,94 @@
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 13.5px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.theory-content .theory-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 28px 0;
+}
+
+.theory-content .theory-callout {
+  margin: 18px 0 24px 0;
+  padding: 16px 20px;
+  border-left: 4px solid var(--accent-primary);
+  background: rgba(14, 165, 233, 0.06);
+  border: 1px solid rgba(14, 165, 233, 0.22);
+  border-left-width: 4px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  line-height: 1.68;
+}
+
+[data-theme='light'] .theory-content .theory-callout {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  border-left-color: #0284c7;
+}
+
+.theory-content .theory-callout strong {
+  color: var(--text-primary);
+}
+
+.theory-content .callout-line + .callout-line {
+  margin-top: 8px;
+}
+
+.theory-content .callout-lead {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+/* Academic Quantitative Formula Box */
+.theory-formula-box {
+  margin: 18px 0 22px 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+  overflow: hidden;
+}
+
+[data-theme='light'] .theory-formula-box {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.formula-box-header {
+  padding: 7px 16px;
+  background: rgba(14, 165, 233, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+}
+
+[data-theme='light'] .formula-box-header {
+  background: #f1f5f9;
+  border-bottom-color: #cbd5e1;
+}
+
+.formula-box-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+}
+
+.formula-box-body {
+  margin: 0;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.65;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
 }
 
 /* YouTube Video Player Embed */

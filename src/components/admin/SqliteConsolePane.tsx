@@ -71,9 +71,12 @@ export const SqliteConsolePane: React.FC = () => {
     <div className="admin-sqlite-pane">
       <div className="sqlite-pane-header">
         <div>
-          <h3 className="section-heading">🗄️ Dữ liệu trình duyệt cũ (IndexedDB)</h3>
+          <h3 className="section-heading">
+            Dữ liệu trình duyệt cũ (IndexedDB)
+          </h3>
           <p className="section-sub">
-            Chỉ xem dữ liệu cũ của trình duyệt này bằng bộ mô phỏng SQL. Đây không phải DB server hay SQLite thực. Chat mới được lưu trên server.
+            Chỉ xem dữ liệu cũ của trình duyệt này bằng bộ mô phỏng SQL. Đây
+            không phải DB server hay SQLite thực. Chat mới được lưu trên server.
           </p>
         </div>
 
@@ -92,7 +95,7 @@ export const SqliteConsolePane: React.FC = () => {
             className={`sqlite-tab-btn ${activeTab === 'console' ? 'active' : ''}`}
             onClick={() => setActiveTab('console')}
           >
-            💻 SQL Console & Query
+            SQL Console & Query
           </button>
           <button
             className={`sqlite-tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
@@ -101,13 +104,13 @@ export const SqliteConsolePane: React.FC = () => {
               void refreshLogs();
             }}
           >
-            📋 Structured Audit Logs ({logs.length})
+            Structured Audit Logs ({logs.length})
           </button>
           <button
             className={`sqlite-tab-btn ${activeTab === 'schema' ? 'active' : ''}`}
             onClick={() => setActiveTab('schema')}
           >
-            📊 Schema & Thông Tin Bảng
+            Schema & Thông Tin Bảng
           </button>
         </div>
       </div>
@@ -121,7 +124,8 @@ export const SqliteConsolePane: React.FC = () => {
                 type="button"
                 className="preset-btn"
                 onClick={() => {
-                  const q = 'SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT 15;';
+                  const q =
+                    'SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT 15;';
                   setQueryInput(q);
                   void runQuery(q);
                 }}
@@ -132,7 +136,8 @@ export const SqliteConsolePane: React.FC = () => {
                 type="button"
                 className="preset-btn"
                 onClick={() => {
-                  const q = 'SELECT * FROM chat_sessions ORDER BY updated_at DESC;';
+                  const q =
+                    'SELECT * FROM chat_sessions ORDER BY updated_at DESC;';
                   setQueryInput(q);
                   void runQuery(q);
                 }}
@@ -143,7 +148,8 @@ export const SqliteConsolePane: React.FC = () => {
                 type="button"
                 className="preset-btn"
                 onClick={() => {
-                  const q = "SELECT * FROM chat_logs WHERE level = 'ERROR' ORDER BY timestamp DESC;";
+                  const q =
+                    "SELECT * FROM chat_logs WHERE level = 'ERROR' ORDER BY timestamp DESC;";
                   setQueryInput(q);
                   void runQuery(q);
                 }}
@@ -176,24 +182,33 @@ export const SqliteConsolePane: React.FC = () => {
                 onClick={() => void runQuery()}
                 disabled={isExecuting}
               >
-                {isExecuting ? 'Đang thực thi...' : '▶ Chạy Truy Vấn SQL'}
+                {isExecuting ? 'Đang thực thi...' : 'Chạy Truy Vấn SQL'}
               </button>
             </div>
 
             <div className="sqlite-result-container">
               {queryResult?.error ? (
                 <div className="sqlite-error-box">
-                  <strong>⚠️ Lỗi SQL:</strong> {queryResult.error}
+                  <strong>Lỗi SQL:</strong> {queryResult.error}
                 </div>
               ) : queryResult ? (
                 <>
                   <div className="sqlite-result-meta">
-                    <span>Kết quả: <strong>{queryResult.rowCount}</strong> dòng</span>
-                    <span>Thời gian thực thi: <strong>{queryResult.executionTimeMs.toFixed(2)}ms</strong></span>
+                    <span>
+                      Kết quả: <strong>{queryResult.rowCount}</strong> dòng
+                    </span>
+                    <span>
+                      Thời gian thực thi:{' '}
+                      <strong>
+                        {queryResult.executionTimeMs.toFixed(2)}ms
+                      </strong>
+                    </span>
                   </div>
 
                   {queryResult.rows.length === 0 ? (
-                    <div className="sqlite-empty-state">Không có dòng dữ liệu nào khớp với truy vấn.</div>
+                    <div className="sqlite-empty-state">
+                      Không có dòng dữ liệu nào khớp với truy vấn.
+                    </div>
                   ) : (
                     <div className="sqlite-table-scroll">
                       <table className="sqlite-data-table">
@@ -213,11 +228,13 @@ export const SqliteConsolePane: React.FC = () => {
                                   cellVal === null || cellVal === undefined
                                     ? '<NULL>'
                                     : typeof cellVal === 'object'
-                                    ? JSON.stringify(cellVal)
-                                    : String(cellVal);
+                                      ? JSON.stringify(cellVal)
+                                      : String(cellVal);
                                 return (
                                   <td key={col} title={formatted}>
-                                    {formatted.length > 80 ? formatted.slice(0, 80) + '…' : formatted}
+                                    {formatted.length > 80
+                                      ? formatted.slice(0, 80) + '…'
+                                      : formatted}
                                   </td>
                                 );
                               })}
@@ -249,8 +266,11 @@ export const SqliteConsolePane: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <button className="sqlite-refresh-btn" onClick={() => void refreshLogs()}>
-                🔄 Làm mới Logs
+              <button
+                className="sqlite-refresh-btn"
+                onClick={() => void refreshLogs()}
+              >
+                Làm mới Logs
               </button>
             </div>
 

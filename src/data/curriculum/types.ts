@@ -8,8 +8,12 @@ export interface TestCase {
 
 export interface CodeChallenge {
   id?: string;
+  level?: 'basic' | 'intermediate' | 'advanced';
+  levelLabel?: string;
   title: string;
   description: string;
+  guidedSteps?: string[];
+  hints?: string[];
   starterCode: string;
   solution?: string;
   testCases: TestCase[];
@@ -33,6 +37,7 @@ export interface Lesson {
   realCodeSnippet: string;
   quiz: QuizQuestion[];
   codeChallenge: CodeChallenge;
+  codeChallenges?: CodeChallenge[];
 }
 
 export interface Sprint {

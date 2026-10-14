@@ -44,13 +44,16 @@ export const AdminAuthScreen: React.FC<AdminAuthScreenProps> = ({ onLoginSuccess
           <div className="auth-brand-logo-wrap">
             <img src="/logo.png" alt="Arc Irobot Logo" className="auth-brand-logo" />
           </div>
-          <div className="admin-portal-badge">👑 SYSTEM CMS</div>
+          <div className="admin-portal-badge">SYSTEM CMS</div>
           <h2>Cổng Quản Trị Arc Irobot Academy</h2>
-          <p>Khu vực bảo mật dành riêng cho Quản trị viên và Ban đào tạo Core Architecture.</p>
+          <p>
+            Khu vực bảo mật dành riêng cho Quản trị viên và Ban đào tạo Core
+            Architecture.
+          </p>
         </div>
 
-        {error && <div className="auth-alert error">⚠️ {error}</div>}
-        {info && <div className="auth-alert success">🔄 {info}</div>}
+        {error && <div className="auth-alert error">{error}</div>}
+        {info && <div className="auth-alert success">{info}</div>}
 
         <form className="auth-form" onSubmit={handleAdminLogin}>
           <div className="form-group">
@@ -74,8 +77,12 @@ export const AdminAuthScreen: React.FC<AdminAuthScreenProps> = ({ onLoginSuccess
             />
           </div>
 
-          <button type="submit" className="btn btn-warning auth-submit-btn" disabled={loading}>
-            {loading ? 'Đang xác thực...' : 'Đăng Nhập Bảng Điều Khiển Admin 🔐'}
+          <button
+            type="submit"
+            className="btn btn-warning auth-submit-btn"
+            disabled={loading}
+          >
+            {loading ? 'Đang xác thực...' : 'Đăng Nhập Bảng Điều Khiển Admin'}
           </button>
         </form>
       </div>

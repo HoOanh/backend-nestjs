@@ -2,12 +2,22 @@ import { escapeHtml } from '../../common/CodeViewer.tsx';
 import type { ParsedFlowStep } from '../types.ts';
 import { renderCleanBlueprint } from './renderCleanBlueprint.ts';
 
+function stripEmojis(input: string): string {
+  return input
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Renderer: Dòng Chảy Quy Trình Tuần Tự (Step-by-step Execution Pipeline)
  */
 export function renderLifecycleFlow(text: string, title?: string): string {
-  const displayTitle = title || 'DÒNG CHẢY QUY TRÌNH THỰC THI (EXECUTION PIPELINE)';
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith('┌') && !l.startsWith('└') && !l.startsWith('├'));
+  const displayTitle = stripEmojis(title || '') || 'DÒNG CHẢY QUY TRÌNH THỰC THI (EXECUTION PIPELINE)';
+  const lines = text
+    .split('\n')
+    .map((l) => stripEmojis(l.trim()))
+    .filter((l) => l.length > 0 && !l.startsWith('┌') && !l.startsWith('└') && !l.startsWith('├'));
 
   const steps: ParsedFlowStep[] = [];
   let stepCount = 0;
@@ -42,7 +52,7 @@ export function renderLifecycleFlow(text: string, title?: string): string {
               ${s.subtitle ? `<div class="flow-step-desc">${escapeHtml(s.subtitle)}</div>` : ''}
             </div>
           </div>
-          ${!isLast ? '<div class="flow-step-arrow">➔</div>' : ''}
+          ${!isLast ? '<div class="flow-step-arrow">→</div>' : ''}
         </div>
       `;
     })
@@ -52,7 +62,9 @@ export function renderLifecycleFlow(text: string, title?: string): string {
     <div class="mindmap-container mindmap-lifecycle-flow">
       <div class="mindmap-header">
         <div class="mindmap-title-wrap">
-          <span class="mindmap-type-icon">⚡</span>
+          <span class="mindmap-type-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
           <span class="mindmap-main-title">${escapeHtml(displayTitle)}</span>
         </div>
         <span class="mindmap-badge badge-flow">EXECUTION PIPELINE</span>

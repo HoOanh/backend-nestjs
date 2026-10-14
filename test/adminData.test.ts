@@ -110,7 +110,15 @@ try {
     await tutorHandler({ method: 'POST', headers: { authorization: `Bearer ${aliceToken}` }, body: { sessionId: id, lesson: { title: 'Bài test' }, messages: [{ role: 'user', content: 'Test' }], model: 'test-unavailable', stream: false } }, response);
     const traces = (await call('/api/chat/logs', 'GET', undefined, adminToken)).data.logs as Array<Record<string, unknown>>;
     assert.ok(traces.some((l) => l.event === 'AI_PROVIDER_REJECTED'));
-    assert.ok(traces.some((l) => l.event === 'AI_RESPONSE_COMPLETE' && (l.metadata as Record<string, unknown>).actualModel === 'gemini-3.8-flash'));
+    const completeLog = traces.find((l) => l.event === 'AI_RESPONSE_COMPLETE');
+    assert.ok(completeLog && (completeLog.metadata as Record<string, unknown>).actualModel === 'gemini-3.5-flash-lite');
+    assert.ok(((completeLog.metadata as Record<string, unknown>).quota as Record<string, unknown>)?.rpmRemaining === 29);
+    const aiTelemetry = (await call('/api/admin/ai', 'GET', undefined, adminToken)).data;
+    assert.equal(aiTelemetry.defaultModel, 'gemini-3.5-flash-lite');
+    assert.equal((aiTelemetry.summary as Record<string, unknown>).totalSuccessToday, 1);
+    assert.equal((aiTelemetry.summary as Record<string, unknown>).totalFallbackToday, 1);
+    assert.ok(Array.isArray(aiTelemetry.models) && aiTelemetry.models.length === 7);
+    assert.ok(Array.isArray(aiTelemetry.recentLogs) && aiTelemetry.recentLogs.length >= 3);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.GEMINI_API_KEY;

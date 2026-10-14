@@ -80,9 +80,9 @@ export class OrderService {
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Cấu Trúc Khối Của IoC Container (Container Taxonomy Map)
+### 4.1 Sơ đồ 1: Bản Đồ Cấu Trúc Khối Của IoC Container (Container Taxonomy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          NESTJS IOC CONTAINER ROOT                          │
@@ -102,7 +102,7 @@ export class OrderService {
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Vòng Đời Khởi Tạo Đối Tượng Tự Động (Instance Resolution Lifecycle)
+### 4.2 Sơ đồ 2: Vòng Đời Khởi Tạo Đối Tượng Tự Động (Instance Resolution Lifecycle)
 \`\`\`diagram
 Yêu cầu khởi tạo một Controller (vd: UsersController)
    │
@@ -124,7 +124,7 @@ Gọi Reflection Constructor: new UsersController(cachedUsersService, cachedConf
 Đưa Instance vừa tạo vào Container Cache & Gắn Route vào Express/Fastify Adapter
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Cơ Chế Inject (Provider Injection Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Cơ Chế Inject (Provider Injection Decision Tree)
 \`\`\`diagram
 BẠN CẦN ĐĂNG KÝ MỘT PROVIDER VÀO MODULE?
 │
@@ -144,12 +144,12 @@ BẠN CẦN ĐĂNG KÝ MỘT PROVIDER VÀO MODULE?
          { provide: 'APP_CONFIG', useValue: Object.freeze(staticConfig) }
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Kiểu Đăng Ký Provider | Thời Điểm Khởi Tạo | Khả Năng Dynamic Config | Chi Phí Bộ Nhớ | Mức Độ Khuyên Dùng |
 | :--- | :--- | :--- | :--- | :--- |
 | **Standard Class** | Bootstrapping (Khởi động) | Cố định, không linh hoạt | Cực thấp (1 Instance duy nhất)| Mặc định cho $95\\%$ dịch vụ nội bộ |
 | **useValue** | Bootstrapping | Truyền object cố định sẵn | Phụ thuộc object truyền vào | Dành cho SDK client, config tĩnh |
-| **useFactory (Async)** | Bootstrapping (Chờ Promise)| Cực kỳ linh hoạt, đọc async | Khởi tạo 1 lần lúc startup | Kết nối Database, Microservice Client |
+| **useFactory (Async)** | Bootstrapping (Chờ Promise)| Rất linh hoạt, đọc async | Khởi tạo 1 lần lúc startup | Kết nối Database, Microservice Client |
 | **useExisting** | Bootstrapping | Tạo bí danh (Alias) cho token| $0\\%$ (Trỏ chung con trỏ) | Đổi tên token mà không duplicate RAM |
 `,
       realCodeSnippet: `// File: src/modules/notification/notification.service.ts
@@ -385,9 +385,9 @@ export class UserNotificationService {
       tag: 'PostgreSQL Architecture & Video Masterclass',
       videoUrl: 'https://www.youtube.com/watch?v=OUlLQK_gN8k',
       theory: `
-# 🎬 CHUYÊN ĐỀ VIDEO MASTERCLASS: TOÀN BỘ KIẾN TRÚC & TỐI ƯU POSTGRESQL TRONG 1H30P
+# CHUYÊN ĐỀ VIDEO MASTERCLASS: TOÀN BỘ KIẾN TRÚC & TỐI ƯU POSTGRESQL TRONG 1H30P
 
-Chào mừng ĐẠI CA đến với chuyên đề video đặc biệt được giảng dạy bởi chuyên gia **Trần Quốc Huy (Wecommit)**. Video tổng hợp toàn bộ các khía cạnh sống còn của PostgreSQL từ nền tảng đến mức độ Enterprise Production: Triết lý thiết kế, Kiến trúc phân tầng Logic & Vật lý, Cơ chế bộ nhớ Shared Memory & Background Processes, Kỹ thuật viết SQL & Tối ưu hóa truy vấn chuyên sâu với \`EXPLAIN ANALYZE\`, và Chiến lược Sao lưu / Phục hồi dữ liệu thảm họa (Disaster Recovery).
+Chào mừng ĐẠI CA đến với chuyên đề video đặc biệt được giảng dạy bởi chuyên gia **Trần Quốc Huy (Wecommit)**. Video tổng hợp toàn bộ các khía cạnh sống còn của PostgreSQL từ nền tảng đến mức độ Enterprise Production: Triết lý thiết kế, Kiến trúc phân tầng Logic & Vật lý, Cơ chế bộ nhớ Shared Memory & Background Processes, Kỹ thuật viết SQL & Tối ưu hóa truy vấn chuyên sâu với \`EXPLAIN ANALYZE\`, và Chiến lược Sao lưu / Phục hồi dữ liệu sự cố nghiêm trọng (Disaster Recovery).
 
 ---
 
@@ -397,8 +397,8 @@ Chào mừng ĐẠI CA đến với chuyên đề video đặc biệt được g
 | :--- | :--- | :--- |
 | **00:00:00** | 1. Tổng Quan & Triết Lý | PostgreSQL là gì, lịch sử hình thành và vị thế áp đảo trong Enterprise Backend |
 | **00:03:03** | 2. Cài Đặt & Môi Trường | Download, cài đặt, tạo Database, User Role và thiết lập thông số kết nối |
-| **00:07:40** | 3. Kiến Trúc PostgreSQL | **3.1 Kiến trúc Logic** (Cluster, DB, Schema, Table, Tablespace) & **3.2 Kiến trúc Vật lý** (Shared Buffers, WAL, Processes) |
-| **00:36:04** | 4. Làm Việc Với SQL | **4.1 SQL Nền tảng** (DDL/DML, Constraints) & **4.2 Tối ưu hóa truy vấn** (B-Tree, GIN, EXPLAIN ANALYZE) |
+| **00:07:40** | 3. Kiến Trúc PostgreSQL | 3.1 Kiến trúc Logic (Cluster, DB, Schema, Table, Tablespace) & 3.2 Kiến trúc Vật lý (Shared Buffers, WAL, Processes) |
+| **00:36:04** | 4. Làm Việc Với SQL | 4.1 SQL Nền tảng (DDL/DML, Constraints) & 4.2 Tối ưu hóa truy vấn (B-Tree, GIN, EXPLAIN ANALYZE) |
 | **01:18:04** | 5. Sao Lưu & Phục Hồi | Logical Backup (\`pg_dump\`), Physical Backup và Khôi phục điểm thời gian (Point-In-Time-Recovery - PITR) |
 | **01:16:03** | 6. Công Cụ Quản Trị | Làm chủ giao diện dòng lệnh \`psql\`, DBeaver và pgAdmin 4 |
 | **01:26:29** | 7. Sơ Đồ Tư Duy Toàn Diện | Mindmap hệ thống hóa toàn bộ luồng dữ liệu từ Client -> RAM -> Disk |
@@ -456,28 +456,27 @@ SELECT * FROM orders WHERE user_id = 12045 AND status = 'COMPLETED';
 \`\`\`
 
 ### 4.1 Ba Kiểu Quét Dữ Liệu Căn Bản
-1. **Sequential Scan (Seq Scan):** Đọc tuần tự toàn bộ các Page 8KB của bảng từ đầu đến cuối. Rất hiệu quả với bảng nhỏ hoặc khi câu query lấy ra hơn $20\\% - 30\\%$ tổng số dòng của bảng. Tuy nhiên trên bảng hàng triệu dòng, Seq Scan gây thảm họa I/O đĩa.
+1. **Sequential Scan (Seq Scan):** Đọc tuần tự toàn bộ các Page 8KB của bảng từ đầu đến cuối. Rất hiệu quả với bảng nhỏ hoặc khi câu query lấy ra hơn $20\\% - 30\\%$ tổng số dòng của bảng. Tuy nhiên trên bảng hàng triệu dòng, Seq Scan gây sự cố nghiêm trọng I/O đĩa.
 2. **Index Scan:** Duyệt cây B-Tree của Index để tìm con trỏ vật lý (\`TID = (Block, Offset)\`), sau đó nhảy trực tiếp vào Page chứa Heap Tuple trên đĩa để lấy toàn bộ dữ liệu dòng. Tối ưu khi câu query chỉ lọc ra vài dòng dữ liệu cụ thể.
 3. **Bitmap Index Scan & Bitmap Heap Scan:** Giai đoạn 1 quét Index và dựng một bản đồ bit (Bitmap) trong RAM đánh dấu các trang dữ liệu thỏa điều kiện; Giai đoạn 2 đọc các trang dữ liệu theo thứ tự tuần tự trên đĩa vật lý, tránh tình trạng giật đầu đọc ngẫu nhiên (Random Disk I/O).
 
 ### 4.2 Các Loại Index Quan Trọng
 * **B-Tree (Mặc định):** Đa năng cho so sánh bằng (\`=\`), khoảng (\`<\`, \`>\`, \`BETWEEN\`), tiền tố (\`LIKE 'hoang%'\`) và sắp xếp (\`ORDER BY\`).
-* **GIN (Generalized Inverted Index):** Chỉ mục đảo ngược. Cực kỳ tối ưu cho các kiểu dữ liệu mảng (\`ARRAY\`), chuỗi tìm kiếm toàn văn (Full-Text Search \`tsvector\`), và đặc biệt là cột **\`JSONB\`** (\`WHERE metadata @> '{"role": "ADMIN"}'\`).
-* **BRIN (Block Range Index):** Chỉ lưu giá trị Min/Max của từng cụm trang dữ liệu (mặc định 128 block). Dung lượng Index siêu nhỏ (vài Kilobyte thay vì hàng Gigabyte), cực kỳ lý tưởng cho các bảng lịch sử, log giao dịch được thêm liên tục theo thời gian (Time-series data).
+* **GIN (Generalized Inverted Index):** Chỉ mục đảo ngược. Rất tối ưu cho các kiểu dữ liệu mảng (\`ARRAY\`), chuỗi tìm kiếm toàn văn (Full-Text Search \`tsvector\`), và đặc biệt là cột **\`JSONB\`** (\`WHERE metadata @> '{"role": "ADMIN"}'\`).
+* **BRIN (Block Range Index):** Chỉ lưu giá trị Min/Max của từng cụm trang dữ liệu (mặc định 128 block). Dung lượng Index siêu nhỏ (vài Kilobyte thay vì hàng Gigabyte), rất lý tưởng cho các bảng lịch sử, log giao dịch được thêm liên tục theo thời gian (Time-series data).
 
 ---
 
-# 5. CHIẾN LƯỢC SAO LƯU & KHÔI PHỤC THẢM HỌA (DISASTER RECOVERY & PITR)
+# 5. CHIẾN LƯỢC SAO LƯU & KHÔI PHỤC SỰ CỐ NGHIÊM TRỌNG (DISASTER RECOVERY & PITR)
 
 * **Logical Backup (\`pg_dump\`):** Xuất toàn bộ lệnh DDL và DML ra file text/tar. Dễ sử dụng, có thể nạp lại vào phiên bản PostgreSQL khác, nhưng chậm chạp khi cơ sở dữ liệu đạt quy mô hàng trăm Gigabyte.
 * **Continuous Archiving & Point-In-Time-Recovery (PITR):**
   - Chụp một bản sao vật lý đầy đủ ban đầu (\`pg_basebackup\`).
   - Bật tính năng lưu trữ liên tục các tệp Write-Ahead Log (\`archive_mode = on\`, \`archive_command\` đẩy các file WAL 16MB sang Amazon S3 / Google Cloud Storage).
-  - Khi có sự cố (ví dụ lúc 10:15:30 một lập trình viên vô tình chạy lệnh \`DROP TABLE users\`), ta có thể khôi phục lại bản Base Backup và replay WAL đến chính xác thời điểm **10:15:29.999**, loại bỏ hoàn toàn sự cố mà không mất mát bất kỳ giao dịch hợp lệ nào!
-
+  - Khi có sự cố (ví dụ lúc 10:15:30 một lập trình viên vô tình chạy lệnh \`DROP TABLE users\`), ta có thể khôi phục lại bản Base Backup và replay WAL đến chính xác thời điểm **10:15:29.999**, loại bỏ hoàn toàn sự cố mà không mất mát bất kỳ giao dịch hợp lệ nào.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (POSTGRESQL ARCHITECTURE MIND MAP)
+# HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (POSTGRESQL ARCHITECTURE MIND MAP)
 
 \`\`\`diagram
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -544,7 +543,7 @@ export class PostgreSqlEngineService implements OnModuleInit, OnModuleDestroy {
     const client = await this.pool.connect();
     try {
       const res = await client.query('SELECT version(), current_setting(\\'shared_buffers\\') AS shared_buffers;');
-      this.logger.log(\`✅ Kết nối thành công PostgreSQL. Thông tin: \${res.rows[0].version} | Shared Buffers: \${res.rows[0].shared_buffers}\`);
+      this.logger.log(\`[OK] Kết nối thành công PostgreSQL. Thông tin: \${res.rows[0].version} | Shared Buffers: \${res.rows[0].shared_buffers}\`);
     } finally {
       client.release();
     }
@@ -631,7 +630,7 @@ export class PostgreSqlEngineService implements OnModuleInit, OnModuleDestroy {
             'Bản ghi log của web server Nginx'
           ],
           correctIndex: 1,
-          explanation: 'Cơ chế PITR yêu cầu một bản Base Backup vật lý làm mốc khởi đầu, sau đó phát lại (Replay) chuỗi các tệp nhật ký WAL liên tục cho tới đúng thời điểm (Timestamp hoặc Transaction ID) mong muốn trước khi xảy ra thảm họa.'
+          explanation: 'Cơ chế PITR yêu cầu một bản Base Backup vật lý làm mốc khởi đầu, sau đó phát lại (Replay) chuỗi các tệp nhật ký WAL liên tục cho tới đúng thời điểm (Timestamp hoặc Transaction ID) mong muốn trước khi xảy ra sự cố nghiêm trọng.'
         },
         {
           id: 'c4-l1b-q5',
@@ -782,7 +781,7 @@ Trong các framework Node.js truyền thống (như Express thuần), việc x�
 
 ---
 
-# 2. THỨ TỰ THỰC THI CHÍNH XÁC TUYỆT ĐỐI THEO CHUẨN NESTJS
+# 2. THỨ TỰ THỰC THI CHÍNH XÁC HOÀN TOÀN THEO CHUẨN NESTJS
 
 Rất nhiều kỹ sư Backend phạm sai lầm nghiêm trọng về thứ tự thực thi (ví dụ: dùng Middleware để bắt ngoại lệ của Controller hoặc dùng Pipe để xác thực quyền hạn):
 
@@ -819,9 +818,9 @@ Rất nhiều kỹ sư Backend phạm sai lầm nghiêm trọng về thứ tự 
 
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Phân Cấp Phạm Vi Áp Dụng (Scope Hierarchy Map)
+### 4.1 Sơ đồ 1: Bản Đồ Phân Cấp Phạm Vi Áp Dụng (Scope Hierarchy Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          PHẠM VI ĐĂNG KÝ (BINDING SCOPES)                   │
@@ -840,7 +839,7 @@ Rất nhiều kỹ sư Backend phạm sai lầm nghiêm trọng về thứ tự 
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Can Thiệp Hai Chiều Của Interceptor (Two-way RxJS Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Can Thiệp Hai Chiều Của Interceptor (Two-way RxJS Flow)
 \`\`\`diagram
 [ HTTP Request Đến ]
         │
@@ -859,7 +858,7 @@ Rất nhiều kỹ sư Backend phạm sai lầm nghiêm trọng về thứ tự 
 [ HTTP Response Đi ]
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Lựa Chọn Thành Phần Pipeline (Component Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Lựa Chọn Thành Phần Pipeline (Component Decision Tree)
 \`\`\`diagram
 BẠN CẦN HIỆN THỰC LOGIC CAN THIỆP VÀO REQUEST?
 │
@@ -879,7 +878,7 @@ BẠN CẦN HIỆN THỰC LOGIC CAN THIỆP VÀO REQUEST?
     └──► DÙNG: Exception Filter (@Catch(HttpException))
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Thành Phần Pipeline | Khả Năng Đọc Reflector | Can Thiệp Luồng Trả Về | Tự Động Bỏ Qua Khi Lỗi | Điểm Mạnh Nhất |
 | :--- | :--- | :--- | :--- | :--- |
 | **Middleware** | Không (Chưa có context) | Có thể (thao tác trực tiếp res)| Không | Tích hợp thư viện Express có sẵn |
@@ -1133,10 +1132,9 @@ Trong quá trình khởi tạo ứng dụng (Bootstrapping phase), NestJS xây d
 * **Vấn nạn Phụ thuộc Vòng lặp (Circular Dependency Deadlock):** Xảy ra khi Service A yêu cầu Service B trong Constructor, đồng thời Service B lại yêu cầu ngược lại Service A. Thuật toán Sắp xếp Tô pô (Topological Sort) của IoC Container rơi vào bế tắc vô hạn (Cyclic Dependency Graph) do không thể tìm được đỉnh có bậc vào bằng 0. Hệ thống lập tức ném lỗi \`Nest can't resolve dependencies of...\` và từ chối khởi động. Cơ chế \`forwardRef()\` giải quyết tạm thời bằng kỹ thuật Trì hoãn Tham chiếu (Lazy Reference Pointer), nhưng về mặt kiến trúc dài hạn, đây là dấu hiệu cảnh báo Code Smell (vi phạm Single Responsibility) đòi hỏi phải tái cấu trúc tách Domain Event hoặc Mediator Service.
 * **Hiểm họa Hiệu năng của Scope.REQUEST & Hiệu ứng Lan truyền (Scope Bubbling):**
   - Mặc định (\`Scope.DEFAULT\`), mọi Provider trong NestJS là **Singleton** (chỉ có 1 instance duy nhất nằm cố định trong Old Generation của V8 Heap). Chi phí cấp phát bộ nhớ bằng 0 sau khi ứng dụng khởi động thành công.
-  - Khi một kỹ sư tùy tiện chuyển một Service sang \`Scope.REQUEST\` (ví dụ để lấy \`req.headers\` trực tiếp trong service), họ vô tình kích hoạt **Scope Bubbling**: Mọi Service, Interceptor, Controller phụ thuộc vào Service đó theo chuỗi DI đều bị ép biến thành Request Scope!
+  - Khi một kỹ sư tùy tiện chuyển một Service sang \`Scope.REQUEST\` (ví dụ để lấy \`req.headers\` trực tiếp trong service), họ vô tình kích hoạt **Scope Bubbling**: Mọi Service, Interceptor, Controller phụ thuộc vào Service đó theo chuỗi DI đều bị ép biến thành Request Scope.
   - **Hậu quả trên Production:** Với lưu lượng 2,000 req/s, hệ thống buộc phải liên tục cấp phát và tiêu hủy hàng chục nghìn đối tượng trên Young Generation (Eden Space) mỗi giây. V8 Garbage Collector rơi vào tình trạng **GC Thrashing**, kích hoạt liên tục các đợt tạm dừng Stop-the-World, khiến CPU tăng vọt lên $100\\%$, độ trễ API P99 nhảy vọt từ 10ms lên 800ms, và Pod có nguy cơ bị Kubernetes OOMKilled.
-  - **Giải pháp Kiến trúc Đẳng cấp:** Giữ nguyên $100\\%$ Singleton Scope và sử dụng **\`AsyncLocalStorage\`** (Node.js Core API) để chia sẻ Ngữ cảnh Yêu cầu (Request Context / Correlation ID) xuyên suốt các tác vụ bất đồng bộ mà không tốn một byte cấp phát DI instance nào!
-
+  - **Giải pháp Kiến trúc Đẳng cấp:** Giữ nguyên $100\\%$ Singleton Scope và sử dụng **\`AsyncLocalStorage\`** (Node.js Core API) để chia sẻ Ngữ cảnh Yêu cầu (Request Context / Correlation ID) xuyên suốt các tác vụ bất đồng bộ mà không tốn một byte cấp phát DI instance nào.
 ---
 
 # 2. ĐỒ THỊ PHỤ THUỘC CÓ HƯỚNG DAG & THUẬT TOÁN TOPOLOGICAL SORT
@@ -1172,7 +1170,7 @@ Khi NestJS nạp các module, nó xây dựng một **Đồ thị có hướng k
 # 3. HIỂM HỌA HIỆU NĂNG CỦA SCOPE BUBBLING TRONG NESTJS
 
 NestJS cung cấp 3 phạm vi sống (Injection Scopes):
-* **\`Scope.DEFAULT\` (Singleton):** 1 instance duy nhất cho toàn bộ vòng đời ứng dụng. An toàn, tốc độ tối đa, tiết kiệm RAM tuyệt đối.
+* **\`Scope.DEFAULT\` (Singleton):** 1 instance duy nhất cho toàn bộ vòng đời ứng dụng. An toàn, tốc độ tối đa, tiết kiệm RAM hoàn toàn.
 * **\`Scope.TRANSIENT\`:** Mỗi provider inject nó sẽ nhận một instance mới riêng biệt (vẫn giữ cố định trong suốt vòng đời của provider đó).
 * **\`Scope.REQUEST\` (Hiểm họa ngầm):** Mỗi HTTP Request đến tạo ra một instance mới hoàn toàn và bị tiêu hủy sau khi request kết thúc.
 
@@ -1191,14 +1189,13 @@ NestJS cung cấp 3 phạm vi sống (Injection Scopes):
                (BỊ ÉP BIẾN THÀNH SCOPE.REQUEST TỰ ĐỘNG - BUBBLING EFFECT!)
 \`\`\`
 
-> **Quy Tắc Sống Còn Của Senior Architect:** \`Scope.REQUEST\` có tính lây nhiễm (Bubbling)! Nếu một Service ở tận cùng tầng Repository bị đổi sang \`Scope.REQUEST\`, **toàn bộ Service, Controller phụ thuộc vào nó dọc theo chuỗi DI đều bị biến thành \`Scope.REQUEST\` theo!**
-> Hệ quả: 1,000 requests/giây sẽ tạo ra hàng chục nghìn object instances mới trên Heap, gây GC Thrashing, làm CPU tăng $300\\%$ và độ trễ API tăng vọt từ 5ms lên 200ms!
-
+> **Quy Tắc Sống Còn Của Senior Architect:** \`Scope.REQUEST\` có tính lây nhiễm (Bubbling)! Nếu một Service ở tận cùng tầng Repository bị đổi sang \`Scope.REQUEST\`, **toàn bộ Service, Controller phụ thuộc vào nó dọc theo chuỗi DI đều bị biến thành \`Scope.REQUEST\` theo.**
+> Hệ quả: 1,000 requests/giây sẽ tạo ra hàng chục nghìn object instances mới trên Heap, gây GC Thrashing, làm CPU tăng $300\\%$ và độ trễ API tăng vọt từ 5ms lên 200ms.
 ---
 
-# 🧠 HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
+# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 🗺️ Sơ đồ 1: Bản Đồ Cấu Trúc Vòng Đời Scopes (Scope Architecture Map)
+### 4.1 Sơ đồ 1: Bản Đồ Cấu Trúc Vòng Đời Scopes (Scope Architecture Map)
 \`\`\`diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            VÙNG BỘ NHỚ V8 HEAP                              │
@@ -1216,7 +1213,7 @@ NestJS cung cấp 3 phạm vi sống (Injection Scopes):
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 🔄 Sơ đồ 2: Dòng Chảy Giải Quyết Circular Dependency Với forwardRef (Resolution Flow)
+### 4.2 Sơ đồ 2: Dòng Chảy Giải Quyết Circular Dependency Với forwardRef (Resolution Flow)
 \`\`\`diagram
 [ Khởi động Container ]
         │
@@ -1237,7 +1234,7 @@ Quét OrderService: Thấy cần @Inject(forwardRef(() => UserService))
 Nạp ngược lại OrderService hoàn chỉnh vào UserService ──► Khởi động thành công!
 \`\`\`
 
-### 🌳 Sơ đồ 3: Cây Quyết Định Xử Lý Circular Dependency (Refactoring Decision Tree)
+### 4.3 Sơ đồ 3: Cây Quyết Định Xử Lý Circular Dependency (Refactoring Decision Tree)
 \`\`\`diagram
 HỆ THỐNG BỊ DÍNH LỖI CIRCULAR DEPENDENCY GIỮA SERVICE A VÀ SERVICE B?
 │
@@ -1252,13 +1249,13 @@ HỆ THỐNG BỊ DÍNH LỖI CIRCULAR DEPENDENCY GIỮA SERVICE A VÀ SERVICE B
         └──► Dùng EventEmitter2 (@OnEvent) để giao tiếp bất đồng bộ lỏng lẻo (Decoupled)
 \`\`\`
 
-### ⚖️ Sơ đồ 4: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
+### 4.4 Bảng tổng hợp: Bảng Đánh Đổi Kỹ Thuật (Engineering Trade-off Matrix)
 | Phạm Vi (Scope) | Chi Phí Tạo Object | Áp Lực Lên Garbage Collector | Lưu Được State Từng Request | Tốc Độ Xử Lý API |
 | :--- | :--- | :--- | :--- | :--- |
-| **Scope.DEFAULT** | $0$ sau khi app khởi động | Hoàn toàn bằng $0$ ($0\\%$ GC) | Tuyệt đối KHÔNG (Rò rỉ state)| Tối đa (Cực nhanh) |
+| **Scope.DEFAULT** | $0$ sau khi app khởi động | Hoàn toàn bằng $0$ ($0\\%$ GC) | không (Rò rỉ state)| Tối đa (Cực nhanh) |
 | **Scope.TRANSIENT** | Thấp (Tạo lúc startup) | Thấp | Không | Tương đương Singleton |
 | **Scope.REQUEST** | Rất cao (Tạo mới mỗi req) | Cực lớn (GC Thrashing liên tục)| Có (Lưu userId, trace-id) | Chậm hơn $3\\times$ - $5\\times$ |
-| **AsyncLocalStorage**| Cực thấp (Ngữ cảnh luồng) | Rất thấp (Node core API) | Hoàn hảo cho trace-id/user | Nhanh hơn Scope.REQUEST rất nhiều |
+| **AsyncLocalStorage**| Cực thấp (Ngữ cảnh luồng) | Rất thấp (Node core API) | Toàn diện cho trace-id/user | Nhanh hơn Scope.REQUEST rất nhiều |
 `,
       realCodeSnippet: `
 import { Injectable, Scope, Inject } from '@nestjs/common';
@@ -1323,7 +1320,7 @@ export class AsyncLocalStorageContextService {
             'Dữ liệu của người dùng này sẽ tự động ghi đè lên bộ nhớ của người dùng khác do các luồng bị gộp chung vào một biến static.'
           ],
           correctIndex: 1,
-          explanation: 'Scope.REQUEST có tính lan truyền ngược (Bubbling) lên toàn bộ chuỗi dependency. Nếu một Repository hoặc Service sâu bên dưới được cấu hình Scope.REQUEST, tất cả các Service và Controller gián tiếp hoặc trực tiếp inject nó bắt buộc phải được tái tạo lại trên mỗi HTTP request, làm bùng nổ số lượng instance và gây áp lực khủng khiếp lên Garbage Collector.'
+          explanation: 'Scope.REQUEST có tính lan truyền ngược (Bubbling) lên toàn bộ chuỗi dependency. Nếu một Repository hoặc Service sâu bên dưới được cấu hình Scope.REQUEST, tất cả các Service và Controller gián tiếp hoặc trực tiếp inject nó bắt buộc phải được tái tạo lại trên mỗi HTTP request, làm bùng nổ số lượng instance và gây áp lực rất lớn lên Garbage Collector.'
         },
         {
           id: 'c4-l3-q2',

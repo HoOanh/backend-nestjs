@@ -86,14 +86,24 @@
   color: #0f172a;
 }
 
-/* 📊 Technical Comparison & Trade-off Matrix Table */
+/* Technical Comparison & Trade-off Matrix Table (Formal Report Standard) */
 .technical-table-container {
   margin: 24px 0;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   overflow-x: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.table-caption-header {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  letter-spacing: 0.2px;
 }
 
 .technical-matrix-table {
@@ -101,39 +111,65 @@
   border-collapse: collapse;
   text-align: left;
   font-size: 13.5px;
-  min-width: 600px;
+  min-width: 580px;
+  table-layout: auto;
 }
 
 .technical-matrix-table thead tr {
   background: rgba(14, 165, 233, 0.08);
-  border-bottom: 2px solid var(--accent-primary);
+  border-top: 1.5px solid var(--accent-primary);
+  border-bottom: 1.5px solid var(--accent-primary);
+}
+
+[data-theme='light'] .technical-matrix-table thead tr {
+  background: #f1f5f9;
+  border-top: 1.5px solid #334155;
+  border-bottom: 1.5px solid #334155;
 }
 
 .technical-matrix-table th {
-  padding: 14px 18px;
-  font-size: 12px;
+  padding: 12px 16px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+  border-right: 1px solid var(--border-subtle);
 }
 
-.technical-matrix-table th:first-child {
-  border-right: 1px solid var(--border-subtle);
-  width: 22%;
+.technical-matrix-table th:last-child {
+  border-right: none;
+}
+
+.technical-matrix-table th:first-child,
+.technical-matrix-table td:first-child {
+  white-space: normal;
+  min-width: 110px;
 }
 
 .technical-matrix-table td {
-  padding: 14px 18px;
+  padding: 11px 16px;
   border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   line-height: 1.6;
+  vertical-align: top;
+}
+
+.technical-matrix-table td code,
+.technical-matrix-table th code {
+  white-space: nowrap;
+  display: inline-block;
+  margin: 1px 0;
+}
+
+.technical-matrix-table td:last-child {
+  border-right: none;
 }
 
 .technical-matrix-table td:first-child {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-primary);
-  border-right: 1px solid var(--border-subtle);
   background: var(--bg-surface-elevated);
 }
 
@@ -154,7 +190,7 @@
 }
 
 .technical-matrix-table tr:last-child td {
-  border-bottom: none;
+  border-bottom: 1.5px solid var(--border-subtle);
 }
 
 .technical-matrix-table code {
@@ -171,14 +207,14 @@
 }
 
 /* ==========================================================================
-   🧠 SMART MIND MAP & DECISION TREE VISUALIZER (WHITE-PAPER GRADE UI/UX)
+   SMART MIND MAP & DECISION TREE VISUALIZER (WHITE-PAPER GRADE UI/UX)
    ========================================================================== */
 .mindmap-container {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  margin: 28px 0;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  margin: 24px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -186,12 +222,11 @@
 [data-theme='light'] .mindmap-container {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
 }
 
 .mindmap-container:hover {
   border-color: rgba(14, 165, 233, 0.35);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.08);
 }
 
 .mindmap-header {
@@ -216,7 +251,15 @@
 }
 
 .mindmap-type-icon {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--accent-primary);
+  flex-shrink: 0;
 }
 
 .mindmap-main-title {
@@ -848,7 +891,18 @@
 }
 
 .zone-icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .zone-title {
@@ -1091,8 +1145,16 @@
 }
 
 .arch-icon {
-  font-size: 26px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  color: var(--accent-primary);
+  flex-shrink: 0;
 }
 
 .arch-main-title {
@@ -1320,7 +1382,17 @@
 }
 
 .comp-icon {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .component-block p {
@@ -1699,39 +1771,40 @@
 }
 
 .mindmap-master-svg {
-  width: 2400px;
-  height: 1080px;
-  min-width: 2400px;
+  width: 2600px;
+  height: 1200px;
+  min-width: 2600px;
   max-width: none;
   display: block;
   flex-shrink: 0;
   user-select: none;
+  overflow: visible;
 }
 
 /* 5. Minimal Interaction Hint */
 .mindmap-interaction-hint {
   position: absolute;
-  bottom: 8px;
+  bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(8px);
   color: #f8fafc;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 4px 14px;
+  padding: 5px 16px;
   border-radius: 20px;
   pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  opacity: 0.88;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  opacity: 0.92;
   transition: opacity 0.35s ease;
   z-index: 5;
   white-space: nowrap;
 }
 
 [data-theme='light'] .mindmap-interaction-hint {
-  background: rgba(30, 41, 59, 0.88);
+  background: rgba(15, 23, 42, 0.88);
   color: #ffffff;
 }
 
@@ -1765,18 +1838,18 @@
   height: calc(100vh - 135px) !important;
 }
 
-/* 7. SVG Typography & Components */
+/* 7. SVG Typography & Boxed Node Cards */
 .hub-svg-title {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 800;
   fill: #ffffff;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
 }
 
 .hub-svg-sub {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
   fill: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.8px;
@@ -1784,7 +1857,7 @@
 
 .card-svg-title {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 800;
   fill: #0f172a;
 }
@@ -1795,7 +1868,7 @@
 
 .card-svg-sub {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
   fill: #64748b;
 }
@@ -1807,13 +1880,35 @@
 .sub-cat-title {
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   fill: #1e293b;
   transition: fill 0.15s ease;
 }
 
 [data-theme='dark'] .sub-cat-title {
-  fill: #e2e8f0;
+  fill: #f1f5f9;
+}
+
+.leaf-svg-title {
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  fill: #0f172a;
+}
+
+[data-theme='dark'] .leaf-svg-title {
+  fill: #f8fafc;
+}
+
+.leaf-svg-sub {
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  font-size: 10.5px;
+  font-weight: 500;
+  fill: #475569;
+}
+
+[data-theme='dark'] .leaf-svg-sub {
+  fill: #94a3b8;
 }
 
 .leaf-svg-text {
@@ -1831,12 +1926,34 @@
 /* SVG Cards & Joint Circles */
 .node-card-bg {
   fill: #ffffff;
-  stroke-width: 2.5px;
-  transition: all 0.2s ease;
+  stroke-width: 2.2px;
+  transition: stroke-width 0.15s ease, fill 0.15s ease;
 }
 
 [data-theme='dark'] .node-card-bg {
-  fill: #181a24;
+  fill: #151926;
+}
+
+.sub-card-bg {
+  fill: #f8fafc;
+  stroke-width: 1.8px;
+  transition: stroke-width 0.15s ease, fill 0.15s ease;
+}
+
+[data-theme='dark'] .sub-card-bg {
+  fill: #182032;
+}
+
+.leaf-card-bg {
+  fill: #ffffff;
+  stroke-width: 1.5px;
+  stroke-opacity: 0.55;
+  transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease, fill 0.15s ease;
+}
+
+[data-theme='dark'] .leaf-card-bg {
+  fill: #131926;
+  stroke-opacity: 0.65;
 }
 
 .card-border-purple {
@@ -1883,7 +2000,7 @@
   stroke: #d97706;
 }
 
-/* Toggle Badges on Tier Cards (Cấp 1) - Smooth Không Giật */
+/* Toggle Badges on Tier Cards (Cấp 1) */
 .tier-toggle-badge {
   cursor: pointer;
   user-select: none;
@@ -1891,11 +2008,11 @@
 }
 
 .tier-toggle-badge:hover {
-  filter: brightness(1.2);
-  opacity: 0.9;
+  filter: brightness(1.15);
+  opacity: 0.95;
 }
 
-/* Sub-branch Toggle Badge (Cấp 2) - Mindmaps.com Flow */
+/* Sub-branch Toggle Badge (Cấp 2) */
 .sub-toggle-badge {
   cursor: pointer;
   user-select: none;
@@ -1903,7 +2020,7 @@
 }
 
 .sub-toggle-badge:hover {
-  filter: brightness(1.25);
+  filter: brightness(1.18);
   opacity: 0.95;
 }
 
@@ -1911,12 +2028,10 @@
   transition: opacity 0.2s ease;
 }
 
-/* Ẩn hiện cây con theo từng cấp */
 .sub-branch-group.is-collapsed-sub .sub-branch-leaves {
   display: none !important;
 }
 
-/* Collapsible Branches Behavior */
 .mindmap-tier-branch {
   transition: opacity 0.25s ease;
 }
@@ -1925,65 +2040,38 @@
   display: none !important;
 }
 
-/* Giữ stroke-width ổn định, tuyệt đối không đổi kích thước khi hover để triệt tiêu hiện tượng giật */
 .mindmap-tier-branch.is-highlighted .branch-stem {
-  stroke-width: 6px;
-  filter: drop-shadow(0 0 8px currentColor);
+  stroke-width: 5.5px;
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 .mindmap-tier-branch.is-highlighted .node-card-bg {
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.25));
-}
-
-.mindmap-tier-branch.is-highlighted .sub-cat-title {
-  fill: #0284c7;
-}
-
-[data-theme='dark'] .mindmap-tier-branch.is-highlighted .sub-cat-title {
-  fill: #38bdf8;
-}
-
-.mindmap-tier-branch.is-highlighted .leaf-svg-text {
-  fill: #0284c7;
-  font-weight: 700;
-}
-
-[data-theme='dark'] .mindmap-tier-branch.is-highlighted .leaf-svg-text {
-  fill: #38bdf8;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.2));
 }
 
 .mindmap-tier-branch.is-dimmed {
-  opacity: 0.15;
+  opacity: 0.16;
   filter: grayscale(85%);
 }
 
 /* 8. Interactive Nodes & Selection Highlighting */
 .mindmap-interactive-node {
   cursor: pointer;
-  transition: opacity 0.15s ease;
 }
 
-.mindmap-interactive-node:hover {
-  opacity: 0.85;
+.mindmap-interactive-node:hover .node-card-bg,
+.mindmap-interactive-node:hover .sub-card-bg,
+.mindmap-interactive-node:hover .leaf-card-bg {
+  stroke-opacity: 1;
+  stroke-width: 2.5px;
 }
 
-.sub-cat-title:hover {
-  fill: #38bdf8 !important;
-  text-decoration: underline;
-}
-
-.leaf-svg-text:hover {
-  fill: #38bdf8 !important;
-}
-
-.mindmap-interactive-node.is-selected-node rect {
-  stroke: #38bdf8 !important;
-  stroke-width: 3px !important;
-}
-
-.mindmap-interactive-node.is-selected-node text {
-  fill: #38bdf8 !important;
-  font-weight: 900 !important;
+.mindmap-interactive-node.is-selected-node .node-card-bg,
+.mindmap-interactive-node.is-selected-node .sub-card-bg,
+.mindmap-interactive-node.is-selected-node .leaf-card-bg {
+  stroke: #0ea5e9 !important;
+  stroke-opacity: 1 !important;
+  stroke-width: 2.8px !important;
 }
 
 /* 9. Deep Knowledge Inspector Drawer */

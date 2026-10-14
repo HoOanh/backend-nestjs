@@ -29,24 +29,43 @@ export const GraduationCertificate: React.FC<GraduationCertificateProps> = ({ re
         </p>
         <div className="cert-footer-row">
           <div>
-            <div className="cert-seal">🏅</div>
+            <div className="cert-seal">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="8" r="7" />
+                <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+              </svg>
+            </div>
             <div style={{ fontWeight: 700, color: '#f8fafc' }}>
               Arc Irobot Core Architecture Committee
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div className="cert-meta-item">Mã chứng chỉ: {result.certificateId}</div>
             <div className="cert-meta-item">
-              Ngày cấp: {new Date(result.completedAt).toLocaleDateString('vi-VN')}
+              Mã chứng chỉ: {result.certificateId}
             </div>
-            <div className="cert-meta-item">Điểm tốt nghiệp: {result.score}%</div>
+            <div className="cert-meta-item">
+              Ngày cấp:{' '}
+              {new Date(result.completedAt).toLocaleDateString('vi-VN')}
+            </div>
+            <div className="cert-meta-item">
+              Điểm tốt nghiệp: {result.score}%
+            </div>
           </div>
         </div>
       </div>
 
       <div style={{ textAlign: 'center', marginTop: '24px' }}>
         <button className="btn btn-secondary" onClick={() => window.print()}>
-          🖨️ In / Xuất PDF Chứng Chỉ
+          In / Xuất PDF Chứng Chỉ
         </button>
         <button
           className="btn btn-primary"

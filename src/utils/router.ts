@@ -62,7 +62,8 @@ export function parseLocation(pathname: string, search: string): AppRoute {
     /^\/(?:lessons|lesson)\/([a-zA-Z0-9_-]+)$/
   );
   if (lessonMatch) {
-    const lessonId = lessonMatch[1];
+    const rawId = lessonMatch[1];
+    const lessonId = rawId === 'lesson-1' ? 'c1-l1' : rawId;
     const rawTab = searchParams.get('tab');
     const tab: 'theory' | 'quiz' | 'code' =
       rawTab === 'quiz' || rawTab === 'code' || rawTab === 'theory'
@@ -77,7 +78,7 @@ export function parseLocation(pathname: string, search: string): AppRoute {
     rawTab === 'quiz' || rawTab === 'code' || rawTab === 'theory'
       ? rawTab
       : 'theory';
-  return { type: 'lesson', lessonId: 'lesson-1', tab };
+  return { type: 'lesson', lessonId: 'c1-l1', tab };
 }
 
 /**

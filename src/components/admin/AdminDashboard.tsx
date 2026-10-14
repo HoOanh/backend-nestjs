@@ -36,11 +36,92 @@ interface Certificate {
   reason?: string;
   completed_at: string;
 }
+interface AiModelTelemetry {
+  id: string;
+  label: string;
+  priority: number;
+  tierNote: string;
+  rpmLimit: number;
+  rpmUsed: number;
+  rpmRemaining: number;
+  rpmPercent: number;
+  rpdLimit: number;
+  rpdUsed: number;
+  rpdRemaining: number;
+  rpdPercent: number;
+  tpmLimit: number;
+  tpmUsed: number;
+  tpmRemaining: number;
+  tokensToday: number;
+  requestsToday: number;
+  successToday: number;
+  fallbackInToday: number;
+  error429Today: number;
+  error503Today: number;
+  errorOtherToday: number;
+  avgDurationMs: number;
+  status: 'healthy' | 'cooldown' | 'warning' | 'exhausted';
+  cooldownRemainingSec: number;
+  lastUsedAt: string | null;
+  lastError: string | null;
+}
+interface AiRecentLog {
+  id: string;
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
+  event: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  sessionId?: string;
+  lessonId?: string;
+  requestedModel: string;
+  actualModel: string;
+  isFallback: boolean;
+  status: number | null;
+  durationMs: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  responseLength: number | null;
+  error: string | null;
+  quota?: {
+    rpmLimit?: number;
+    rpmUsed?: number;
+    rpmRemaining?: number;
+    rpdLimit?: number;
+    rpdUsed?: number;
+    rpdRemaining?: number;
+  } | null;
+}
 interface AiStatus {
   prompt?: string;
   promptVersion?: string;
   configured: boolean;
   defaultModel: string;
+  generatedAt?: string;
+  summary?: {
+    totalRpmLimit: number;
+    totalRpmUsed: number;
+    totalRpmRemaining: number;
+    totalRpdLimit: number;
+    totalRpdUsed: number;
+    totalRpdRemaining: number;
+    totalTpmLimit: number;
+    totalTpmUsed: number;
+    totalTokensToday: number;
+    totalRequestsToday: number;
+    totalSuccessToday: number;
+    totalFallbackToday: number;
+    totalFailedToday: number;
+    rejected429Today: number;
+    rejected503Today: number;
+    successRateToday: number;
+    healthyModelsCount: number;
+    totalModelsCount: number;
+  };
+  models?: AiModelTelemetry[];
+  recentLogs?: AiRecentLog[];
 }
 const menus = [
   ['overview', 'Tổng quan', '◫'],
@@ -92,6 +173,10 @@ export const AdminDashboard: React.FC<Props> = ({
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [ai, setAi] = useState<AiStatus | null>(null);
+  const [aiLogFilter, setAiLogFilter] = useState<
+    'all' | 'complete' | 'rejected' | 'fallback'
+  >('all');
+  const [aiRefreshing, setAiRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportPreview, setExportPreview] =
@@ -146,6 +231,17 @@ export const AdminDashboard: React.FC<Props> = ({
     const timer = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(timer);
   }, [toast]);
+  const refreshAi = async () => {
+    setAiRefreshing(true);
+    try {
+      const latestAi = await apiFetch<AiStatus>('/admin/ai');
+      setAi(latestAi);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAiRefreshing(false);
+    }
+  };
   const load = async () => {
     setLoading(true);
     setError('');
@@ -173,6 +269,11 @@ export const AdminDashboard: React.FC<Props> = ({
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (section === 'ai') {
+      void refreshAi();
+    }
+  }, [section]);
   const previousSection = useRef(section);
   const hydrateFilters = () => {
     const query = new URLSearchParams(window.location.search);
@@ -1138,35 +1239,392 @@ export const AdminDashboard: React.FC<Props> = ({
             </>
           )}
           {section === 'ai' && (
-            <section className="admin-card">
-              <h2>Trạng thái AI Tutor</h2>
-              <p className="admin-badge">
-                {ai?.configured
-                  ? 'Đã cấu hình API key'
-                  : 'Chưa cấu hình API key'}
-              </p>
-              <dl>
-                <dt>Model mặc định</dt>
-                <dd>
-                  <code>{ai?.defaultModel || '—'}</code>
-                </dd>
-                <dt>Phiên bản prompt</dt>
-                <dd>{ai?.promptVersion || '—'}</dd>
-                <dt>Kết nối provider</dt>
-                <dd>Chưa kiểm tra trực tiếp</dd>
-              </dl>
-              <p>
-                Cấu hình được đọc từ backend. Chi tiết request, lỗi provider và
-                thời gian xử lý có trong AI Chat Logs.
-              </p>
-              <details>
-                <summary>Prompt hiện hành trên server</summary>
-                <pre>{ai?.prompt || 'Chưa tải được prompt'}</pre>
-              </details>
-              <button onClick={() => navigate('database')}>
-                Xem trace AI →
-              </button>
-            </section>
+            <>
+              <div className="admin-page-heading">
+                <div>
+                  <h2>Trạng thái AI Tutor & Thống kê Quota (Free Plan)</h2>
+                  <p>
+                    Theo dõi thời gian thực lưu lượng sử dụng, hạn mức RPM/RPD
+                    còn lại của từng bucket model và lịch sử chuyển hướng
+                    fallback.
+                  </p>
+                </div>
+                <div className="admin-row-actions">
+                  <button
+                    disabled={aiRefreshing || loading}
+                    onClick={() => void refreshAi()}
+                  >
+                    {aiRefreshing ? 'Đang cập nhật…' : 'Làm mới Quota & Log'}
+                  </button>
+                  <button onClick={() => navigate('database')}>
+                    Xem bảng thô (DB) →
+                  </button>
+                </div>
+              </div>
+
+              <div className="admin-metrics-grid">
+                <div className="admin-metric">
+                  <span>Quota Phút (RPM Còn lại)</span>
+                  <strong>
+                    {ai?.summary
+                      ? `${ai.summary.totalRpmRemaining} / ${ai.summary.totalRpmLimit}`
+                      : '—'}
+                  </strong>
+                  <small>
+                    Đã dùng {ai?.summary?.totalRpmUsed ?? 0} req trong 60 giây
+                    qua
+                  </small>
+                </div>
+                <div className="admin-metric">
+                  <span>Quota Ngày (RPD Còn lại)</span>
+                  <strong>
+                    {ai?.summary
+                      ? `${ai.summary.totalRpdRemaining.toLocaleString('vi-VN')} / ${ai.summary.totalRpdLimit.toLocaleString('vi-VN')}`
+                      : '—'}
+                  </strong>
+                  <small>
+                    Đã dùng{' '}
+                    {(ai?.summary?.totalRpdUsed ?? 0).toLocaleString('vi-VN')}{' '}
+                    req hôm nay
+                  </small>
+                </div>
+                <div className="admin-metric">
+                  <span>Token & Tỉ lệ Thành công</span>
+                  <strong>
+                    {ai?.summary
+                      ? `${ai.summary.totalTokensToday.toLocaleString('vi-VN')} tok`
+                      : '—'}
+                  </strong>
+                  <small>
+                    Thành công {ai?.summary?.successRateToday ?? 100}% ·
+                    Fallback cứu hộ {ai?.summary?.totalFallbackToday ?? 0} lần
+                  </small>
+                </div>
+                <div className="admin-metric">
+                  <span>Sức khỏe Cụm Model</span>
+                  <strong>
+                    {ai?.summary
+                      ? `${ai.summary.healthyModelsCount} / ${ai.summary.totalModelsCount} sẵn sàng`
+                      : '—'}
+                  </strong>
+                  <small>
+                    Hôm nay: 429 ({ai?.summary?.rejected429Today ?? 0}) · 503 (
+                    {ai?.summary?.rejected503Today ?? 0}) · Lỗi (
+                    {ai?.summary?.totalFailedToday ?? 0})
+                  </small>
+                </div>
+              </div>
+
+              <section className="admin-card">
+                <div className="admin-page-heading">
+                  <div>
+                    <h2>Bảng phân bổ Quota & Trạng thái từng Model</h2>
+                    <p>
+                      Thứ tự ưu tiên từ #1 đến #7 theo các bucket độc lập trên
+                      Google AI Studio Free Tier. Khi model gặp lỗi 429/503, hệ
+                      thống tự động kích hoạt cooldown và đẩy xuống cuối chuỗi.
+                    </p>
+                  </div>
+                  <span
+                    className={`admin-badge ${ai?.configured ? 'success' : 'warning'}`}
+                  >
+                    {ai?.configured
+                      ? `API Key sẵn sàng · Mặc định: ${ai.defaultModel}`
+                      : 'Chưa cấu hình GEMINI_API_KEY'}
+                  </span>
+                </div>
+                <div className="admin-table-wrapper">
+                  <table className="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>Ưu tiên & Model</th>
+                        <th>Trạng thái</th>
+                        <th>Quota Phút (RPM)</th>
+                        <th>Quota Ngày (RPD)</th>
+                        <th>Sử dụng hôm nay</th>
+                        <th>Token & Độ trễ TB</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(ai?.models || []).map((m) => (
+                        <tr key={m.id}>
+                          <td>
+                            <strong>
+                              #{m.priority} · {m.label}
+                            </strong>
+                            <div>
+                              <code>{m.id}</code>
+                            </div>
+                            <small>{m.tierNote}</small>
+                          </td>
+                          <td>
+                            <span
+                              className={`admin-badge ${
+                                m.status === 'healthy'
+                                  ? 'success'
+                                  : m.status === 'warning'
+                                    ? 'warning'
+                                    : ''
+                              }`}
+                            >
+                              {m.status === 'healthy'
+                                ? 'Sẵn sàng'
+                                : m.status === 'cooldown'
+                                  ? `Đang nghỉ (${m.cooldownRemainingSec}s)`
+                                  : m.status === 'warning'
+                                    ? 'Sắp chạm trần'
+                                    : 'Hết quota'}
+                            </span>
+                            {m.lastUsedAt && (
+                              <small>Gần nhất: {date(m.lastUsedAt)}</small>
+                            )}
+                            {m.lastError && (
+                              <small className="admin-ai-error-note">
+                                Lỗi cuối: {m.lastError}
+                              </small>
+                            )}
+                          </td>
+                          <td>
+                            <strong>
+                              Còn {m.rpmRemaining} / {m.rpmLimit} RPM
+                            </strong>
+                            <small>
+                              Đã dùng {m.rpmUsed} ({m.rpmPercent}%)
+                            </small>
+                            <div className="admin-quota-bar">
+                              <div
+                                className={`admin-quota-fill ${m.rpmPercent >= 80 ? 'warning' : ''}`}
+                                style={{ width: `${m.rpmPercent}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <strong>
+                              Còn {m.rpdRemaining.toLocaleString('vi-VN')} /{' '}
+                              {m.rpdLimit.toLocaleString('vi-VN')} RPD
+                            </strong>
+                            <small>
+                              Đã dùng {m.rpdUsed.toLocaleString('vi-VN')} (
+                              {m.rpdPercent}%)
+                            </small>
+                            <div className="admin-quota-bar">
+                              <div
+                                className={`admin-quota-fill ${m.rpdPercent >= 80 ? 'warning' : ''}`}
+                                style={{ width: `${m.rpdPercent}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <strong>{m.successToday} hoàn tất</strong>
+                            <small>
+                              Fallback nhận: {m.fallbackInToday} · 429:{' '}
+                              {m.error429Today} · 503: {m.error503Today}
+                            </small>
+                          </td>
+                          <td>
+                            <strong>
+                              {m.tokensToday.toLocaleString('vi-VN')} tokens
+                            </strong>
+                            <small>
+                              TPM (60s): {m.tpmUsed.toLocaleString('vi-VN')} ·
+                              Trễ TB:{' '}
+                              {m.avgDurationMs ? `${m.avgDurationMs} ms` : '—'}
+                            </small>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="admin-card">
+                <div className="admin-page-heading">
+                  <div>
+                    <h2>Nhật ký Sử dụng & Quota AI Gần Đây</h2>
+                    <p>
+                      Ghi nhận tự động mỗi lần gọi model, số token tiêu thụ,
+                      quota còn lại tại thời điểm gọi và lý do chuyển hướng.
+                    </p>
+                  </div>
+                  <div className="admin-toolbar">
+                    <select
+                      aria-label="Lọc nhật ký AI"
+                      value={aiLogFilter}
+                      onChange={(e) =>
+                        setAiLogFilter(
+                          e.target.value as
+                            | 'all'
+                            | 'complete'
+                            | 'rejected'
+                            | 'fallback'
+                        )
+                      }
+                    >
+                      <option value="all">Mọi sự kiện AI</option>
+                      <option value="complete">
+                        Hoàn tất trả lời (Stream / Response)
+                      </option>
+                      <option value="rejected">
+                        Từ chối / Lỗi (429 / 503 / 404)
+                      </option>
+                      <option value="fallback">
+                        Có chuyển hướng Fallback
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div className="admin-table-wrapper">
+                  <table className="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>Thời gian</th>
+                        <th>Học viên / Bài</th>
+                        <th>Sự kiện</th>
+                        <th>Model (Yêu cầu → Thực chạy)</th>
+                        <th>Quota còn lại lúc ghi</th>
+                        <th>Token & Độ trễ</th>
+                        <th>Chi tiết / Lỗi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(ai?.recentLogs || [])
+                        .filter((item) => {
+                          if (aiLogFilter === 'complete') {
+                            return (
+                              item.event === 'AI_STREAM_COMPLETE' ||
+                              item.event === 'AI_RESPONSE_COMPLETE'
+                            );
+                          }
+                          if (aiLogFilter === 'rejected') {
+                            return (
+                              item.level === 'WARN' || item.level === 'ERROR'
+                            );
+                          }
+                          if (aiLogFilter === 'fallback') {
+                            return item.isFallback;
+                          }
+                          return true;
+                        })
+                        .map((item) => (
+                          <tr key={item.id}>
+                            <td>{date(item.timestamp)}</td>
+                            <td>
+                              <strong>{item.userName}</strong>
+                              <small>{item.userEmail}</small>
+                              {item.lessonId && (
+                                <small>Bài: {item.lessonId}</small>
+                              )}
+                            </td>
+                            <td>
+                              <span
+                                className={`admin-badge ${
+                                  item.level === 'INFO'
+                                    ? 'success'
+                                    : item.level === 'WARN'
+                                      ? 'warning'
+                                      : ''
+                                }`}
+                              >
+                                {item.event}
+                              </span>
+                            </td>
+                            <td>
+                              {item.requestedModel &&
+                              item.actualModel &&
+                              item.requestedModel !== item.actualModel ? (
+                                <>
+                                  <code>{item.requestedModel}</code> →{' '}
+                                  <code>{item.actualModel}</code>
+                                  <div>
+                                    <span className="admin-badge warning">
+                                      Fallback cứu hộ
+                                    </span>
+                                  </div>
+                                </>
+                              ) : (
+                                <code>
+                                  {item.actualModel ||
+                                    item.requestedModel ||
+                                    '—'}
+                                </code>
+                              )}
+                            </td>
+                            <td>
+                              {item.quota ? (
+                                <>
+                                  <strong>
+                                    RPM còn: {item.quota.rpmRemaining}/
+                                    {item.quota.rpmLimit}
+                                  </strong>
+                                  <small>
+                                    RPD còn:{' '}
+                                    {item.quota.rpdRemaining?.toLocaleString(
+                                      'vi-VN'
+                                    )}
+                                    /
+                                    {item.quota.rpdLimit?.toLocaleString(
+                                      'vi-VN'
+                                    )}
+                                  </small>
+                                </>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td>
+                              {item.totalTokens ? (
+                                <>
+                                  <strong>
+                                    {item.totalTokens.toLocaleString('vi-VN')}{' '}
+                                    tok
+                                  </strong>
+                                  <small>
+                                    In: {item.promptTokens ?? 0} · Out:{' '}
+                                    {item.completionTokens ?? 0}
+                                  </small>
+                                </>
+                              ) : (
+                                '—'
+                              )}
+                              {item.durationMs !== null && (
+                                <small>{item.durationMs} ms</small>
+                              )}
+                            </td>
+                            <td>
+                              {item.error ? (
+                                <span className="admin-ai-error-note">
+                                  {item.status ? `[HTTP ${item.status}] ` : ''}
+                                  {item.error}
+                                </span>
+                              ) : item.status ? (
+                                `HTTP ${item.status} OK`
+                              ) : item.responseLength ? (
+                                `Đã trả ${item.responseLength} ký tự`
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!(ai?.recentLogs || []).length && (
+                  <p className="admin-empty">
+                    Chưa có nhật ký gọi AI nào được ghi nhận.
+                  </p>
+                )}
+              </section>
+
+              <section className="admin-card">
+                <h2>Cấu hình Prompt hệ thống ({ai?.promptVersion || '—'})</h2>
+                <details>
+                  <summary>Prompt hiện hành trên server</summary>
+                  <pre>{ai?.prompt || 'Chưa tải được prompt'}</pre>
+                </details>
+              </section>
+            </>
           )}
           {section === 'trace' && <AuditTrailPane />}
           {section === 'database' && <ServerDatabasePane />}

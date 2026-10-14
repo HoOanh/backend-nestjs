@@ -6,8 +6,16 @@ interface FormattedTextProps {
   className?: string;
 }
 
-export const FormattedText: React.FC<FormattedTextProps> = ({ content, className }) => {
+const EMOJI_STRIP_REGEX =
+  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\uFE0F?\s*/gu;
+
+export const FormattedText: React.FC<FormattedTextProps> = ({
+  content,
+  className
+}) => {
   if (!content) return null;
+
+  const cleanContent = content.replace(EMOJI_STRIP_REGEX, '');
 
   const renderInline = (text: string) => {
     // Match inline `code` and **bold**
@@ -28,7 +36,7 @@ export const FormattedText: React.FC<FormattedTextProps> = ({ content, className
   };
 
   // Split by newlines
-  const lines = content.split(/\n+/);
+  const lines = cleanContent.split(/\n+/);
 
   return (
     <div className={`formatted-text-block ${className || ''}`}>

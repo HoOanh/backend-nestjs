@@ -62,15 +62,23 @@ Every lesson's `theory` field MUST follow this exact structural skeleton (see de
      - **End-of-Part Academic Callout**: `> **Tổng kết học thuật Phần X (...):**` summarizing invariant rules.
 3. **Part 4 (`# 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)`)**:
    - **CRITICAL TEMPLATE LITERAL RULE**: Because `theory` is a TypeScript template literal (`` theory: `...` ``), any backslash `\` inside an ASCII diagram **MUST be escaped as `\\`** (especially at the end of a line like `/       \\`, otherwise JavaScript treats `\` + newline as a line continuation and collapses the next line!).
-   - **`### 4.1 Sơ đồ 1: Bản Đồ Tầng Bậc Hệ Thống (...)`** + `\`\`\`diagram` (triggers `layered-stack` renderer -> renders **BOTH** the `Kiến Trúc Phân Tầng (Stack)` view AND the interactive `Sơ Đồ Tư Duy (Mindmap)` SVG radial tree + Inspector Drawer):
-     - Enclose each tier in `┌───...───┐` and `└───┬───┘`.
-     - Start each tier header with `│ 1. TẦNG ... (ENGLISH LAYER) │`, `│ 2. TẦNG ... │`, `│ 3. TẦNG ... │`.
-     - Inside a tier box, list components either as `├── ComponentName: Technical description` or horizontal flow `[ Comp A ] ◄───► [ Comp B ] ◄───► [ Comp C ]`.
-     - Between `└───┬───┘` and the next `┌───▼───┐`, place `│ <Protocol / Transition description>` on its own line so the parser renders it inside the `.arch-connector-bridge` pill between tiers.
-   - **`### 4.2 Sơ đồ 2: Dòng Chảy So Sánh ...`** + `\`\`\`diagram` (triggers `comparison` renderer -> renders `.mindmap-comparison` 2-column matrix):
+   - **STRICT CONTENT-DRIVEN MINDMAP TOPOLOGY RULE (NO FIXED SINGLE TEMPLATE)**:
+     - Every lesson has different pedagogical mechanics. **Never** force all lessons into a single fixed 4-wing radial spider layout or reuse hardcoded labels from Lesson 1.
+     - **`### 4.1 Sơ đồ 1: Bản Đồ Tầng Bậc Hệ Thống (...)`** + `\`\`\`diagram` triggers `renderLayeredStack`, which renders **BOTH** the `Kiến Trúc Phân Tầng (Stack)` view AND an **Excalidraw Hand-Drawn Interactive Mindmap (`excalidraw-sketch-svg`)** whose topology automatically adapts to the lesson's subject matter (or via an optional first-line directive `[TOPOLOGY: <kind>]` inside the `\`\`\`diagram` block):
+       1. **`taxonomy-tree` (Sơ Đồ Phân Nhánh Đa Tầng — 4+ Tiers)**: Used for full-stack 4-tier hardware-to-application taxonomies (e.g., `c1-l1`: Hardware $\rightarrow$ Linux Kernel $\rightarrow$ Node.js Runtime $\rightarrow$ NestJS).
+       2. **`pipeline-feedback-loop` (Sơ Đồ Đường Ống Thực Thi & Vòng Phản Hồi)**: Used for multi-stage compilation, parsing, stream, request pipeline, or inter-isolate transfer architectures with forward stages and speculative optimization / deoptimization bailout loops (e.g., `c1-l2`: V8 Frontend Parsing $\rightarrow$ Ignition Bytecode & IC $\rightarrow$ TurboFan JIT + OSR Bailout; `c2-l3`: Multi-Isolate Transfer Pipeline).
+       3. **`dual-cycle-loop` (Sơ Đồ Vòng Lặp Kép — Inner Loop $\leftrightarrow$ Outer Loop + Foundation Bar)**: Used for dual-cycle, two-generation memory/GC, fast-path vs. slow-path, or event-loop systems (e.g., `c1-l3`: OS `cgroups` RSS Foundation Bar + Young Gen Scavenger Inner Loop $\leftrightarrow$ Old Gen Orinoco Major GC Outer Loop; `c2-l1`: V8 Call Stack + High-Priority Microtask Loop $\leftrightarrow$ Libuv 6-Phase Macrotask Loop).
+       4. **`orbital-cycle` (Sơ Đồ Chu Trình Đa Trụ Cột — Balanced 3-Pillar Orbital Map)**: Used for 3-pillar subsystem routing or triangular architectures (e.g., `c2-l2`: Node.js API $\leftrightarrow$ Libuv Subsystem Routing $\leftrightarrow$ Linux Kernel `epoll` & NIC Hardware).
+     - **Structural syntax inside `### 4.1` `\`\`\`diagram`**:
+       - Optional line 1: `[TOPOLOGY: taxonomy-tree | pipeline-feedback-loop | dual-cycle-loop | orbital-cycle]` (if omitted, `detectMindmapTopology` selects the topology from the lesson's domain structure).
+       - Enclose each tier/stage/loop in `┌───...───┐` and `└───┬───┘`.
+       - Start each tier header with `│ 1. TẦNG ... (ENGLISH LAYER) │`, `│ 2. TẦNG ... │`, `│ 3. TẦNG ... │`.
+       - Inside a tier box, list components either as `├── ComponentName: Technical description` or horizontal peer flow `[ Comp A (Spec A) ] ◄───► [ Comp B (Spec B) ] ◄───► [ Comp C (Spec C) ]`. **Always provide a concise parenthetical `(Spec)` or `: Spec` for each bracketed item** so the Mindmap card displays a real technical subtitle (never leave bare `[ Comp A ]` without a spec).
+       - Between `└───┬───┘` and the next `┌───▼───┐`, place `│ <Protocol / Transition / Loop bridge description>` on its own line so the parser renders it on the inter-tier connectors, pipeline stage arrows, and feedback loops.
+   - **`### 4.2 Sơ đồ 2: Dòng Chảy So Sánh ...`** + `\`\`\`diagram` (triggers `comparison` renderer -> renders `.mindmap-comparison` Excalidraw 2-column visual flow):
      - Block 1 MUST start with `MÔ HÌNH CŨ: <Tên mô hình Anti-pattern>` followed by 2–3 lines of flow (`──►`) and quantitative penalty (`= ...`), then a blank line.
      - Block 2 MUST start with `MÔ HÌNH HIỆN ĐẠI: <Tên mô hình Chuẩn Production>` followed by either linear flow lines or fan-in lines (`Item 1 ──┐` / `Item 2 ──┼──► [ Target ] ──► ...` / `Item 3 ──┘` / `└──► ...`).
-   - **`### 4.3 Sơ đồ 3: Cây Quyết Định Kỹ Thuật (...)`** + `\`\`\`diagram` (triggers `decision-tree` renderer -> renders `.mindmap-decision-tree` cards; **MUST NEVER** fall back to raw blueprint):
+   - **`### 4.3 Sơ đồ 3: Cây Quyết Định Kỹ Thuật (...)`** + `\`\`\`diagram` (triggers `decision-tree` renderer -> renders `.mindmap-decision-tree` Excalidraw flowchart + diagnostic cards; **MUST NEVER** fall back to raw blueprint):
      - Line 1: All-caps root question ending with `?`.
      - Every leaf outcome node MUST be enclosed in square brackets `[ TÊN KẾT QUẢ IN HOA ]` (include keywords like `CHUẨN`/`TỐI ƯU`/`MONOMORPHIC` for positive green badge, `SLOW`/`LỖI`/`CẤM` for danger red badge, or trade-off terms for caution amber badge).
      - Directly below each `[ TÊN KẾT QUẢ ]` in the same column, include 2–3 `- Đặc điểm kỹ thuật` bullet lines.

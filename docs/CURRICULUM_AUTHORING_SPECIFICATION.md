@@ -131,9 +131,14 @@ Khi biên soạn nội dung Markdown trong `theory`, người biên soạn phả
 ### 5.2. Quy tắc kích hoạt đúng 6 Bộ Dựng Sơ Đồ (`detectDiagramCategory.ts`)
 Hệ thống có 6 bộ dựng sơ đồ chuyên biệt trong `src/components/mindmap/renderers/`. Để kích hoạt chính xác bộ dựng mong muốn, tiêu đề `###` đứng ngay trước khối `\`\`\`diagram` và cấu trúc văn bản bên trong phải tuân thủ quy tắc sau:
 
-1. **Bộ dựng `layered-stack` (`renderLayeredStack.ts`):**
+1. **Bộ dựng `layered-stack` (`renderLayeredStack.ts` — Đa Topology Sơ Đồ Tư Duy Theo Nội Dung Bài Học):**
    - **Cách kích hoạt:** Tiêu đề `###` chứa một trong các từ khóa: `"Bản Đồ"`, `"Taxonomy"`, `"Tầng Bậc"`, `"Phân Cấp"`, `"Phân Phối"`, `"Architecture Map"`.
-   - **Cấu trúc nội dung:** Chia thành các hộp tầng `1. TẦNG ...`, `2. TẦNG ...`, `3. TẦNG ...` nối nhau bằng mũi tên `│ System Calls...` / `▼`. Bên trong mỗi tầng dùng `├──` và `└──` để liệt kê các thành phần con.
+   - **Cấu trúc nội dung:** Chia thành các hộp tầng `1. TẦNG ...`, `2. TẦNG ...`, `3. TẦNG ...` nối nhau bằng mũi tên `│ <Giao thức / Chuyển tiếp>...` / `▼`. Bên trong mỗi tầng dùng `├── Tên: Mô tả` hoặc chuỗi ngang `[ Thành phần A (Thông số A) ] ◄───► [ Thành phần B (Thông số B) ]`.
+   - **Quy tắc Đa Topology Sơ Đồ Tư Duy (`detectMindmapTopology`):** Nghiêm cấm ép mọi bài học vào chung 1 mẫu sơ đồ cố định. Tab `Sơ Đồ Tư Duy (Mindmap)` tự động dựng 1 trong **4 Topology Excalidraw (`excalidraw-sketch-svg`)** tùy theo bản chất kiến trúc của bài học (hoặc chỉ định tường minh qua dòng đầu `[TOPOLOGY: <loại>]`):
+     - `taxonomy-tree`: Sơ đồ phân nhánh đa tầng (>= 4 tầng, ví dụ Bài `c1-l1` từ Hardware $\rightarrow$ Kernel $\rightarrow$ Node.js $\rightarrow$ NestJS).
+     - `pipeline-feedback-loop`: Sơ đồ chuỗi đường ống thực thi ngang kèm vòng phản hồi tối ưu hóa & thoát lui (ví dụ Bài `c1-l2` V8 Parsing $\rightarrow$ Ignition Bytecode & IC $\rightarrow$ TurboFan JIT + OSR Deopt Bailout; Bài `c2-l3` Multi-Isolate Transfer Pipeline).
+     - `dual-cycle-loop`: Sơ đồ vòng lặp kép (`Inner Loop ↔ Outer Loop`) kèm thanh ranh giới nền tảng (ví dụ Bài `c1-l3` OS `cgroups` RSS + Vòng lặp Young Gen Scavenger $\leftrightarrow$ Vòng lặp Old Gen Orinoco Major GC; Bài `c2-l1` V8 Call Stack + Vòng lặp Microtask $\leftrightarrow$ Vòng lặp 6 pha Libuv).
+     - `orbital-cycle`: Sơ đồ chu trình 3 trụ cột cân đối cho các hệ thống phân luồng/định tuyến 3 tầng (ví dụ Bài `c2-l2` Node.js API $\leftrightarrow$ Libuv Routing $\leftrightarrow$ Linux Kernel `epoll`).
 2. **Bộ dựng `comparison` (`renderComparisonFlow.ts`):**
    - **Cách kích hoạt:** Tiêu đề `###` chứa từ khóa `"So Sánh"`, `"Comparison"`, `"vs"` HOẶC nội dung chứa `"MÔ HÌNH CŨ:"` / `"MÔ HÌNH HIỆN ĐẠI:"` / `"KỊCH BẢN 1:"`.
    - **Cấu trúc nội dung:** Chia làm 2 khối rõ rệt (cách nhau bằng 1 dòng trống): khối đầu là mô hình cũ/anti-pattern, khối hai là mô hình hiện đại/best-practice, các bước nối nhau bằng `──►`.

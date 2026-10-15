@@ -351,7 +351,7 @@ Bảng dưới đây tổng hợp các triệu chứng suy thoái bộ nhớ đ�
 \`\`\`diagram
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │ 1. TẦNG KHÔNG GIAN ĐỊA CHỈ TIẾN TRÌNH & CONTAINER (OS & CGROUPS RSS LAYER)    │
-│    [ Linux cgroups Limit ] ◄───► [ V8 JS Heap ] ◄───► [ C++ External Buffer ] │
+│    [ Linux cgroups Limit (Trần RAM Pod) ] ◄───► [ V8 JS Heap (Young & Old Gen) ] ◄───► [ C++ External Buffer (Ngoài Heap) ] │
 └──────────────────────────────────────┬────────────────────────────────────────┘
                                        │ Phân bổ trang nhớ ảo (mmap) & Write Barrier
 ┌──────────────────────────────────────▼────────────────────────────────────────┐

@@ -5,7 +5,11 @@
 import './mindmap.css';
 import { detectDiagramCategory } from './detectDiagramCategory.ts';
 import { renderMemoryLayout } from './renderers/renderMemoryLayout.ts';
-import { renderLayeredStack } from './renderers/renderLayeredStack.ts';
+import {
+  detectMindmapTopology,
+  type MindmapTopologyKind,
+  renderLayeredStack,
+} from './renderers/renderLayeredStack.ts';
 import { renderDecisionTree } from './renderers/renderDecisionTree.ts';
 import { renderComparisonFlow } from './renderers/renderComparisonFlow.ts';
 import { renderLifecycleFlow } from './renderers/renderLifecycleFlow.ts';
@@ -15,7 +19,10 @@ export * from './types.ts';
 export * from './knowledgeBase.ts';
 export * from './detectDiagramCategory.ts';
 export * from './mindMapController.ts';
+export * from './sketchEngine.ts';
+export type { MindmapTopologyKind };
 export {
+  detectMindmapTopology,
   renderMemoryLayout,
   renderLayeredStack,
   renderDecisionTree,

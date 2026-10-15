@@ -1538,9 +1538,9 @@
 .arch-radial-container {
   width: 100%;
   position: relative;
-  background-color: var(--bg-surface);
-  background-image: radial-gradient(rgba(148, 163, 184, 0.28) 1.2px, transparent 1.2px);
-  background-size: 20px 20px;
+  background-color: #fdfcf8;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.34) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
   padding: 0;
   margin: 0;
   display: flex;
@@ -1550,8 +1550,80 @@
 }
 
 [data-theme='light'] .arch-radial-container {
-  background-color: #f8fafc;
+  background-color: #ffffff;
   background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+}
+
+.sketch-canvas-wrapper {
+  width: 100%;
+  background-color: #ffffff;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.26) 1.15px, transparent 1.15px);
+  background-size: 20px 20px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 16px 12px 10px;
+  margin-bottom: 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 20px rgba(15, 23, 42, 0.05);
+  overflow-x: auto;
+}
+
+.excalidraw-sketch-svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  font-family: 'Playpen Sans', 'Patrick Hand', 'Comic Sans MS', cursive;
+}
+
+.sketch-loop-heading {
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 16.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.sketch-loop-subheading {
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.sketch-heading-blue {
+  fill: #3b6998;
+}
+
+.sketch-heading-green {
+  fill: #246b43;
+}
+
+.sketch-node-text {
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-weight: 600;
+  fill: #1e1e1e;
+}
+
+.sketch-node-sub {
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 12px;
+  font-weight: 500;
+  fill: #334155;
+}
+
+.sketch-node-badge {
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.sketch-arrow-label {
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-weight: 600;
+  fill: #1e1e1e;
+  paint-order: stroke fill;
+  stroke: #ffffff;
+  stroke-width: 5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* 1. Mindmap Top Control Bar */
@@ -1838,138 +1910,96 @@
   height: calc(100vh - 135px) !important;
 }
 
-/* 7. SVG Typography & Boxed Node Cards */
+/* 7. SVG Typography & Excalidraw Hand-Drawn Boxed Node Cards */
 .hub-svg-title {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 15.5px;
-  font-weight: 800;
-  fill: #ffffff;
-  letter-spacing: 0.3px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 17px;
+  font-weight: 700;
+  fill: #1e1e1e;
+  letter-spacing: 0.2px;
 }
 
 .hub-svg-sub {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 9.5px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 10.5px;
   font-weight: 700;
-  fill: rgba(255, 255, 255, 0.92);
-  letter-spacing: 0.8px;
+  fill: #475569;
+  letter-spacing: 0.5px;
 }
 
 .card-svg-title {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 13.5px;
-  font-weight: 800;
-  fill: #0f172a;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 14.5px;
+  font-weight: 700;
+  fill: #1e1e1e;
 }
 
 [data-theme='dark'] .card-svg-title {
-  fill: #f8fafc;
+  fill: #1e1e1e;
 }
 
 .card-svg-sub {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 10.5px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 11.5px;
   font-weight: 600;
-  fill: #64748b;
+  fill: #334155;
 }
 
 [data-theme='dark'] .card-svg-sub {
-  fill: #94a3b8;
+  fill: #334155;
 }
 
 .sub-cat-title {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 12px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 13px;
   font-weight: 700;
-  fill: #1e293b;
+  fill: #1e1e1e;
   transition: fill 0.15s ease;
 }
 
 [data-theme='dark'] .sub-cat-title {
-  fill: #f1f5f9;
+  fill: #1e1e1e;
 }
 
 .leaf-svg-title {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 12px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 13px;
   font-weight: 700;
-  fill: #0f172a;
+  fill: #1e1e1e;
 }
 
 [data-theme='dark'] .leaf-svg-title {
-  fill: #f8fafc;
+  fill: #1e1e1e;
 }
 
 .leaf-svg-sub {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 10.5px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 11px;
   font-weight: 500;
-  fill: #475569;
+  fill: #334155;
 }
 
 [data-theme='dark'] .leaf-svg-sub {
-  fill: #94a3b8;
+  fill: #334155;
 }
 
 .leaf-svg-text {
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-  font-size: 11px;
+  font-family: 'Playpen Sans', 'Patrick Hand', cursive;
+  font-size: 11.5px;
   font-weight: 600;
-  fill: #334155;
+  fill: #1e1e1e;
   transition: fill 0.15s ease;
 }
 
 [data-theme='dark'] .leaf-svg-text {
-  fill: #94a3b8;
+  fill: #1e1e1e;
 }
 
-/* SVG Cards & Joint Circles */
-.node-card-bg {
-  fill: #ffffff;
-  stroke-width: 2.2px;
-  transition: stroke-width 0.15s ease, fill 0.15s ease;
-}
-
-[data-theme='dark'] .node-card-bg {
-  fill: #151926;
-}
-
-.sub-card-bg {
-  fill: #f8fafc;
-  stroke-width: 1.8px;
-  transition: stroke-width 0.15s ease, fill 0.15s ease;
-}
-
-[data-theme='dark'] .sub-card-bg {
-  fill: #182032;
-}
-
+/* SVG Cards & Joint Circles (Pastel fills handled inline by sketchRoundedBox) */
+.node-card-bg,
+.sub-card-bg,
 .leaf-card-bg {
-  fill: #ffffff;
-  stroke-width: 1.5px;
-  stroke-opacity: 0.55;
-  transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease, fill 0.15s ease;
-}
-
-[data-theme='dark'] .leaf-card-bg {
-  fill: #131926;
-  stroke-opacity: 0.65;
-}
-
-.card-border-purple {
-  stroke: #8b5cf6;
-}
-
-.card-border-sky {
-  stroke: #0284c7;
-}
-
-.card-border-green {
-  stroke: #16a34a;
-}
-
-.card-border-amber {
-  stroke: #d97706;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
 .fork-joint-circle,
@@ -1981,23 +2011,23 @@
 [data-theme='dark'] .fork-joint-circle,
 [data-theme='dark'] .sub-joint-circle,
 [data-theme='dark'] .leaf-joint-circle {
-  fill: #0b0f19;
+  fill: #ffffff;
 }
 
 .circle-purple {
-  stroke: #8b5cf6;
+  stroke: #6741d9;
 }
 
 .circle-sky {
-  stroke: #0284c7;
+  stroke: #1971c2;
 }
 
 .circle-green {
-  stroke: #16a34a;
+  stroke: #2f9e44;
 }
 
 .circle-amber {
-  stroke: #d97706;
+  stroke: #e67700;
 }
 
 /* Toggle Badges on Tier Cards (Cấp 1) */
@@ -2062,15 +2092,11 @@
 .mindmap-interactive-node:hover .node-card-bg,
 .mindmap-interactive-node:hover .sub-card-bg,
 .mindmap-interactive-node:hover .leaf-card-bg {
-  stroke-opacity: 1;
-  stroke-width: 2.5px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.14));
 }
 
-.mindmap-interactive-node.is-selected-node .node-card-bg,
-.mindmap-interactive-node.is-selected-node .sub-card-bg,
-.mindmap-interactive-node.is-selected-node .leaf-card-bg {
-  stroke: #0ea5e9 !important;
-  stroke-opacity: 1 !important;
+.mindmap-interactive-node.is-selected-node .sketch-box-stroke {
+  stroke: #0284c7 !important;
   stroke-width: 2.8px !important;
 }
 

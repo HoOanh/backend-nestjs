@@ -29,7 +29,7 @@ function getOrCreateBoardState(board: HTMLElement): MindmapBoardState {
   if (existing) return existing;
 
   const created: MindmapBoardState = {
-    activeTab: 'stack',
+    activeTab: 'radial',
     scale: 0.48,
     panX: 0,
     panY: 0,

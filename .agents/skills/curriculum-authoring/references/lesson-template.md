@@ -143,20 +143,21 @@ export class ExampleSafeService {
 
 # 4. HỆ THỐNG HÓA KIẾN THỨC & SƠ ĐỒ TƯ DUY (ENGINEERING MIND MAP)
 
-### 4.1 Sơ đồ 1: Bản Đồ Tầng Bậc Hệ Thống (System Taxonomy Map)
+### 4.1 Sơ đồ 1: Bản Đồ Tầng Bậc Hệ Thống ([Tên Tiếng Anh Tương Ứng Của Bài Học])
 \`\`\`diagram
+[TOPOLOGY: dual-cycle-loop | pipeline-feedback-loop | orbital-cycle | taxonomy-tree] (Tùy chọn: Khai báo tường minh hoặc để bộ phân loại tự động chọn theo nội dung bài học)
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ 1. TẦNG [TÊN TẦNG 1]                                                          │
-│    [ Thành phần A ] ◄───► [ Thành phần B ] ◄───► [ Thành phần C ]             │
+│ 1. TẦNG [TÊN TẦNG 1] ([ENGLISH LAYER 1])                                      │
+│    [ Thành phần A (Thông số A) ] ◄───► [ Thành phần B (Thông số B) ]          │
 └──────────────────────────────────────┬────────────────────────────────────────┘
-                                       │ [Giao thức / Lời gọi kết nối 1-2]
+                                       │ [Giao thức / Lời gọi kết nối / Cầu nối 1-2]
 ┌──────────────────────────────────────▼────────────────────────────────────────┐
-│ 2. TẦNG [TÊN TẦNG 2]                                                          │
+│ 2. TẦNG [TÊN TẦNG 2] ([ENGLISH LAYER 2])                                      │
 │    ├── [Thành phần 2.1]: [Mô tả kỹ thuật ngắn]                                │
 │    ├── [Thành phần 2.2]: [Mô tả kỹ thuật ngắn]                                │
 │    └── [Thành phần 2.3]: [Mô tả kỹ thuật ngắn]                                │
 └──────────────────────────────────────┬────────────────────────────────────────┘
-                                       │ [Giao thức / Lời gọi kết nối 2-3]
+                                       │ [Giao thức / Lời gọi kết nối / Cầu nối 2-3]
 ┌──────────────────────────────────────▼────────────────────────────────────────┐
 │ 3. TẦNG [TÊN TẦNG 3]                                                          │
 │    ├── [Thành phần 3.1]: [Mô tả kỹ thuật ngắn]                                │

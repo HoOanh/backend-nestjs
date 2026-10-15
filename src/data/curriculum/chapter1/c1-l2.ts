@@ -312,7 +312,7 @@ Bảng dưới đây tổng hợp 5 mã lý do thoát lui (\`Bailout Reasons\`) 
 \`\`\`diagram
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │ 1. TẦNG PHÂN TÍCH CÚ PHÁP & KHỞI TẠO (FRONTEND PARSING LAYER)                 │
-│    [ Mã nguồn TS/JS ] ◄───► [ Scanner (Tokens) ] ◄───► [ Parser (Cây AST) ]   │
+│    [ Mã nguồn TS/JS (UTF-16 Stream) ] ◄───► [ Scanner (Tách Tokens) ] ◄───► [ Parser (Dựng Cây AST) ] │
 └──────────────────────────────────────┬────────────────────────────────────────┘
                                    │ Sinh mã Bytecode thanh ghi (Accumulator r0)
 ┌──────────────────────────────────────▼────────────────────────────────────────┐

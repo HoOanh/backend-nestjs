@@ -251,19 +251,34 @@ export async function validateLesson(lesson: Lesson): Promise<CheckResult[]> {
   const mindmapDetails: string[] = [];
 
   if (section4Diagrams.length === 3) {
-    // 4.1 Layered Stack + Interactive Radial SVG Mindmap
+    // 4.1 Layered Stack + Content-Driven Multi-Topology Excalidraw SVG Mindmap
     const d1Title = section4Diagrams[0][1].replace(/^###\s+/, '').trim();
     const d1Code = section4Diagrams[0][2];
     const d1Cat = detectDiagramCategory(d1Code, d1Title);
     const d1Html = renderLayeredStack(d1Code, d1Title);
     const d1HasStack = d1Html.includes('arch-stack-container') && (d1Html.match(/arch-tier-card/g) || []).length >= 3;
-    const d1HasRadial = d1Html.includes('arch-radial-container') && d1Html.includes('mindmap-master-svg');
+    const d1HasRadial =
+      d1Html.includes('arch-radial-container') &&
+      d1Html.includes('mindmap-master-svg') &&
+      d1Html.includes('excalidraw-sketch-svg');
+    const d1TopologyMatch = d1Html.match(/data-mindmap-topology="([^"]+)"/);
+    const d1Topology = d1TopologyMatch ? d1TopologyMatch[1] : '';
+    const d1NoBoilerplate = !d1Html.includes('Thành phần thứ 1 trong luồng xử lý tầng');
     const d1NoBlueprint = !d1Html.includes('mindmap-blueprint-view');
-    if (d1Cat !== 'layered-stack' || !d1HasStack || !d1HasRadial || !d1NoBlueprint) {
+    if (
+      d1Cat !== 'layered-stack' ||
+      !d1HasStack ||
+      !d1HasRadial ||
+      !d1Topology ||
+      !d1NoBoilerplate ||
+      !d1NoBlueprint
+    ) {
       mindmapRenderOk = false;
-      mindmapDetails.push(`4.1 lỗi render (cat=${d1Cat}, stack=${d1HasStack}, radial=${d1HasRadial})`);
+      mindmapDetails.push(
+        `4.1 lỗi render (cat=${d1Cat}, stack=${d1HasStack}, radial=${d1HasRadial}, topology=${d1Topology || 'missing'}, noBoilerplate=${d1NoBoilerplate})`
+      );
     } else {
-      mindmapDetails.push('4.1 Stack+Radial OK');
+      mindmapDetails.push(`4.1 Stack+Mindmap [${d1Topology}] OK`);
     }
 
     // 4.2 Comparison or Lifecycle Flow
@@ -444,7 +459,7 @@ export async function validateLesson(lesson: Lesson): Promise<CheckResult[]> {
   });
 
   // 17. Modular 1-Lesson-Per-File Architecture (src/data/curriculum/chapterX/cX-lY.ts)
-  const chapterMatch = lesson.id.match(/^c(\d+)-l(\d+)$/);
+  const chapterMatch = lesson.id.match(/^c(\d+)-l(\d+[a-z]?)$/);
   let modularFileOk = false;
   let modularFileDetail = `ID không khớp định dạng cX-lY: ${lesson.id}`;
   if (chapterMatch) {

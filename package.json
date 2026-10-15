@@ -12,10 +12,24 @@
     "curriculum:validate": "bun .agents/skills/curriculum-authoring/scripts/validate-lesson.ts"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/three": "^0.186.0",
+    "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
+    "framer-motion": "^14.2.0",
+    "lucide-react": "^1.57.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-resizable-panels": "^4.14.5",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "three": "^0.186.1"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.10.7",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

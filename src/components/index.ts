@@ -6,3 +6,6 @@ export * from './chat/index.ts';
 export * from './auth/index.ts';
 export * from './student/index.ts';
 export * from './mindmap/index.ts';
+export * from './courses/LearningHubView.tsx';
+export * from './classroom/AiInstructorClassroom.tsx';
+

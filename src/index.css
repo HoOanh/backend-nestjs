@@ -1,12 +1,21 @@
-/* ==========================================================================
-   Arc Irobot Academy - Core Design Tokens & App Shell Baseline
-   (Các styles chuyên biệt của từng component đã được chuyển sang file .css tương ứng)
-   ========================================================================== */
+@import "tailwindcss";
 
-/* ==========================================================================
-   Arc Irobot Academy - Main Stylesheet & Design Tokens
-   Modern, Functional, Dark/Light Hybrid Aesthetic (No Clichés)
-   ========================================================================== */
+@theme inline {
+  --color-app: var(--bg-app);
+  --color-surface: var(--bg-surface);
+  --color-surface-elevated: var(--bg-surface-elevated);
+  --color-surface-subtle: var(--bg-surface-subtle);
+  --color-subtle: var(--border-subtle);
+  --color-strong: var(--border-strong);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-primary-hover);
+  --color-success: var(--accent-success);
+  --color-warning: var(--accent-warning);
+  --color-danger: var(--accent-error);
+}
 
 :root {
   /* Color Tokens - Default Dark Mode */
@@ -82,19 +91,21 @@
   --code-inline-border: #cbd5e1;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-app);
-  color: var(--text-primary);
-  line-height: 1.6;
-  font-size: 15px;
-  overflow-x: hidden;
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: 15px;
+    overflow-x: hidden;
+  }
 }
 
 /* App Shell Layout */

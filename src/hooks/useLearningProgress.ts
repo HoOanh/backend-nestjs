@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { CURRICULUM } from '../data/curriculum.ts';
+import { COURSES, getCourseById } from '../data/courses.ts';
 import { apiClient } from '../services/apiClient.ts';
 import type { UserProfile, UserProgressState } from '../types/user.ts';
 
@@ -11,7 +12,18 @@ const INITIAL_PROGRESS: UserProgressState = {
   streakDays: 1,
   lastActiveDate: new Date().toISOString().split('T')[0],
   clearedLessons: {},
-  quizScores: {}
+  quizScores: {},
+  activeCourseId: 'backend-nestjs',
+  activeCareerPathId: 'path-backend-architect',
+  enrolledCourses: {
+    'backend-nestjs': {
+      courseId: 'backend-nestjs',
+      enrolledAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+      currentLessonId: 'c1-l1'
+    }
+  },
+  classroomProgress: {}
 };
 
 function hydrateQuizScoresFromLocalStorage(base: UserProgressState): UserProgressState {
@@ -19,34 +31,49 @@ function hydrateQuizScoresFromLocalStorage(base: UserProgressState): UserProgres
   const quizScores = { ...(base.quizScores || {}) };
   const clearedLessons = { ...(base.clearedLessons || {}) };
   try {
-    for (const sprint of CURRICULUM) {
-      for (const lesson of sprint.lessons) {
-        const raw = localStorage.getItem(`arc_quiz_result_${lesson.id}`);
-        if (raw) {
-          const parsed = JSON.parse(raw) as {
-            score?: number;
-            passed?: boolean;
-            submittedAt?: string;
-          };
-          if (typeof parsed.score === 'number') {
-            const passed = Boolean(parsed.passed ?? parsed.score >= 70);
-            quizScores[lesson.id] = {
-              score: parsed.score,
-              passed,
-              completedAt: parsed.submittedAt || new Date().toISOString()
+    for (const course of COURSES) {
+      for (const sprint of course.curriculum) {
+        for (const lesson of sprint.lessons) {
+          const raw = localStorage.getItem(`arc_quiz_result_${lesson.id}`);
+          if (raw) {
+            const parsed = JSON.parse(raw) as {
+              score?: number;
+              passed?: boolean;
+              submittedAt?: string;
             };
-            if (passed) {
-              clearedLessons[lesson.id] = true;
+            if (typeof parsed.score === 'number') {
+              const passed = Boolean(parsed.passed ?? parsed.score >= 70);
+              quizScores[lesson.id] = {
+                score: parsed.score,
+                passed,
+                completedAt: parsed.submittedAt || new Date().toISOString()
+              };
+              if (passed) {
+                clearedLessons[lesson.id] = true;
+              }
             }
           }
         }
       }
     }
   } catch {}
+  const enrolledCourses = { ...(base.enrolledCourses || {}) };
+  if (!enrolledCourses['backend-nestjs']) {
+    enrolledCourses['backend-nestjs'] = {
+      courseId: 'backend-nestjs',
+      enrolledAt: new Date().toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+      currentLessonId: base.currentLessonId || 'c1-l1'
+    };
+  }
   return {
     ...base,
     quizScores,
-    clearedLessons
+    clearedLessons,
+    activeCourseId: base.activeCourseId || 'backend-nestjs',
+    activeCareerPathId: base.activeCareerPathId || 'path-backend-architect',
+    enrolledCourses,
+    classroomProgress: base.classroomProgress || {}
   };
 }
 
@@ -255,6 +282,120 @@ export function useLearningProgress(activeUser: UserProfile | null) {
     }));
   };
 
+  const handleEnrollCourse = (courseId: string, courseTitle?: string) => {
+    const now = new Date().toISOString();
+    const targetCourse = getCourseById(courseId);
+    const defaultLessonId = targetCourse.curriculum[0]?.lessons[0]?.id || 'c1-l1';
+    const alreadyEnrolled = Boolean(state.enrolledCourses?.[courseId]);
+
+    setState((prev) => {
+      const existing = prev.enrolledCourses?.[courseId];
+      const next: UserProgressState = {
+        ...prev,
+        activeCourseId: courseId,
+        enrolledCourses: {
+          ...(prev.enrolledCourses || {}),
+          [courseId]: {
+            courseId,
+            enrolledAt: existing?.enrolledAt || now,
+            lastAccessedAt: now,
+            currentLessonId: existing?.currentLessonId || defaultLessonId
+          }
+        },
+        lastActiveDate: now.split('T')[0]
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
+
+    if (!alreadyEnrolled) {
+      void apiClient.addHistory({
+        userId: userKey,
+        lessonId: defaultLessonId,
+        lessonTitle: courseTitle || targetCourse.title,
+        action: 'course_enrolled',
+        details: `Đăng ký ghi danh khóa học: ${courseTitle || targetCourse.title}`
+      });
+    }
+  };
+
+  const handleSelectCareerPath = (pathId: string, courseIdsToEnroll: string[] = []) => {
+    const now = new Date().toISOString();
+    setState((prev) => {
+      const updatedEnrolled = { ...(prev.enrolledCourses || {}) };
+      for (const cId of courseIdsToEnroll) {
+        if (!updatedEnrolled[cId]) {
+          const courseObj = getCourseById(cId);
+          updatedEnrolled[cId] = {
+            courseId: cId,
+            enrolledAt: now,
+            lastAccessedAt: now,
+            currentLessonId: courseObj.curriculum[0]?.lessons[0]?.id || 'c1-l1'
+          };
+        }
+      }
+      const next: UserProgressState = {
+        ...prev,
+        activeCareerPathId: pathId,
+        enrolledCourses: updatedEnrolled,
+        lastActiveDate: now.split('T')[0]
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
+  };
+
+  const handleSaveClassroomCheckpoint = (
+    courseId: string,
+    lessonId: string,
+    lessonTitle: string,
+    checkpointId: string,
+    nextCheckpointIndex: number,
+    sessionCompleted: boolean
+  ) => {
+    const now = new Date().toISOString();
+    const wasAlreadyCleared = Boolean(state.clearedLessons[lessonId]);
+
+    setState((prev) => {
+      const existing = prev.classroomProgress?.[lessonId];
+      const prevIds = existing?.completedCheckpointIds || [];
+      const completedCheckpointIds = prevIds.includes(checkpointId)
+        ? prevIds
+        : [...prevIds, checkpointId];
+
+      const next: UserProgressState = {
+        ...prev,
+        clearedLessons: sessionCompleted
+          ? { ...prev.clearedLessons, [lessonId]: true }
+          : prev.clearedLessons,
+        classroomProgress: {
+          ...(prev.classroomProgress || {}),
+          [lessonId]: {
+            lessonId,
+            courseId,
+            completedCheckpointIds,
+            currentCheckpointIndex: nextCheckpointIndex,
+            sessionCompleted: Boolean(existing?.sessionCompleted || sessionCompleted),
+            updatedAt: now
+          }
+        },
+        lastActiveDate: now.split('T')[0]
+      };
+      apiClient.writeLocalProgress(userKey, next);
+      return next;
+    });
+
+    if (sessionCompleted && !wasAlreadyCleared) {
+      void apiClient.addHistory({
+        userId: userKey,
+        lessonId,
+        lessonTitle,
+        action: 'theory_read',
+        details: 'Hoàn thành trọn vẹn tiết học trực tiếp 1-1 với AI Giảng viên'
+      });
+    }
+  };
+
   return {
     state,
     setState,
@@ -266,6 +407,9 @@ export function useLearningProgress(activeUser: UserProfile | null) {
     handleQuizSubmitted,
     handleSprintExamSubmitted,
     handleFinalExamSubmitted,
-    handleRetakeFinalExam
+    handleRetakeFinalExam,
+    handleEnrollCourse,
+    handleSelectCareerPath,
+    handleSaveClassroomCheckpoint
   };
 }

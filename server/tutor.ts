@@ -3,7 +3,12 @@ import {
   authorizeTutorRequest,
   getPersistedModelCooldowns
 } from './index.ts';
-import { DEFAULT_MODEL, FALLBACK_MODELS, SYSTEM_PROMPT } from './tutor-config.ts';
+import {
+  DEFAULT_MODEL,
+  FALLBACK_MODELS,
+  SYSTEM_PROMPT,
+  INSTRUCTOR_1ON1_PROMPT
+} from './tutor-config.ts';
 
 interface TutorMessage {
   role: 'user' | 'assistant';
@@ -51,6 +56,15 @@ function sanitizeModel(model?: string): string {
 
 interface TutorRequestBody {
   sessionId?: string;
+  mode?: 'copilot' | 'instructor-1on1';
+  courseTitle?: string;
+  checkpoint?: {
+    index?: number;
+    total?: number;
+    title?: string;
+    boardMarkdown?: string;
+    socraticQuestion?: string;
+  };
   lesson?: {
     title?: string;
     tag?: string;
@@ -172,7 +186,14 @@ export default async function handler(
       .status(400)
       .json({ error: 'Không tìm thấy câu hỏi hợp lệ từ học viên.' });
   }
-  const prompt = `${SYSTEM_PROMPT}\n\nLESSON_CONTEXT:\nTitle: ${lesson.title}\nTag: ${lesson.tag || ''}\n\n${lesson.theory || ''}\n\nREAL_CODE:\n${lesson.realCodeSnippet || ''}`;
+  const isInstructorMode = body.mode === 'instructor-1on1';
+  const baseSystemPrompt = isInstructorMode ? INSTRUCTOR_1ON1_PROMPT : SYSTEM_PROMPT;
+  const checkpointBlock =
+    isInstructorMode && body.checkpoint
+      ? `\n\nCHECKPOINT_CONTEXT (PHẦN ĐANG GIẢNG TRÊN BẢNG):\nChặng: ${body.checkpoint.index || 1}/${body.checkpoint.total || 1} — ${body.checkpoint.title || ''}\nNội dung trọng tâm chặng này:\n${body.checkpoint.boardMarkdown || ''}\nCâu hỏi gợi mở trọng tâm của chặng: ${body.checkpoint.socraticQuestion || ''}`
+      : '';
+
+  const prompt = `${baseSystemPrompt}${checkpointBlock}\n\nLESSON_CONTEXT:\nCourse: ${body.courseTitle || 'Arc Irobot Academy'}\nTitle: ${lesson.title}\nTag: ${lesson.tag || ''}\n\n${lesson.theory || ''}\n\nREAL_CODE:\n${lesson.realCodeSnippet || ''}`;
   const estimatedPromptTokens = Math.max(
     1,
     Math.ceil((prompt.length + JSON.stringify(contents).length) / 4)

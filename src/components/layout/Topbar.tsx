@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
-import './Topbar.css';
+import clsx from 'clsx';
+import {
+  PanelLeft,
+  LayoutGrid,
+  Radio,
+  Bot,
+  Zap,
+  ChevronDown,
+  Shield,
+  History,
+  Sun,
+  Moon,
+  LogOut,
+  Unlock
+} from 'lucide-react';
 import { UserProfile } from '../../types/user.ts';
 import { getModKey } from '../../utils/platform.ts';
 
@@ -15,6 +29,8 @@ interface TopbarProps {
   isAdminBypass?: boolean;
   onToggleAdminBypass?: () => void;
   onNavigateToAdmin?: () => void;
+  onNavigateToHub?: () => void;
+  onOpenAiClassroom?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   isTutorOpen?: boolean;
@@ -33,6 +49,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   isAdminBypass = false,
   onToggleAdminBypass,
   onNavigateToAdmin,
+  onNavigateToHub,
+  onOpenAiClassroom,
   isSidebarCollapsed = false,
   onToggleSidebar,
   isTutorOpen = false,
@@ -42,189 +60,233 @@ export const Topbar: React.FC<TopbarProps> = ({
   const isAdmin = currentUser?.role === 'admin';
 
   return (
-    <header className="main-top-bar">
-      <div className="top-bar-left">
+    <header className="h-14 min-h-14 px-5 bg-surface border-b border-subtle flex items-center justify-between gap-4 shrink-0 z-20">
+      {/* LEFT BREADCRUMB & TITLE */}
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {onToggleSidebar && (
           <button
-            className={`sidebar-toggle-btn ${isSidebarCollapsed ? 'is-collapsed' : ''}`}
+            type="button"
             onClick={onToggleSidebar}
-            title={isSidebarCollapsed ? `Mở danh mục bài học (${getModKey()}+B)` : `Ẩn danh mục bài học (${getModKey()}+B)`}
+            title={
+              isSidebarCollapsed
+                ? `Mở thanh điều hướng (${getModKey()}+B)`
+                : `Ẩn thanh điều hướng (${getModKey()}+B)`
+            }
             aria-label="Đóng mở thanh điều hướng"
+            className={clsx(
+              'w-8 h-8 rounded-md flex items-center justify-center border transition-colors cursor-pointer shrink-0',
+              isSidebarCollapsed
+                ? 'bg-accent/12 text-accent border-accent/35'
+                : 'bg-surface-elevated text-secondary border-subtle hover:text-primary hover:border-strong'
+            )}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="9" y1="3" x2="9" y2="21" />
-            </svg>
+            <PanelLeft size={15} />
           </button>
         )}
-        <span className="tag-badge">{tag}</span>
-        <h2 className="top-bar-title" title={title}>{title}</h2>
+
+        {onNavigateToHub && (
+          <button
+            type="button"
+            onClick={onNavigateToHub}
+            className="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-surface-elevated hover:bg-accent/10 text-secondary hover:text-accent border border-subtle hover:border-accent/35 text-[11.5px] font-semibold transition-colors cursor-pointer shrink-0"
+            title="Quay về Kho Khóa Học & Lộ Trình"
+          >
+            <LayoutGrid size={12} />
+            <span>Kho Khóa Học</span>
+          </button>
+        )}
+
+        <span className="inline-flex items-center h-6 px-2.5 rounded-md bg-accent/12 text-accent border border-accent/25 text-[11px] font-bold uppercase tracking-wider shrink-0">
+          {tag}
+        </span>
+
+        <h2
+          className="text-[14px] font-bold text-primary truncate m-0"
+          title={title}
+        >
+          {title}
+        </h2>
       </div>
-      <div className="top-bar-right">
-        {/* AI Tutor Toggle Button on Topbar */}
+
+      {/* RIGHT CONTEXTUAL ACTIONS */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Lesson-specific AI actions: ONLY rendered when studying a lesson */}
+        {onOpenAiClassroom && (
+          <button
+            type="button"
+            onClick={onOpenAiClassroom}
+            title="Vào Phòng Học Trực Tiếp 1-1 Với AI Giảng Viên cho bài học này"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-accent hover:bg-accent-hover text-white text-[12px] font-semibold transition-colors cursor-pointer border border-accent"
+          >
+            <Radio size={13} />
+            <span>Học 1-1 Với AI</span>
+          </button>
+        )}
+
         {onToggleTutor && (
           <button
-            className={`topbar-tutor-btn ${isTutorOpen ? 'active' : ''}`}
+            type="button"
             onClick={onToggleTutor}
-            title={isTutorOpen ? `Đang mở Tutor AI Co-Pilot (${getModKey()}+J)` : `Mở Tutor AI Co-Pilot hỗ trợ học tập (${getModKey()}+J)`}
+            title={
+              isTutorOpen
+                ? `Đang mở Trợ giảng AI (${getModKey()}+J)`
+                : `Mở Trợ giảng AI hỏi đáp nhanh (${getModKey()}+J)`
+            }
             aria-label="Hỏi AI Tutor"
+            className={clsx(
+              'inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-semibold border transition-colors cursor-pointer',
+              isTutorOpen
+                ? 'bg-accent/15 text-accent border-accent'
+                : 'bg-surface-elevated text-secondary border-subtle hover:text-primary hover:border-strong'
+            )}
           >
-            <span className="tutor-btn-sparkle">✦</span>
-            <span>Tutor AI</span>
-            {isTutorOpen && <span className="tutor-btn-active-dot" />}
-          </button>
-        )}
-        {/* Admin Bypass Toggle Button */}
-        {isAdmin && onToggleAdminBypass && (
-          <button
-            className={`admin-mode-toggle-btn ${isAdminBypass ? 'active' : ''}`}
-            onClick={onToggleAdminBypass}
-            title="Bật/tắt chế độ xem trước toàn bộ bài học của Admin"
-          >
-            <span>{isAdminBypass ? 'Unlock All (Admin)' : 'Student Mode'}</span>
+            <Bot size={14} />
+            <span>Trợ Giảng AI</span>
           </button>
         )}
 
-        {/* User Role Badge */}
-        <div className={`user-role-badge ${currentUser?.role || 'student'}`}>
-          {isAdmin
-            ? 'Quản Trị Viên'
-            : currentUser?.role === 'instructor'
-              ? 'Giảng Viên'
-              : 'Học Viên'}
-        </div>
-
-        {/* Streak Badge */}
+        {/* Streak Pill */}
         <div
-          className="user-streak-badge"
+          className="hidden md:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-500 text-[12px] font-semibold"
           title={`Chuỗi học tập liên tiếp: ${streakDays} ngày`}
         >
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
+          <Zap size={13} />
           <span>{streakDays} ngày</span>
         </div>
 
+        {/* Theme Switcher Button */}
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? 'Chuyển sang Giao diện Sáng' : 'Chuyển sang Giao diện Tối'}
+          aria-label="Chuyển đổi giao diện Sáng/Tối"
+          className="w-8 h-8 rounded-md bg-surface-elevated hover:bg-surface border border-subtle hover:border-strong text-secondary hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
+        >
+          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
+
         {/* User Account Menu */}
-        <div className="user-menu-wrapper">
+        <div className="relative">
           <button
-            className="user-profile-btn"
+            type="button"
             onClick={() => setIsUserMenuOpen((prev) => !prev)}
             aria-label="Menu tài khoản"
+            className="h-8 pl-1.5 pr-2.5 rounded-md bg-surface-elevated hover:bg-surface border border-subtle hover:border-strong flex items-center gap-2 transition-colors cursor-pointer"
           >
             <span
-              className="user-avatar"
+              className="w-5 h-5 rounded text-[11px] font-bold text-white flex items-center justify-center shrink-0"
               style={{ background: currentUser?.avatarColor || '#0ea5e9' }}
             >
               {(currentUser?.name || 'U').charAt(0).toUpperCase()}
             </span>
-            <span className="user-display-name">
+            <span className="text-[12px] font-semibold text-primary max-w-[130px] truncate hidden sm:inline">
               {currentUser?.name || 'Học Viên'}
             </span>
-            <span className="user-menu-chevron">▾</span>
+            <ChevronDown size={13} className="text-muted" />
           </button>
 
           {isUserMenuOpen && (
             <>
               <div
-                className="user-menu-backdrop"
+                className="fixed inset-0 z-30"
                 onClick={() => setIsUserMenuOpen(false)}
               />
-              <div className="user-dropdown-menu">
-                <div className="user-dropdown-header">
+              <div className="absolute right-0 mt-2 w-64 rounded-xl bg-surface border border-subtle shadow-xl py-2 z-40">
+                <div className="px-3.5 py-2.5 border-b border-subtle flex items-center gap-3">
                   <span
-                    className="dropdown-avatar"
+                    className="w-9 h-9 rounded-lg text-sm font-bold text-white flex items-center justify-center shrink-0"
                     style={{
                       background: currentUser?.avatarColor || '#0ea5e9'
                     }}
                   >
                     {(currentUser?.name || 'U').charAt(0).toUpperCase()}
                   </span>
-                  <div>
-                    <div className="dropdown-user-name">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-bold text-primary truncate">
                       {currentUser?.name || 'Học Viên'}
                     </div>
-                    <div className="dropdown-user-email">
+                    <div className="text-[11.5px] text-muted truncate">
                       {currentUser?.email || ''}
                     </div>
-                    <div className="dropdown-user-plan">
+                    <div className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-accent/12 text-accent">
                       {isAdmin
-                        ? 'SYSTEM ADMIN'
+                        ? 'Quản Trị Viên'
                         : `${(currentUser?.planId || 'free').toUpperCase()} PLAN`}
                     </div>
                   </div>
                 </div>
 
-                <div className="user-dropdown-divider" />
+                <div className="py-1">
+                  {isAdmin && onNavigateToAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onNavigateToAdmin();
+                      }}
+                      className="w-full px-3.5 py-2 text-left text-[12.5px] font-medium text-secondary hover:text-primary hover:bg-surface-elevated flex items-center gap-2.5 transition-colors cursor-pointer bg-transparent border-0"
+                    >
+                      <Shield size={14} className="text-accent" />
+                      <span>Trang Quản Trị (Admin CMS)</span>
+                    </button>
+                  )}
 
-                {isAdmin && onNavigateToAdmin && (
+                  {isAdmin && onToggleAdminBypass && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onToggleAdminBypass();
+                      }}
+                      className="w-full px-3.5 py-2 text-left text-[12.5px] font-medium text-secondary hover:text-primary hover:bg-surface-elevated flex items-center gap-2.5 transition-colors cursor-pointer bg-transparent border-0"
+                    >
+                      <Unlock size={14} className="text-amber-500" />
+                      <span>
+                        {isAdminBypass
+                          ? 'Đang Bật Mở Khóa Toàn Bộ (Admin)'
+                          : 'Bật Mở Khóa Preview (Admin)'}
+                      </span>
+                    </button>
+                  )}
+
                   <button
-                    className="user-dropdown-item"
+                    type="button"
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      onNavigateToAdmin();
+                      onOpenHistory();
                     }}
+                    className="w-full px-3.5 py-2 text-left text-[12.5px] font-medium text-secondary hover:text-primary hover:bg-surface-elevated flex items-center gap-2.5 transition-colors cursor-pointer bg-transparent border-0"
                   >
-                    <span>Trang Quản Trị (Admin CMS)</span>
+                    <History size={14} />
+                    <span>Hồ Sơ &amp; Bảng Điểm Học Tập</span>
                   </button>
-                )}
 
-                <button
-                  className="user-dropdown-item"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    onOpenHistory();
-                  }}
-                >
-                  <span>Hồ Sơ & Tiến Độ Học Tập</span>
-                </button>
-
-                {isAdmin && onToggleAdminBypass && (
                   <button
-                    className="user-dropdown-item"
+                    type="button"
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      onToggleAdminBypass();
+                      onToggleTheme();
                     }}
+                    className="w-full px-3.5 py-2 text-left text-[12.5px] font-medium text-secondary hover:text-primary hover:bg-surface-elevated flex items-center gap-2.5 transition-colors cursor-pointer bg-transparent border-0"
                   >
-                    <span>
-                      {isAdminBypass
-                        ? 'Tắt Mở Khóa Preview'
-                        : 'Bật Mở Khóa Preview (Admin)'}
-                    </span>
+                    {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                    <span>Giao diện {theme === 'dark' ? 'Sáng' : 'Tối'}</span>
                   </button>
-                )}
+                </div>
 
-                <button
-                  className="user-dropdown-item"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    onToggleTheme();
-                  }}
-                >
-                  <span>Giao diện {theme === 'dark' ? 'Sáng' : 'Tối'}</span>
-                </button>
-
-                <div className="user-dropdown-divider" />
-
-                <button
-                  className="user-dropdown-item logout"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    onLogout();
-                  }}
-                >
-                  <span>Đăng Xuất</span>
-                </button>
+                <div className="border-t border-subtle pt-1 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-[12.5px] font-semibold text-red-500 hover:bg-red-500/10 flex items-center gap-2.5 transition-colors cursor-pointer bg-transparent border-0"
+                  >
+                    <LogOut size={14} />
+                    <span>Đăng Xuất</span>
+                  </button>
+                </div>
               </div>
             </>
           )}

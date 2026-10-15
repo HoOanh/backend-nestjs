@@ -1,6 +1,12 @@
 import { adminReturnTo } from './utils/router.ts';
 import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { CURRICULUM } from './data/curriculum.ts';
+import {
+  COURSES,
+  getCourseById,
+  findCourseByLessonId,
+  getCourseTotalLessons,
+  getCourseCompletedCount
+} from './data/courses.ts';
 import { SPRINT_EXAMS } from './data/sprintExams.ts';
 import { FINAL_EXAM } from './data/finalExam.ts';
 import {
@@ -15,7 +21,9 @@ import {
   LockedContentNotice,
   StudentAuthScreen,
   AdminAuthScreen,
-  LearningHistoryModal
+  LearningHistoryModal,
+  LearningHubView,
+  AiInstructorClassroom
 } from './components/index.ts';
 const AdminDashboard = React.lazy(() =>
   import('./components/admin/AdminDashboard.tsx').then((module) => ({
@@ -75,7 +83,10 @@ export const App: React.FC = () => {
     handleQuizSubmitted,
     handleSprintExamSubmitted,
     handleFinalExamSubmitted,
-    handleRetakeFinalExam
+    handleRetakeFinalExam,
+    handleEnrollCourse,
+    handleSelectCareerPath,
+    handleSaveClassroomCheckpoint
   } = useLearningProgress(activeUser);
 
   const {
@@ -92,18 +103,67 @@ export const App: React.FC = () => {
 
   const effectiveBypass = isEffectiveAdmin && adminBypassLock;
 
-  // Active Lesson Resolution
-  const currentLessonId =
-    route.type === 'lesson'
-      ? route.lessonId
-      : state.currentLessonId || 'c1-l1';
-  const currentLesson = useMemo(() => {
-    for (const sprint of CURRICULUM) {
-      const lesson = sprint.lessons.find((item) => item.id === currentLessonId);
-      if (lesson) return lesson;
+  // Strict Course & Lesson Resolution across Multi-Course Catalog
+  const resolvedCourseAndLesson = useMemo(() => {
+    // 1. If route explicitly specifies courseId, strictly lock to that course first
+    if (
+      (route.type === 'lesson' ||
+        route.type === 'ai-classroom' ||
+        route.type === 'sprint-exam' ||
+        route.type === 'final-exam') &&
+      route.courseId
+    ) {
+      const explicitCourse = getCourseById(route.courseId);
+      if (route.type === 'lesson' || route.type === 'ai-classroom') {
+        for (const sp of explicitCourse.curriculum) {
+          const found = sp.lessons.find((l) => l.id === route.lessonId);
+          if (found) return { course: explicitCourse, sprint: sp, lesson: found };
+        }
+      }
+      const firstSp = explicitCourse.curriculum[0];
+      return {
+        course: explicitCourse,
+        sprint: firstSp,
+        lesson: firstSp?.lessons[0] || null
+      };
     }
-    return CURRICULUM[0]?.lessons[0] || null;
-  }, [currentLessonId]);
+
+    // 2. Legacy /lessons/:lessonId without courseId in URL: find course owning lessonId
+    if (route.type === 'lesson' || route.type === 'ai-classroom') {
+      const match = findCourseByLessonId(route.lessonId, state.activeCourseId);
+      if (match) return match;
+    }
+
+    // 3. Fallback to activeCourseId in state
+    const fallbackCourse = getCourseById(state.activeCourseId);
+    const enrolledLessonId =
+      state.enrolledCourses?.[fallbackCourse.id]?.currentLessonId ||
+      state.currentLessonId;
+
+    for (const sp of fallbackCourse.curriculum) {
+      const found = sp.lessons.find((l) => l.id === enrolledLessonId);
+      if (found) return { course: fallbackCourse, sprint: sp, lesson: found };
+    }
+
+    const firstSprint = fallbackCourse.curriculum[0];
+    return {
+      course: fallbackCourse,
+      sprint: firstSprint,
+      lesson: firstSprint?.lessons[0] || null
+    };
+  }, [route, state.activeCourseId, state.currentLessonId, state.enrolledCourses]);
+
+  const activeCourse = resolvedCourseAndLesson.course;
+  const currentLesson = resolvedCourseAndLesson.lesson;
+  const courseTotalLessons = getCourseTotalLessons(activeCourse);
+  const courseCompletedCount = getCourseCompletedCount(
+    activeCourse,
+    state.completedLessons
+  );
+  const courseProgressPercent =
+    courseTotalLessons > 0
+      ? Math.round((courseCompletedCount / courseTotalLessons) * 100)
+      : progressPercent;
 
   // Active Sprint Exam Resolution
   const activeSprintExamId = route.type === 'sprint-exam' ? route.sprintId : 0;
@@ -122,8 +182,8 @@ export const App: React.FC = () => {
   if (isAuthChecking) {
     return (
       <div className="auth-portal-page">
-        <div style={{ textAlign: 'center', color: '#0ea5e9' }}>
-          <div style={{ marginBottom: '12px' }}>
+        <div className="text-center text-accent">
+          <div className="mb-3 flex justify-center">
             <svg
               width="32"
               height="32"
@@ -133,6 +193,7 @@ export const App: React.FC = () => {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="animate-spin"
             >
               <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
@@ -187,10 +248,7 @@ export const App: React.FC = () => {
             navigate('/admin');
           } else {
             setStudentUser(user);
-            const firstAvailable = getFirstIncompleteLessonId(
-              state.completedLessons
-            );
-            navigate(`/lessons/${firstAvailable}?tab=theory`);
+            navigate('/courses');
           }
         }}
       />
@@ -198,49 +256,123 @@ export const App: React.FC = () => {
   }
 
   // Navigation handlers
-  const handleSelectLesson = (lessonId: string) => {
-    setState((prev) => ({ ...prev, currentLessonId: lessonId }));
-    navigate(`/lessons/${lessonId}?tab=theory`);
+  const handleSelectLesson = (lessonId: string, targetCourseId = activeCourse.id) => {
+    setState((prev) => ({
+      ...prev,
+      activeCourseId: targetCourseId,
+      currentLessonId: lessonId,
+      enrolledCourses: {
+        ...(prev.enrolledCourses || {}),
+        [targetCourseId]: {
+          courseId: targetCourseId,
+          enrolledAt:
+            prev.enrolledCourses?.[targetCourseId]?.enrolledAt ||
+            new Date().toISOString(),
+          lastAccessedAt: new Date().toISOString(),
+          currentLessonId: lessonId
+        }
+      }
+    }));
+    navigate(`/courses/${targetCourseId}/lessons/${lessonId}?tab=theory`);
+  };
+
+  const handleSelectCourse = (courseId: string) => {
+    const courseObj = getCourseById(courseId);
+    const savedLessonId = state.enrolledCourses?.[courseId]?.currentLessonId;
+    const hasSavedInCourse = courseObj.curriculum.some((sp) =>
+      sp.lessons.some((l) => l.id === savedLessonId)
+    );
+    const nextLessonId = hasSavedInCourse && savedLessonId
+      ? savedLessonId
+      : getFirstIncompleteLessonId(state.completedLessons, courseObj.curriculum);
+
+    handleEnrollCourse(courseId, courseObj.title);
+    handleSelectLesson(nextLessonId, courseId);
+  };
+
+  const handleOpenAiClassroom = (
+    courseId = activeCourse.id,
+    lessonId = currentLesson?.id || 'c1-l1'
+  ) => {
+    const courseObj = getCourseById(courseId);
+    const validLesson = courseObj.curriculum.some((sp) =>
+      sp.lessons.some((l) => l.id === lessonId)
+    )
+      ? lessonId
+      : courseObj.curriculum[0]?.lessons[0]?.id || 'c1-l1';
+    handleEnrollCourse(courseId, courseObj.title);
+    navigate(`/ai-classroom/${courseId}/${validLesson}`);
   };
 
   const handleSelectSprintExam = (sprintId: number) => {
-    navigate(`/sprint-exam/${sprintId}`);
+    navigate(`/courses/${activeCourse.id}/sprint-exam/${sprintId}`);
   };
 
   const handleSelectFinalExam = () => {
-    navigate('/final-exam');
+    navigate(`/courses/${activeCourse.id}/final-exam`);
   };
 
   const handleNavigateToAvailable = () => {
-    const nextLessonId = getFirstIncompleteLessonId(state.completedLessons);
-    navigate(`/lessons/${nextLessonId}?tab=theory`);
+    const nextLessonId = getFirstIncompleteLessonId(
+      state.completedLessons,
+      activeCourse.curriculum
+    );
+    navigate(`/courses/${activeCourse.id}/lessons/${nextLessonId}?tab=theory`);
   };
 
-  // Topbar presentation
-  let topTag = 'LÝ THUYẾT & THỰC HÀNH';
-  let topTitle = currentLesson?.title || '';
-  const currentViewType: ViewType =
-    route.type === 'sprint-exam'
-      ? 'sprint-exam'
-      : route.type === 'final-exam'
-        ? 'final-exam'
-        : 'lesson';
+  // 4. DEDICATED FULL-SCREEN 1-ON-1 AI INSTRUCTOR CLASSROOM (/ai-classroom/:courseId/:lessonId)
+  if (route.type === 'ai-classroom' && currentLesson) {
+    return (
+      <TutorChatProvider userId={activeUser?.id || 'guest'}>
+        <AiInstructorClassroom
+          course={activeCourse}
+          lesson={currentLesson}
+          userId={activeUser?.id || 'guest'}
+          savedClassroomProgress={state.classroomProgress?.[currentLesson.id]}
+          isLessonCompleted={Boolean(state.completedLessons[currentLesson.id])}
+          onSaveCheckpoint={handleSaveClassroomCheckpoint}
+          onLessonCompleted={(id) =>
+            handleLessonCompleted(id, currentLesson.title)
+          }
+          onExitToLesson={() =>
+            navigate(`/courses/${activeCourse.id}/lessons/${currentLesson.id}?tab=theory`)
+          }
+          onExitToHub={() => navigate('/courses')}
+        />
+      </TutorChatProvider>
+    );
+  }
 
-  if (route.type === 'sprint-exam') {
-    topTag = 'KỲ THI SPRINT';
+  // Topbar presentation
+  let topTag = activeCourse.shortTitle.toUpperCase();
+  let topTitle = currentLesson?.title || activeCourse.title;
+  const currentViewType: ViewType =
+    route.type === 'courses-hub'
+      ? 'courses-hub'
+      : route.type === 'sprint-exam'
+        ? 'sprint-exam'
+        : route.type === 'final-exam'
+          ? 'final-exam'
+          : 'lesson';
+
+  if (route.type === 'courses-hub') {
+    topTag = 'HỌC VIỆN KỸ SƯ';
+    topTitle = 'Trung Tâm Khóa Học & Lộ Trình Phát Triển Kỹ Sư';
+  } else if (route.type === 'sprint-exam') {
+    topTag = 'KỲ THI CHƯƠNG';
     topTitle =
       currentSprintExam?.title ||
-      `Đánh Giá Tiến Độ Sprint ${activeSprintExamId}`;
+      `Đánh Giá Tiến Độ Chương ${activeSprintExamId}`;
   } else if (route.type === 'final-exam') {
     topTag = 'TỐT NGHIỆP TOÀN KHÓA';
-    topTitle = 'Khảo Thí Cấp Bằng Master Backend NestJS';
+    topTitle = `Khảo Thí Cấp Bằng ${activeCourse.shortTitle}`;
   }
 
   const activeTab: LessonActiveTab =
     route.type === 'lesson' ? route.tab : 'theory';
   const handleTabChange = (tab: LessonActiveTab) => {
     if (currentLesson) {
-      navigate(`/lessons/${currentLesson.id}?tab=${tab}`);
+      navigate(`/courses/${activeCourse.id}/lessons/${currentLesson.id}?tab=${tab}`);
     }
   };
 
@@ -249,7 +381,8 @@ export const App: React.FC = () => {
     activeSprintExamId,
     state.completedLessons,
     activeUser?.role,
-    effectiveBypass
+    effectiveBypass,
+    activeCourse.curriculum
   );
 
   const finalExamUnlockStatus = checkFinalExamUnlockStatus(
@@ -265,21 +398,30 @@ export const App: React.FC = () => {
         className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}
       >
         <Sidebar
-          curriculum={CURRICULUM}
-          sprintExams={SPRINT_EXAMS}
+          curriculum={activeCourse.curriculum}
+          sprintExams={activeCourse.id === 'backend-nestjs' ? SPRINT_EXAMS : []}
           activeView={currentViewType}
+          hubTab={route.type === 'courses-hub' ? route.viewTab || 'overview' : undefined}
+          activeCourse={activeCourse}
+          courses={COURSES}
+          enrolledCourses={state.enrolledCourses || {}}
           currentLesson={currentLesson}
           currentSprintExam={currentSprintExam}
           completedLessons={state.completedLessons}
           sprintExamScores={state.sprintExamScores}
           finalExam={state.finalExam}
-          progressPercent={progressPercent}
+          progressPercent={courseProgressPercent}
           userRole={activeUser?.role}
           bypassLock={effectiveBypass}
           isCollapsed={isSidebarCollapsed}
-          onSelectLesson={handleSelectLesson}
+          onSelectLesson={(lessonId) => handleSelectLesson(lessonId, activeCourse.id)}
           onSelectSprintExam={handleSelectSprintExam}
           onSelectFinalExam={handleSelectFinalExam}
+          onNavigateToHub={(tab) =>
+            navigate(tab && tab !== 'overview' ? `/courses?view=${tab}` : '/courses')
+          }
+          onSelectCourse={handleSelectCourse}
+          onOpenHistory={() => setIsHistoryModalOpen(true)}
         />
 
         <main className="app-main">
@@ -313,10 +455,18 @@ export const App: React.FC = () => {
             onNavigateToAdmin={
               isEffectiveAdmin ? () => navigate('/admin') : undefined
             }
+            onNavigateToHub={
+              route.type !== 'courses-hub' ? () => navigate('/courses') : undefined
+            }
+            onOpenAiClassroom={
+              route.type === 'lesson' && currentLesson
+                ? () => handleOpenAiClassroom(activeCourse.id, currentLesson.id)
+                : undefined
+            }
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebar={toggleSidebar}
             isTutorOpen={isTutorOpen}
-            onToggleTutor={toggleTutor}
+            onToggleTutor={route.type === 'lesson' ? toggleTutor : undefined}
           />
 
           <div
@@ -327,6 +477,46 @@ export const App: React.FC = () => {
             }`}
           >
             <section className="content-viewport" ref={contentViewportRef}>
+              {/* 0. MULTI-COURSE & CAREER PATH LEARNING HUB */}
+              {route.type === 'courses-hub' && (
+                <LearningHubView
+                  initialTab={route.viewTab}
+                  activeCourseId={activeCourse.id}
+                  activeCareerPathId={
+                    state.activeCareerPathId || 'path-backend-architect'
+                  }
+                  enrolledCourses={state.enrolledCourses || {}}
+                  completedLessons={state.completedLessons}
+                  streakDays={state.streakDays}
+                  onEnrollAndOpenCourse={(courseId, lessonId) => {
+                    const targetCourse = getCourseById(courseId);
+                    const targetLessonId =
+                      lessonId ||
+                      getFirstIncompleteLessonId(
+                        state.completedLessons,
+                        targetCourse.curriculum
+                      );
+                    handleEnrollCourse(courseId, targetCourse.title);
+                    handleSelectLesson(targetLessonId, courseId);
+                  }}
+                  onEnrollCourseOnly={(courseId, courseTitle) => {
+                    handleEnrollCourse(courseId, courseTitle);
+                  }}
+                  onOpenAiClassroom={(courseId, lessonId) => {
+                    handleOpenAiClassroom(courseId, lessonId);
+                  }}
+                  onSelectCareerPath={(pathId, courseIds) => {
+                    handleSelectCareerPath(pathId, courseIds);
+                  }}
+                  onSwitchHubTab={(tab) => {
+                    navigate(
+                      tab === 'overview' ? '/courses' : `/courses?view=${tab}`,
+                      true
+                    );
+                  }}
+                />
+              )}
+
               {/* 1. LESSON VIEW */}
               {route.type === 'lesson' && currentLesson && (
                 <div>
@@ -348,7 +538,7 @@ export const App: React.FC = () => {
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                       </svg>{' '}
-                      Lý Thuyết & Code Mẫu
+                      Lý Thuyết &amp; Code Mẫu
                     </button>
                     <button
                       className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
@@ -396,6 +586,15 @@ export const App: React.FC = () => {
                           : `${currentLesson.codeChallenge.testCases.length} Tests`}
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      className="tab-btn-classroom"
+                      onClick={() =>
+                        handleOpenAiClassroom(activeCourse.id, currentLesson.id)
+                      }
+                    >
+                      <span>Phòng Học 1-1 Với AI Giảng Viên</span>
+                    </button>
                   </div>
 
                   {activeTab === 'theory' && (
@@ -403,6 +602,9 @@ export const App: React.FC = () => {
                       lesson={currentLesson}
                       onNextTab={() => handleTabChange('quiz')}
                       onOpenTutor={() => setIsTutorOpen(true)}
+                      onOpenAiClassroom={() =>
+                        handleOpenAiClassroom(activeCourse.id, currentLesson.id)
+                      }
                       onLessonCleared={() =>
                         handleLessonCleared(
                           currentLesson.id,

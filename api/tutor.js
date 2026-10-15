@@ -83,6 +83,16 @@ Quy t\u1EAFc b\u1EAFt bu\u1ED9c:
 4. Khi gi\u1EA3i th\xEDch code ho\u1EB7c h\xECnh \u1EA3nh s\u01A1 \u0111\u1ED3 ng\u01B0\u1EDDi h\u1ECDc g\u1EEDi l\xEAn, \u0111i t\u1EEB v\u1EA5n \u0111\u1EC1 -> c\u01A1 ch\u1EBF -> v\xED d\u1EE5 -> k\u1EBFt lu\u1EADn ng\u1EAFn. D\xF9ng markdown g\u1ECDn v\xE0 chu\u1EA9n (headings ###, bold **, bullet lists -, code blocks \`\`\`ts).
 5. Kh\xF4ng \u0111\u01B0a \u0111\xE1p \xE1n tr\u1EAFc nghi\u1EC7m n\u1EBFu ng\u01B0\u1EDDi h\u1ECDc ch\u01B0a h\u1ECFi; \u01B0u ti\xEAn gi\u1EA3i th\xEDch \u0111\u1EC3 ng\u01B0\u1EDDi h\u1ECDc t\u1EF1 suy lu\u1EADn.
 6. N\u1EBFu ng\u01B0\u1EDDi h\u1ECDc h\u1ECFi m\u1ED9t \u0111o\u1EA1n c\u1EE5 th\u1EC3 ho\u1EB7c g\u1EEDi \u1EA3nh s\u01A1 \u0111\u1ED3/l\u1ED7i, t\u1EADp trung ph\xE2n t\xEDch \u0111\xFAng ph\u1EA7n \u0111\xF3, kh\xF4ng lan man.`;
+var INSTRUCTOR_1ON1_PROMPT = `Em l\xE0 Gi\u1EA3ng vi\xEAn K\u1EF9 thu\u1EADt Tr\u1EF1c ti\u1EBFp 1-1 (Live 1-on-1 AI Instructor) c\u1EE7a Arc Irobot Academy.
+Nhi\u1EC7m v\u1EE5: Tr\u1EF1c ti\u1EBFp \u0111\u1EE9ng l\u1EDBp gi\u1EA3ng d\u1EA1y 1-1 cho h\u1ECDc vi\xEAn ("\u0110\u1EA0I CA") \u0111i qua t\u1EEBng ph\u1EA7n (Checkpoint) c\u1EE7a ti\u1EBFt h\u1ECDc t\u1EEB \u0111\u1EA7u \u0111\u1EBFn cu\u1ED1i bu\u1ED5i, v\u1EEBa gi\u1EA3ng v\u1EEBa trao \u0111\u1ED5i, h\u1ECFi \u0111\xE1p hai chi\u1EC1u \u0111\u1EC3 \u0110\u1EA0I CA hi\u1EC3u s\xE2u b\u1EA3n ch\u1EA5t ki\u1EBFn tr\xFAc v\xE0 \xE1p d\u1EE5ng \u0111\u01B0\u1EE3c ngay.
+
+Quy t\u1EAFc s\u01B0 ph\u1EA1m 1-1 b\u1EAFt bu\u1ED9c:
+1. X\u01B0ng "em", g\u1ECDi h\u1ECDc vi\xEAn l\xE0 "\u0110\u1EA0I CA". Phong th\xE1i nh\u01B0 m\u1ED9t Senior Architect \u0111ang k\xE8m c\u1EB7p tr\u1EF1c ti\u1EBFp 1-1: t\xF4n tr\u1ECDng, s\u1EAFc b\xE9n, th\u1EF1c chi\u1EBFn, ng\u1EAFn g\u1ECDn v\xE0 truy\u1EC1n c\u1EA3m h\u1EE9ng.
+2. B\xE1m s\xE1t CHECKPOINT_CONTEXT (ph\u1EA7n ki\u1EBFn th\u1EE9c \u0111ang chi\u1EBFu tr\xEAn B\u1EA3ng Gi\u1EA3ng Tr\u1EF1c Quan) v\xE0 LESSON_CONTEXT:
+   - Khi b\u1EAFt \u0111\u1EA7u m\u1ED9t ph\u1EA7n m\u1EDBi ho\u1EB7c khi \u0110\u1EA0I CA y\xEAu c\u1EA7u gi\u1EA3ng ph\u1EA7n hi\u1EC7n t\u1EA1i: h\xE3y \u0111\xFAc k\u1EBFt c\xF4 \u0111\u1ECDng (1) B\xE0i to\xE1n th\u1EF1c t\u1EBF c\u1EA7n gi\u1EA3i quy\u1EBFt, (2) C\u01A1 ch\u1EBF v\u1EADn h\xE0nh c\u1ED1t l\xF5i tr\xEAn B\u1EA3ng Gi\u1EA3ng / Code m\u1EABu, v\xE0 (3) K\u1EBFt th\xFAc b\u1EB1ng 1 c\xE2u h\u1ECFi t\u01B0\u01A1ng t\xE1c ng\u1EAFn (Socratic Check) \u0111\u1EC3 c\xF9ng \u0110\u1EA0I CA th\u1EA3o lu\u1EADn.
+   - Khi \u0110\u1EA0I CA tr\u1EA3 l\u1EDDi c\xE2u h\u1ECFi ki\u1EC3m tra ho\u1EB7c n\xEAu \xFD ki\u1EBFn: \u0111\xE1nh gi\xE1 th\u1EB3ng th\u1EAFn c\xE2u tr\u1EA3 l\u1EDDi c\u1EE7a \u0110\u1EA0I CA (khen ng\u1EE3i \u0111i\u1EC3m chu\u1EA9n x\xE1c, ch\u1EC9nh s\u1EEDa ngay n\u1EBFu c\xF3 ng\u1ED9 nh\u1EADn k\u1EF9 thu\u1EADt), gi\u1EA3i th\xEDch v\xEC sao, v\xE0 n\u1EBFu \u0110\u1EA0I CA \u0111\xE3 n\u1EAFm ch\u1EAFc th\xEC m\u1EDDi \u0110\u1EA0I CA b\u1EA5m chuy\u1EC3n sang Ph\u1EA7n ti\u1EBFp theo tr\xEAn B\u1EA3ng Gi\u1EA3ng.
+   - Khi \u0110\u1EA0I CA \u0111\u1EB7t c\xE2u h\u1ECFi th\u1EAFc m\u1EAFc gi\u1EEFa ch\u1EEBng: gi\u1EA3i \u0111\xE1p tr\u1EF1c di\u1EC7n b\u1EB1ng v\xED d\u1EE5 th\u1EF1c t\u1EBF / lu\u1ED3ng b\u1ED9 nh\u1EDB / code minh h\u1ECDa r\u1ED3i n\u1ED1i l\u1EA1i m\u1EA1ch b\xE0i gi\u1EA3ng c\u1EE7a ph\u1EA7n \u0111ang h\u1ECDc.
+3. Tr\xECnh b\xE0y Markdown r\xF5 r\xE0ng, s\xFAc t\xEDch (d\xF9ng ### cho ti\xEAu \u0111\u1EC1 nh\u1ECF, **in \u0111\u1EADm** t\u1EEB kh\xF3a quan tr\u1ECDng, danh s\xE1ch -, v\xE0 kh\u1ED1i l\u1EC7nh \`\`\`ts ng\u1EAFn g\u1ECDn khi c\u1EA7n). Kh\xF4ng vi\u1EBFt b\xE0i v\u0103n d\xE0i d\xF2ng m\u1ED9t chi\u1EC1u m\xE0 lu\xF4n gi\u1EEF nh\u1ECBp trao \u0111\u1ED5i qua l\u1EA1i v\u1EDBi \u0110\u1EA0I CA.`;
 
 // server/index.ts
 import fs from "fs";
@@ -977,9 +987,19 @@ async function handler(request, response) {
   if (contents.length === 0) {
     return response.status(400).json({ error: "Kh\xF4ng t\xECm th\u1EA5y c\xE2u h\u1ECFi h\u1EE3p l\u1EC7 t\u1EEB h\u1ECDc vi\xEAn." });
   }
-  const prompt = `${SYSTEM_PROMPT}
+  const isInstructorMode = body.mode === "instructor-1on1";
+  const baseSystemPrompt = isInstructorMode ? INSTRUCTOR_1ON1_PROMPT : SYSTEM_PROMPT;
+  const checkpointBlock = isInstructorMode && body.checkpoint ? `
+
+CHECKPOINT_CONTEXT (PH\u1EA6N \u0110ANG GI\u1EA2NG TR\xCAN B\u1EA2NG):
+Ch\u1EB7ng: ${body.checkpoint.index || 1}/${body.checkpoint.total || 1} \u2014 ${body.checkpoint.title || ""}
+N\u1ED9i dung tr\u1ECDng t\xE2m ch\u1EB7ng n\xE0y:
+${body.checkpoint.boardMarkdown || ""}
+C\xE2u h\u1ECFi g\u1EE3i m\u1EDF tr\u1ECDng t\xE2m c\u1EE7a ch\u1EB7ng: ${body.checkpoint.socraticQuestion || ""}` : "";
+  const prompt = `${baseSystemPrompt}${checkpointBlock}
 
 LESSON_CONTEXT:
+Course: ${body.courseTitle || "Arc Irobot Academy"}
 Title: ${lesson.title}
 Tag: ${lesson.tag || ""}
 

@@ -2570,6 +2570,93 @@ async function handleApiRequestInner(
       res.status(405).json({ error: 'Method Not Allowed' });
       return;
     }
+
+    // VIETNAMESE TTS ENGINE: Synthesize natural Vietnamese speech chunks (tl=vi)
+    if (pathname === '/api/tts' && (method === 'POST' || method === 'GET')) {
+      const rawText =
+        typeof reqBody.text === 'string'
+          ? reqBody.text
+          : queryParams.get('text') || '';
+      const cleaned = rawText
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/[#*>_~|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 1800);
+
+      if (!cleaned) {
+        res.status(400).json({ error: 'Thiếu nội dung văn bản cần đọc' });
+        return;
+      }
+
+      // Split into <= 170 char chunks at punctuation or word boundaries
+      const rawSentences = cleaned.split(/(?<=[.!?;:\n])\s+|(?<=,)\s+/);
+      const chunks: string[] = [];
+      let current = '';
+      for (const part of rawSentences) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        if ((current + ' ' + trimmed).trim().length <= 170) {
+          current = (current + ' ' + trimmed).trim();
+        } else {
+          if (current) chunks.push(current);
+          if (trimmed.length <= 170) {
+            current = trimmed;
+          } else {
+            const words = trimmed.split(/\s+/);
+            let sub = '';
+            for (const w of words) {
+              if ((sub + ' ' + w).trim().length <= 170) {
+                sub = (sub + ' ' + w).trim();
+              } else {
+                if (sub) chunks.push(sub);
+                sub = w.slice(0, 170);
+              }
+            }
+            current = sub;
+          }
+        }
+      }
+      if (current) chunks.push(current);
+
+      try {
+        const audioChunks: string[] = [];
+        for (const chunk of chunks.slice(0, 12)) {
+          const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodeURIComponent(chunk)}`;
+          const response = await fetch(ttsUrl, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+              Referer: 'https://translate.google.com/'
+            },
+            signal: AbortSignal.timeout(8000)
+          });
+          if (!response.ok) {
+            throw new Error(`TTS upstream HTTP ${response.status}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          audioChunks.push(`data:audio/mpeg;base64,${base64}`);
+        }
+        res.status(200).json({
+          success: true,
+          lang: 'vi-VN',
+          chunks: chunks.slice(0, 12),
+          audioChunks
+        });
+        return;
+      } catch (err) {
+        res.status(502).json({
+          error:
+            err instanceof Error
+              ? err.message
+              : 'Không thể kết nối dịch vụ giọng nói Tiếng Việt'
+        });
+        return;
+      }
+    }
+
     // Identify and authorize every business mutation before it can produce evidence.
     if (
       ['POST', 'PATCH', 'DELETE', 'PUT'].includes(method) &&

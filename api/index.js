@@ -161,7 +161,7 @@ var MODEL_QUOTA_SPECS = [
     tierNote: "Ch\u1ED1t ch\u1EB7n cu\u1ED1i \xB7 C\u1EE5m h\u1EA1 t\u1EA7ng 2.5 \u0111\u1ED9c l\u1EADp"
   }
 ];
-var PROMPT_VERSION = "academy-tutor-v1";
+var PROMPT_VERSION = "academy-tutor-v2";
 var SYSTEM_PROMPT = `Em l\xE0 m\u1ED9t tutor k\u1EF9 thu\u1EADt c\u1EE7a Arc Irobot Academy.
 Nhi\u1EC7m v\u1EE5: gi\xFAp h\u1ECDc vi\xEAn hi\u1EC3u th\u1EADt ch\u1EAFc b\xE0i h\u1ECDc hi\u1EC7n t\u1EA1i tr\u01B0\u1EDBc khi l\xE0m tr\u1EAFc nghi\u1EC7m.
 Quy t\u1EAFc b\u1EAFt bu\u1ED9c:
@@ -2060,6 +2060,73 @@ async function handleApiRequestInner(req, res) {
       }
       res.status(405).json({ error: "Method Not Allowed" });
       return;
+    }
+    if (pathname === "/api/tts" && (method === "POST" || method === "GET")) {
+      const rawText = typeof reqBody.text === "string" ? reqBody.text : queryParams.get("text") || "";
+      const cleaned = rawText.replace(/```[\s\S]*?```/g, " ").replace(/`([^`]+)`/g, "$1").replace(/[#*>_~|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 1800);
+      if (!cleaned) {
+        res.status(400).json({ error: "Thi\u1EBFu n\u1ED9i dung v\u0103n b\u1EA3n c\u1EA7n \u0111\u1ECDc" });
+        return;
+      }
+      const rawSentences = cleaned.split(/(?<=[.!?;:\n])\s+|(?<=,)\s+/);
+      const chunks = [];
+      let current = "";
+      for (const part of rawSentences) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        if ((current + " " + trimmed).trim().length <= 170) {
+          current = (current + " " + trimmed).trim();
+        } else {
+          if (current) chunks.push(current);
+          if (trimmed.length <= 170) {
+            current = trimmed;
+          } else {
+            const words = trimmed.split(/\s+/);
+            let sub = "";
+            for (const w of words) {
+              if ((sub + " " + w).trim().length <= 170) {
+                sub = (sub + " " + w).trim();
+              } else {
+                if (sub) chunks.push(sub);
+                sub = w.slice(0, 170);
+              }
+            }
+            current = sub;
+          }
+        }
+      }
+      if (current) chunks.push(current);
+      try {
+        const audioChunks = [];
+        for (const chunk of chunks.slice(0, 12)) {
+          const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodeURIComponent(chunk)}`;
+          const response = await fetch(ttsUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+              Referer: "https://translate.google.com/"
+            },
+            signal: AbortSignal.timeout(8e3)
+          });
+          if (!response.ok) {
+            throw new Error(`TTS upstream HTTP ${response.status}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString("base64");
+          audioChunks.push(`data:audio/mpeg;base64,${base64}`);
+        }
+        res.status(200).json({
+          success: true,
+          lang: "vi-VN",
+          chunks: chunks.slice(0, 12),
+          audioChunks
+        });
+        return;
+      } catch (err) {
+        res.status(502).json({
+          error: err instanceof Error ? err.message : "Kh\xF4ng th\u1EC3 k\u1EBFt n\u1ED1i d\u1ECBch v\u1EE5 gi\u1ECDng n\xF3i Ti\u1EBFng Vi\u1EC7t"
+        });
+        return;
+      }
     }
     if (["POST", "PATCH", "DELETE", "PUT"].includes(method) && !pathname.startsWith("/api/auth/")) {
       const context = auditContext.getStore();

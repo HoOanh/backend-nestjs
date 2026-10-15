@@ -46,3 +46,72 @@ export interface Sprint {
   sprintDesc: string;
   lessons: Lesson[];
 }
+
+export interface TeachingCheckpoint {
+  id: string;
+  index: number;
+  title: string;
+  shortTitle?: string;
+  summary: string;
+  keyPoints?: string[];
+  visualMarkdown?: string;
+  boardMarkdown: string;
+  codeExcerpt?: string;
+  instructorLeadIn?: string;
+  interactiveQuiz?: QuizQuestion;
+  socraticQuestion: string;
+  quickReplies: string[];
+  type: 'concept' | 'architecture' | 'code-walkthrough' | 'final-practice';
+}
+
+export type CourseCategory =
+  | 'Backend Engineering'
+  | 'Frontend & UI Architecture'
+  | 'Database & Storage'
+  | 'DevOps & Distributed Systems'
+  | 'Core Computer Science';
+
+export type CourseLevel = 'Foundation' | 'Intermediate' | 'Advanced' | 'Master';
+
+export interface CourseDefinition {
+  id: string;
+  slug: string;
+  title: string;
+  shortTitle: string;
+  subtitle: string;
+  description: string;
+  category: CourseCategory;
+  level: CourseLevel;
+  requiredPlan: 'free' | 'pro' | 'enterprise';
+  estimatedHours: number;
+  accentColor: string;
+  badgeText: string;
+  techStack: string[];
+  outcomes: string[];
+  status: 'active' | 'early-access';
+  curriculum: Sprint[];
+}
+
+export interface CareerPathMilestone {
+  step: number;
+  title: string;
+  roleMilestone: string;
+  courseId: string;
+  outcome: string;
+  skills: string[];
+}
+
+export interface CareerPathDefinition {
+  id: string;
+  title: string;
+  subtitle: string;
+  roleTarget: string;
+  levelRange: string;
+  estimatedMonths: string;
+  description: string;
+  accentColor: string;
+  badgeText: string;
+  courseIds: string[];
+  milestones: CareerPathMilestone[];
+}
+

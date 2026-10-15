@@ -8,6 +8,7 @@ interface TheoryTabProps {
   lesson: Lesson;
   onNextTab: () => void;
   onOpenTutor?: () => void;
+  onOpenAiClassroom?: () => void;
   onLessonCleared?: () => void;
 }
 
@@ -152,7 +153,7 @@ function inferSnippetFilename(code: string, lang: string): string {
           : 'example.ts';
 }
 
-function formatMarkdown(text: string): string {
+export function formatMarkdown(text: string): string {
   if (!text) return '';
 
   const codeBlocks: string[] = [];
@@ -337,6 +338,7 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
   lesson,
   onNextTab,
   onOpenTutor,
+  onOpenAiClassroom,
   onLessonCleared,
 }) => {
   const referenceFilename = extractFilenameFromCode(lesson.realCodeSnippet || '');
@@ -454,6 +456,15 @@ export const TheoryTab: React.FC<TheoryTabProps> = ({
           </div>
         </div>
         <div className="tutor-banner-actions">
+          {onOpenAiClassroom && (
+            <button
+              className="btn btn-primary"
+              onClick={onOpenAiClassroom}
+              type="button"
+            >
+              <span>Phòng Học 1-1 Với AI Giảng Viên</span>
+            </button>
+          )}
           {onOpenTutor && (
             <button className="btn btn-tutor-callout" onClick={onOpenTutor} type="button">
               Mở AI Tutor Co-Pilot

@@ -59,6 +59,22 @@ export interface FinalExamResult {
   completedAt: string;
 }
 
+export interface CourseEnrollmentInfo {
+  courseId: string;
+  enrolledAt: string;
+  lastAccessedAt: string;
+  currentLessonId?: string;
+}
+
+export interface ClassroomCheckpointProgress {
+  lessonId: string;
+  courseId: string;
+  completedCheckpointIds: string[];
+  currentCheckpointIndex: number;
+  sessionCompleted: boolean;
+  updatedAt: string;
+}
+
 export interface UserProgressState {
   currentLessonId: string;
   completedLessons: Record<string, { completedAt: string }>;
@@ -68,6 +84,12 @@ export interface UserProgressState {
   lastActiveDate: string;
   clearedLessons: Record<string, boolean>;
   quizScores?: Record<string, { score: number; passed: boolean; completedAt: string }>;
+  activeCourseId?: string;
+  activeCareerPathId?: string;
+  enrolledCourses?: Record<string, CourseEnrollmentInfo>;
+  courseSprintExamScores?: Record<string, Record<number, { score: number; passed: boolean; completedAt: string }>>;
+  courseFinalExams?: Record<string, FinalExamResult | null>;
+  classroomProgress?: Record<string, ClassroomCheckpointProgress>;
 }
 
 export interface AdminStats {

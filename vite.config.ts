@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 function localBackendApi(): Plugin {
   return {
@@ -140,7 +141,42 @@ export default defineConfig(({ mode }) => {
   process.env.ADMIN_PASSWORD = env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
   return {
-    plugins: [react(), localBackendApi()],
+    plugins: [react(), tailwindcss(), localBackendApi()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('node_modules/lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('node_modules/three')) {
+              return 'vendor-three';
+            }
+            if (
+              id.includes('node_modules/framer-motion') ||
+              id.includes('node_modules/motion-') ||
+              id.includes('node_modules/react-resizable-panels') ||
+              id.includes('node_modules/sonner') ||
+              id.includes('node_modules/canvas-confetti')
+            ) {
+              return 'vendor-ui';
+            }
+            if (id.includes('/src/data/curriculum/chapter')) {
+              if (/\/chapter([1-5])(\/|\.)/.test(id)) {
+                return 'curriculum-part1';
+              }
+              return 'curriculum-part2';
+            }
+            if (id.includes('/src/data/sprintExams') || id.includes('/src/data/finalExam')) {
+              return 'curriculum-exams';
+            }
+          }
+        }
+      }
+    },
     server: {
       port: 5173,
       open: true

@@ -257,6 +257,15 @@ export const apiClient = {
           ? remote.currentLessonId
           : 'c1-l1';
 
+    const enrolledCourses = {
+      ...(remote.enrolledCourses || {}),
+      ...(local.enrolledCourses || {})
+    };
+    const classroomProgress = {
+      ...(remote.classroomProgress || {}),
+      ...(local.classroomProgress || {})
+    };
+
     return {
       currentLessonId,
       completedLessons,
@@ -268,7 +277,12 @@ export const apiClient = {
           ? local.lastActiveDate || today
           : remote.lastActiveDate || today,
       clearedLessons,
-      quizScores
+      quizScores,
+      activeCourseId: local.activeCourseId || remote.activeCourseId || 'backend-nestjs',
+      activeCareerPathId:
+        local.activeCareerPathId || remote.activeCareerPathId || 'path-backend-architect',
+      enrolledCourses,
+      classroomProgress
     };
   },
 

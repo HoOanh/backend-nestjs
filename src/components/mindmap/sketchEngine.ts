@@ -327,14 +327,18 @@ export function sketchLabeledNode(params: {
     extraClass: 'node-card-bg',
   });
 
-  const maxChars = Math.max(10, Math.floor((w - 22) / (fontSize * 0.52)));
-  const lines = wrapSketchText(label, maxChars, subLabel ? 2 : 3);
-  const lineHeight = fontSize * 1.24;
-
   const hasBadge = Boolean(badge);
   const hasSub = Boolean(subLabel);
+  const maxChars = Math.max(10, Math.floor((w - 22) / (fontSize * 0.52)));
+  const lineHeight = fontSize * 1.24;
+  const maxLabelLines = hasSub
+    ? 2
+    : Math.min(5, Math.max(3, Math.floor((h - 34) / lineHeight)));
+  const lines = wrapSketchText(label, maxChars, maxLabelLines);
+  const subMaxChars = Math.max(14, Math.floor((w - 18) / 6.2));
+  const subLines = hasSub ? wrapSketchText(subLabel || '', subMaxChars, 2) : [];
   const totalTextH =
-    lines.length * lineHeight + (hasSub ? 17 : 0) + (hasBadge ? 14 : 0);
+    lines.length * lineHeight + subLines.length * 14 + (hasBadge ? 14 : 0);
   let currentY = y + (h - totalTextH) / 2 + fontSize * 0.82;
 
   let badgeSvg = '';
@@ -354,12 +358,9 @@ export function sketchLabeledNode(params: {
 
   let subSvg = '';
   if (subLabel) {
-    const subMaxChars = Math.max(14, Math.floor((w - 18) / 6.2));
-    const cleanSub =
-      subLabel.length > subMaxChars
-        ? `${subLabel.slice(0, subMaxChars - 1).trim()}…`
-        : subLabel;
-    subSvg = `<text x="${fmt(x + w / 2)}" y="${fmt(currentY + 2)}" text-anchor="middle" class="sketch-node-sub">${escapeHtml(cleanSub)}</text>`;
+    subSvg = subLines
+      .map((line, index) => `<text x="${fmt(x + w / 2)}" y="${fmt(currentY + 2 + index * 14)}" text-anchor="middle" class="sketch-node-sub">${escapeHtml(line)}</text>`)
+      .join('');
   }
 
   const idAttr = nodeId ? ` data-node-id="${escapeHtml(nodeId)}"` : '';

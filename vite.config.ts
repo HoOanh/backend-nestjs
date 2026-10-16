@@ -1,17 +1,125 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
 
 function localBackendApi(): Plugin {
   return {
     name: 'local-backend-api',
     async configureServer(server) {
-      const [{ default: tutorHandler }, { handleApiRequest }] =
-        await Promise.all([import('./server/tutor.ts'), import('./server/index.ts')]);
+      const [
+        { default: tutorHandler },
+        { handleApiRequest },
+        {
+          canUseZeroTts,
+          stopLocalZeroTtsService,
+          streamWithZeroTts,
+          synthesizeWithZeroTts,
+          warmLocalZeroTtsService
+        }
+      ] = await Promise.all([
+        import('./server/tutor.ts'),
+        import('./server/index.ts'),
+        import('./server/zerotts.ts')
+      ]);
+      server.httpServer?.once('close', () => {
+        void stopLocalZeroTtsService();
+      });
+      void warmLocalZeroTtsService().catch((error: unknown) => {
+        console.error('ZeroTTS warmup failed:', error);
+      });
+
       server.middlewares.use(async (request, response, next) => {
         const url = request.url || '';
         if (!url.startsWith('/api/')) {
           next();
+          return;
+        }
+
+        const ttsPath = url.split('?')[0];
+        if (ttsPath === '/api/tts' || ttsPath === '/api/tts/stream') {
+          if (request.method !== 'POST') {
+            response.statusCode = 405;
+            response.setHeader('Allow', 'POST');
+            response.setHeader('Content-Type', 'application/json; charset=utf-8');
+            response.end(JSON.stringify({ error: 'Chỉ hỗ trợ POST.' }));
+            return;
+          }
+
+          if (!canUseZeroTts(request.headers as Record<string, string | string[] | undefined>)) {
+            response.statusCode = 401;
+            response.setHeader('Content-Type', 'application/json; charset=utf-8');
+            response.end(JSON.stringify({ error: 'Đăng nhập để sử dụng giọng đọc của lớp học.' }));
+            return;
+          }
+
+          let rawBody = '';
+          let bodyTooLarge = false;
+          request.on('data', (chunk: unknown) => {
+            rawBody += String(chunk);
+            if (rawBody.length > 32768) bodyTooLarge = true;
+          });
+          request.on('end', async () => {
+            if (bodyTooLarge) {
+              response.statusCode = 413;
+              response.setHeader('Content-Type', 'application/json; charset=utf-8');
+              response.end(JSON.stringify({ error: 'Request TTS quá lớn.' }));
+              return;
+            }
+
+            let payload: unknown;
+            try {
+              payload = rawBody ? (JSON.parse(rawBody) as unknown) : {};
+            } catch {
+              response.statusCode = 400;
+              response.setHeader('Content-Type', 'application/json; charset=utf-8');
+              response.end(JSON.stringify({ error: 'Request TTS không phải JSON hợp lệ.' }));
+              return;
+            }
+            const text =
+              payload && typeof payload === 'object' && 'text' in payload &&
+              typeof payload.text === 'string'
+                ? payload.text
+                : '';
+            try {
+              if (ttsPath === '/api/tts/stream') {
+                const result = await streamWithZeroTts(text);
+                response.statusCode = result.status;
+                for (const [name, value] of result.headers) response.setHeader(name, value);
+                if (!result.body) {
+                  response.end();
+                  return;
+                }
+                const reader = result.body.getReader();
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    response.write(Buffer.from(value));
+                  }
+                  response.end();
+                } finally {
+                  reader.releaseLock();
+                }
+                return;
+              }
+
+              const result = await synthesizeWithZeroTts(text);
+              response.statusCode = result.status;
+              response.setHeader('Content-Type', result.contentType);
+              response.setHeader('Cache-Control', 'no-store');
+              response.end(Buffer.from(result.body));
+            } catch (error) {
+              console.error('ZeroTTS API request failed:', error);
+              if (!response.headersSent) {
+                response.statusCode = 503;
+                response.setHeader('Content-Type', 'application/json; charset=utf-8');
+                response.end(JSON.stringify({ error: 'Không phát được giọng đọc lúc này.' }));
+              } else {
+                response.end();
+              }
+            }
+          });
           return;
         }
 
@@ -137,11 +245,18 @@ function localBackendApi(): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   process.env.GEMINI_API_KEY = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  process.env.GEMINI_TTS_MODEL = env.GEMINI_TTS_MODEL || process.env.GEMINI_TTS_MODEL;
+  process.env.GEMINI_TTS_VOICE = env.GEMINI_TTS_VOICE || process.env.GEMINI_TTS_VOICE;
   process.env.ADMIN_EMAIL = env.ADMIN_EMAIL || process.env.ADMIN_EMAIL;
   process.env.ADMIN_PASSWORD = env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
   return {
     plugins: [react(), tailwindcss(), localBackendApi()],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
+    },
     build: {
       rollupOptions: {
         output: {

@@ -15,15 +15,9 @@ import {
   SkipForward,
   RotateCcw,
   Hand,
-  Video,
-  Monitor,
-  UserCheck,
-  Maximize2,
   Laptop,
   MessageSquare,
-  Sparkles,
   Check,
-  XCircle,
   BookOpen
 } from 'lucide-react';
 import { buildLessonCheckpoints } from '../../data/courses.ts';
@@ -32,20 +26,38 @@ import type {
   Lesson,
   TeachingCheckpoint
 } from '../../data/curriculum/types.ts';
+import {
+  instructor_c1_l1
+} from '../../data/instructor-curriculum/chapter1/c1-l1.ts';
+import type {
+  InstructorSection,
+  InstructorSlide,
+  InstructorVisual
+} from '../../data/instructor-curriculum/types.ts';
 import type { ClassroomCheckpointProgress } from '../../types/user.ts';
 import { chatDbService } from '../../services/db/chatDbService.ts';
 import { MODEL_OPTIONS } from '../../context/TutorChatContext.tsx';
 import {
   speakVietnamese,
-  stopVietnameseSpeech
+  speakVietnameseStream,
+  stopVietnameseSpeech,
+  splitIntoVietnameseSentences
 } from '../../services/vietnameseVoiceService.ts';
 import {
-  LectureHall3DScene,
-  type InstructorStagePose,
-  type CameraPreset,
-  type BoardDisplayMode
-} from './LectureHall3DScene.tsx';
+  InteractiveSmartboardClassroom,
+  type BoardDisplayMode,
+  visualEntryCount
+} from './InteractiveSmartboardClassroom.tsx';
 import { CodeSandboxTab } from '../lesson/CodeSandboxTab.tsx';
+import { Button } from '../ui/button.tsx';
+import { Input } from '../ui/input.tsx';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '../ui/select.tsx';
 
 export interface AiInstructorClassroomProps {
   course: CourseDefinition;
@@ -101,10 +113,191 @@ interface LectureBeat {
   id: string;
   label: string;
   boardMode: BoardDisplayMode;
-  pose: InstructorStagePose;
   pointIndex: number;
   codeLineIndex: number;
   spokenScript: string;
+  slideTitle: string;
+  slideTakeaway: string;
+  slidePoints: string[];
+  slideSubtitle?: string;
+  instructorVisual?: InstructorVisual;
+}
+
+interface TeachingSlide {
+  title: string;
+  takeaway: string;
+  points: string[];
+  narration: string;
+}
+
+interface LectureResumePoint {
+  stepIndex: number;
+  beatIndex: number;
+  sentenceIndex: number;
+  autoPlay: boolean;
+  shouldResumeAudio: boolean;
+}
+
+class AsyncSentenceQueue implements AsyncIterable<string> {
+  private sentences: string[] = [];
+  private waiters: Array<() => void> = [];
+  private closed = false;
+
+  push(sentence: string): void {
+    if (this.closed || !sentence.trim()) return;
+    this.sentences.push(sentence);
+    this.waiters.shift()?.();
+  }
+
+  close(): void {
+    this.closed = true;
+    this.waiters.splice(0).forEach((wake) => wake());
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<string, void, undefined> {
+    while (true) {
+      const sentence = this.sentences.shift();
+      if (sentence !== undefined) {
+        yield sentence;
+        continue;
+      }
+      if (this.closed) return;
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+  }
+}
+
+function extractCompleteSpeechSentences(
+  buffer: string,
+  flush = false
+): { sentences: string[]; remainder: string } {
+  let speechText = buffer;
+  if (flush) speechText = speechText.replace(/\[CHECKPOINT_PASSED\]/g, '').trim();
+
+  let boundary = -1;
+  const sentenceBoundary = /[.!?;:](?=\s)/g;
+  let match = sentenceBoundary.exec(speechText);
+  while (match) {
+    boundary = match.index + 1;
+    match = sentenceBoundary.exec(speechText);
+  }
+
+  if (boundary < 0 && !flush && speechText.length > 220) {
+    const commaBoundary = speechText.lastIndexOf(',', 190);
+    boundary = commaBoundary > 90 ? commaBoundary + 1 : speechText.lastIndexOf(' ', 180);
+  }
+
+  if (flush) {
+    return { sentences: splitIntoVietnameseSentences(speechText), remainder: '' };
+  }
+  if (boundary < 0) return { sentences: [], remainder: speechText };
+
+  const completeText = speechText.slice(0, boundary).trim();
+  const remainder = speechText.slice(boundary).trimStart();
+  return {
+    sentences: splitIntoVietnameseSentences(completeText),
+    remainder
+  };
+}
+
+function cleanLectureMarkup(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/^\|\s*:?-{3,}.*\|\s*$/gm, '')
+    .replace(/^\|(.+)\|\s*$/gm, '$1')
+    .replace(/\s*\|\s*/g, ' · ')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, '• ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\s+\n/g, '\n')
+    .trim();
+}
+
+function toBoardPoint(value: string): string {
+  return cleanLectureMarkup(value)
+    .replace(/^[-*•\d.)\s]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractTeachingFacts(markdown: string): string[] {
+  const facts: string[] = [];
+  const withoutCode = markdown.replace(/```[\s\S]*?```/g, ' ');
+
+  for (const rawLine of withoutCode.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || /^#{1,4}\s/.test(line) || /^\|?\s*:?-{3,}/.test(line)) continue;
+
+    if (line.startsWith('|')) {
+      const cells = line.split('|').map(toBoardPoint).filter(Boolean);
+      if (cells.length > 1) facts.push(cells.join('  →  '));
+      continue;
+    }
+
+    if (/^(?:[-*+]\s|\d+[.)]\s)/.test(line)) {
+      facts.push(toBoardPoint(line));
+      continue;
+    }
+
+    const cleaned = toBoardPoint(line.replace(/^>\s?/, ''));
+    const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+    for (const sentence of sentences) {
+      const fact = sentence.trim();
+      if (fact.length >= 36) facts.push(fact);
+    }
+  }
+
+  return [...new Set(facts)].filter((fact) => fact.length > 24);
+}
+
+function buildTeachingSlides(
+  markdown: string,
+  fallbackTitle: string,
+  fallbackPoints: string[]
+): TeachingSlide[] {
+  const slides: TeachingSlide[] = [];
+  let currentTitle = fallbackTitle;
+  let currentBlocks: string[] = [];
+
+  const flush = () => {
+    const facts = extractTeachingFacts(currentBlocks.join('\n\n'));
+    if (facts.length) {
+      const takeaway = facts[0];
+      const points = facts.slice(1, 4);
+      const narration = cleanLectureMarkup(currentBlocks.join('\n\n'))
+        .replace(/\s+/g, ' ')
+        .slice(0, 1400);
+      slides.push({ title: currentTitle, takeaway, points, narration });
+    }
+    currentBlocks = [];
+  };
+
+  for (const block of markdown.split(/\n\s*\n/)) {
+    const heading = block.match(/^#{1,4}\s+(.+)$/m);
+    if (heading) {
+      flush();
+      currentTitle = cleanLectureMarkup(heading[1]);
+      const remaining = block.replace(/^#{1,4}\s+.+$/m, '').trim();
+      if (remaining) currentBlocks.push(remaining);
+      continue;
+    }
+    if (block.trim()) currentBlocks.push(block.trim());
+  }
+  flush();
+
+  if (slides.length === 0) {
+    const points = fallbackPoints.map(toBoardPoint).filter(Boolean).slice(0, 4);
+    const fallback = extractTeachingFacts(markdown)[0] || fallbackTitle;
+    slides.push({
+      title: fallbackTitle,
+      takeaway: fallback,
+      points,
+      narration: cleanLectureMarkup(markdown).slice(0, 1400)
+    });
+  }
+  return slides;
 }
 
 /**
@@ -114,36 +307,94 @@ interface LectureBeat {
 function buildLectureBeatsForStep(
   checkpoint: TeachingCheckpoint,
   stepIdx: number,
-  totalSteps: number
+  totalSteps: number,
+  instructorSection?: InstructorSection,
+  openingSlide?: InstructorSlide,
+  roadmapSlide?: InstructorSlide,
+  closingSlide?: InstructorSlide
 ): LectureBeat[] {
   const beats: LectureBeat[] = [];
-  const keyPoints = checkpoint.keyPoints || [checkpoint.summary];
 
-  // Beat 1: Teacher introduces the section
+  if (instructorSection) {
+    const plannedSlides = [openingSlide, roadmapSlide, ...instructorSection.slides]
+      .filter((slide): slide is InstructorSlide => Boolean(slide));
+
+    plannedSlides.forEach((slide, idx) => {
+      beats.push({
+        id: slide.id,
+        label: slide.title,
+        boardMode: 'keypoints',
+        pointIndex: idx,
+        codeLineIndex: 0,
+        slideTitle: slide.title,
+        slideTakeaway: slide.takeaway,
+        slidePoints: [],
+        slideSubtitle: slide.subtitle,
+        instructorVisual: slide.visual,
+        spokenScript: slide.narration
+      });
+    });
+
+    beats.push({
+      id: `${instructorSection.id}-check`,
+      label: 'Kiểm tra hiểu bài',
+      boardMode: 'question',
+      pointIndex: 0,
+      codeLineIndex: 0,
+      slideTitle: 'Thử áp dụng điều vừa học',
+      slideTakeaway: '',
+      slidePoints: [],
+      spokenScript: `Mình vừa lần theo xong cơ chế này. Trước khi nối sang tình huống kế tiếp, mình muốn nghe cách bạn tự giải thích: ${instructorSection.check.question}`
+    });
+
+    if (closingSlide) {
+      beats.push({
+        id: closingSlide.id,
+        label: closingSlide.title,
+        boardMode: 'keypoints',
+        pointIndex: 0,
+        codeLineIndex: 0,
+        slideTitle: closingSlide.title,
+        slideTakeaway: closingSlide.takeaway,
+        slidePoints: [],
+        slideSubtitle: closingSlide.subtitle,
+        instructorVisual: closingSlide.visual,
+        spokenScript: closingSlide.narration
+      });
+    }
+    return beats;
+  }
+
+  const slides = buildTeachingSlides(
+    checkpoint.boardMarkdown,
+    checkpoint.shortTitle || checkpoint.title,
+    checkpoint.keyPoints
+  );
+
+  // Start with an actual teaching slide, then progress through the lesson text.
   beats.push({
     id: `${checkpoint.id}-intro`,
     label: 'Mở đầu phần giảng',
     boardMode: 'keypoints',
-    pose: 'podium_speaking',
     pointIndex: 0,
     codeLineIndex: 0,
-    spokenScript:
-      stepIdx === 0
-        ? `Chào mừng em đến với tiết học trực tiếp hôm nay! Chúng ta bắt đầu Phần 1: ${checkpoint.title}. Em hãy nhìn lên bảng thông minh phía trước để nắm bức tranh tổng thể nhé.`
-        : `Bây giờ cô trò mình chuyển sang Phần ${stepIdx + 1} trên ${totalSteps}: ${checkpoint.title}. Đây là phần kiến thức rất quan trọng trong thực tế.`
+    slideTitle: 'Mục tiêu của phần học',
+    slideTakeaway: 'Sau phần này, bạn cần nắm được ba ý cốt lõi bên dưới.',
+    slidePoints: checkpoint.keyPoints.slice(0, 3),
+    spokenScript: `Mình và bạn bắt đầu phần ${stepIdx + 1} trên ${totalSteps}: ${checkpoint.title}. Trước hết, mục tiêu là hiểu được ý cốt lõi: ${checkpoint.summary}. Sau đó mình sẽ đi từng nội dung trên bảng, giải thích vì sao nó hoạt động như vậy và liên hệ với tình huống thực tế.`
   });
 
-  // Beats 2..k: Teacher points wand at each Key Takeaway on the White Smartboard
-  keyPoints.forEach((point, idx) => {
-    const cleanPoint = point.replace(/`([^`]+)`/g, '$1').trim();
+  slides.forEach((slide, idx) => {
     beats.push({
-      id: `${checkpoint.id}-kp-${idx}`,
-      label: `Ý chính #${idx + 1}`,
+      id: `${checkpoint.id}-slide-${idx}`,
+      label: `Slide ${idx + 1}`,
       boardMode: 'keypoints',
-      pose: 'pointing_board',
       pointIndex: idx,
       codeLineIndex: 0,
-      spokenScript: `Em chú ý vào mục số ${idx + 1} cô đang chỉ trên bảng trắng nhé: ${cleanPoint}`
+      slideTitle: slide.title,
+      slideTakeaway: slide.takeaway,
+      slidePoints: slide.points,
+      spokenScript: `Mình cùng phân tích sâu hơn về ${slide.title}. ${slide.narration || slide.takeaway}`
     });
   });
 
@@ -153,10 +404,12 @@ function buildLectureBeatsForStep(
       id: `${checkpoint.id}-diagram`,
       label: 'Phân tích sơ đồ',
       boardMode: 'diagram',
-      pose: 'pointing_board',
       pointIndex: 0,
       codeLineIndex: 0,
-      spokenScript: `Cô chiếu sơ đồ kiến trúc lên bảng để em dễ hình dung luồng chạy thực tế của ${checkpoint.title}. Hãy quan sát cách các thành phần kết nối với nhau.`
+      slideTitle: 'Sơ đồ kiến trúc',
+      slideTakeaway: '',
+      slidePoints: [],
+      spokenScript: `Mình chuyển sang sơ đồ để bạn hình dung luồng chạy thực tế của ${checkpoint.title}. Hãy theo dõi thứ tự các thành phần kết nối với nhau rồi mình sẽ phân tích từng bước.`
     });
   }
 
@@ -171,14 +424,16 @@ function buildLectureBeatsForStep(
       id: `${checkpoint.id}-code`,
       label: 'Mổ xẻ Code',
       boardMode: 'code',
-      pose: 'pointing_board',
       pointIndex: 0,
       codeLineIndex: importantLineIdx,
-      spokenScript: `Bây giờ cô chuyển bảng sang chế độ mổ xẻ code. Em nhìn vào dòng số ${importantLineIdx + 1}: đây chính là cách triển khai ${checkpoint.title} trong dự án thực tế.`
+      slideTitle: 'Đọc code trong dự án',
+      slideTakeaway: '',
+      slidePoints: [],
+      spokenScript: `Mình chuyển sang đoạn code minh họa. Bạn để ý dòng ${importantLineIdx + 1}; đây là chỗ thể hiện trực tiếp cơ chế ${checkpoint.title} trong dự án.`
     });
   }
 
-  // Final Beat of the Step: Teacher asks the student a check question
+  // Final Beat of the step: present a short check question
   const questionPrompt = checkpoint.interactiveQuiz
     ? checkpoint.interactiveQuiz.question
     : checkpoint.socraticQuestion;
@@ -187,13 +442,38 @@ function buildLectureBeatsForStep(
     id: `${checkpoint.id}-question`,
     label: 'Hỏi đáp tại lớp',
     boardMode: 'question',
-    pose: 'asking_student',
     pointIndex: 0,
     codeLineIndex: 0,
-    spokenScript: `Trước khi qua phần tiếp theo, cô hỏi nhanh để kiểm tra xem em đã nắm chắc chưa nhé: ${questionPrompt} Em hãy chọn đáp án hoặc bật mic trả lời ngay tại bàn học!`
+    slideTitle: 'Cùng kiểm tra lại',
+    slideTakeaway: '',
+    slidePoints: [],
+    spokenScript: `Trước khi mình nối tiếp mạch bài giảng, mình muốn nghe bạn giải thích lại cơ chế vừa xem nhé. ${questionPrompt} Bạn có thể chọn đáp án hoặc bật mic để trả lời.`
   });
 
   return beats;
+}
+
+function toInstructorCheckpoint(section: InstructorSection, index: number): TeachingCheckpoint {
+  return {
+    id: section.id,
+    index: index + 1,
+    title: `Phần ${index + 1}: ${section.title}`,
+    shortTitle: section.title,
+    summary: section.objective,
+    keyPoints: section.slides.map((slide) => slide.takeaway),
+    visualMarkdown: '',
+    boardMarkdown: section.slides
+      .map((slide) => `### ${slide.title}\n\n${slide.narration}\n\nÝ cốt lõi: ${slide.takeaway}`)
+      .join('\n\n'),
+    interactiveQuiz: section.check,
+    socraticQuestion: section.check.question,
+    quickReplies: [
+      'Cho mình một ví dụ khác để kiểm tra hiểu bài',
+      'Giải thích vì sao đáp án còn lại chưa đúng',
+      'Liên hệ cơ chế này với một API thực tế'
+    ],
+    type: 'concept'
+  };
 }
 
 export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
@@ -206,9 +486,14 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   onExitToLesson,
   onExitToHub
 }) => {
+  const instructorPlan = lesson.id === instructor_c1_l1.lessonId
+    ? instructor_c1_l1
+    : undefined;
   const checkpoints: TeachingCheckpoint[] = useMemo(
-    () => buildLessonCheckpoints(lesson),
-    [lesson]
+    () => instructorPlan
+      ? instructorPlan.sections.map(toInstructorCheckpoint)
+      : buildLessonCheckpoints(lesson),
+    [lesson, instructorPlan]
   );
 
   // Lecture Session State
@@ -218,21 +503,14 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     return Math.min(Math.max(0, savedIdx), Math.max(0, checkpoints.length - 1));
   });
   const [passedStepIds, setPassedStepIds] = useState<string[]>(
-    () => savedClassroomProgress?.completedCheckpointIds || []
+    () => (savedClassroomProgress?.completedCheckpointIds || []).filter((id) =>
+      checkpoints.some((checkpoint) => checkpoint.id === id)
+    )
   );
   const [activeBeatIndex, setActiveBeatIndex] = useState(0);
-  const [isAutoPlayingLecture, setIsAutoPlayingLecture] = useState(true);
+  const [visualRevealCount, setVisualRevealCount] = useState(0);
 
   // Classroom Stage & Camera State
-  const [cameraPreset, setCameraPreset] = useState<CameraPreset>('pov');
-  const [cameraSnap, setCameraSnap] = useState(0);
-  const requestCameraPreset = useCallback((preset: CameraPreset) => {
-    setCameraPreset(preset);
-    setCameraSnap((value) => value + 1);
-  }, []);
-  const [overridePose, setOverridePose] = useState<InstructorStagePose | null>(
-    null
-  );
   const [overrideBoardMode, setOverrideBoardMode] =
     useState<BoardDisplayMode | null>(null);
   const [overridePointIndex, setOverridePointIndex] = useState<number | null>(
@@ -244,9 +522,8 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [speechRate, setSpeechRate] = useState<number>(1.05);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceAmplitude, setVoiceAmplitude] = useState(0);
   const [liveSubtitle, setLiveSubtitle] = useState<string>(
-    'Nhấn "Bắt Đầu Tiết Học" để vào lớp học sáng sủa và nghe giảng viên giảng bài bằng Tiếng Việt.'
+    'Nhấn "Bắt Đầu Tiết Học" để cùng học qua các slide có lời giải thích tiếng Việt.'
   );
 
   // Student Interaction ("Giơ Tay Hỏi Bài", Mic STT, Quiz, Sandbox Drawer)
@@ -264,8 +541,19 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   >({});
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const raisingHandRef = useRef(false);
+  const lectureAutoPlayRef = useRef(true);
+  const activeNarrationSentenceIndexRef = useRef(0);
+  const resumeAfterQuestionRef = useRef<LectureResumePoint | null>(null);
+  const tutorRequestControllerRef = useRef<AbortController | null>(null);
+  const pendingTutorAssistantIdRef = useRef<string | null>(null);
+
+  const setLectureAutoPlay = useCallback((enabled: boolean) => {
+    lectureAutoPlayRef.current = enabled;
+  }, []);
 
   const currentCheckpoint = checkpoints[activeStepIndex] || checkpoints[0];
+  const currentInstructorSection = instructorPlan?.sections[activeStepIndex];
   const currentKeyPoints = useMemo(
     () => currentCheckpoint.keyPoints || [currentCheckpoint.summary],
     [currentCheckpoint]
@@ -276,46 +564,83 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       buildLectureBeatsForStep(
         currentCheckpoint,
         activeStepIndex,
-        checkpoints.length
+        checkpoints.length,
+        currentInstructorSection,
+        activeStepIndex === 0 ? instructorPlan?.opening : undefined,
+        activeStepIndex === 0 ? instructorPlan?.roadmap : undefined,
+        activeStepIndex === checkpoints.length - 1 ? instructorPlan?.closing : undefined
       ),
-    [currentCheckpoint, activeStepIndex, checkpoints.length]
+    [currentCheckpoint, currentInstructorSection, activeStepIndex, checkpoints.length, instructorPlan]
   );
 
   const currentBeat =
     lectureBeats[Math.min(activeBeatIndex, lectureBeats.length - 1)] ||
     lectureBeats[0];
 
-  const isCurrentStepPassed = passedStepIds.includes(currentCheckpoint.id);
   const currentQuizAttempt = quizSelectionByStep[currentCheckpoint.id];
 
-  // Reset state when switching lessons
+  // Reset the classroom only when changing lessons. Progress writes during this
+  // lesson must not rewind the active step or interrupt the lecture.
   useEffect(() => {
     stopVietnameseSpeech();
-    setActiveStepIndex(0);
-    setPassedStepIds(savedClassroomProgress?.completedCheckpointIds || []);
+    tutorRequestControllerRef.current?.abort();
+    tutorRequestControllerRef.current = null;
+    pendingTutorAssistantIdRef.current = null;
+    raisingHandRef.current = false;
+    resumeAfterQuestionRef.current = null;
+    setHasStartedClass(false);
+    setActiveStepIndex(
+      Math.min(
+        Math.max(0, savedClassroomProgress?.currentCheckpointIndex ?? 0),
+        Math.max(0, checkpoints.length - 1)
+      )
+    );
+    setPassedStepIds(
+      (savedClassroomProgress?.completedCheckpointIds || []).filter((id) =>
+        checkpoints.some((checkpoint) => checkpoint.id === id)
+      )
+    );
     setActiveBeatIndex(0);
+    activeNarrationSentenceIndexRef.current = 0;
+    setLectureAutoPlay(true);
     setQuizSelectionByStep({});
     setQaHistory([]);
     setIsRaisingHand(false);
+    setIsAiThinking(false);
     setShowLaptopSandbox(false);
-  }, [lesson.id, savedClassroomProgress]);
+  }, [lesson.id]);
 
   // Clean up speech on unmount
   useEffect(() => {
     return () => {
+      tutorRequestControllerRef.current?.abort();
       stopVietnameseSpeech();
     };
   }, []);
 
   // Trigger Vietnamese voice playback for a given script
   const playProfessorVietnameseVoice = useCallback(
-    (scriptText: string, onFinishedBeat?: () => void) => {
+    (
+      scriptText: string,
+      onFinishedBeat?: () => void,
+      onSentenceProgress?: (index: number, total: number) => void,
+      sentenceOffset = 0
+    ) => {
       setLiveSubtitle(scriptText);
       if (!voiceEnabled) {
+        stopVietnameseSpeech();
         setIsSpeaking(false);
-        setVoiceAmplitude(0);
+        onFinishedBeat?.();
         return;
       }
+
+      let didFinish = false;
+      const finishPlayback = () => {
+        if (didFinish) return;
+        didFinish = true;
+        setIsSpeaking(false);
+        onFinishedBeat?.();
+      };
 
       void speakVietnamese({
         text: scriptText,
@@ -323,20 +648,51 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         onStart: () => {
           setIsSpeaking(true);
         },
-        onSentenceChange: (sentence) => {
+        onSentenceChange: (sentence, index, total) => {
+          activeNarrationSentenceIndexRef.current = sentenceOffset + index;
           setLiveSubtitle(sentence);
-        },
-        onAmplitude: (amp) => {
-          setVoiceAmplitude(amp);
+          onSentenceProgress?.(index, total);
         },
         onEnd: () => {
-          setIsSpeaking(false);
-          setVoiceAmplitude(0);
-          onFinishedBeat?.();
+          finishPlayback();
         },
-        onError: () => {
-          setIsSpeaking(false);
-          setVoiceAmplitude(0);
+        onError: (message) => {
+          toast.error(message);
+          finishPlayback();
+        }
+      });
+    },
+    [voiceEnabled, speechRate]
+  );
+
+  const playProfessorVietnameseStream = useCallback(
+    (sentences: AsyncIterable<string>, onFinished?: () => void) => {
+      let didFinish = false;
+      const finishPlayback = () => {
+        if (didFinish) return;
+        didFinish = true;
+        setIsSpeaking(false);
+        onFinished?.();
+      };
+
+      if (!voiceEnabled) {
+        setIsSpeaking(false);
+        void (async () => {
+          for await (const _sentence of sentences) {
+            // Drain the text queue so the lesson flow can finish without audio.
+          }
+          finishPlayback();
+        })();
+        return;
+      }
+
+      void speakVietnameseStream(sentences, {
+        rate: speechRate,
+        onStart: () => setIsSpeaking(true),
+        onSentenceChange: (sentence) => setLiveSubtitle(sentence),
+        onEnd: finishPlayback,
+        onError: (message) => {
+          toast.error(message);
         }
       });
     },
@@ -347,27 +703,76 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   useEffect(() => {
     if (!hasStartedClass || isRaisingHand || showLaptopSandbox) return;
 
-    setOverridePose(null);
-    setOverrideBoardMode(null);
-    setOverridePointIndex(null);
-
     const beat = lectureBeats[activeBeatIndex];
     if (!beat) return;
 
-    if (beat.boardMode === 'code') {
+    const resumePoint = resumeAfterQuestionRef.current;
+    const isResumingSameBeat =
+      resumePoint?.stepIndex === activeStepIndex &&
+      resumePoint.beatIndex === activeBeatIndex;
+    if (!isResumingSameBeat) {
+      setOverrideBoardMode(null);
+      setOverridePointIndex(null);
+    }
+    if (beat.boardMode === 'code' && !isResumingSameBeat) {
       setSelectedCodeLine(beat.codeLineIndex);
     }
 
-    playProfessorVietnameseVoice(beat.spokenScript, () => {
-      // Auto-advance to the next beat in the lecture script until we reach the Question beat
-      if (isAutoPlayingLecture && activeBeatIndex < lectureBeats.length - 1) {
-        setTimeout(() => {
-          setActiveBeatIndex((prev) =>
-            Math.min(prev + 1, lectureBeats.length - 1)
-          );
-        }, 650);
+    let narration = beat.spokenScript;
+    let sentenceOffset = 0;
+    let autoAdvanceAfterNarration = lectureAutoPlayRef.current;
+    const fullSentences = splitIntoVietnameseSentences(beat.spokenScript);
+    const totalNarrationSentences = fullSentences.length;
+
+    if (isResumingSameBeat && resumePoint) {
+      resumeAfterQuestionRef.current = null;
+      if (!resumePoint.shouldResumeAudio) return;
+      sentenceOffset = Math.min(
+        resumePoint.sentenceIndex,
+        Math.max(0, fullSentences.length - 1)
+      );
+      narration = fullSentences.slice(sentenceOffset).join(' ');
+      autoAdvanceAfterNarration = resumePoint.autoPlay;
+    } else {
+      resumeAfterQuestionRef.current = null;
+      activeNarrationSentenceIndexRef.current = 0;
+      setVisualRevealCount(0);
+      if (!voiceEnabled && beat.instructorVisual) {
+        setVisualRevealCount(visualEntryCount(beat.instructorVisual));
       }
-    });
+    }
+
+    playProfessorVietnameseVoice(
+      narration,
+      () => {
+        if (
+          voiceEnabled &&
+          autoAdvanceAfterNarration &&
+          lectureAutoPlayRef.current &&
+          beat.boardMode !== 'question' &&
+          activeBeatIndex < lectureBeats.length - 1
+        ) {
+          setTimeout(() => {
+            setActiveBeatIndex((prev) => Math.min(prev + 1, lectureBeats.length - 1));
+          }, 650);
+        }
+      },
+      (sentenceIndex) => {
+        const entryCount = beat.instructorVisual
+          ? visualEntryCount(beat.instructorVisual)
+          : 0;
+        setVisualRevealCount(
+          Math.min(
+            entryCount,
+            Math.ceil(
+              ((sentenceOffset + sentenceIndex + 1) /
+                Math.max(1, totalNarrationSentences)) * entryCount
+            )
+          )
+        );
+      },
+      sentenceOffset
+    );
   }, [
     hasStartedClass,
     activeStepIndex,
@@ -375,7 +780,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     lectureBeats,
     isRaisingHand,
     showLaptopSandbox,
-    isAutoPlayingLecture,
+    voiceEnabled,
     playProfessorVietnameseVoice
   ]);
 
@@ -412,21 +817,152 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     ]
   );
 
+  const pauseForQuestion = useCallback(() => {
+    if (!raisingHandRef.current) {
+      const isAssessmentBeat = currentBeat?.boardMode === 'question';
+      const autoPlay = lectureAutoPlayRef.current;
+      resumeAfterQuestionRef.current = {
+        stepIndex: activeStepIndex,
+        beatIndex: activeBeatIndex,
+        sentenceIndex: activeNarrationSentenceIndexRef.current,
+        autoPlay,
+        shouldResumeAudio:
+          voiceEnabled && (isSpeaking || (autoPlay && !isAssessmentBeat))
+      };
+    }
+
+    raisingHandRef.current = true;
+    stopVietnameseSpeech();
+    setIsSpeaking(false);
+    setIsRaisingHand(true);
+    setLectureAutoPlay(false);
+  }, [activeBeatIndex, activeStepIndex, currentBeat?.boardMode, isSpeaking, setLectureAutoPlay, voiceEnabled]);
+
+  const finishQuestion = useCallback(
+    (passed = false, holdAtAssessment = false) => {
+      raisingHandRef.current = false;
+      setIsRaisingHand(false);
+      const resumePoint = resumeAfterQuestionRef.current;
+
+      if (passed) {
+        const nextStepIndex = activeStepIndex + 1;
+        const hasNextStep = nextStepIndex < checkpoints.length;
+        const hasNextBeat = activeBeatIndex + 1 < lectureBeats.length;
+        if (hasNextStep) {
+          resumeAfterQuestionRef.current = null;
+          setActiveStepIndex(nextStepIndex);
+          setActiveBeatIndex(0);
+          setLectureAutoPlay(true);
+        } else if (hasNextBeat) {
+          resumeAfterQuestionRef.current = null;
+          setActiveBeatIndex(activeBeatIndex + 1);
+          setLectureAutoPlay(true);
+        } else {
+          resumeAfterQuestionRef.current = {
+            stepIndex: activeStepIndex,
+            beatIndex: activeBeatIndex,
+            sentenceIndex: 0,
+            autoPlay: false,
+            shouldResumeAudio: false
+          };
+          setLectureAutoPlay(false);
+        }
+        return;
+      }
+
+      if (holdAtAssessment && resumePoint) {
+        resumeAfterQuestionRef.current = {
+          ...resumePoint,
+          autoPlay: false,
+          shouldResumeAudio: false
+        };
+        setLectureAutoPlay(false);
+        return;
+      }
+
+      setLectureAutoPlay(resumePoint?.autoPlay ?? false);
+    },
+    [activeBeatIndex, activeStepIndex, checkpoints.length, lectureBeats.length, setLectureAutoPlay]
+  );
+
+  const playCurrentBeatFromCurrentSentence = (autoAdvance: boolean) => {
+    if (!currentBeat) return;
+    const sentences = splitIntoVietnameseSentences(currentBeat.spokenScript);
+    const sentenceOffset = Math.min(
+      activeNarrationSentenceIndexRef.current,
+      Math.max(0, sentences.length - 1)
+    );
+    const narration = sentences.slice(sentenceOffset).join(' ');
+    const entryCount = currentBeat.instructorVisual
+      ? visualEntryCount(currentBeat.instructorVisual)
+      : 0;
+    setLectureAutoPlay(autoAdvance);
+    playProfessorVietnameseVoice(
+      narration,
+      () => {
+        if (
+          autoAdvance &&
+          voiceEnabled &&
+          lectureAutoPlayRef.current &&
+          currentBeat.boardMode !== 'question' &&
+          activeBeatIndex < lectureBeats.length - 1
+        ) {
+          setTimeout(() => {
+            setActiveBeatIndex((previous) => Math.min(previous + 1, lectureBeats.length - 1));
+          }, 650);
+        }
+      },
+      (sentenceIndex) => {
+        setVisualRevealCount(
+          Math.min(
+            entryCount,
+            Math.ceil(
+              ((sentenceOffset + sentenceIndex + 1) / Math.max(1, sentences.length)) *
+                entryCount
+            )
+          )
+        );
+      },
+      sentenceOffset
+    );
+  };
+
   // Start the live lecture session
   const handleStartLectureSession = () => {
     setHasStartedClass(true);
     setActiveBeatIndex(0);
-    setIsAutoPlayingLecture(true);
-    toast.success('Đã vào lớp học! Cô bắt đầu giảng bài...');
+    resumeAfterQuestionRef.current = null;
+    setLectureAutoPlay(true);
+    toast.success('Đã vào lớp học! Mình bắt đầu bài học nhé.');
   };
 
   // Switch to another Step in the lesson
   const handleSelectStep = (idx: number) => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setIsListeningMic(false);
+    tutorRequestControllerRef.current?.abort();
+    tutorRequestControllerRef.current = null;
+    const pendingAssistantId = pendingTutorAssistantIdRef.current;
+    if (pendingAssistantId) {
+      setQaHistory((previous) =>
+        previous.map((message) =>
+          message.id === pendingAssistantId
+            ? { ...message, content: 'Câu hỏi đã dừng khi mình chuyển sang phần khác.' }
+            : message
+        )
+      );
+    }
+    pendingTutorAssistantIdRef.current = null;
+    raisingHandRef.current = false;
+    resumeAfterQuestionRef.current = null;
     stopVietnameseSpeech();
+    setIsSpeaking(false);
     setActiveStepIndex(idx);
     setActiveBeatIndex(0);
+    setIsAiThinking(false);
     setIsRaisingHand(false);
-    setOverridePose(null);
+    setLectureAutoPlay(true);
     setOverrideBoardMode(null);
     setOverridePointIndex(null);
 
@@ -439,20 +975,31 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   // Student clicks "✋ Giơ Tay Hỏi Bài" to interrupt and ask a question
   const handleToggleRaiseHand = () => {
-    if (!isRaisingHand) {
-      stopVietnameseSpeech();
-      setIsRaisingHand(true);
-      setIsAutoPlayingLecture(false);
-      requestCameraPreset('instructor');
-      setOverridePose('listening_student');
-      const promptMsg =
-        'Cô thấy em giơ tay! Em chưa rõ chỗ nào ở phần này cứ bật mic nói bằng Tiếng Việt hoặc gõ câu hỏi cho cô nhé!';
-      playProfessorVietnameseVoice(promptMsg);
+    if (!raisingHandRef.current) {
+      pauseForQuestion();
     } else {
+      if (isAiThinking) {
+        tutorRequestControllerRef.current?.abort();
+        tutorRequestControllerRef.current = null;
+        setIsAiThinking(false);
+        const pendingAssistantId = pendingTutorAssistantIdRef.current;
+        if (pendingAssistantId) {
+          setQaHistory((previous) =>
+            previous.map((message) =>
+              message.id === pendingAssistantId
+                ? { ...message, content: 'Mình đã dừng câu hỏi theo yêu cầu.' }
+                : message
+            )
+          );
+        }
+        pendingTutorAssistantIdRef.current = null;
+      }
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setIsListeningMic(false);
       stopVietnameseSpeech();
-      setIsRaisingHand(false);
-      requestCameraPreset('pov');
-      setOverridePose(null);
+      setIsSpeaking(false);
+      finishQuestion(false, currentBeat?.boardMode === 'question');
     }
   };
 
@@ -471,15 +1018,12 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
     if (!SpeechRec) {
       toast.error(
-        'Trình duyệt hiện tại chưa hỗ trợ nhận diện giọng nói. Em hãy dùng Chrome hoặc Edge nhé!'
+        'Trình duyệt hiện tại chưa hỗ trợ nhận diện giọng nói. Bạn hãy dùng Chrome hoặc Edge nhé!'
       );
       return;
     }
 
-    stopVietnameseSpeech();
-    setIsRaisingHand(true);
-    setIsAutoPlayingLecture(false);
-    setOverridePose('listening_student');
+    pauseForQuestion();
 
     const recognition = new SpeechRec();
     recognition.lang = 'vi-VN';
@@ -495,10 +1039,12 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     };
 
     recognition.onerror = () => {
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
       setIsListeningMic(false);
     };
 
     recognition.onend = () => {
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
       setIsListeningMic(false);
     };
 
@@ -513,11 +1059,14 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       const content = (customQuestion ?? studentQuestionInput).trim();
       if (!content || isAiThinking) return;
 
+      pauseForQuestion();
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setIsListeningMic(false);
       stopVietnameseSpeech();
       setStudentQuestionInput('');
       setIsAiThinking(true);
-      setOverridePose('listening_student');
-      setLiveSubtitle('Cô đang suy nghĩ câu trả lời cho em...');
+      setLiveSubtitle('Mình đang soạn câu trả lời cho bạn...');
 
       const userMsg: ClassroomQaTurn = {
         id: `usr-${Date.now()}`,
@@ -526,29 +1075,57 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         createdAt: new Date().toISOString()
       };
       const assistantMsgId = `ai-${Date.now() + 1}`;
+      pendingTutorAssistantIdRef.current = assistantMsgId;
       const placeholderAiMsg: ClassroomQaTurn = {
         id: assistantMsgId,
         role: 'assistant',
-        content: '',
+        content: 'Đang soạn câu trả lời…',
         createdAt: new Date().toISOString()
       };
 
       const nextHistory = [...qaHistory, userMsg];
       setQaHistory([...nextHistory, placeholderAiMsg]);
 
-      const systemStageContext = `
-[CHẾ ĐỘ GIẢNG VIÊN TRỰC TIẾP TRÊN BẢNG THÔNG MINH — BẮT BUỘC NÓI TIẾNG VIỆT TỰ NHIÊN]
-- Bạn là Cô giáo / Giảng viên AI đang đứng cạnh Bảng Tương Tác Thông Minh dạy trực tiếp 1-1 cho học viên.
-- Bài học hiện tại: "${lesson.title}" (${course.title}).
-- Phần đang giảng trên bảng (Phần ${activeStepIndex + 1}/${checkpoints.length}): "${currentCheckpoint.title}".
-- Các ý chính đang chiếu trên bảng:
-${currentKeyPoints.map((kp, i) => `  ${i + 1}. ${kp}`).join('\n')}
-- Câu hỏi kiểm tra của phần này: "${currentCheckpoint.interactiveQuiz?.question || currentCheckpoint.socraticQuestion}"
+      const requestController = new AbortController();
+      tutorRequestControllerRef.current?.abort();
+      tutorRequestControllerRef.current = requestController;
 
-QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NÓI TIẾNG VIỆT TỰ NHIÊN):
-1. Xưng "cô", gọi học viên là "em". Trả lời ấm áp, rõ ràng, dễ hiểu như đang giảng bài trực tiếp trên lớp (không dùng markdown phức tạp hay bảng biểu dài dòng).
+      const isAssessmentBeat = currentBeat?.boardMode === 'question';
+      let streamedSpeechQueue: AsyncSentenceQueue | null = null;
+      let streamedSpeechRemainder = '';
+      let streamedSpeechPassed = false;
+      const activeKeyPoints = instructorPlan && !isAssessmentBeat && currentBeat?.slideTakeaway
+        ? [currentBeat.slideTakeaway]
+        : currentKeyPoints;
+      const activeBoardMarkdown = instructorPlan && !isAssessmentBeat && currentBeat
+        ? [
+            `### ${currentBeat.slideTitle}`,
+            currentBeat.slideSubtitle,
+            currentBeat.spokenScript,
+            currentBeat.slideTakeaway ? `Ý cốt lõi: ${currentBeat.slideTakeaway}` : ''
+          ].filter(Boolean).join('\n\n')
+        : currentCheckpoint.boardMarkdown;
+      const activeAssessmentQuestion = isAssessmentBeat
+        ? currentCheckpoint.interactiveQuiz?.question || currentCheckpoint.socraticQuestion
+        : 'Chưa đến lượt kiểm tra; tiếp tục giảng nội dung hiện tại.';
+
+      const systemStageContext = `
+[CHẾ ĐỘ TRỢ GIẢNG TRỰC TIẾP QUA BẢNG THÔNG MINH — NÓI TIẾNG VIỆT TỰ NHIÊN]
+- Bạn là người hướng dẫn thân thiện, đang học và giải thích cùng người học qua Bảng Tương Tác Thông Minh.
+- Bài học hiện tại: "${lesson.title}" (${course.title}).
+- Ý đang được giảng trên bảng: "${currentCheckpoint.shortTitle || currentCheckpoint.title}".
+- Nhịp đang diễn ra: "${currentBeat?.slideTitle || currentBeat?.label}" (${currentBeat?.boardMode || 'keypoints'}).
+- Lời giảng của slide hiện tại: "${currentBeat?.spokenScript || ''}".
+- Các ý chính đang chiếu trên bảng:
+${activeKeyPoints.map((kp, i) => `  ${i + 1}. ${kp}`).join('\n')}
+- Nội dung hỏi đáp hiện tại: "${activeAssessmentQuestion}"
+
+QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NAM TIẾNG VIỆT TỰ NHIÊN):
+1. Đây là cuộc trao đổi giữa giảng viên và học viên: luôn xưng "mình", gọi người học là "bạn"; không dùng "ĐẠI CA", "em", "thầy" hoặc "cô".
 2. Giải thích thẳng vào bản chất câu hỏi của học viên, liên hệ trực tiếp tới ý trên bảng.
-3. Nếu học viên đang trả lời câu hỏi kiểm tra và trả lời đúng ý cốt lõi, hãy khen ngợi nhiệt tình và kèm đúng thẻ \`[CHECKPOINT_PASSED]\` ở cuối câu trả lời.
+3. Chỉ đánh giá câu trả lời kiểm tra khi nhịp đang diễn ra là "question". Nếu học viên hỏi chen ngang lúc đang giảng, trả lời câu hỏi của họ rồi nối lại slide; không tự chuyển cuộc nói chuyện thành câu đố.
+4. Không đưa câu hỏi kiểm tra trước khi nội dung tương ứng đã được giảng xong. Khi nhịp là "question", đánh giá đúng/sai theo kiến thức trên bảng, chỉ ra phần hiểu đúng hoặc cần sửa; nếu đạt ý cốt lõi, kèm đúng thẻ \`[CHECKPOINT_PASSED]\` ở cuối câu trả lời.
+5. Nếu câu hỏi mơ hồ, hỏi lại một câu ngắn. Chỉ đặt câu hỏi gợi mở khi nó giúp làm rõ nội dung đang học.
 `;
 
       try {
@@ -558,6 +1135,7 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
           lesson.id,
           `Lớp học 1-1: ${lesson.title}`
         );
+        if (requestController.signal.aborted) return;
 
         const response = await fetch('/api/tutor', {
           method: 'POST',
@@ -566,12 +1144,24 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
             Accept: 'text/event-stream, application/json'
           },
           credentials: 'include',
+          signal: requestController.signal,
           body: JSON.stringify({
             sessionId,
+            mode: 'instructor-1on1',
+            courseTitle: course.title,
+            checkpoint: {
+              index: activeStepIndex + 1,
+              total: checkpoints.length,
+              title: currentCheckpoint.title,
+              boardMarkdown: activeBoardMarkdown,
+              socraticQuestion: isAssessmentBeat ? activeAssessmentQuestion : ''
+            },
             lesson: {
-              title: `${lesson.title} — [Lớp Học 1-1: ${currentCheckpoint.title}]`,
+              title: instructorPlan
+                ? lesson.title
+                : `${lesson.title} — [Lớp Học 1-1: ${currentCheckpoint.title}]`,
               tag: lesson.tag,
-              theory: `${systemStageContext}\n\n${currentCheckpoint.boardMarkdown}`,
+              theory: `${systemStageContext}\n\n${activeBoardMarkdown}`,
               realCodeSnippet:
                 currentCheckpoint.codeExcerpt || lesson.realCodeSnippet
             },
@@ -584,6 +1174,11 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
           })
         });
 
+        if (!response.ok) {
+          const failure = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(failure.error || `Không lấy được câu trả lời (HTTP ${response.status}).`);
+        }
+
         const contentType = response.headers.get('content-type') || '';
         let finalAccumulated = '';
 
@@ -592,6 +1187,14 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
           contentType.includes('text/event-stream') &&
           response.body
         ) {
+          if (voiceEnabled) {
+            streamedSpeechQueue = new AsyncSentenceQueue();
+            playProfessorVietnameseStream(streamedSpeechQueue, () => {
+              if (!raisingHandRef.current) return;
+              finishQuestion(streamedSpeechPassed, isAssessmentBeat);
+            });
+          }
+
           const reader = response.body.getReader();
           const decoder = new TextDecoder('utf-8');
           let buffer = '';
@@ -619,12 +1222,21 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                   const cleanChunk = finalAccumulated
                     .replace(/\[CHECKPOINT_PASSED\]/g, '')
                     .trim();
-                  setLiveSubtitle(cleanChunk);
+                  if (!streamedSpeechQueue) setLiveSubtitle(cleanChunk);
                   setQaHistory((prev) =>
                     prev.map((m) =>
                       m.id === assistantMsgId ? { ...m, content: cleanChunk } : m
                     )
                   );
+                  if (streamedSpeechQueue) {
+                    const extracted = extractCompleteSpeechSentences(
+                      streamedSpeechRemainder + parsed.text
+                    );
+                    streamedSpeechRemainder = extracted.remainder;
+                    extracted.sentences.forEach((sentence) =>
+                      streamedSpeechQueue?.push(sentence)
+                    );
+                  }
                 }
               } catch {
                 // ignore malformed SSE line
@@ -636,60 +1248,78 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
             reply?: string;
             error?: string;
           };
-          finalAccumulated =
-            json.reply ||
-            `Cô giải thích nhanh ý trọng tâm nhé: ${currentKeyPoints[0]}`;
+          if (json.error) throw new Error(json.error);
+          finalAccumulated = json.reply || '';
         }
 
         setIsAiThinking(false);
         const passed = finalAccumulated.includes('[CHECKPOINT_PASSED]');
+        streamedSpeechPassed = passed;
         const cleanSpoken = finalAccumulated
           .replace(/\[CHECKPOINT_PASSED\]/g, '')
           .trim();
+        if (!cleanSpoken) throw new Error('Giảng viên chưa tạo được câu trả lời.');
 
         setQaHistory((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId ? { ...m, content: cleanSpoken } : m
           )
         );
+        pendingTutorAssistantIdRef.current = null;
 
         if (passed) {
-          setOverridePose('celebrating');
           confetti({
             particleCount: 65,
             spread: 70,
             origin: { y: 0.65 }
           });
           markCurrentStepCompleted(currentCheckpoint.id, activeStepIndex);
-          toast.success(
-            `Tuyệt vời! Em đã vượt qua Phần ${activeStepIndex + 1}!`
-          );
-        } else {
-          setOverridePose('pointing_board');
+          toast.success('Tốt, mình đã ghi nhận câu trả lời. Bài giảng tiếp tục nhé.');
         }
 
-        playProfessorVietnameseVoice(cleanSpoken, () => {
-          setIsRaisingHand(false);
-          setOverridePose(null);
-        });
-      } catch {
+        if (streamedSpeechQueue) {
+          const extracted = extractCompleteSpeechSentences(streamedSpeechRemainder, true);
+          extracted.sentences.forEach((sentence) => streamedSpeechQueue?.push(sentence));
+          streamedSpeechQueue.close();
+        } else {
+          playProfessorVietnameseVoice(cleanSpoken, () => {
+            finishQuestion(passed, isAssessmentBeat);
+          });
+        }
+      } catch (error) {
+        if (requestController.signal.aborted) {
+          streamedSpeechQueue?.close();
+          return;
+        }
         setIsAiThinking(false);
-        const fallbackReply = `Cô giải thích trực tiếp ý này nhé: ${currentKeyPoints[0] || currentCheckpoint.summary}`;
+        tutorRequestControllerRef.current = null;
+        pendingTutorAssistantIdRef.current = null;
+        const errorMessage = error instanceof Error ? error.message : 'Không rõ nguyên nhân.';
+        const fallbackReply = 'Mình chưa lấy được câu trả lời lúc này. Mình giữ nguyên slide để bạn thử gửi lại câu hỏi nhé.';
         setQaHistory((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId ? { ...m, content: fallbackReply } : m
           )
         );
-        setOverridePose('pointing_board');
-        playProfessorVietnameseVoice(fallbackReply, () => {
-          setIsRaisingHand(false);
-          setOverridePose(null);
-        });
+        toast.error(`Chưa nhận được phản hồi từ trợ giảng: ${errorMessage}`);
+        if (streamedSpeechQueue) {
+          streamedSpeechQueue.push(fallbackReply);
+          streamedSpeechQueue.close();
+        } else {
+          playProfessorVietnameseVoice(fallbackReply, () => {
+            finishQuestion(false, isAssessmentBeat);
+          });
+        }
+      } finally {
+        if (tutorRequestControllerRef.current === requestController) {
+          tutorRequestControllerRef.current = null;
+        }
       }
     },
     [
       studentQuestionInput,
       isAiThinking,
+      pauseForQuestion,
       qaHistory,
       lesson.id,
       lesson.title,
@@ -699,15 +1329,23 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
       course.title,
       activeStepIndex,
       checkpoints.length,
+      activeBeatIndex,
+      lectureBeats.length,
       currentCheckpoint,
+      currentBeat,
       currentKeyPoints,
+      instructorPlan,
+      voiceEnabled,
       markCurrentStepCompleted,
-      playProfessorVietnameseVoice
+      finishQuestion,
+      playProfessorVietnameseVoice,
+      playProfessorVietnameseStream
     ]
   );
 
   // Student selects a 1-click Multiple Choice Answer on the Lecture Hall Question Overlay
   const handleSelectQuizOption = (optionIndex: number) => {
+    if (isAiThinking) return;
     const quiz = currentCheckpoint.interactiveQuiz;
     if (!quiz) return;
 
@@ -718,39 +1356,40 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
     }));
 
     if (isCorrect) {
-      setOverridePose('celebrating');
       confetti({
         particleCount: 70,
         spread: 65,
         origin: { y: 0.68 }
       });
 
+      raisingHandRef.current = false;
+      resumeAfterQuestionRef.current = null;
+      setIsRaisingHand(false);
+      setLectureAutoPlay(true);
+
       markCurrentStepCompleted(currentCheckpoint.id, activeStepIndex);
 
-      const praiseScript = `Chính xác tuyệt đối! ${quiz.explanation} Em nắm bài rất chắc. Cô trò mình chuyển sang phần tiếp theo nhé!`;
-      toast.success(
-        `Chính xác! Đã mở khóa Phần ${activeStepIndex + 1}/${checkpoints.length}`
-      );
+      const praiseScript = `Chính xác rồi. ${quiz.explanation} Mình nối tiếp mạch bài giảng nhé.`;
+      toast.success('Chính xác. Bài giảng tiếp tục.');
 
       playProfessorVietnameseVoice(praiseScript, () => {
-        setOverridePose(null);
         if (activeStepIndex < checkpoints.length - 1) {
           setActiveStepIndex((prev) => prev + 1);
           setActiveBeatIndex(0);
-          setIsAutoPlayingLecture(true);
+          setLectureAutoPlay(true);
+        } else if (activeBeatIndex < lectureBeats.length - 1) {
+          setActiveBeatIndex((prev) => Math.min(prev + 1, lectureBeats.length - 1));
+          setLectureAutoPlay(true);
         }
       });
     } else {
-      setOverridePose('pointing_board');
-      const hintScript = `Đáp án đó chưa chính xác rồi em ơi! Em nghe cô gợi ý lại nhé: ${quiz.explanation} Em thử chọn lại đáp án đúng xem nào!`;
-      toast.error('Chưa chính xác! Hãy nghe gợi ý của cô và chọn lại nhé.');
+      const hintScript = `Đáp án này chưa đúng. Mình gợi ý lại nhé: ${quiz.explanation} Bạn thử chọn lại đáp án xem sao.`;
+      toast.error('Chưa chính xác. Mình nghe gợi ý rồi thử lại nhé.');
       playProfessorVietnameseVoice(hintScript);
     }
   };
 
   // Derived Scene props
-  const effectivePose: InstructorStagePose =
-    overridePose || currentBeat?.pose || 'podium_speaking';
   const effectiveBoardMode: BoardDisplayMode =
     overrideBoardMode || currentBeat?.boardMode || 'keypoints';
   const effectivePointIndex =
@@ -773,167 +1412,111 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
       {/* =====================================================================
           1. TOP BRIGHT CLASSROOM HEADER BAR
          ===================================================================== */}
-      <header className="z-20 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/90 bg-white/95 px-4 py-2.5 shadow-xs backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <button
+      <header className="z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-stone-200/90 bg-white/95 px-3 py-1 shadow-xs backdrop-blur-md sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="auto"
             type="button"
             onClick={() => {
               stopVietnameseSpeech();
               onExitToLesson();
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-700 transition hover:border-sky-500 hover:bg-white hover:text-sky-700 cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-stone-50 px-2.5 py-1 text-xs font-bold text-stone-700 transition hover:border-sky-500 hover:bg-white hover:text-sky-700 cursor-pointer"
           >
             <ArrowLeft size={14} />
             Về Bài Học
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="ghost"
+            size="auto"
             type="button"
             onClick={() => {
               stopVietnameseSpeech();
               onExitToHub();
             }}
-            className="hidden rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-600 transition hover:border-stone-300 hover:text-stone-900 sm:inline-flex cursor-pointer"
+            className="hidden rounded-lg border border-stone-200 bg-white px-2 py-1 text-[11px] font-semibold text-stone-600 transition hover:border-stone-300 hover:text-stone-900 lg:inline-flex cursor-pointer"
           >
             Danh Sách Khóa Học
-          </button>
+          </Button>
 
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              LỚP HỌC TRỰC TIẾP 1-1
-            </span>
+          <div className="flex min-w-0 items-center gap-2">
+            {!instructorPlan && (
+              <span className="hidden items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 xl:inline-flex">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                LỚP TRỰC TIẾP
+              </span>
+            )}
             <h1 className="max-w-[220px] truncate text-sm font-extrabold text-stone-900 sm:max-w-[320px]">
               {lesson.title}
             </h1>
           </div>
         </div>
 
-        {/* Interactive Step Pills (Phần 1 -> Phần N) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-          {checkpoints.map((cp, idx) => {
-            const isCurrent = idx === activeStepIndex;
-            const isPassed = passedStepIds.includes(cp.id);
-            return (
-              <button
-                key={cp.id}
-                type="button"
-                onClick={() => handleSelectStep(idx)}
-                className={`relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
-                  isCurrent
-                    ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-2xs'
-                    : isPassed
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                      : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-white'
-                }`}
-              >
-                <span
-                  className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-extrabold ${
-                    isPassed
-                      ? 'bg-emerald-600 text-white'
-                      : isCurrent
-                        ? 'bg-sky-600 text-white'
-                        : 'bg-stone-200 text-stone-700'
-                  }`}
-                >
-                  {isPassed ? <Check size={10} strokeWidth={3} /> : idx + 1}
-                </span>
-                <span className="max-w-[115px] truncate">
-                  {cp.shortTitle || cp.title}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Camera Angle Switcher + Vietnamese Voice Controls */}
-        <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-1 rounded-lg border border-stone-200 bg-stone-100 p-1 lg:flex">
-            {(
-              [
-                { id: 'pov', label: 'Bàn Học', icon: Video },
-                { id: 'instructor', label: 'Cận Giảng Viên', icon: UserCheck },
-                { id: 'board', label: 'Phóng To Bảng', icon: Monitor },
-                { id: 'wide', label: 'Toàn Cảnh', icon: Maximize2 }
-              ] as const
-            ).map((cam) => {
-              const Icon = cam.icon;
-              const active = cameraPreset === cam.id;
+        {!instructorPlan && (
+          <div className="order-3 flex w-full items-center gap-1 overflow-x-auto py-0.5 lg:order-none lg:w-auto lg:max-w-[58vw]">
+            {checkpoints.map((cp, idx) => {
+              const isCurrent = idx === activeStepIndex;
+              const isPassed = passedStepIds.includes(cp.id);
               return (
-                <button
-                  key={cam.id}
+                <Button
+                  variant="ghost"
+                  size="auto"
+                  key={cp.id}
                   type="button"
-                  onClick={() => requestCameraPreset(cam.id)}
-                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold transition cursor-pointer ${
-                    active
-                      ? 'bg-sky-600 text-white shadow-2xs'
-                      : 'text-stone-600 hover:text-stone-900'
+                  onClick={() => handleSelectStep(idx)}
+                  className={`relative flex shrink-0 items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-bold transition cursor-pointer ${
+                    isCurrent
+                      ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-2xs'
+                      : isPassed
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                        : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-white'
                   }`}
-                  title={`Đổi góc nhìn: ${cam.label}`}
                 >
-                  <Icon size={12} />
-                  {cam.label}
-                </button>
+                  <span
+                    className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-extrabold ${
+                      isPassed
+                        ? 'bg-emerald-600 text-white'
+                        : isCurrent
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-stone-200 text-stone-700'
+                    }`}
+                  >
+                    {isPassed ? <Check size={10} strokeWidth={3} /> : idx + 1}
+                  </span>
+                  <span className="max-w-[92px] truncate">
+                    {cp.shortTitle || cp.title}
+                  </span>
+                </Button>
               );
             })}
           </div>
+        )}
 
-          {/* Vietnamese Voice Mute/Unmute */}
-          <button
-            type="button"
-            onClick={() => {
-              const next = !voiceEnabled;
-              setVoiceEnabled(next);
-              if (!next) {
-                stopVietnameseSpeech();
-                setIsSpeaking(false);
-                setVoiceAmplitude(0);
-              } else if (hasStartedClass && currentBeat) {
-                playProfessorVietnameseVoice(currentBeat.spokenScript);
-              }
-            }}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-              voiceEnabled
-                ? 'border-sky-300 bg-sky-50 text-sky-800'
-                : 'border-stone-300 bg-stone-100 text-stone-500'
-            }`}
-            title="Bật/Tắt giọng nói Tiếng Việt của Giảng Viên"
-          >
-            {voiceEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            <span className="hidden sm:inline">
-              {voiceEnabled ? 'Giọng Tiếng Việt' : 'Đã Tắt Tiếng'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              setSpeechRate((prev) =>
-                prev >= 1.25 ? 0.95 : Number((prev + 0.1).toFixed(2))
-              )
-            }
-            className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-[11px] font-extrabold text-stone-700 hover:border-stone-300 cursor-pointer"
-            title="Tốc độ giảng bài Tiếng Việt"
-          >
-            {speechRate}x
-          </button>
-        </div>
       </header>
 
       {/* =====================================================================
           2. MAIN BRIGHT DAYLIGHT CLASSROOM VIEWPORT
          ===================================================================== */}
       <div className="relative flex-1 overflow-hidden">
-        <LectureHall3DScene
+        <InteractiveSmartboardClassroom
           lessonTitle={lesson.title}
+          continuousLesson={Boolean(instructorPlan)}
           stepTitle={currentCheckpoint.title}
           stepIndex={activeStepIndex}
           totalSteps={checkpoints.length}
-          pose={effectivePose}
-          cameraPreset={cameraPreset}
           boardMode={effectiveBoardMode}
           keyPoints={currentKeyPoints}
           activePointIndex={effectivePointIndex}
+          slideTitle={currentBeat?.slideTitle}
+          slideTakeaway={currentBeat?.slideTakeaway}
+          slidePoints={currentBeat?.slidePoints}
+          slideSubtitle={currentBeat?.slideSubtitle}
+          instructorVisual={currentBeat?.instructorVisual}
+          visualRevealCount={visualRevealCount}
+          slideIndex={lectureBeats.slice(0, activeBeatIndex).filter((beat) => beat.boardMode === 'keypoints').length}
+          slideCount={lectureBeats.filter((beat) => beat.boardMode === 'keypoints').length}
           visualDiagramText={
             currentCheckpoint.visualMarkdown || currentCheckpoint.boardMarkdown
           }
@@ -945,38 +1528,33 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
             currentCheckpoint.interactiveQuiz?.question ||
             currentCheckpoint.socraticQuestion
           }
-          voiceAmplitude={voiceAmplitude}
-          isSpeaking={isSpeaking}
-          isListening={isListeningMic || isRaisingHand}
-          cameraSnap={cameraSnap}
-          onRequestCameraPreset={requestCameraPreset}
-          onOpenLaptop={() => {
-            stopVietnameseSpeech();
-            setShowLaptopSandbox(true);
-          }}
+          questionOptions={currentCheckpoint.interactiveQuiz?.options}
+          selectedQuestionOption={currentQuizAttempt?.selectedIndex}
+          correctQuestionOption={currentCheckpoint.interactiveQuiz?.correctIndex}
+          questionAnsweredCorrectly={currentQuizAttempt?.isCorrect}
+          onSelectQuestionOption={handleSelectQuizOption}
           onSelectBoardPoint={(ptIdx) => {
-            setIsAutoPlayingLecture(false);
+            if (isAiThinking) return;
+            pauseForQuestion();
             setOverrideBoardMode('keypoints');
-            setOverridePose('pointing_board');
             setOverridePointIndex(ptIdx);
             const selectedPt = currentKeyPoints[ptIdx] || '';
             void handleAskProfessor(
-              `Cô giải thích sâu hơn và cho ví dụ thực tế về mục số #${ptIdx + 1} trên bảng: "${selectedPt}" giúp em với ạ!`
+              `Giải thích sâu hơn và cho ví dụ thực tế về mục số #${ptIdx + 1} trên bảng này giúp mình nhé: "${selectedPt}"`
             );
           }}
           onSelectCodeLine={(lineIdx, lineText) => {
-            setIsAutoPlayingLecture(false);
+            if (isAiThinking) return;
+            pauseForQuestion();
             setSelectedCodeLine(lineIdx);
             setOverrideBoardMode('code');
-            setOverridePose('pointing_board');
             void handleAskProfessor(
-              `Cô giải thích giúp em dòng code số #${lineIdx + 1} trên bảng: "${lineText.trim()}" hoạt động như thế nào ạ?`
+              `Giải thích giúp mình dòng code số #${lineIdx + 1} trên bảng hoạt động thế nào: "${lineText.trim()}"`
             );
           }}
           onSwitchBoardMode={(mode) => {
-            setIsAutoPlayingLecture(false);
+            setLectureAutoPlay(false);
             setOverrideBoardMode(mode);
-            setOverridePose('pointing_board');
           }}
         />
 
@@ -997,313 +1575,190 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                 exit={{ scale: 0.94, y: 12 }}
                 className="max-w-xl rounded-3xl border border-stone-200 bg-white p-7 text-center shadow-2xl"
               >
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-600">
-                  <Sparkles size={32} />
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
+                  <BookOpen size={24} />
                 </div>
-                <span className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700">
-                  PHÒNG HỌC TRỰC TIẾP 1-1 · GIỌNG GIẢNG VIÊN TIẾNG VIỆT 100%
-                </span>
                 <h2 className="mt-3 text-2xl font-extrabold text-stone-900">
                   {lesson.title}
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-stone-600">
-                  Giảng viên sẽ trực tiếp đứng cạnh{' '}
-                  <strong className="text-sky-700">Bảng Tương Tác Thông Minh</strong>,
-                  giảng từng ý bằng{' '}
-                  <strong className="text-sky-700">Giọng Tiếng Việt</strong> và dùng que
-                  chỉ vào từng mục hoặc từng dòng code. Em có thể bấm trực tiếp vào bảng
-                  hoặc bấm{' '}
-                  <strong className="text-amber-700">
-                    &ldquo;✋ Giơ Tay Hỏi Bài&rdquo;
-                  </strong>{' '}
-                  bất cứ lúc nào!
+                  Mình bắt đầu từ một tình huống thực tế, rồi cùng lần theo từng cơ chế trên bảng.
                 </p>
 
-                <div className="mt-5 grid grid-cols-3 gap-2.5 text-left">
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                    <div className="text-[11px] font-extrabold text-sky-700">
-                      1. BẢNG THÔNG MINH
-                    </div>
-                    <p className="mt-1 text-xs text-stone-600">
-                      Lớp học sáng sủa, dễ nhìn; bấm vào mục nào trên bảng cô giảng ngay
-                      mục đó.
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                    <div className="text-[11px] font-extrabold text-amber-700">
-                      2. GIƠ TAY HỎI BÀI
-                    </div>
-                    <p className="mt-1 text-xs text-stone-600">
-                      Bật Mic nói Tiếng Việt hoặc gõ câu hỏi ngay khi chưa hiểu.
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                    <div className="text-[11px] font-extrabold text-emerald-700">
-                      3. CÔ HỎI - TRÒ ĐÁP
-                    </div>
-                    <p className="mt-1 text-xs text-stone-600">
-                      Cuối mỗi phần cô đặt câu hỏi kiểm tra ngay tại lớp học.
-                    </p>
-                  </div>
-                </div>
-
-                <button
+                <Button
+                  variant="ghost"
+                  size="auto"
                   type="button"
                   onClick={handleStartLectureSession}
                   className="mt-6 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-sky-600 to-emerald-600 px-6 py-4 text-base font-extrabold text-white shadow-lg shadow-sky-600/25 transition hover:brightness-105 cursor-pointer"
                 >
                   <Play size={20} fill="currentColor" />
-                  BẮT ĐẦU TIẾT HỌC (VÀO LỚP NGAY)
-                </button>
+                  Bắt đầu bài học
+                </Button>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* -----------------------------------------------------------------
-            FLOATING BEAT TIMELINE PILLS (Top-Left of Classroom)
+            CURRENT SLIDE PROGRESS
            ----------------------------------------------------------------- */}
-        {hasStartedClass && (
-          <div className="absolute left-4 top-3 z-20 flex flex-wrap items-center gap-1.5 rounded-2xl border border-stone-200 bg-white/95 p-1.5 shadow-md backdrop-blur-md">
-            {lectureBeats.map((beat, idx) => {
-              const isActive = idx === activeBeatIndex;
-              return (
-                <button
-                  key={beat.id}
-                  type="button"
-                  onClick={() => {
-                    stopVietnameseSpeech();
-                    setIsRaisingHand(false);
-                    setActiveBeatIndex(idx);
-                  }}
-                  className={`rounded-xl px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
-                    isActive
-                      ? 'bg-sky-600 text-white shadow-xs'
-                      : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
-                  }`}
-                >
-                  {idx + 1}. {beat.label}
-                </button>
-              );
-            })}
+        {hasStartedClass && !instructorPlan && (
+          <div className="absolute inset-x-0 top-0 z-20 h-0.5 bg-stone-200/70">
+            <div className="h-full bg-sky-500 transition-[width] duration-300" style={{ width: `${Math.round(((activeBeatIndex + 1) / lectureBeats.length) * 100)}%` }} />
           </div>
         )}
 
         {/* -----------------------------------------------------------------
-            INTERACTIVE IN-CLASS QUESTION POPUP (Light Mode Card)
-           ----------------------------------------------------------------- */}
-        <AnimatePresence>
-          {hasStartedClass &&
-            currentBeat?.boardMode === 'question' &&
-            !isRaisingHand &&
-            currentCheckpoint.interactiveQuiz && (
-              <motion.div
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 30 }}
-                className="absolute right-4 top-14 z-30 w-full max-w-md rounded-2xl border-2 border-amber-400 bg-white p-4 shadow-2xl"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-800">
-                    ⚡ CÔ ĐANG HỎI BÀI TẠI LỚP
-                  </span>
-                  {isCurrentStepPassed && (
-                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-600">
-                      <CheckCircle2 size={14} />
-                      Đã vượt qua
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-sm font-extrabold leading-snug text-stone-900">
-                  {currentCheckpoint.interactiveQuiz.question}
-                </p>
-
-                <div className="mt-3 space-y-1.5">
-                  {currentCheckpoint.interactiveQuiz.options.map((opt, oIdx) => {
-                    const isSelected =
-                      currentQuizAttempt?.selectedIndex === oIdx;
-                    const isCorrectOpt =
-                      oIdx === currentCheckpoint.interactiveQuiz?.correctIndex;
-
-                    let btnStyle =
-                      'border-stone-200 bg-stone-50 text-stone-800 hover:border-amber-400 hover:bg-amber-50/40';
-                    if (currentQuizAttempt) {
-                      if (isSelected && currentQuizAttempt.isCorrect) {
-                        btnStyle =
-                          'border-emerald-500 bg-emerald-50 text-emerald-950 font-semibold';
-                      } else if (isSelected && !currentQuizAttempt.isCorrect) {
-                        btnStyle =
-                          'border-rose-500 bg-rose-50 text-rose-950 font-semibold';
-                      } else if (currentQuizAttempt.isCorrect && isCorrectOpt) {
-                        btnStyle =
-                          'border-emerald-400 bg-emerald-50/60 text-emerald-900';
-                      }
-                    }
-
-                    return (
-                      <button
-                        key={oIdx}
-                        type="button"
-                        onClick={() => handleSelectQuizOption(oIdx)}
-                        className={`flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left text-xs transition cursor-pointer ${btnStyle}`}
-                      >
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-200/80 font-extrabold text-amber-900">
-                          {String.fromCharCode(65 + oIdx)}
-                        </span>
-                        <span className="flex-1 leading-relaxed">{opt}</span>
-                        {isSelected && currentQuizAttempt?.isCorrect && (
-                          <CheckCircle2
-                            size={15}
-                            className="shrink-0 text-emerald-600"
-                          />
-                        )}
-                        {isSelected && !currentQuizAttempt?.isCorrect && (
-                          <XCircle
-                            size={15}
-                            className="shrink-0 text-rose-600"
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-        </AnimatePresence>
-
-        {/* -----------------------------------------------------------------
             3. LIVE SUBTITLE & STUDENT DESK HUD (Warm Light Mode)
            ----------------------------------------------------------------- */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-3 pt-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-1 px-2 pb-1 pt-1 sm:px-3">
           {/* Live Spoken Vietnamese Subtitle Box */}
-          <div className="pointer-events-auto mb-2.5 w-full max-w-4xl rounded-2xl border border-stone-200/90 bg-white/95 px-5 py-2.5 shadow-xl backdrop-blur-md">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-4 items-end gap-0.5">
-                  {[0, 1, 2, 3, 4].map((bar) => {
-                    const barHeight = isSpeaking
-                      ? Math.max(
-                          25,
-                          Math.min(
-                            100,
-                            Math.round(
-                              (voiceAmplitude * 100 * ((bar % 3) + 1)) / 2
-                            )
-                          )
-                        )
-                      : 25;
-                    return (
-                      <span
-                        key={bar}
-                        style={{ height: `${barHeight}%` }}
-                        className={`w-1 rounded-full transition-all duration-75 ${
-                          isSpeaking ? 'bg-sky-600' : 'bg-stone-300'
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-700">
-                  {isAiThinking
-                    ? 'Cô đang suy nghĩ câu trả lời...'
-                    : isSpeaking
-                      ? 'Giảng Viên AI đang giảng (Tiếng Việt):'
-                      : isRaisingHand
-                        ? 'Cô đang lắng nghe em hỏi bài:'
-                        : 'Lời giảng tại lớp:'}
-                </span>
-              </div>
-
-              {/* Playback controls for current lecture beat */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isSpeaking) {
-                      stopVietnameseSpeech();
-                      setIsSpeaking(false);
-                      setIsAutoPlayingLecture(false);
-                    } else {
-                      setIsAutoPlayingLecture(true);
-                      playProfessorVietnameseVoice(
-                        currentBeat?.spokenScript || liveSubtitle
-                      );
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-100 px-2.5 py-1 text-[11px] font-bold text-stone-700 hover:border-sky-400 hover:bg-white cursor-pointer"
-                >
-                  {isSpeaking ? <Pause size={12} /> : <Play size={12} />}
-                  {isSpeaking ? 'Tạm dừng' : 'Nghe tiếp'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    playProfessorVietnameseVoice(
-                      currentBeat?.spokenScript || liveSubtitle
-                    )
-                  }
-                  className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-100 px-2 py-1 text-[11px] font-bold text-stone-700 hover:bg-white cursor-pointer"
-                  title="Nghe giảng lại câu này"
-                >
-                  <RotateCcw size={12} />
-                  Nghe lại
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopVietnameseSpeech();
-                    if (activeBeatIndex < lectureBeats.length - 1) {
-                      setActiveBeatIndex((prev) => prev + 1);
-                    } else if (activeStepIndex < checkpoints.length - 1) {
-                      handleSelectStep(activeStepIndex + 1);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1 text-[11px] font-extrabold text-sky-700 hover:bg-sky-100 cursor-pointer"
-                >
-                  Ý tiếp theo
-                  <SkipForward size={12} />
-                </button>
-              </div>
+          {hasStartedClass && (
+            <div className="pointer-events-auto flex w-full max-w-7xl items-center gap-2 rounded-xl border border-stone-200/90 bg-white/95 px-3 py-1.5 shadow-lg backdrop-blur-md">
+              <p className="line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-snug text-stone-800 sm:text-sm">
+                &ldquo;{liveSubtitle}&rdquo;
+              </p>
             </div>
-
-            <p className="mt-1 text-sm font-semibold leading-relaxed text-stone-800 sm:text-[15px]">
-              &ldquo;{liveSubtitle}&rdquo;
-            </p>
-          </div>
+          )}
 
           {/* Student Desk Interactive Controls Bar */}
-          <div className="pointer-events-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-stone-300/90 bg-white/95 p-2.5 shadow-xl backdrop-blur-md">
+          <div className="pointer-events-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-1.5 rounded-xl border border-stone-300/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md md:flex-nowrap">
             {/* Left Desk Actions: Raise Hand + Voice Mic */}
-            <div className="flex items-center gap-2">
-              <button
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="auto"
                 type="button"
+                aria-label={voiceEnabled ? 'Tắt giọng đọc' : 'Bật giọng đọc'}
+                aria-pressed={voiceEnabled}
+                onClick={() => {
+                  const next = !voiceEnabled;
+                  setVoiceEnabled(next);
+                  if (!next) {
+                    stopVietnameseSpeech();
+                    setIsSpeaking(false);
+                    if (raisingHandRef.current && !isAiThinking) {
+                      finishQuestion(false, currentBeat?.boardMode === 'question');
+                    }
+                  }
+                }}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition cursor-pointer ${voiceEnabled ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-stone-300 bg-stone-100 text-stone-500'}`}
+              >
+                {voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              </Button>
+
+              <Select
+                value={String(speechRate)}
+                onValueChange={(value) => setSpeechRate(Number(value))}
+              >
+                <SelectTrigger
+                  aria-label="Tốc độ đọc"
+                  size="sm"
+                  className="w-[72px] border-stone-300 bg-white px-2 text-[11px] font-bold text-stone-700 focus-visible:border-sky-500 focus-visible:ring-sky-500/20"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-stone-200 bg-white text-stone-800">
+                  {[0.85, 0.95, 1, 1.05, 1.15, 1.25, 1.35].map((rate) => (
+                    <SelectItem key={rate} value={String(rate)} className="focus:bg-sky-50 focus:text-sky-900">
+                      {rate}×
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="ghost"
+                size="auto"
+                type="button"
+                aria-label={isSpeaking ? 'Tạm dừng' : 'Nghe tiếp'}
+                onClick={() => {
+                  if (isSpeaking) {
+                    stopVietnameseSpeech();
+                    setIsSpeaking(false);
+                    setLectureAutoPlay(false);
+                  } else {
+                    playCurrentBeatFromCurrentSentence(true);
+                  }
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-100 text-stone-700 hover:border-sky-400 hover:bg-white cursor-pointer"
+              >
+                {isSpeaking ? <Pause size={14} /> : <Play size={14} />}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="auto"
+                type="button"
+                aria-label="Nghe lại"
+                onClick={() => playProfessorVietnameseVoice(currentBeat?.spokenScript || liveSubtitle)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-100 text-stone-700 hover:bg-white cursor-pointer"
+              >
+                <RotateCcw size={14} />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="auto"
+                type="button"
+                aria-label="Slide tiếp theo"
+                disabled={isRaisingHand || isAiThinking}
+                onClick={() => {
+                  stopVietnameseSpeech();
+                  if (activeBeatIndex < lectureBeats.length - 1) {
+                    setActiveBeatIndex((prev) => prev + 1);
+                  } else if (activeStepIndex < checkpoints.length - 1) {
+                    handleSelectStep(activeStepIndex + 1);
+                  }
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 cursor-pointer"
+              >
+                <SkipForward size={14} />
+              </Button>
+
+              <span className="mx-0.5 h-5 w-px bg-stone-200" />
+
+              <Button
+                variant="ghost"
+                size="auto"
+                type="button"
+                aria-pressed={isRaisingHand}
                 onClick={handleToggleRaiseHand}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition cursor-pointer ${
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-[11px] font-extrabold transition cursor-pointer ${
                   isRaisingHand
                     ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
                     : 'border border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100'
                 }`}
               >
                 <Hand size={16} />
-                {isRaisingHand ? 'Đang Giơ Tay Hỏi Cô' : '✋ Giơ Tay Hỏi Bài'}
-              </button>
+                {isAiThinking
+                  ? 'Đang soạn câu trả lời'
+                  : isListeningMic
+                    ? 'Đang nghe câu hỏi'
+                    : isRaisingHand && isSpeaking
+                      ? 'Đang trả lời'
+                      : isRaisingHand
+                        ? 'Đang hỏi bài'
+                        : 'Hỏi bài'}
+              </Button>
 
-              <button
+              <Button
+                variant="ghost"
+                size="auto"
                 type="button"
                 onClick={toggleMicrophoneSTT}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-extrabold transition cursor-pointer ${
+                disabled={isAiThinking}
+                className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-[11px] font-extrabold transition cursor-pointer ${
                   isListeningMic
                     ? 'border-rose-500 bg-rose-500 text-white animate-pulse'
                     : 'border-stone-300 bg-stone-50 text-stone-700 hover:border-sky-500 hover:bg-white'
                 }`}
-                title="Bật Mic nói trực tiếp bằng Tiếng Việt với Cô"
+                title="Bật mic để hỏi bằng tiếng Việt"
               >
                 {isListeningMic ? <MicOff size={15} /> : <Mic size={15} />}
-                {isListeningMic ? 'Đang nghe Tiếng Việt...' : '🎙️ Nói Tiếng Việt'}
-              </button>
+                {isListeningMic ? 'Đang nghe tiếng Việt...' : 'Nói tiếng Việt'}
+              </Button>
             </div>
 
             {/* Center Input: Ask Question or Answer Directly */}
@@ -1312,40 +1767,41 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                 e.preventDefault();
                 void handleAskProfessor();
               }}
-              className="flex min-w-[240px] flex-1 items-center gap-2"
+                className="flex min-w-[180px] flex-1 items-center gap-1.5"
             >
-              <input
+              <Input
                 type="text"
                 value={studentQuestionInput}
                 onChange={(e) => setStudentQuestionInput(e.target.value)}
                 onFocus={() => {
-                  if (!isRaisingHand) {
-                    stopVietnameseSpeech();
-                    setIsAutoPlayingLecture(false);
-                  }
+                  pauseForQuestion();
                 }}
-                placeholder="Hỏi trực tiếp cô giáo hoặc trả lời câu hỏi tại lớp..."
-                className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3.5 py-2 text-xs font-medium text-stone-900 placeholder-stone-400 focus:border-sky-500 focus:bg-white focus:outline-none"
+                placeholder="Hỏi thêm hoặc trả lời câu hỏi tại lớp..."
+                className="h-auto w-full rounded-lg border-stone-300 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus-visible:border-sky-500 focus-visible:bg-white focus-visible:ring-sky-500/20 md:text-xs"
               />
-              <button
+              <Button
+                variant="ghost"
+                size="auto"
                 type="submit"
                 disabled={!studentQuestionInput.trim() || isAiThinking}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-sky-500 disabled:opacity-40 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-extrabold text-white transition hover:bg-sky-500 disabled:opacity-40 cursor-pointer"
               >
                 <Send size={14} />
                 Gửi
-              </button>
+              </Button>
             </form>
 
             {/* Right Desk Actions: Open Student Laptop (Code Sandbox) & Notebook */}
-            <div className="flex items-center gap-2">
-              <button
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="auto"
                 type="button"
                 onClick={() => {
                   stopVietnameseSpeech();
                   setShowLaptopSandbox((prev) => !prev);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-extrabold transition cursor-pointer ${
+                className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-[11px] font-extrabold transition cursor-pointer ${
                   showLaptopSandbox
                     ? 'border-emerald-600 bg-emerald-600 text-white'
                     : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
@@ -1353,9 +1809,11 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
               >
                 <Laptop size={15} />
                 Laptop Thực Hành
-              </button>
+              </Button>
 
-              <button
+              <Button
+                variant="ghost"
+                size="auto"
                 type="button"
                 onClick={() => setShowNotebookDrawer((prev) => !prev)}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-white cursor-pointer"
@@ -1363,9 +1821,11 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
               >
                 <MessageSquare size={14} />
                 Sổ Tay ({qaHistory.length})
-              </button>
+              </Button>
 
-              <button
+              <Button
+                variant="ghost"
+                size="auto"
                 type="button"
                 onClick={() => {
                   onLessonCompleted(lesson.id);
@@ -1374,7 +1834,7 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                     spread: 80,
                     origin: { y: 0.6 }
                   });
-                  toast.success('Chúc mừng em đã hoàn thành tiết học 1-1!');
+                  toast.success('Chúc mừng bạn đã hoàn thành bài học!');
                 }}
                 className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-extrabold transition cursor-pointer ${
                   isLessonCompleted || progressPercentage >= 100
@@ -1384,7 +1844,7 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
               >
                 <CheckCircle2 size={14} />
                 {isLessonCompleted ? 'Đã Hoàn Thành' : 'Hoàn Thành'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1407,13 +1867,15 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                     Laptop Học Viên Trên Bàn Học — Thực Hành Live Sandbox
                   </span>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="auto"
                   type="button"
                   onClick={() => setShowLaptopSandbox(false)}
                   className="rounded-lg border border-stone-300 bg-white px-3 py-1 text-xs font-bold text-stone-700 hover:bg-stone-100 cursor-pointer"
                 >
                   Đóng Laptop (Quay lại nhìn Bảng Trắng)
-                </button>
+                </Button>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 <CodeSandboxTab
@@ -1426,7 +1888,7 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                       origin: { y: 0.6 }
                     });
                     toast.success(
-                      'Giảng Viên AI: Tuyệt vời! Em đã code vượt qua bài thực hành ngay tại lớp!'
+                      'Mình làm tốt lắm! Bạn đã hoàn thành phần thực hành.'
                     );
                   }}
                 />
@@ -1453,13 +1915,15 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                     Sổ Tay Lớp Học & Lịch Sử Hỏi Đáp
                   </span>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="auto"
                   type="button"
                   onClick={() => setShowNotebookDrawer(false)}
                   className="text-xs font-bold text-stone-500 hover:text-stone-900 cursor-pointer"
                 >
                   Đóng
-                </button>
+                </Button>
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -1481,8 +1945,8 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
 
                 {qaHistory.length === 0 ? (
                   <p className="py-6 text-center text-xs text-stone-500">
-                    Chưa có câu hỏi riêng nào. Em hãy bấm &ldquo;✋ Giơ Tay Hỏi Bài&rdquo;
-                    hoặc bấm vào mục bất kỳ trên bảng trắng để hỏi cô nhé!
+                    Chưa có câu hỏi riêng nào. Bạn hãy chọn &ldquo;Hỏi bài&rdquo;
+                    hoặc bấm vào nội dung trên bảng để hỏi thêm nhé!
                   </p>
                 ) : (
                   qaHistory.map((msg) => (
@@ -1496,8 +1960,8 @@ QUY TẮC PHẢN HỒI CỦA GIẢNG VIÊN TRÊN LỚP (TỐI ĐA 90–120 TỪ,
                     >
                       <div className="mb-1 text-[10px] font-extrabold uppercase text-stone-500">
                         {msg.role === 'user'
-                          ? 'Em hỏi tại lớp:'
-                          : 'Giảng Viên AI trả lời:'}
+                          ? 'Bạn hỏi tại lớp:'
+                          : 'Mình trả lời:'}
                       </div>
                       {msg.content}
                     </div>

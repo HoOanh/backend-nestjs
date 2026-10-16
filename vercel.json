@@ -6,11 +6,19 @@
     "api/tutor.js": {
       "maxDuration": 30
     },
+    "api/tts.js": {
+      "maxDuration": 60
+    },
+    "api/tts-stream.js": {
+      "maxDuration": 60
+    },
     "api/index.js": {
       "maxDuration": 15
     }
   },
   "routes": [
+    { "src": "/api/tts/stream", "dest": "/api/tts-stream.js" },
+    { "src": "/api/tts", "dest": "/api/tts.js" },
     { "src": "/api/tutor", "dest": "/api/tutor.js" },
     { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "handle": "filesystem" },

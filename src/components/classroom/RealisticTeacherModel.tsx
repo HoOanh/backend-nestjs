@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
-import type { InstructorStagePose } from './LectureHall3DScene.tsx';
+import type { InstructorStagePose } from './InteractiveSmartboardClassroom.tsx';
 
 export interface RealisticTeacherModelProps {
   pose: InstructorStagePose;

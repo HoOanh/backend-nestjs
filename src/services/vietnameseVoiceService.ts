@@ -1,6 +1,4 @@
-// Vietnamese Voice & Real-Time Lip-Sync Engine for 3D Lecture Hall
-// Uses /api/tts (Vietnamese Neural TTS) with Web Audio API AnalyserNode for 60fps 3D mouth lip-sync,
-// plus automatic fallback to Browser Native vi-VN SpeechSynthesis Voice (Linh / Google Tiếng Việt / HoaiMy).
+// Pre-generated Vietnamese lecture audio with Web Audio amplitude tracking.
 
 export interface SpeakVietnameseOptions {
   text: string;
@@ -15,29 +13,26 @@ export interface SpeakVietnameseOptions {
 let activeStopController: { cancelled: boolean } | null = null;
 let currentAudioElement: HTMLAudioElement | null = null;
 let sharedAudioContext: AudioContext | null = null;
-let cachedVietnameseVoice: SpeechSynthesisVoice | null = null;
+const activeAudioObjectUrls = new Set<string>();
+const activeStreamAudioSources = new Set<AudioBufferSourceNode>();
+let activeTtsRequest: AbortController | null = null;
+const INSTRUCTOR_AUDIO_MANIFEST_URL = '/assets/instructor-audio/c1-l1/manifest.json';
+const INSTRUCTOR_AUDIO_ENGINE = 'zerotts-0.1.5-quangminh-v1';
+let instructorAudioManifestPromise: Promise<Record<string, string>> | null = null;
 
 /**
- * Clean markdown, ASCII diagrams, and normalize common tech abbreviations
- * so Vietnamese TTS pronounces them naturally like a real Vietnamese lecturer.
+ * Remove visual-only markdown and ASCII diagrams while preserving technical names
+ * for the AI voice to pronounce as English terms.
  */
 export function normalizeTextForVietnameseSpeech(raw: string): string {
   return raw
     .replace(/```[\s\S]*?```/g, ' . Mở phần minh họa trên bảng. ')
     .replace(/`([^`]+)`/g, '$1')
     .replace(/[┌┐└┘├┤┬┴┼─│═║╔╗╚╝╠╣╦╩╬▲▼◀▶→←↑↓⚡🎯💡📌🔥✅❌✋🎙️]/g, ' ')
-    .replace(/[#*>_~|]/g, ' ')
-    .replace(/\bNestJS\b/gi, 'Nest J S')
-    .replace(/\bNode\.?js\b/gi, 'Node J S')
-    .replace(/\bIoC\b/g, 'I O C')
-    .replace(/\bJWT\b/g, 'J W T')
-    .replace(/\bSQL\b/g, 'S Q L')
-    .replace(/\bAPI\b/g, 'A P I')
-    .replace(/\bHTTP\b/g, 'H T T P')
-    .replace(/\bCPU\b/g, 'C P U')
-    .replace(/\bDTO\b/g, 'D T O')
-    .replace(/\bORM\b/g, 'O R M')
-    .replace(/\bCRUD\b/g, 'C R U D')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/[*_~|]/g, ' ')
+    .replace(/\bepoll_wait\b/g, 'epoll wait')
+    .replace(/\bprocess\.memoryUsage\b/g, 'process memory usage')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -73,60 +68,6 @@ export function splitIntoVietnameseSentences(text: string): string[] {
 }
 
 /**
- * Resolve the best available native Vietnamese voice in the browser.
- */
-export async function resolveNativeVietnameseVoice(): Promise<SpeechSynthesisVoice | null> {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return null;
-  }
-  if (cachedVietnameseVoice) return cachedVietnameseVoice;
-
-  const pickBestVoice = (
-    voices: SpeechSynthesisVoice[]
-  ): SpeechSynthesisVoice | null => {
-    const viVoices = voices.filter(
-      (v) =>
-        v.lang.toLowerCase().startsWith('vi') ||
-        v.name.toLowerCase().includes('viet') ||
-        v.name.toLowerCase().includes('tiếng việt') ||
-        v.name.toLowerCase().includes('linh') ||
-        v.name.toLowerCase().includes('hoaimy') ||
-        v.name.toLowerCase().includes('namminh')
-    );
-    if (viVoices.length === 0) return null;
-
-    // Prefer Google Tiếng Việt, Microsoft HoaiMy/NamMinh, or Apple Linh
-    const preferred = viVoices.find((v) =>
-      /google|natural|neural|hoaimy|namminh|linh/i.test(v.name)
-    );
-    return preferred || viVoices[0];
-  };
-
-  const immediate = window.speechSynthesis.getVoices();
-  const foundImmediate = pickBestVoice(immediate);
-  if (foundImmediate) {
-    cachedVietnameseVoice = foundImmediate;
-    return foundImmediate;
-  }
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      const voices = window.speechSynthesis.getVoices();
-      const chosen = pickBestVoice(voices);
-      cachedVietnameseVoice = chosen;
-      resolve(chosen);
-    };
-    window.speechSynthesis.addEventListener('voiceschanged', finish, {
-      once: true
-    });
-    setTimeout(finish, 650);
-  });
-}
-
-/**
  * Stop any ongoing Vietnamese speech playback immediately.
  */
 export function stopVietnameseSpeech(): void {
@@ -134,32 +75,43 @@ export function stopVietnameseSpeech(): void {
     activeStopController.cancelled = true;
     activeStopController = null;
   }
+  if (activeTtsRequest) {
+    activeTtsRequest.abort();
+    activeTtsRequest = null;
+  }
+  for (const source of activeStreamAudioSources) {
+    try {
+      source.stop();
+    } catch {
+      // The source may already have ended.
+    }
+  }
+  activeStreamAudioSources.clear();
   if (currentAudioElement) {
     try {
       currentAudioElement.pause();
-      currentAudioElement.src = '';
+      currentAudioElement.removeAttribute('src');
+      currentAudioElement.load();
     } catch {
       // Ignore cleanup errors
     }
     currentAudioElement = null;
   }
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch {
-      // Ignore speechSynthesis cancel errors
-    }
+  for (const audioUrl of activeAudioObjectUrls) {
+    URL.revokeObjectURL(audioUrl);
   }
+  activeAudioObjectUrls.clear();
 }
 
 /**
- * Play a single base64 MP3 data URI with Web Audio API real-time amplitude analysis for 3D lip-sync.
+ * Play a lesson audio asset with Web Audio API amplitude analysis.
  */
-async function playAudioDataUriWithLipSync(
-  dataUri: string,
+async function playAudioSourceWithLipSync(
+  audioSource: string,
   rate: number,
   controller: { cancelled: boolean },
-  onAmplitude?: (amplitude: number) => void
+  onAmplitude?: (amplitude: number) => void,
+  onProgress?: (progress: number) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (controller.cancelled) {
@@ -167,13 +119,14 @@ async function playAudioDataUriWithLipSync(
       return;
     }
 
-    const audio = new Audio(dataUri);
+    const audio = new Audio(audioSource);
     audio.playbackRate = Math.min(1.5, Math.max(0.8, rate));
     currentAudioElement = audio;
 
     let animFrameId = 0;
     let analyser: AnalyserNode | null = null;
     let dataArray: Uint8Array<ArrayBuffer> | null = null;
+    let settled = false;
 
     try {
       const AudioCtx =
@@ -227,10 +180,16 @@ async function playAudioDataUriWithLipSync(
     };
 
     const cleanup = () => {
+      if (settled) return;
+      settled = true;
       if (animFrameId) cancelAnimationFrame(animFrameId);
       onAmplitude?.(0);
       if (currentAudioElement === audio) {
         currentAudioElement = null;
+      }
+      if (activeAudioObjectUrls.has(audioSource)) {
+        URL.revokeObjectURL(audioSource);
+        activeAudioObjectUrls.delete(audioSource);
       }
     };
 
@@ -239,8 +198,21 @@ async function playAudioDataUriWithLipSync(
     };
 
     audio.onended = () => {
+      onProgress?.(1);
       cleanup();
       resolve();
+    };
+
+    audio.onpause = () => {
+      if (!controller.cancelled) return;
+      cleanup();
+      resolve();
+    };
+
+    audio.ontimeupdate = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        onProgress?.(Math.min(1, audio.currentTime / audio.duration));
+      }
     };
 
     audio.onerror = () => {
@@ -255,88 +227,279 @@ async function playAudioDataUriWithLipSync(
   });
 }
 
-/**
- * Fallback to Browser Native Vietnamese SpeechSynthesis (`vi-VN`) with simulated lip-sync.
- */
-async function speakWithNativeBrowserVietnamese(
-  sentences: string[],
-  rate: number,
-  controller: { cancelled: boolean },
-  options: SpeakVietnameseOptions
-): Promise<void> {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    options.onError?.('Trình duyệt không hỗ trợ phát giọng nói.');
-    options.onEnd?.();
-    return;
-  }
+async function getPreGeneratedInstructorAudio(text: string): Promise<string | null> {
+  if (!globalThis.crypto?.subtle) return null;
 
-  const viVoice = await resolveNativeVietnameseVoice();
-  window.speechSynthesis.cancel();
+  const keyMaterial = `${INSTRUCTOR_AUDIO_ENGINE}\0quangminh\0${text}`;
+  const digest = await globalThis.crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(keyMaterial)
+  );
+  const key = Array.from(new Uint8Array(digest), (value) =>
+    value.toString(16).padStart(2, '0')
+  ).join('');
 
-  for (let i = 0; i < sentences.length; i++) {
-    if (controller.cancelled) break;
-    const sentence = sentences[i];
-    options.onSentenceChange?.(sentence, i, sentences.length);
+  instructorAudioManifestPromise ??= fetch(INSTRUCTOR_AUDIO_MANIFEST_URL, {
+    // Revalidate the small manifest so updated lesson audio is not hidden by
+    // an old browser disk-cache entry.
+    cache: 'no-cache'
+  })
+    .then(async (response) => {
+      if (!response.ok) return {};
+      return (await response.json()) as Record<string, string>;
+    })
+    .catch(() => ({}));
 
-    await new Promise<void>((resolve) => {
-      if (controller.cancelled) {
-        resolve();
-        return;
-      }
-      const utterance = new SpeechSynthesisUtterance(sentence);
-      utterance.lang = 'vi-VN';
-      if (viVoice) {
-        utterance.voice = viVoice;
-      }
-      utterance.rate = Math.min(1.35, Math.max(0.85, rate));
-      utterance.pitch = 1.0;
+  const manifest = await instructorAudioManifestPromise;
+  return manifest[key] || null;
+}
 
-      let intervalId: ReturnType<typeof setInterval> | null = null;
-      const stopSim = () => {
-        if (intervalId) clearInterval(intervalId);
-        options.onAmplitude?.(0);
-      };
+interface StreamAudioSession {
+  context: AudioContext;
+  analyser: AnalyserNode;
+  scheduleCursor: number;
+}
 
-      utterance.onstart = () => {
-        intervalId = setInterval(() => {
-          if (controller.cancelled) {
-            stopSim();
-            return;
-          }
-          const t = performance.now() * 0.016;
-          const level =
-            Math.abs(Math.sin(t) * Math.sin(t * 0.43)) * 0.85 + 0.1;
-          options.onAmplitude?.(level);
-        }, 40);
-      };
-
-      utterance.onend = () => {
-        stopSim();
-        resolve();
-      };
-
-      utterance.onerror = () => {
-        stopSim();
-        resolve();
-      };
-
-      window.speechSynthesis.speak(utterance);
+async function requestZeroTtsAudio(
+  text: string,
+  controller: { cancelled: boolean }
+): Promise<string> {
+  const requestController = new AbortController();
+  activeTtsRequest = requestController;
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ text }),
+      signal: requestController.signal
     });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error || `ZeroTTS request thất bại (HTTP ${response.status}).`);
+    }
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.startsWith('audio/')) {
+      throw new Error('Backend ZeroTTS không trả về dữ liệu âm thanh hợp lệ.');
+    }
+    const audioUrl = URL.createObjectURL(await response.blob());
+    if (controller.cancelled) {
+      URL.revokeObjectURL(audioUrl);
+      throw new DOMException('Speech request was cancelled.', 'AbortError');
+    }
+    activeAudioObjectUrls.add(audioUrl);
+    return audioUrl;
+  } finally {
+    if (activeTtsRequest === requestController) activeTtsRequest = null;
   }
 }
 
-/**
- * Speak Vietnamese lecture content with real-time 3D lip-sync and live sentence subtitles.
- * Always prioritizes genuine Vietnamese TTS via /api/tts, with seamless fallback to native vi-VN voice.
- */
-export async function speakVietnamese(
-  options: SpeakVietnameseOptions
-): Promise<void> {
-  stopVietnameseSpeech();
+function createStreamAudioSession(): StreamAudioSession | null {
+  try {
+    const AudioCtx = window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return null;
+    sharedAudioContext ??= new AudioCtx();
+    const analyser = sharedAudioContext.createAnalyser();
+    analyser.fftSize = 128;
+    analyser.smoothingTimeConstant = 0.65;
+    analyser.connect(sharedAudioContext.destination);
+    return {
+      context: sharedAudioContext,
+      analyser,
+      scheduleCursor: sharedAudioContext.currentTime + 0.04
+    };
+  } catch {
+    return null;
+  }
+}
 
+async function streamZeroTtsSentence(
+  text: string,
+  rate: number,
+  controller: { cancelled: boolean },
+  session: StreamAudioSession
+): Promise<void> {
+  const requestController = new AbortController();
+  activeTtsRequest = requestController;
+  try {
+    const response = await fetch('/api/tts/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ text }),
+      signal: requestController.signal
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error || `ZeroTTS request thất bại (HTTP ${response.status}).`);
+    }
+    if (!response.body) throw new Error('ZeroTTS không trả luồng âm thanh.');
+    const sampleRate = Number(response.headers.get('X-Audio-Sample-Rate'));
+    if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+      throw new Error('ZeroTTS trả sample rate không hợp lệ.');
+    }
+
+    if (session.context.state === 'suspended') await session.context.resume();
+    const reader = response.body.getReader();
+    let pending = new Uint8Array(0);
+    try {
+      while (!controller.cancelled) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const combined = new Uint8Array(pending.length + value.length);
+        combined.set(pending);
+        combined.set(value, pending.length);
+        pending = combined;
+
+        while (pending.length >= 4) {
+          const frameSize = new DataView(
+            pending.buffer,
+            pending.byteOffset,
+            pending.byteLength
+          ).getUint32(0, false);
+          if (frameSize <= 0 || frameSize > 4_000_000 || frameSize % 2 !== 0) {
+            throw new Error('ZeroTTS trả khung âm thanh không hợp lệ.');
+          }
+          if (pending.length < frameSize + 4) break;
+
+          const pcm = new DataView(
+            pending.buffer,
+            pending.byteOffset + 4,
+            frameSize
+          );
+          const sampleCount = frameSize / 2;
+          const audioBuffer = session.context.createBuffer(1, sampleCount, sampleRate);
+          const samples = audioBuffer.getChannelData(0);
+          for (let index = 0; index < sampleCount; index += 1) {
+            samples[index] = pcm.getInt16(index * 2, true) / 32768;
+          }
+          const source = session.context.createBufferSource();
+          source.buffer = audioBuffer;
+          source.playbackRate.value = Math.min(1.5, Math.max(0.8, rate));
+          source.connect(session.analyser);
+          const startAt = Math.max(session.scheduleCursor, session.context.currentTime + 0.025);
+          source.onended = () => activeStreamAudioSources.delete(source);
+          activeStreamAudioSources.add(source);
+          source.start(startAt);
+          session.scheduleCursor = startAt + audioBuffer.duration / source.playbackRate.value;
+          pending = pending.slice(frameSize + 4);
+        }
+      }
+      if (!controller.cancelled && pending.length > 0) {
+        throw new Error('ZeroTTS kết thúc giữa chừng một khung âm thanh.');
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  } finally {
+    if (activeTtsRequest === requestController) activeTtsRequest = null;
+  }
+}
+
+async function waitForStreamPlayback(
+  session: StreamAudioSession,
+  controller: { cancelled: boolean }
+): Promise<void> {
+  while (
+    !controller.cancelled &&
+    session.context.state === 'running' &&
+    session.context.currentTime < session.scheduleCursor
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+}
+
+async function playStreamedSentences(
+  sentenceStream: AsyncIterable<string>,
+  options: Omit<SpeakVietnameseOptions, 'text'>,
+  controller: { cancelled: boolean },
+  rate: number
+): Promise<void> {
+  const session = createStreamAudioSession();
+  let animationFrame = 0;
+  let sentenceIndex = 0;
+  let failed = false;
+  let dataArray: Uint8Array<ArrayBuffer> | null = null;
+
+  if (session) {
+    dataArray = new Uint8Array(new ArrayBuffer(session.analyser.frequencyBinCount));
+    const pumpAmplitude = () => {
+      if (controller.cancelled) return;
+      if (dataArray && session) {
+        session.analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let index = 1; index < Math.min(28, dataArray.length); index += 1) {
+          sum += dataArray[index];
+        }
+        options.onAmplitude?.(Math.min(1, Math.max(0, (sum / (dataArray.length * 255)) * 2.4)));
+      }
+      animationFrame = requestAnimationFrame(pumpAmplitude);
+    };
+    animationFrame = requestAnimationFrame(pumpAmplitude);
+  }
+
+  try {
+    for await (const rawSentence of sentenceStream) {
+      for (const sentence of splitIntoVietnameseSentences(rawSentence)) {
+        if (controller.cancelled) break;
+        options.onSentenceChange?.(sentence, sentenceIndex, sentenceIndex + 1);
+        sentenceIndex += 1;
+
+        const cursorBeforeSentence = session?.scheduleCursor ?? 0;
+        try {
+          if (!session) throw new Error('Web Audio không được trình duyệt hỗ trợ.');
+          await streamZeroTtsSentence(sentence, rate, controller, session);
+        } catch (error) {
+          if (controller.cancelled) break;
+          const partialAudioWasScheduled =
+            session !== null && session.scheduleCursor > cursorBeforeSentence;
+          if (partialAudioWasScheduled) {
+            failed = true;
+            options.onError?.(
+              error instanceof Error ? error.message : 'Luồng âm thanh bị ngắt giữa chừng.'
+            );
+            continue;
+          }
+          if (session) await waitForStreamPlayback(session, controller);
+          if (controller.cancelled) break;
+          try {
+            const audioUrl = await requestZeroTtsAudio(sentence, controller);
+            await playAudioSourceWithLipSync(audioUrl, rate, controller, options.onAmplitude);
+          } catch (fallbackError) {
+            failed = true;
+            options.onError?.(
+              fallbackError instanceof Error
+                ? fallbackError.message
+                : error instanceof Error
+                  ? error.message
+                  : 'Không thể phát giọng đọc tiếng Việt.'
+            );
+          }
+        }
+      }
+      if (controller.cancelled) break;
+    }
+    if (session) await waitForStreamPlayback(session, controller);
+    if (failed && !controller.cancelled) options.onAmplitude?.(0);
+  } finally {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    options.onAmplitude?.(0);
+  }
+}
+
+async function* iterateSentences(sentences: string[]): AsyncGenerator<string, void, undefined> {
+  for (const sentence of sentences) yield sentence;
+}
+
+/**
+ * Prefer pre-generated lesson audio. Uncached narration starts playback as
+ * ZeroTTS emits PCM frames; resuming after a question uses this same path.
+ */
+export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<void> {
+  stopVietnameseSpeech();
   const controller = { cancelled: false };
   activeStopController = controller;
-
   const rate = options.rate ?? 1.05;
   const cleanedText = normalizeTextForVietnameseSpeech(options.text);
   if (!cleanedText) {
@@ -345,64 +508,71 @@ export async function speakVietnamese(
   }
 
   options.onStart?.();
-
   try {
-    const response = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleanedText })
-    });
-
-    if (controller.cancelled) return;
-
-    if (response.ok) {
-      const payload = (await response.json()) as {
-        success?: boolean;
-        chunks?: string[];
-        audioChunks?: string[];
+    const sentences = splitIntoVietnameseSentences(cleanedText);
+    const audioSource = await getPreGeneratedInstructorAudio(cleanedText);
+    if (audioSource && !controller.cancelled) {
+      let currentSentenceIndex = -1;
+      const characterCount = sentences.reduce((total, sentence) => total + sentence.length, 0);
+      const publishProgress = (progress: number) => {
+        const targetCharacter = progress * characterCount;
+        let accumulated = 0;
+        const sentenceIndex = sentences.findIndex((sentence, index) => {
+          accumulated += sentence.length;
+          return targetCharacter <= accumulated || index === sentences.length - 1;
+        });
+        const safeIndex = Math.max(0, sentenceIndex);
+        if (safeIndex === currentSentenceIndex) return;
+        currentSentenceIndex = safeIndex;
+        options.onSentenceChange?.(sentences[safeIndex] || cleanedText, safeIndex, sentences.length);
       };
-
-      if (
-        payload.success &&
-        Array.isArray(payload.audioChunks) &&
-        payload.audioChunks.length > 0
-      ) {
-        const textChunks = payload.chunks || [];
-        for (let i = 0; i < payload.audioChunks.length; i++) {
-          if (controller.cancelled) break;
-          const currentSentence =
-            textChunks[i] || cleanedText.slice(0, 160);
-          options.onSentenceChange?.(
-            currentSentence,
-            i,
-            payload.audioChunks.length
-          );
-          await playAudioDataUriWithLipSync(
-            payload.audioChunks[i],
-            rate,
-            controller,
-            options.onAmplitude
-          );
-        }
-
-        if (!controller.cancelled) {
-          options.onAmplitude?.(0);
-          options.onEnd?.();
-        }
-        return;
+      try {
+        options.onSentenceChange?.(sentences[0] || cleanedText, 0, sentences.length);
+        await playAudioSourceWithLipSync(audioSource, rate, controller, options.onAmplitude, publishProgress);
+      } catch (error) {
+        if (controller.cancelled) return;
+        await playStreamedSentences(iterateSentences(sentences), options, controller, rate);
       }
+    } else if (!controller.cancelled) {
+      await playStreamedSentences(iterateSentences(sentences), options, controller, rate);
     }
-  } catch {
-    // Fall through to native Vietnamese browser voice if /api/tts fails
+
+    if (!controller.cancelled) options.onEnd?.();
+  } catch (error) {
+    if (!controller.cancelled) {
+      options.onError?.(
+        error instanceof Error ? error.message : 'Không thể phát giọng đọc tiếng Việt.'
+      );
+      options.onAmplitude?.(0);
+    }
+  } finally {
+    if (activeStopController === controller) activeStopController = null;
   }
+}
 
-  if (controller.cancelled) return;
-
-  const sentences = splitIntoVietnameseSentences(cleanedText);
-  await speakWithNativeBrowserVietnamese(sentences, rate, controller, options);
-
-  if (!controller.cancelled) {
-    options.onAmplitude?.(0);
-    options.onEnd?.();
+/**
+ * Stream completed tutor sentences into ZeroTTS while the model is still
+ * generating the rest of its response.
+ */
+export async function speakVietnameseStream(
+  sentenceStream: AsyncIterable<string>,
+  options: Omit<SpeakVietnameseOptions, 'text'>
+): Promise<void> {
+  stopVietnameseSpeech();
+  const controller = { cancelled: false };
+  activeStopController = controller;
+  options.onStart?.();
+  try {
+    await playStreamedSentences(sentenceStream, options, controller, options.rate ?? 1.05);
+    if (!controller.cancelled) options.onEnd?.();
+  } catch (error) {
+    if (!controller.cancelled) {
+      options.onError?.(
+        error instanceof Error ? error.message : 'Không thể phát giọng đọc tiếng Việt.'
+      );
+      options.onAmplitude?.(0);
+    }
+  } finally {
+    if (activeStopController === controller) activeStopController = null;
   }
 }

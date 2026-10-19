@@ -12,8 +12,14 @@ Vite khởi chạy sidecar ZeroTTS ở backend và trình duyệt gọi API cùn
 
 GIF minh họa ở slide I/O được nhúng trực tiếp từ bài [Node.js animated: Event Loop của Andrew Hu / Node Doctors](https://dev.to/nodedoctors/an-animated-guide-to-nodejs-event-loop-3g62); ứng dụng không lưu bản GIF tự dựng trong assets.
 
-## Production trên Vercel
+## Production: Cloud Run + Vercel
 
-Vercel chuyển `/api/tts` và `/api/tts/stream` tới Python Function trong `api/zerotts.py`. Function xác thực JWT `arc_session`, tải model ZeroTTS vào `/tmp` ở lần gọi đầu tiên, rồi giữ model trong bộ nhớ khi instance còn nóng. `requirements.txt` khai báo dependency cho Python runtime của Vercel; `.python-version` chọn Python 3.13. Luồng này không cần `ZEROTTS_URL` hay `ZEROTTS_API_KEY`.
+ZeroTTS chạy trong container Cloud Run; Docker build tải model vào `/opt/zerotts-model`, vì vậy request không tải model vào `/tmp`. Hướng dẫn tạo image và deploy nằm trong repo riêng `zerotts-cloudrun`.
 
-Request đầu tiên trên instance mới có thể lâu do tải và làm nóng model. Audio beat kế tiếp được tổng hợp trong lúc beat hiện tại đang phát, nhờ vậy thời gian tạo TTS được chồng lên thời gian nghe. Nếu chưa có frame đầu tiên khi chuyển beat, người học vẫn nghe một khoảng đệm chờ ZeroTTS tạo frame đó; các frame sau được phát theo luồng, không đợi toàn bộ câu hoặc beat tải xong. Theo dõi Function Logs và Usage nếu cold start hoặc giới hạn tài nguyên Vercel ảnh hưởng thời gian phản hồi.
+Vercel tiếp tục xác thực `arc_session` ở `/api/tts` và `/api/tts/stream`, sau đó proxy request sang Cloud Run. Sau khi deploy Cloud Run, cấu hình các biến trong Vercel:
+
+- `ZEROTTS_URL`: URL HTTPS của Cloud Run service.
+- `ZEROTTS_API_KEY`: cùng khóa bí mật đã cấu hình cho Cloud Run.
+- `VITE_ZEROTTS_ENABLED=true`: bật lời đọc ZeroTTS trên frontend production; cần redeploy frontend để áp dụng.
+
+Nếu chưa bật `VITE_ZEROTTS_ENABLED`, production tiếp tục dùng giọng tiếng Việt cài trong trình duyệt. Local dev vẫn khởi chạy sidecar ZeroTTS như trước.

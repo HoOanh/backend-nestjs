@@ -31,6 +31,13 @@ SYNTHESIS_LOCK = threading.Lock()
 
 
 def materialize_model_snapshot() -> Path:
+    configured_model_dir = os.environ.get("ZEROTTS_MODEL_DIR")
+    if configured_model_dir:
+        model_dir = Path(configured_model_dir).expanduser()
+        if not model_dir.is_dir():
+            raise FileNotFoundError(f"Configured ZeroTTS model directory not found: {model_dir}")
+        return model_dir
+
     snapshot = Path(
         snapshot_download(
             MODEL_REPO,
@@ -191,8 +198,6 @@ class ZeroTTSRequestHandler(BaseHTTPRequestHandler):
                             self._write_stream_frame(audio_chunk, sentence_index)
                     if sentence_index < len(sentences) - 1:
                         self._write_stream_frame(silence, sentence_index)
-                    if sentence_index < len(sentences) - 1:
-                        self._write_stream_frame(silence, sentence_index)
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
@@ -229,8 +234,8 @@ class ZeroTTSRequestHandler(BaseHTTPRequestHandler):
 def main() -> None:
     global MODEL
     MODEL = load_model()
-    host = os.environ.get("ZEROTTS_HOST", "127.0.0.1")
-    port = int(os.environ.get("ZEROTTS_PORT", "4179"))
+    host = os.environ.get("ZEROTTS_HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", os.environ.get("ZEROTTS_PORT", "8080")))
     server = ThreadingHTTPServer((host, port), ZeroTTSRequestHandler)
     print(f"ZeroTTS ready at http://{host}:{port} (voice={VOICE})", flush=True)
     server.serve_forever()

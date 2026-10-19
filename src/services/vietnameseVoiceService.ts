@@ -1,10 +1,12 @@
-// Pre-generated Vietnamese lecture audio with Web Audio amplitude tracking.
+// ZeroTTS Vietnamese lecture audio with Web Audio amplitude tracking.
 
 export interface SpeakVietnameseOptions {
   text: string;
   rate?: number;
   onStart?: () => void;
   onSentenceChange?: (sentence: string, index: number, total: number) => void;
+  onSentenceEnd?: (sentence: string, index: number, total: number) => void;
+  onAudioReady?: () => void;
   onAmplitude?: (amplitude: number) => void;
   onEnd?: () => void;
   onError?: (errMessage: string) => void;
@@ -16,9 +18,7 @@ let sharedAudioContext: AudioContext | null = null;
 const activeAudioObjectUrls = new Set<string>();
 const activeStreamAudioSources = new Set<AudioBufferSourceNode>();
 let activeTtsRequest: AbortController | null = null;
-const INSTRUCTOR_AUDIO_MANIFEST_URL = '/assets/instructor-audio/c1-l1/manifest.json';
-const INSTRUCTOR_AUDIO_ENGINE = 'zerotts-0.1.5-quangminh-v1';
-let instructorAudioManifestPromise: Promise<Record<string, string>> | null = null;
+const preloadedTtsAudio = new Map<string, PreparedSpeechTask>();
 
 /**
  * Remove visual-only markdown and ASCII diagrams while preserving technical names
@@ -227,45 +227,75 @@ async function playAudioSourceWithLipSync(
   });
 }
 
-async function getPreGeneratedInstructorAudio(text: string): Promise<string | null> {
-  if (!globalThis.crypto?.subtle) return null;
-
-  const keyMaterial = `${INSTRUCTOR_AUDIO_ENGINE}\0quangminh\0${text}`;
-  const digest = await globalThis.crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(keyMaterial)
-  );
-  const key = Array.from(new Uint8Array(digest), (value) =>
-    value.toString(16).padStart(2, '0')
-  ).join('');
-
-  instructorAudioManifestPromise ??= fetch(INSTRUCTOR_AUDIO_MANIFEST_URL, {
-    // Revalidate the small manifest so updated lesson audio is not hidden by
-    // an old browser disk-cache entry.
-    cache: 'no-cache'
-  })
-    .then(async (response) => {
-      if (!response.ok) return {};
-      return (await response.json()) as Record<string, string>;
-    })
-    .catch(() => ({}));
-
-  const manifest = await instructorAudioManifestPromise;
-  return manifest[key] || null;
-}
-
 interface StreamAudioSession {
   context: AudioContext;
   analyser: AnalyserNode;
   scheduleCursor: number;
 }
 
+type PreparedSpeechEvent =
+  | { type: 'frame'; sentence: string; sentenceIndex: number; sampleRate: number; samples: Float32Array<ArrayBuffer> }
+  | { type: 'sentence-end'; sentence: string; sentenceIndex: number };
+
+class PreparedSpeechQueue {
+  private readonly events: PreparedSpeechEvent[] = [];
+  private readonly waiters: Array<() => void> = [];
+  private closed = false;
+  private discarded = false;
+  private failure: Error | null = null;
+
+  push(event: PreparedSpeechEvent): void {
+    if (this.closed || this.discarded) return;
+    this.events.push(event);
+    this.wakeReaders();
+  }
+
+  close(error?: unknown): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.failure = error instanceof Error ? error : error ? new Error(String(error)) : null;
+    this.wakeReaders();
+  }
+
+  discard(): void {
+    this.discarded = true;
+    this.events.length = 0;
+    this.close();
+  }
+
+  private wakeReaders(): void {
+    for (const wake of this.waiters.splice(0)) wake();
+  }
+
+  async *read(): AsyncGenerator<PreparedSpeechEvent, void, undefined> {
+    while (true) {
+      const event = this.events.shift();
+      if (event) {
+        yield event;
+        continue;
+      }
+      if (this.closed) {
+        if (this.failure) throw this.failure;
+        return;
+      }
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+  }
+}
+
+interface PreparedSpeechTask {
+  sentences: string[];
+  queue: PreparedSpeechQueue;
+  producer: Promise<void>;
+}
+
 async function requestZeroTtsAudio(
   text: string,
-  controller: { cancelled: boolean }
+  controller: { cancelled: boolean },
+  trackAsActive = true
 ): Promise<string> {
   const requestController = new AbortController();
-  activeTtsRequest = requestController;
+  if (trackAsActive) activeTtsRequest = requestController;
   try {
     const response = await fetch('/api/tts', {
       method: 'POST',
@@ -287,10 +317,29 @@ async function requestZeroTtsAudio(
       URL.revokeObjectURL(audioUrl);
       throw new DOMException('Speech request was cancelled.', 'AbortError');
     }
-    activeAudioObjectUrls.add(audioUrl);
+    if (trackAsActive) activeAudioObjectUrls.add(audioUrl);
     return audioUrl;
   } finally {
-    if (activeTtsRequest === requestController) activeTtsRequest = null;
+    if (trackAsActive && activeTtsRequest === requestController) activeTtsRequest = null;
+  }
+}
+
+/** Start one lookahead request while the current beat's audio is playing. */
+export function preloadVietnameseSpeech(rawText: string): void {
+  const text = normalizeTextForVietnameseSpeech(rawText);
+  if (!text || preloadedTtsAudio.has(text)) return;
+
+  const task = createPreparedSpeechTask(text);
+  preloadedTtsAudio.set(text, task);
+  void task.producer.catch(() => {
+    if (preloadedTtsAudio.get(text) === task) preloadedTtsAudio.delete(text);
+  });
+
+  while (preloadedTtsAudio.size > 1) {
+    const [oldestText, oldestTask] = preloadedTtsAudio.entries().next().value ?? [];
+    if (typeof oldestText !== 'string' || !oldestTask) break;
+    preloadedTtsAudio.delete(oldestText);
+    oldestTask.queue.discard();
   }
 }
 
@@ -318,16 +367,34 @@ async function streamZeroTtsSentence(
   text: string,
   rate: number,
   controller: { cancelled: boolean },
-  session: StreamAudioSession
+  session: StreamAudioSession,
+  onFirstFrame?: (startAt: number) => void
+): Promise<void> {
+  let sentenceStarted = false;
+  await fetchZeroTtsPcmFrames([text], controller, (samples, sampleRate) => {
+    if (session.context.state === 'suspended') void session.context.resume();
+    const { startAt } = schedulePcmFrame(samples, sampleRate, rate, session, controller);
+    if (!sentenceStarted) {
+      sentenceStarted = true;
+      onFirstFrame?.(startAt);
+    }
+  });
+}
+
+export async function fetchZeroTtsPcmFrames(
+  sentences: string[],
+  controller: { cancelled: boolean },
+  onFrame: (samples: Float32Array<ArrayBuffer>, sampleRate: number, sentenceIndex: number) => void,
+  trackAsActive = true
 ): Promise<void> {
   const requestController = new AbortController();
-  activeTtsRequest = requestController;
+  if (trackAsActive) activeTtsRequest = requestController;
   try {
     const response = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ sentences }),
       signal: requestController.signal
     });
     if (!response.ok) {
@@ -340,9 +407,9 @@ async function streamZeroTtsSentence(
       throw new Error('ZeroTTS trả sample rate không hợp lệ.');
     }
 
-    if (session.context.state === 'suspended') await session.context.resume();
     const reader = response.body.getReader();
     let pending = new Uint8Array(0);
+    let lastSentenceIndex = 0;
     try {
       while (!controller.cancelled) {
         const { done, value } = await reader.read();
@@ -352,38 +419,25 @@ async function streamZeroTtsSentence(
         combined.set(value, pending.length);
         pending = combined;
 
-        while (pending.length >= 4) {
-          const frameSize = new DataView(
-            pending.buffer,
-            pending.byteOffset,
-            pending.byteLength
-          ).getUint32(0, false);
+        while (pending.length >= 8) {
+          const frameHeader = new DataView(pending.buffer, pending.byteOffset, pending.byteLength);
+          const sentenceIndex = frameHeader.getUint32(0, false);
+          const frameSize = frameHeader.getUint32(4, false);
           if (frameSize <= 0 || frameSize > 4_000_000 || frameSize % 2 !== 0) {
             throw new Error('ZeroTTS trả khung âm thanh không hợp lệ.');
           }
-          if (pending.length < frameSize + 4) break;
+          if (sentenceIndex >= sentences.length) throw new Error('ZeroTTS trả chỉ mục câu không hợp lệ.');
+          if (sentenceIndex < lastSentenceIndex) throw new Error('ZeroTTS trả câu âm thanh sai thứ tự.');
+          if (pending.length < frameSize + 8) break;
 
-          const pcm = new DataView(
-            pending.buffer,
-            pending.byteOffset + 4,
-            frameSize
-          );
-          const sampleCount = frameSize / 2;
-          const audioBuffer = session.context.createBuffer(1, sampleCount, sampleRate);
-          const samples = audioBuffer.getChannelData(0);
-          for (let index = 0; index < sampleCount; index += 1) {
+          const pcm = new DataView(pending.buffer, pending.byteOffset + 8, frameSize);
+          const samples = new Float32Array(frameSize / 2);
+          for (let index = 0; index < samples.length; index += 1) {
             samples[index] = pcm.getInt16(index * 2, true) / 32768;
           }
-          const source = session.context.createBufferSource();
-          source.buffer = audioBuffer;
-          source.playbackRate.value = Math.min(1.5, Math.max(0.8, rate));
-          source.connect(session.analyser);
-          const startAt = Math.max(session.scheduleCursor, session.context.currentTime + 0.025);
-          source.onended = () => activeStreamAudioSources.delete(source);
-          activeStreamAudioSources.add(source);
-          source.start(startAt);
-          session.scheduleCursor = startAt + audioBuffer.duration / source.playbackRate.value;
-          pending = pending.slice(frameSize + 4);
+          onFrame(samples, sampleRate, sentenceIndex);
+          lastSentenceIndex = sentenceIndex;
+          pending = pending.slice(frameSize + 8);
         }
       }
       if (!controller.cancelled && pending.length > 0) {
@@ -393,8 +447,263 @@ async function streamZeroTtsSentence(
       reader.releaseLock();
     }
   } finally {
-    if (activeTtsRequest === requestController) activeTtsRequest = null;
+    if (trackAsActive && activeTtsRequest === requestController) activeTtsRequest = null;
   }
+}
+
+function scheduleFocusCallback(
+  callback: () => void,
+  context: AudioContext,
+  targetTime: number,
+  controller: { cancelled: boolean }
+): void {
+  const delay = Math.max(0, (targetTime - context.currentTime) * 1000);
+  window.setTimeout(() => {
+    if (!controller.cancelled) callback();
+  }, delay);
+}
+
+function schedulePcmFrame(
+  samples: Float32Array<ArrayBuffer>,
+  sampleRate: number,
+  rate: number,
+  session: StreamAudioSession,
+  controller: { cancelled: boolean }
+): { startAt: number; endAt: number } {
+  const audioBuffer = session.context.createBuffer(1, samples.length, sampleRate);
+  audioBuffer.copyToChannel(samples, 0);
+  const source = session.context.createBufferSource();
+  source.buffer = audioBuffer;
+  source.playbackRate.value = Math.min(1.5, Math.max(0.8, rate));
+  source.connect(session.analyser);
+  const startAt = Math.max(session.scheduleCursor, session.context.currentTime + 0.025);
+  source.onended = () => activeStreamAudioSources.delete(source);
+  activeStreamAudioSources.add(source);
+  source.start(startAt);
+  const endAt = startAt + audioBuffer.duration / source.playbackRate.value;
+  session.scheduleCursor = endAt;
+  return { startAt, endAt };
+}
+
+function createPreparedSpeechTask(text: string): PreparedSpeechTask {
+  const sentences = splitIntoVietnameseSentences(text);
+  const queue = new PreparedSpeechQueue();
+  const task: PreparedSpeechTask = {
+    sentences,
+    queue,
+    producer: Promise.resolve()
+  };
+  task.producer = (async () => {
+    try {
+      const controller = { cancelled: false };
+      let activeSentenceIndex = -1;
+      await fetchZeroTtsPcmFrames(sentences, controller, (samples, sampleRate, sentenceIndex) => {
+        if (activeSentenceIndex >= 0 && sentenceIndex !== activeSentenceIndex) {
+          queue.push({
+            type: 'sentence-end',
+            sentence: sentences[activeSentenceIndex],
+            sentenceIndex: activeSentenceIndex
+          });
+        }
+        activeSentenceIndex = sentenceIndex;
+        queue.push({
+          type: 'frame',
+          sentence: sentences[sentenceIndex],
+          sentenceIndex,
+          sampleRate,
+          samples
+        });
+      }, false);
+      if (activeSentenceIndex >= 0) {
+        queue.push({
+          type: 'sentence-end',
+          sentence: sentences[activeSentenceIndex],
+          sentenceIndex: activeSentenceIndex
+        });
+      }
+      queue.close();
+    } catch (error) {
+      queue.close(error);
+    }
+  })();
+  return task;
+}
+
+async function playPreparedTtsTask(
+  task: PreparedSpeechTask,
+  options: Omit<SpeakVietnameseOptions, 'text'>,
+  controller: { cancelled: boolean },
+  rate: number
+): Promise<void> {
+  const session = createStreamAudioSession();
+  if (!session) {
+    await task.producer;
+    await playPreparedPcmWithoutWebAudio(task, options, controller, rate);
+    return;
+  }
+  if (session.context.state === 'suspended') await session.context.resume();
+
+  const dataArray = new Uint8Array(new ArrayBuffer(session.analyser.frequencyBinCount));
+  let animationFrame = 0;
+  const pumpAmplitude = () => {
+    if (controller.cancelled) return;
+    session.analyser.getByteFrequencyData(dataArray);
+    let sum = 0;
+    for (let index = 1; index < Math.min(28, dataArray.length); index += 1) sum += dataArray[index];
+    options.onAmplitude?.(Math.min(1, Math.max(0, (sum / (dataArray.length * 255)) * 2.4)));
+    animationFrame = requestAnimationFrame(pumpAmplitude);
+  };
+  animationFrame = requestAnimationFrame(pumpAmplitude);
+
+  let activeSentenceIndex = -1;
+  let scheduledFrames = 0;
+  let streamFailure: Error | null = null;
+  try {
+    try {
+      for await (const event of task.queue.read()) {
+        if (controller.cancelled) break;
+        if (event.type === 'frame') {
+          const { startAt } = schedulePcmFrame(
+            event.samples,
+            event.sampleRate,
+            rate,
+            session,
+            controller
+          );
+          scheduledFrames += 1;
+          if (event.sentenceIndex !== activeSentenceIndex) {
+            activeSentenceIndex = event.sentenceIndex;
+            scheduleFocusCallback(
+              () => options.onSentenceChange?.(event.sentence, event.sentenceIndex, task.sentences.length),
+              session.context,
+              startAt,
+              controller
+            );
+          }
+        } else {
+          const endAt = session.scheduleCursor;
+          scheduleFocusCallback(
+            () => options.onSentenceEnd?.(event.sentence, event.sentenceIndex, task.sentences.length),
+            session.context,
+            endAt,
+            controller
+          );
+        }
+      }
+    } catch (error) {
+      streamFailure = error instanceof Error ? error : new Error(String(error));
+    }
+
+    if (streamFailure && scheduledFrames === 0 && !controller.cancelled) {
+      await playStreamedSentences(iterateSentences(task.sentences), options, controller, rate);
+      return;
+    }
+    options.onAudioReady?.();
+    await waitForStreamPlayback(session, controller);
+    if (streamFailure && !controller.cancelled) options.onError?.(streamFailure.message);
+  } finally {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    options.onAmplitude?.(0);
+  }
+}
+
+async function playPreparedPcmWithoutWebAudio(
+  task: PreparedSpeechTask,
+  options: Omit<SpeakVietnameseOptions, 'text'>,
+  controller: { cancelled: boolean },
+  rate: number
+): Promise<void> {
+  const sentenceFrames = task.sentences.map(() => [] as Float32Array<ArrayBuffer>[]);
+  const sentenceSamples = task.sentences.map(() => 0);
+  let sampleRate = 0;
+  for await (const event of task.queue.read()) {
+    if (event.type !== 'frame') continue;
+    sampleRate = event.sampleRate;
+    sentenceFrames[event.sentenceIndex].push(event.samples);
+    sentenceSamples[event.sentenceIndex] += event.samples.length;
+  }
+  if (controller.cancelled || sampleRate === 0) return;
+
+  const sampleCount = sentenceSamples.reduce((total, count) => total + count, 0);
+  const wav = new ArrayBuffer(44 + sampleCount * 2);
+  const view = new DataView(wav);
+  const writeAscii = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index));
+  };
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + sampleCount * 2, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, sampleCount * 2, true);
+  let sampleOffset = 44;
+  const sentenceEndTimes: number[] = [];
+  let elapsedSamples = 0;
+  for (const frames of sentenceFrames) {
+    for (const samples of frames) {
+      for (const sample of samples) {
+        view.setInt16(sampleOffset, Math.max(-32768, Math.min(32767, Math.round(sample * 32767))), true);
+        sampleOffset += 2;
+      }
+    }
+    elapsedSamples += frames.reduce((total, samples) => total + samples.length, 0);
+    sentenceEndTimes.push(elapsedSamples / sampleRate);
+  }
+
+  const audioUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+  const audio = new Audio(audioUrl);
+  audio.playbackRate = Math.min(1.5, Math.max(0.8, rate));
+  currentAudioElement = audio;
+  activeAudioObjectUrls.add(audioUrl);
+  let activeSentenceIndex = -1;
+  const updateSentenceFocus = () => {
+    const elapsed = audio.currentTime * audio.playbackRate;
+    const sentenceIndex = sentenceEndTimes.findIndex((endTime) => elapsed < endTime);
+    const nextIndex = sentenceIndex < 0 ? task.sentences.length - 1 : sentenceIndex;
+    if (nextIndex === activeSentenceIndex) return;
+    activeSentenceIndex = nextIndex;
+    options.onSentenceChange?.(task.sentences[nextIndex], nextIndex, task.sentences.length);
+  };
+  updateSentenceFocus();
+  options.onAudioReady?.();
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      audio.ontimeupdate = null;
+      audio.onended = null;
+      audio.onpause = null;
+      audio.onerror = null;
+      if (currentAudioElement === audio) currentAudioElement = null;
+      URL.revokeObjectURL(audioUrl);
+      activeAudioObjectUrls.delete(audioUrl);
+      options.onAmplitude?.(0);
+    };
+    audio.ontimeupdate = updateSentenceFocus;
+    audio.onended = () => {
+      cleanup();
+      resolve();
+    };
+    audio.onpause = () => {
+      if (!controller.cancelled) return;
+      cleanup();
+      resolve();
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error('Không phát được âm thanh ZeroTTS đã chuẩn bị.'));
+    };
+    void audio.play().catch((error: unknown) => {
+      cleanup();
+      reject(error);
+    });
+  });
 }
 
 async function waitForStreamPlayback(
@@ -420,6 +729,7 @@ async function playStreamedSentences(
   let animationFrame = 0;
   let sentenceIndex = 0;
   let failed = false;
+  let audioReadySent = false;
   let dataArray: Uint8Array<ArrayBuffer> | null = null;
 
   if (session) {
@@ -443,13 +753,27 @@ async function playStreamedSentences(
     for await (const rawSentence of sentenceStream) {
       for (const sentence of splitIntoVietnameseSentences(rawSentence)) {
         if (controller.cancelled) break;
-        options.onSentenceChange?.(sentence, sentenceIndex, sentenceIndex + 1);
+        const currentSentenceIndex = sentenceIndex;
         sentenceIndex += 1;
 
         const cursorBeforeSentence = session?.scheduleCursor ?? 0;
         try {
           if (!session) throw new Error('Web Audio không được trình duyệt hỗ trợ.');
-          await streamZeroTtsSentence(sentence, rate, controller, session);
+          await streamZeroTtsSentence(sentence, rate, controller, session, (sentenceStartAt) => {
+            scheduleFocusCallback(
+              () => options.onSentenceChange?.(sentence, currentSentenceIndex, sentenceIndex),
+              session.context,
+              sentenceStartAt,
+              controller
+            );
+          });
+          const sentenceEndAt = session.scheduleCursor;
+          const delay = Math.max(0, (sentenceEndAt - session.context.currentTime) * 1000);
+          window.setTimeout(() => {
+            if (!controller.cancelled) {
+              options.onSentenceEnd?.(sentence, currentSentenceIndex, sentenceIndex);
+            }
+          }, delay);
         } catch (error) {
           if (controller.cancelled) break;
           const partialAudioWasScheduled =
@@ -465,7 +789,13 @@ async function playStreamedSentences(
           if (controller.cancelled) break;
           try {
             const audioUrl = await requestZeroTtsAudio(sentence, controller);
+            options.onSentenceChange?.(sentence, currentSentenceIndex, sentenceIndex);
+            if (!audioReadySent) {
+              options.onAudioReady?.();
+              audioReadySent = true;
+            }
             await playAudioSourceWithLipSync(audioUrl, rate, controller, options.onAmplitude);
+            options.onSentenceEnd?.(sentence, currentSentenceIndex, sentenceIndex);
           } catch (fallbackError) {
             failed = true;
             options.onError?.(
@@ -480,6 +810,10 @@ async function playStreamedSentences(
       }
       if (controller.cancelled) break;
     }
+    if (!audioReadySent) {
+      options.onAudioReady?.();
+      audioReadySent = true;
+    }
     if (session) await waitForStreamPlayback(session, controller);
     if (failed && !controller.cancelled) options.onAmplitude?.(0);
   } finally {
@@ -493,8 +827,8 @@ async function* iterateSentences(sentences: string[]): AsyncGenerator<string, vo
 }
 
 /**
- * Prefer pre-generated lesson audio. Uncached narration starts playback as
- * ZeroTTS emits PCM frames; resuming after a question uses this same path.
+ * Stream each sentence's PCM as it is generated; the next beat is prepared
+ * while these scheduled frames are still playing.
  */
 export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<void> {
   stopVietnameseSpeech();
@@ -509,32 +843,12 @@ export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<
 
   options.onStart?.();
   try {
-    const sentences = splitIntoVietnameseSentences(cleanedText);
-    const audioSource = await getPreGeneratedInstructorAudio(cleanedText);
-    if (audioSource && !controller.cancelled) {
-      let currentSentenceIndex = -1;
-      const characterCount = sentences.reduce((total, sentence) => total + sentence.length, 0);
-      const publishProgress = (progress: number) => {
-        const targetCharacter = progress * characterCount;
-        let accumulated = 0;
-        const sentenceIndex = sentences.findIndex((sentence, index) => {
-          accumulated += sentence.length;
-          return targetCharacter <= accumulated || index === sentences.length - 1;
-        });
-        const safeIndex = Math.max(0, sentenceIndex);
-        if (safeIndex === currentSentenceIndex) return;
-        currentSentenceIndex = safeIndex;
-        options.onSentenceChange?.(sentences[safeIndex] || cleanedText, safeIndex, sentences.length);
-      };
-      try {
-        options.onSentenceChange?.(sentences[0] || cleanedText, 0, sentences.length);
-        await playAudioSourceWithLipSync(audioSource, rate, controller, options.onAmplitude, publishProgress);
-      } catch (error) {
-        if (controller.cancelled) return;
-        await playStreamedSentences(iterateSentences(sentences), options, controller, rate);
-      }
-    } else if (!controller.cancelled) {
-      await playStreamedSentences(iterateSentences(sentences), options, controller, rate);
+    const preparedTask = preloadedTtsAudio.get(cleanedText) ?? createPreparedSpeechTask(cleanedText);
+    preloadedTtsAudio.delete(cleanedText);
+
+    if (controller.cancelled) return;
+    if (preparedTask) {
+      await playPreparedTtsTask(preparedTask, options, controller, rate);
     }
 
     if (!controller.cancelled) options.onEnd?.();

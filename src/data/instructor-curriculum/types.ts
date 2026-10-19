@@ -6,11 +6,15 @@ export interface InstructorVisualNode {
   detail: string;
 }
 
+export type InstructorPresentationRole = 'title' | 'overview' | 'detail' | 'recap' | 'closing';
+export type InstructorFocusCue = 'highlight' | 'pointer' | 'circle' | 'none';
+
 export type InstructorVisual =
   | {
       kind: 'text-slide';
       eyebrow?: string;
       lead: string;
+      illustration?: { src: string; alt: string; caption?: string };
       metrics?: Array<{ value: string; label: string }>;
       points?: Array<{ title: string; detail: string }>;
       question?: string;
@@ -68,6 +72,9 @@ export interface InstructorSlide {
   narration: string;
   takeaway: string;
   visual: InstructorVisual;
+  presentationRole?: InstructorPresentationRole;
+  focusPlan?: InstructorFocusCue[];
+  focusSequence?: number[];
 }
 
 export interface InstructorSection {

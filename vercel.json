@@ -12,13 +12,16 @@
     "api/tts-stream.js": {
       "maxDuration": 60
     },
+    "api/zerotts.py": {
+      "maxDuration": 300
+    },
     "api/index.js": {
       "maxDuration": 15
     }
   },
   "routes": [
-    { "src": "/api/tts/stream", "dest": "/api/tts-stream.js" },
-    { "src": "/api/tts", "dest": "/api/tts.js" },
+    { "src": "/api/tts/stream", "dest": "/api/zerotts.py?mode=stream" },
+    { "src": "/api/tts", "dest": "/api/zerotts.py?mode=wav" },
     { "src": "/api/tutor", "dest": "/api/tutor.js" },
     { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "handle": "filesystem" },

@@ -60,7 +60,7 @@ async function startLocalService(): Promise<void> {
       '--python',
       '3.13',
       '--with-requirements',
-      path.join(root, 'requirements-instructor-audio.txt'),
+      path.join(root, 'requirements-zerotts.txt'),
       'python',
       path.join(root, 'scripts/zerotts-server.py')
     ],
@@ -148,15 +148,16 @@ export async function synthesizeWithZeroTts(text: string): Promise<ZeroTtsResult
   }
 }
 
-export async function streamWithZeroTts(text: string): Promise<Response> {
-  const cleanedText = text.trim();
-  if (!cleanedText) {
+export async function streamWithZeroTts(sentences: string[]): Promise<Response> {
+  const cleanedSentences = sentences.map((sentence) => sentence.trim()).filter(Boolean);
+  const characterCount = cleanedSentences.reduce((total, sentence) => total + sentence.length, 0);
+  if (cleanedSentences.length === 0) {
     return new Response(JSON.stringify({ error: 'Thiếu nội dung cần đọc.' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json; charset=utf-8' }
     });
   }
-  if (cleanedText.length > MAX_TEXT_CHARACTERS) {
+  if (characterCount > MAX_TEXT_CHARACTERS || cleanedSentences.length > 100) {
     return new Response(JSON.stringify({ error: 'Đoạn đọc vượt quá giới hạn 6.000 ký tự.' }), {
       status: 413,
       headers: { 'Content-Type': 'application/json; charset=utf-8' }
@@ -188,7 +189,7 @@ export async function streamWithZeroTts(text: string): Promise<Response> {
           ? { 'X-ZeroTTS-Key': process.env.ZEROTTS_API_KEY }
           : {})
       },
-      body: JSON.stringify({ text: cleanedText }),
+      body: JSON.stringify({ sentences: cleanedSentences }),
       signal: AbortSignal.timeout(SYNTHESIS_TIMEOUT_MS)
     });
     const headers = new Headers({

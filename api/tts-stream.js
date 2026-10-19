@@ -701,7 +701,7 @@ async function startLocalService() {
       "--python",
       "3.13",
       "--with-requirements",
-      path2.join(root, "requirements-instructor-audio.txt"),
+      path2.join(root, "requirements-zerotts.txt"),
       "python",
       path2.join(root, "scripts/zerotts-server.py")
     ],
@@ -724,15 +724,16 @@ async function startLocalService() {
   });
   return localStartup;
 }
-async function streamWithZeroTts(text) {
-  const cleanedText = text.trim();
-  if (!cleanedText) {
+async function streamWithZeroTts(sentences) {
+  const cleanedSentences = sentences.map((sentence) => sentence.trim()).filter(Boolean);
+  const characterCount = cleanedSentences.reduce((total, sentence) => total + sentence.length, 0);
+  if (cleanedSentences.length === 0) {
     return new Response(JSON.stringify({ error: "Thi\u1EBFu n\u1ED9i dung c\u1EA7n \u0111\u1ECDc." }), {
       status: 400,
       headers: { "Content-Type": "application/json; charset=utf-8" }
     });
   }
-  if (cleanedText.length > MAX_TEXT_CHARACTERS) {
+  if (characterCount > MAX_TEXT_CHARACTERS || cleanedSentences.length > 100) {
     return new Response(JSON.stringify({ error: "\u0110o\u1EA1n \u0111\u1ECDc v\u01B0\u1EE3t qu\xE1 gi\u1EDBi h\u1EA1n 6.000 k\xFD t\u1EF1." }), {
       status: 413,
       headers: { "Content-Type": "application/json; charset=utf-8" }
@@ -757,7 +758,7 @@ async function streamWithZeroTts(text) {
         "Content-Type": "application/json",
         ...process.env.ZEROTTS_API_KEY ? { "X-ZeroTTS-Key": process.env.ZEROTTS_API_KEY } : {}
       },
-      body: JSON.stringify({ text: cleanedText }),
+      body: JSON.stringify({ sentences: cleanedSentences }),
       signal: AbortSignal.timeout(SYNTHESIS_TIMEOUT_MS)
     });
     const headers = new Headers({
@@ -799,8 +800,8 @@ async function handler(request, response) {
       return;
     }
   }
-  const text = payload && typeof payload === "object" && "text" in payload && typeof payload.text === "string" ? payload.text : "";
-  const result = await streamWithZeroTts(text);
+  const sentences = payload && typeof payload === "object" && "sentences" in payload && Array.isArray(payload.sentences) && payload.sentences.every((sentence) => typeof sentence === "string") ? payload.sentences : payload && typeof payload === "object" && "text" in payload && typeof payload.text === "string" ? [payload.text] : [];
+  const result = await streamWithZeroTts(sentences);
   response.status(result.status);
   for (const [name, value] of result.headers) response.setHeader(name, value);
   if (!result.body) {

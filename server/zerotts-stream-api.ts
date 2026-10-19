@@ -47,12 +47,16 @@ export default async function handler(
     }
   }
 
-  const text =
-    payload && typeof payload === 'object' && 'text' in payload &&
-    typeof payload.text === 'string'
-      ? payload.text
-      : '';
-  const result = await streamWithZeroTts(text);
+  const sentences =
+    payload && typeof payload === 'object' && 'sentences' in payload &&
+    Array.isArray(payload.sentences) &&
+    payload.sentences.every((sentence: unknown) => typeof sentence === 'string')
+      ? payload.sentences
+      : payload && typeof payload === 'object' && 'text' in payload &&
+        typeof payload.text === 'string'
+        ? [payload.text]
+        : [];
+  const result = await streamWithZeroTts(sentences);
   response.status(result.status);
   for (const [name, value] of result.headers) response.setHeader(name, value);
 

@@ -133,16 +133,23 @@ class ZeroTTSRequestHandler(BaseHTTPRequestHandler):
                 return
 
             payload = json.loads(self.rfile.read(content_length))
-            text = payload.get("text") if isinstance(payload, dict) else None
-            if not isinstance(text, str) or not text.strip():
+            raw_sentences = payload.get("sentences") if isinstance(payload, dict) else None
+            if raw_sentences is None and isinstance(payload, dict):
+                raw_text = payload.get("text")
+                raw_sentences = [raw_text] if isinstance(raw_text, str) else None
+            if not isinstance(raw_sentences, list) or not raw_sentences or not all(
+                isinstance(sentence, str) and sentence.strip() for sentence in raw_sentences
+            ):
                 self._send_json(400, {"error": "Thiếu nội dung cần đọc."})
                 return
-            if len(text) > MAX_TEXT_CHARACTERS:
+            sentences = [sentence.strip() for sentence in raw_sentences]
+            if len(sentences) > 100 or sum(map(len, sentences)) > MAX_TEXT_CHARACTERS:
                 self._send_json(413, {"error": "Đoạn đọc vượt quá giới hạn 6.000 ký tự."})
                 return
+            text = " ".join(sentences)
 
             if stream_audio:
-                self._stream_synthesis(text)
+                self._stream_synthesis(sentences)
                 return
 
             with SYNTHESIS_LOCK:
@@ -159,14 +166,8 @@ class ZeroTTSRequestHandler(BaseHTTPRequestHandler):
             print(f"ZeroTTS synthesis failed: {error}", file=sys.stderr, flush=True)
             self._send_json(500, {"error": "ZeroTTS không tạo được giọng đọc."})
 
-    def _stream_synthesis(self, text: str) -> None:
+    def _stream_synthesis(self, sentences: list[str]) -> None:
         model = cast(ZeroTTS, MODEL)
-        normalized = normalize_punctuation(text)
-        segments = [
-            clean_segment_punctuation(segment)
-            for segment in chunk_text(normalized, max_chunk_sec=15)
-            if segment.strip()
-        ]
         silence = np.zeros(round(model.sample_rate * PAUSE_SECONDS), dtype=np.float32)
 
         self.send_response(200)
@@ -178,11 +179,20 @@ class ZeroTTSRequestHandler(BaseHTTPRequestHandler):
 
         try:
             with SYNTHESIS_LOCK:
-                for index, segment in enumerate(segments):
-                    for audio_chunk in model.synthesize_stream(segment, voice=VOICE):
-                        self._write_stream_frame(audio_chunk)
-                    if index < len(segments) - 1:
-                        self._write_stream_frame(silence)
+                for sentence_index, sentence in enumerate(sentences):
+                    normalized = normalize_punctuation(sentence)
+                    segments = [
+                        clean_segment_punctuation(segment)
+                        for segment in chunk_text(normalized, max_chunk_sec=15)
+                        if segment.strip()
+                    ]
+                    for segment in segments:
+                        for audio_chunk in model.synthesize_stream(segment, voice=VOICE):
+                            self._write_stream_frame(audio_chunk, sentence_index)
+                    if sentence_index < len(sentences) - 1:
+                        self._write_stream_frame(silence, sentence_index)
+                    if sentence_index < len(sentences) - 1:
+                        self._write_stream_frame(silence, sentence_index)
             self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
@@ -191,14 +201,14 @@ class ZeroTTSRequestHandler(BaseHTTPRequestHandler):
             print(f"ZeroTTS streaming failed: {error}", file=sys.stderr, flush=True)
             self.close_connection = True
 
-    def _write_stream_frame(self, samples: np.ndarray) -> None:
+    def _write_stream_frame(self, samples: np.ndarray, sentence_index: int) -> None:
         pcm = (
             np.clip(np.nan_to_num(np.asarray(samples).reshape(-1)), -1.0, 1.0)
             * 32767
         ).astype("<i2").tobytes()
         if not pcm:
             return
-        frame = len(pcm).to_bytes(4, byteorder="big") + pcm
+        frame = sentence_index.to_bytes(4, byteorder="big") + len(pcm).to_bytes(4, byteorder="big") + pcm
         self.wfile.write(f"{len(frame):X}\r\n".encode("ascii"))
         self.wfile.write(frame)
         self.wfile.write(b"\r\n")

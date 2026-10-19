@@ -32,7 +32,9 @@ import {
 import type {
   InstructorSection,
   InstructorSlide,
-  InstructorVisual
+  InstructorVisual,
+  InstructorFocusCue,
+  InstructorPresentationRole
 } from '../../data/instructor-curriculum/types.ts';
 import type { ClassroomCheckpointProgress } from '../../types/user.ts';
 import { chatDbService } from '../../services/db/chatDbService.ts';
@@ -40,6 +42,7 @@ import { MODEL_OPTIONS } from '../../context/TutorChatContext.tsx';
 import {
   speakVietnamese,
   speakVietnameseStream,
+  preloadVietnameseSpeech,
   stopVietnameseSpeech,
   splitIntoVietnameseSentences
 } from '../../services/vietnameseVoiceService.ts';
@@ -48,6 +51,7 @@ import {
   type BoardDisplayMode,
   visualEntryCount
 } from './InteractiveSmartboardClassroom.tsx';
+import { buildStableFocusSequence, resolveFocusSequenceIndex } from './focusSequence.ts';
 import { CodeSandboxTab } from '../lesson/CodeSandboxTab.tsx';
 import { Button } from '../ui/button.tsx';
 import { Input } from '../ui/input.tsx';
@@ -121,6 +125,114 @@ interface LectureBeat {
   slidePoints: string[];
   slideSubtitle?: string;
   instructorVisual?: InstructorVisual;
+  pauseAfterNarration?: boolean;
+  presentationRole?: InstructorPresentationRole;
+  focusPlan?: InstructorFocusCue[];
+  focusSequence?: number[];
+}
+
+function visualEntryLabels(visual: InstructorVisual): string[] {
+  switch (visual.kind) {
+    case 'text-slide':
+      return [
+        visual.lead,
+        ...(visual.metrics ?? []).map((metric) => `${metric.value} ${metric.label}`),
+        ...(visual.points ?? []).map((point) => `${point.title} ${point.detail}`),
+        ...(visual.question ? [visual.question] : [])
+      ];
+    case 'flow':
+    case 'cycle':
+      return visual.nodes.map((node) => `${node.title} ${node.detail}`);
+    case 'decision-tree':
+      return [visual.rootTitle, ...visual.branches.map((branch) => branch.condition)];
+    case 'architecture-comparison':
+      return [...visual.left.steps, ...visual.right.steps].map((node) => `${node.title} ${node.detail}`);
+    case 'comparison':
+      return visual.columns.flatMap((column) => column.points);
+    case 'latency-scale':
+      return visual.items.map((item) => `${item.title} ${item.label}`);
+    case 'timeline':
+      return visual.events.map((event) => `${event.time} ${event.actor} ${event.action}`);
+    case 'memory-map':
+    case 'process-memory':
+      return visual.regions.map((region) => `${region.title} ${region.detail}`);
+    case 'connection-model':
+      return visual.strategies.map((strategy) => `${strategy.title} ${strategy.resource} ${strategy.limitation}`);
+  }
+}
+
+function findNarrationFocusIndex(
+  visual: InstructorVisual,
+  sentence: string,
+  visibleCount: number,
+  fallbackIndex: number
+): number {
+  const visibleLabels = visualEntryLabels(visual).slice(0, visibleCount);
+  if (visibleLabels.length === 0) return -1;
+
+  const ignoredWords = new Set([
+    'nhung', 'trong', 'duoc', 'mot', 'cho', 'cua', 'voi', 'nay', 'khi', 'theo', 'dang', 'sau', 'truoc',
+    'va', 'la', 'thi', 'se', 'cac', 'nhieu', 'phan', 'giup', 'hay', 'minh', 'ban', 'ung', 'dung', 'tu'
+  ]);
+  const tokenize = (value: string) => value
+    .toLocaleLowerCase('vi')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .match(/[a-z0-9]+/g)
+    ?.filter((word) => word.length > 2 && !ignoredWords.has(word)) ?? [];
+  const sentenceWords = new Set(tokenize(sentence));
+  let bestIndex = -1;
+  let bestScore = 0;
+  let bestLabelSize = Number.POSITIVE_INFINITY;
+
+  visibleLabels.forEach((label, index) => {
+    const labelWords = tokenize(label);
+    const score = labelWords.reduce((total, word) => total + Number(sentenceWords.has(word)), 0);
+    if (score > bestScore || (score > 0 && score === bestScore && labelWords.length < bestLabelSize)) {
+      bestScore = score;
+      bestIndex = index;
+      bestLabelSize = labelWords.length;
+    }
+  });
+
+  return bestIndex >= 0 ? bestIndex : fallbackIndex;
+}
+
+function resolveNarrationFocusIndex(
+  beat: LectureBeat,
+  visual: InstructorVisual,
+  sentenceIndex: number,
+  sentence: string,
+  visibleCount: number,
+  previousIndex: number
+): number {
+  const plannedIndex = beat.focusSequence?.[sentenceIndex];
+  const matchedIndex = findNarrationFocusIndex(
+    visual,
+    sentence,
+    visibleCount,
+    -1
+  );
+  return resolveFocusSequenceIndex(plannedIndex, matchedIndex, visibleCount, previousIndex);
+}
+
+function prepareNarrationFocusSequences(beats: LectureBeat[]): LectureBeat[] {
+  return beats.map((beat) => {
+    const visual = beat.instructorVisual;
+    if (!visual) return beat;
+    const sentences = splitIntoVietnameseSentences(beat.spokenScript);
+    const visibleCount = visualEntryCount(visual);
+    const matchedIndexes = sentences.map((sentence, index) => {
+      const matchedIndex = findNarrationFocusIndex(visual, sentence, visibleCount, -1);
+      return matchedIndex >= 0
+        ? matchedIndex
+        : Math.floor(((index + 1) * visibleCount) / Math.max(1, sentences.length));
+    });
+    return {
+      ...beat,
+      focusSequence: buildStableFocusSequence(matchedIndexes, visibleCount, beat.focusSequence)
+    };
+  });
 }
 
 interface TeachingSlide {
@@ -136,6 +248,58 @@ interface LectureResumePoint {
   sentenceIndex: number;
   autoPlay: boolean;
   shouldResumeAudio: boolean;
+}
+
+function formatClassTime(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const paddedMinutes = String(minutes).padStart(2, '0');
+  const paddedSeconds = String(seconds).padStart(2, '0');
+  return hours > 0
+    ? `${String(hours).padStart(2, '0')}:${paddedMinutes}:${paddedSeconds}`
+    : `${paddedMinutes}:${paddedSeconds}`;
+}
+
+function ClassSessionProgress({ startedAt, durationMinutes, pausedDurationMs, pauseStartedAt }: Readonly<{
+  startedAt: number;
+  durationMinutes: number;
+  pausedDurationMs: number;
+  pauseStartedAt: number | null;
+}>) {
+  const [now, setNow] = useState(() => Date.now());
+  const durationSeconds = Math.max(1, durationMinutes * 60);
+  const currentPauseMs = pauseStartedAt === null ? 0 : now - pauseStartedAt;
+  const elapsedSeconds = Math.max(0, Math.floor((now - startedAt - pausedDurationMs - currentPauseMs) / 1000));
+  const remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
+  const percentage = Math.min(100, Math.round((elapsedSeconds / durationSeconds) * 100));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="pointer-events-auto w-full max-w-7xl px-1" aria-label="Tiến trình thời lượng buổi học">
+      <div className="mb-1 flex items-center justify-between gap-3 text-[10px] font-extrabold text-red-900 sm:text-xs">
+        <span>TIẾN TRÌNH BUỔI HỌC · {formatClassTime(elapsedSeconds)} · {percentage}%</span>
+        <span>CÒN {formatClassTime(remainingSeconds)} / {formatClassTime(durationSeconds)}</span>
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-red-100"
+        role="progressbar"
+        aria-label="Thời lượng buổi học"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percentage}
+      >
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-red-700 to-red-500 shadow-[0_0_8px_rgba(220,38,38,0.45)] transition-[width] duration-700"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 class AsyncSentenceQueue implements AsyncIterable<string> {
@@ -311,15 +475,62 @@ function buildLectureBeatsForStep(
   instructorSection?: InstructorSection,
   openingSlide?: InstructorSlide,
   roadmapSlide?: InstructorSlide,
-  closingSlide?: InstructorSlide
+  closingSlide?: InstructorSlide,
+  lessonTitle?: string
 ): LectureBeat[] {
   const beats: LectureBeat[] = [];
 
   if (instructorSection) {
-    const plannedSlides = [openingSlide, roadmapSlide, ...instructorSection.slides]
+    if (openingSlide) {
+      beats.push({
+        id: `${openingSlide.id}-title`,
+        label: 'Mở đầu bài học',
+        boardMode: 'keypoints',
+        pointIndex: 0,
+        codeLineIndex: 0,
+        slideTitle: lessonTitle?.replace(/^Bài\s+\d+\s*:\s*/i, '') || openingSlide.title,
+        slideSubtitle: 'BÀI 01 · MỞ ĐẦU',
+        slideTakeaway: '',
+        slidePoints: [],
+        spokenScript: `Xin chào, chào mừng đến với bài học ${lessonTitle || openingSlide.title}. Mình sẽ bắt đầu bằng một tình huống production rồi lần theo cơ chế phía sau.`,
+        presentationRole: 'title'
+      });
+      beats.push({
+        id: openingSlide.id,
+        label: 'Tình huống mở bài',
+        boardMode: 'keypoints',
+        pointIndex: 0,
+        codeLineIndex: 0,
+        slideTitle: 'Tình huống production',
+        slideTakeaway: openingSlide.takeaway,
+        slidePoints: [],
+        instructorVisual: openingSlide.visual,
+        spokenScript: openingSlide.narration,
+        presentationRole: 'detail',
+        focusPlan: openingSlide.focusPlan,
+        focusSequence: openingSlide.focusSequence
+      });
+    }
+
+    const plannedSlides = [roadmapSlide, ...instructorSection.slides]
       .filter((slide): slide is InstructorSlide => Boolean(slide));
 
     plannedSlides.forEach((slide, idx) => {
+      if (slide === instructorSection.slides[0]) {
+        beats.push({
+          id: `${instructorSection.id}-title`,
+          label: `Mở đầu: ${instructorSection.title}`,
+          boardMode: 'keypoints',
+          pointIndex: 0,
+          codeLineIndex: 0,
+          slideTitle: instructorSection.title,
+          slideTakeaway: '',
+          slidePoints: [],
+          spokenScript: `Mình chuyển sang phần ${instructorSection.title}. Mục tiêu là ${instructorSection.objective} Mình bắt đầu bằng khái niệm đầu tiên.`,
+          presentationRole: 'title'
+        });
+      }
+
       beats.push({
         id: slide.id,
         label: slide.title,
@@ -331,8 +542,45 @@ function buildLectureBeatsForStep(
         slidePoints: [],
         slideSubtitle: slide.subtitle,
         instructorVisual: slide.visual,
-        spokenScript: slide.narration
+        spokenScript: slide.narration,
+        presentationRole: slide.presentationRole || (slide === roadmapSlide ? 'overview' : 'detail'),
+        focusPlan: slide.focusPlan,
+        focusSequence: slide.focusSequence
       });
+    });
+
+    const recapTakeaways = instructorSection.slides
+      .map((slide) => slide.takeaway.trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    const recapLead = instructorSection.objective.trim();
+    const recapPoints = recapTakeaways.map((takeaway, idx) => ({
+      title: `Ý ${String(idx + 1).padStart(2, '0')}`,
+      detail: takeaway
+    }));
+    const recapConnection = recapTakeaways.length > 1
+      ? `Các ý này nối với nhau để trả lời mục tiêu: ${recapLead}`
+      : recapLead;
+    beats.push({
+      id: `${instructorSection.id}-recap`,
+      label: 'Cô đọng phần vừa học',
+      boardMode: 'keypoints',
+      pointIndex: 0,
+      codeLineIndex: 0,
+      slideTitle: 'Dừng lại và cô đọng',
+      slideTakeaway: '',
+      slidePoints: [],
+      slideSubtitle: 'Nhìn lại các ý vừa học, rồi tự nói lại bằng lời của mình.',
+      instructorVisual: {
+        kind: 'text-slide',
+        eyebrow: 'CÔ ĐỌNG SAU PHẦN HỌC',
+        lead: recapConnection,
+        points: recapPoints,
+        question: 'Nếu chỉ giữ lại một điều từ phần này, em sẽ nói điều gì?'
+      },
+      spokenScript: `Mình vừa đi qua ${instructorSection.title}. ${recapTakeaways.join(' ')} ${recapLead ? `Các ý này liên kết với nhau ở điểm: ${recapLead}` : ''} Bây giờ mình dừng một nhịp. Hãy tự nói lại ý quan trọng nhất bằng một hoặc hai câu, và nghĩ xem vì sao nó đúng. Khi sẵn sàng, mình tiếp tục với câu hỏi áp dụng.`,
+      pauseAfterNarration: true,
+      presentationRole: 'recap'
     });
 
     beats.push({
@@ -359,7 +607,8 @@ function buildLectureBeatsForStep(
         slidePoints: [],
         slideSubtitle: closingSlide.subtitle,
         instructorVisual: closingSlide.visual,
-        spokenScript: closingSlide.narration
+        spokenScript: closingSlide.narration,
+        presentationRole: 'closing'
       });
     }
     return beats;
@@ -371,6 +620,19 @@ function buildLectureBeatsForStep(
     checkpoint.keyPoints
   );
 
+  beats.push({
+    id: `${checkpoint.id}-title`,
+    label: `Mở đầu: ${checkpoint.shortTitle || checkpoint.title}`,
+    boardMode: 'keypoints',
+    pointIndex: 0,
+    codeLineIndex: 0,
+    slideTitle: checkpoint.shortTitle || checkpoint.title,
+    slideTakeaway: '',
+    slidePoints: [],
+    spokenScript: `Mình bắt đầu phần ${stepIdx + 1} trên ${totalSteps}: ${checkpoint.title}. Mục tiêu là ${checkpoint.summary}`,
+    presentationRole: 'title'
+  });
+
   // Start with an actual teaching slide, then progress through the lesson text.
   beats.push({
     id: `${checkpoint.id}-intro`,
@@ -381,7 +643,8 @@ function buildLectureBeatsForStep(
     slideTitle: 'Mục tiêu của phần học',
     slideTakeaway: 'Sau phần này, bạn cần nắm được ba ý cốt lõi bên dưới.',
     slidePoints: checkpoint.keyPoints.slice(0, 3),
-    spokenScript: `Mình và bạn bắt đầu phần ${stepIdx + 1} trên ${totalSteps}: ${checkpoint.title}. Trước hết, mục tiêu là hiểu được ý cốt lõi: ${checkpoint.summary}. Sau đó mình sẽ đi từng nội dung trên bảng, giải thích vì sao nó hoạt động như vậy và liên hệ với tình huống thực tế.`
+    spokenScript: `Trước hết, mục tiêu là hiểu được ý cốt lõi: ${checkpoint.summary}. Sau đó mình sẽ đi từng nội dung trên bảng, giải thích vì sao nó hoạt động như vậy và liên hệ với tình huống thực tế.`,
+    presentationRole: 'overview'
   });
 
   slides.forEach((slide, idx) => {
@@ -394,7 +657,8 @@ function buildLectureBeatsForStep(
       slideTitle: slide.title,
       slideTakeaway: slide.takeaway,
       slidePoints: slide.points,
-      spokenScript: `Mình cùng phân tích sâu hơn về ${slide.title}. ${slide.narration || slide.takeaway}`
+      spokenScript: `Mình cùng phân tích sâu hơn về ${slide.title}. ${slide.narration || slide.takeaway}`,
+      presentationRole: 'detail'
     });
   });
 
@@ -433,6 +697,32 @@ function buildLectureBeatsForStep(
     });
   }
 
+  const recapPoints = slides
+    .map((slide, idx) => ({ title: `Ý ${String(idx + 1).padStart(2, '0')}`, detail: slide.takeaway }))
+    .filter((point) => point.detail.trim())
+    .slice(0, 4);
+  beats.push({
+    id: `${checkpoint.id}-recap`,
+    label: 'Cô đọng phần vừa học',
+    boardMode: 'keypoints',
+    pointIndex: 0,
+    codeLineIndex: 0,
+    slideTitle: 'Dừng lại và cô đọng',
+    slideTakeaway: '',
+    slidePoints: [],
+    slideSubtitle: 'Nhìn lại các ý vừa học, rồi tự nói lại bằng lời của mình.',
+    instructorVisual: {
+      kind: 'text-slide',
+      eyebrow: 'CÔ ĐỌNG SAU PHẦN HỌC',
+      lead: checkpoint.summary,
+      points: recapPoints,
+      question: 'Nếu chỉ giữ lại một điều từ phần này, em sẽ nói điều gì?'
+    },
+    spokenScript: `Mình vừa học xong ${checkpoint.title}. ${recapPoints.map((point) => point.detail).join(' ')} Bây giờ mình dừng một nhịp. Hãy tự nói lại ý quan trọng nhất bằng một hoặc hai câu, rồi nghĩ xem nó giải thích được điều gì trong tình huống thực tế. Khi sẵn sàng, mình tiếp tục với câu hỏi áp dụng.`,
+    pauseAfterNarration: true,
+    presentationRole: 'recap'
+  });
+
   // Final Beat of the step: present a short check question
   const questionPrompt = checkpoint.interactiveQuiz
     ? checkpoint.interactiveQuiz.question
@@ -463,7 +753,7 @@ function toInstructorCheckpoint(section: InstructorSection, index: number): Teac
     keyPoints: section.slides.map((slide) => slide.takeaway),
     visualMarkdown: '',
     boardMarkdown: section.slides
-      .map((slide) => `### ${slide.title}\n\n${slide.narration}\n\nÝ cốt lõi: ${slide.takeaway}`)
+      .map((slide) => `### ${slide.title}\n\n${slide.narration}\n\nĐiểm cần nắm: ${slide.takeaway}`)
       .join('\n\n'),
     interactiveQuiz: section.check,
     socraticQuestion: section.check.question,
@@ -498,6 +788,9 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   // Lecture Session State
   const [hasStartedClass, setHasStartedClass] = useState(false);
+  const [classStartedAt, setClassStartedAt] = useState<number | null>(null);
+  const [classPausedAt, setClassPausedAt] = useState<number | null>(null);
+  const [classPausedDurationMs, setClassPausedDurationMs] = useState(0);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(() => {
     const savedIdx = savedClassroomProgress?.currentCheckpointIndex ?? 0;
     return Math.min(Math.max(0, savedIdx), Math.max(0, checkpoints.length - 1));
@@ -509,6 +802,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   );
   const [activeBeatIndex, setActiveBeatIndex] = useState(0);
   const [visualRevealCount, setVisualRevealCount] = useState(0);
+  const [visualFocusIndex, setVisualFocusIndex] = useState(-1);
 
   // Classroom Stage & Camera State
   const [overrideBoardMode, setOverrideBoardMode] =
@@ -520,7 +814,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   // Vietnamese Voice & Real-Time Lip-Sync State
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [speechRate, setSpeechRate] = useState<number>(1.05);
+  const [speechRate, setSpeechRate] = useState<number>(0.95);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [liveSubtitle, setLiveSubtitle] = useState<string>(
     'Nhấn "Bắt Đầu Tiết Học" để cùng học qua các slide có lời giải thích tiếng Việt.'
@@ -544,13 +838,22 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const raisingHandRef = useRef(false);
   const lectureAutoPlayRef = useRef(true);
   const activeNarrationSentenceIndexRef = useRef(0);
+  const activeNarrationFocusIndexRef = useRef(-1);
   const resumeAfterQuestionRef = useRef<LectureResumePoint | null>(null);
   const tutorRequestControllerRef = useRef<AbortController | null>(null);
   const pendingTutorAssistantIdRef = useRef<string | null>(null);
 
   const setLectureAutoPlay = useCallback((enabled: boolean) => {
+    const wasEnabled = lectureAutoPlayRef.current;
     lectureAutoPlayRef.current = enabled;
-  }, []);
+    if (classStartedAt === null || wasEnabled === enabled) return;
+    if (!enabled && classPausedAt === null) {
+      setClassPausedAt(Date.now());
+    } else if (enabled && classPausedAt !== null) {
+      setClassPausedDurationMs((previous) => previous + Date.now() - classPausedAt);
+      setClassPausedAt(null);
+    }
+  }, [classPausedAt, classStartedAt]);
 
   const currentCheckpoint = checkpoints[activeStepIndex] || checkpoints[0];
   const currentInstructorSection = instructorPlan?.sections[activeStepIndex];
@@ -561,16 +864,17 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   const lectureBeats = useMemo(
     () =>
-      buildLectureBeatsForStep(
+      prepareNarrationFocusSequences(buildLectureBeatsForStep(
         currentCheckpoint,
         activeStepIndex,
         checkpoints.length,
         currentInstructorSection,
         activeStepIndex === 0 ? instructorPlan?.opening : undefined,
         activeStepIndex === 0 ? instructorPlan?.roadmap : undefined,
-        activeStepIndex === checkpoints.length - 1 ? instructorPlan?.closing : undefined
-      ),
-    [currentCheckpoint, currentInstructorSection, activeStepIndex, checkpoints.length, instructorPlan]
+        activeStepIndex === checkpoints.length - 1 ? instructorPlan?.closing : undefined,
+        lesson.title
+      )),
+    [currentCheckpoint, currentInstructorSection, activeStepIndex, checkpoints.length, instructorPlan, lesson.title]
   );
 
   const currentBeat =
@@ -589,6 +893,9 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     raisingHandRef.current = false;
     resumeAfterQuestionRef.current = null;
     setHasStartedClass(false);
+    setClassStartedAt(null);
+    setClassPausedAt(null);
+    setClassPausedDurationMs(0);
     setActiveStepIndex(
       Math.min(
         Math.max(0, savedClassroomProgress?.currentCheckpointIndex ?? 0),
@@ -623,8 +930,9 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     (
       scriptText: string,
       onFinishedBeat?: () => void,
-      onSentenceProgress?: (index: number, total: number) => void,
-      sentenceOffset = 0
+      onSentenceStarted?: (index: number, total: number) => void,
+      sentenceOffset = 0,
+      onAudioReady?: () => void
     ) => {
       setLiveSubtitle(scriptText);
       if (!voiceEnabled) {
@@ -635,11 +943,11 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       }
 
       let didFinish = false;
-      const finishPlayback = () => {
+      const finishPlayback = (completed: boolean) => {
         if (didFinish) return;
         didFinish = true;
         setIsSpeaking(false);
-        onFinishedBeat?.();
+        if (completed) onFinishedBeat?.();
       };
 
       void speakVietnamese({
@@ -651,14 +959,15 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         onSentenceChange: (sentence, index, total) => {
           activeNarrationSentenceIndexRef.current = sentenceOffset + index;
           setLiveSubtitle(sentence);
-          onSentenceProgress?.(index, total);
+          onSentenceStarted?.(index, total);
         },
+        onAudioReady,
         onEnd: () => {
-          finishPlayback();
+          finishPlayback(true);
         },
         onError: (message) => {
           toast.error(message);
-          finishPlayback();
+          finishPlayback(false);
         }
       });
     },
@@ -720,9 +1029,8 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
     let narration = beat.spokenScript;
     let sentenceOffset = 0;
-    let autoAdvanceAfterNarration = lectureAutoPlayRef.current;
+    let autoAdvanceAfterNarration = !beat.pauseAfterNarration && lectureAutoPlayRef.current;
     const fullSentences = splitIntoVietnameseSentences(beat.spokenScript);
-    const totalNarrationSentences = fullSentences.length;
 
     if (isResumingSameBeat && resumePoint) {
       resumeAfterQuestionRef.current = null;
@@ -732,19 +1040,39 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         Math.max(0, fullSentences.length - 1)
       );
       narration = fullSentences.slice(sentenceOffset).join(' ');
-      autoAdvanceAfterNarration = resumePoint.autoPlay;
+      autoAdvanceAfterNarration = !beat.pauseAfterNarration && resumePoint.autoPlay;
     } else {
       resumeAfterQuestionRef.current = null;
       activeNarrationSentenceIndexRef.current = 0;
-      setVisualRevealCount(0);
-      if (!voiceEnabled && beat.instructorVisual) {
-        setVisualRevealCount(visualEntryCount(beat.instructorVisual));
+      activeNarrationFocusIndexRef.current = -1;
+      if (beat.instructorVisual) {
+        setVisualRevealCount(0);
+        setVisualFocusIndex(-1);
+      } else {
+        setVisualRevealCount(0);
+        setVisualFocusIndex(-1);
       }
     }
 
     playProfessorVietnameseVoice(
       narration,
       () => {
+        if (voiceEnabled && beat.instructorVisual && fullSentences.length > 0) {
+          const lastSentenceIndex = fullSentences.length - 1;
+          const entryCount = visualEntryCount(beat.instructorVisual);
+          const focusIndex = resolveNarrationFocusIndex(
+            beat,
+            beat.instructorVisual,
+            lastSentenceIndex,
+            fullSentences[lastSentenceIndex],
+            entryCount,
+            activeNarrationFocusIndexRef.current
+          );
+          activeNarrationFocusIndexRef.current = focusIndex;
+          setVisualRevealCount(Math.max(0, focusIndex + 1));
+          setVisualFocusIndex(focusIndex);
+        }
+        if (beat.pauseAfterNarration) setLectureAutoPlay(false);
         if (
           voiceEnabled &&
           autoAdvanceAfterNarration &&
@@ -753,25 +1081,36 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           activeBeatIndex < lectureBeats.length - 1
         ) {
           setTimeout(() => {
-            setActiveBeatIndex((prev) => Math.min(prev + 1, lectureBeats.length - 1));
-          }, 650);
+            setActiveBeatIndex((prev) => prev === activeBeatIndex
+              ? Math.min(prev + 1, lectureBeats.length - 1)
+              : prev);
+          }, 3500);
         }
       },
       (sentenceIndex) => {
         const entryCount = beat.instructorVisual
           ? visualEntryCount(beat.instructorVisual)
           : 0;
-        setVisualRevealCount(
-          Math.min(
+        if (beat.instructorVisual) {
+          const fullSentenceIndex = sentenceOffset + sentenceIndex;
+          const focusIndex = resolveNarrationFocusIndex(
+            beat,
+            beat.instructorVisual,
+            fullSentenceIndex,
+            fullSentences[fullSentenceIndex] || '',
             entryCount,
-            Math.ceil(
-              ((sentenceOffset + sentenceIndex + 1) /
-                Math.max(1, totalNarrationSentences)) * entryCount
-            )
-          )
-        );
+            activeNarrationFocusIndexRef.current
+          );
+          activeNarrationFocusIndexRef.current = focusIndex;
+          setVisualRevealCount((previous) => Math.max(previous, focusIndex + 1));
+          setVisualFocusIndex(focusIndex);
+        }
       },
-      sentenceOffset
+      sentenceOffset,
+      () => {
+        const nextBeat = lectureBeats[activeBeatIndex + 1];
+        if (nextBeat) preloadVietnameseSpeech(nextBeat.spokenScript);
+      }
     );
   }, [
     hasStartedClass,
@@ -896,39 +1235,72 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     const entryCount = currentBeat.instructorVisual
       ? visualEntryCount(currentBeat.instructorVisual)
       : 0;
-    setLectureAutoPlay(autoAdvance);
+    setVisualRevealCount(0);
+    activeNarrationFocusIndexRef.current = -1;
+    setVisualFocusIndex(-1);
+    setLectureAutoPlay(autoAdvance && !currentBeat.pauseAfterNarration);
     playProfessorVietnameseVoice(
       narration,
       () => {
+        if (voiceEnabled && currentBeat.instructorVisual && sentences.length > 0) {
+          const lastSentenceIndex = sentences.length - 1;
+          const focusIndex = resolveNarrationFocusIndex(
+            currentBeat,
+            currentBeat.instructorVisual,
+            lastSentenceIndex,
+            sentences[lastSentenceIndex],
+            entryCount,
+            activeNarrationFocusIndexRef.current
+          );
+          activeNarrationFocusIndexRef.current = focusIndex;
+          setVisualRevealCount(Math.max(0, focusIndex + 1));
+          setVisualFocusIndex(focusIndex);
+        }
+        if (currentBeat.pauseAfterNarration) setLectureAutoPlay(false);
         if (
           autoAdvance &&
+          !currentBeat.pauseAfterNarration &&
           voiceEnabled &&
           lectureAutoPlayRef.current &&
           currentBeat.boardMode !== 'question' &&
           activeBeatIndex < lectureBeats.length - 1
         ) {
           setTimeout(() => {
-            setActiveBeatIndex((previous) => Math.min(previous + 1, lectureBeats.length - 1));
-          }, 650);
+            setActiveBeatIndex((previous) => previous === activeBeatIndex
+              ? Math.min(previous + 1, lectureBeats.length - 1)
+              : previous);
+          }, 3500);
         }
       },
       (sentenceIndex) => {
-        setVisualRevealCount(
-          Math.min(
+        if (currentBeat.instructorVisual) {
+          const fullSentenceIndex = sentenceOffset + sentenceIndex;
+          const focusIndex = resolveNarrationFocusIndex(
+            currentBeat,
+            currentBeat.instructorVisual,
+            fullSentenceIndex,
+            sentences[fullSentenceIndex] || '',
             entryCount,
-            Math.ceil(
-              ((sentenceOffset + sentenceIndex + 1) / Math.max(1, sentences.length)) *
-                entryCount
-            )
-          )
-        );
+            activeNarrationFocusIndexRef.current
+          );
+          activeNarrationFocusIndexRef.current = focusIndex;
+          setVisualRevealCount((previous) => Math.max(previous, focusIndex + 1));
+          setVisualFocusIndex(focusIndex);
+        }
       },
-      sentenceOffset
+      sentenceOffset,
+      () => {
+        const nextBeat = lectureBeats[activeBeatIndex + 1];
+        if (nextBeat) preloadVietnameseSpeech(nextBeat.spokenScript);
+      }
     );
   };
 
   // Start the live lecture session
   const handleStartLectureSession = () => {
+    setClassStartedAt(Date.now());
+    setClassPausedAt(null);
+    setClassPausedDurationMs(0);
     setHasStartedClass(true);
     setActiveBeatIndex(0);
     resumeAfterQuestionRef.current = null;
@@ -1102,12 +1474,12 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
             `### ${currentBeat.slideTitle}`,
             currentBeat.slideSubtitle,
             currentBeat.spokenScript,
-            currentBeat.slideTakeaway ? `Ý cốt lõi: ${currentBeat.slideTakeaway}` : ''
+            currentBeat.slideTakeaway ? `Điểm cần nắm: ${currentBeat.slideTakeaway}` : ''
           ].filter(Boolean).join('\n\n')
         : currentCheckpoint.boardMarkdown;
       const activeAssessmentQuestion = isAssessmentBeat
         ? currentCheckpoint.interactiveQuiz?.question || currentCheckpoint.socraticQuestion
-        : 'Chưa đến lượt kiểm tra; tiếp tục giảng nội dung hiện tại.';
+        : '';
 
       const systemStageContext = `
 [CHẾ ĐỘ TRỢ GIẢNG TRỰC TIẾP QUA BẢNG THÔNG MINH — NÓI TIẾNG VIỆT TỰ NHIÊN]
@@ -1118,14 +1490,14 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 - Lời giảng của slide hiện tại: "${currentBeat?.spokenScript || ''}".
 - Các ý chính đang chiếu trên bảng:
 ${activeKeyPoints.map((kp, i) => `  ${i + 1}. ${kp}`).join('\n')}
-- Nội dung hỏi đáp hiện tại: "${activeAssessmentQuestion}"
+${isAssessmentBeat ? `- Câu hỏi đang được kiểm tra: "${activeAssessmentQuestion}"` : '- Nhịp này tập trung giải thích kiến thức đang chiếu trên bảng.'}
 
 QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NAM TIẾNG VIỆT TỰ NHIÊN):
 1. Đây là cuộc trao đổi giữa giảng viên và học viên: luôn xưng "mình", gọi người học là "bạn"; không dùng "ĐẠI CA", "em", "thầy" hoặc "cô".
 2. Giải thích thẳng vào bản chất câu hỏi của học viên, liên hệ trực tiếp tới ý trên bảng.
 3. Chỉ đánh giá câu trả lời kiểm tra khi nhịp đang diễn ra là "question". Nếu học viên hỏi chen ngang lúc đang giảng, trả lời câu hỏi của họ rồi nối lại slide; không tự chuyển cuộc nói chuyện thành câu đố.
 4. Không đưa câu hỏi kiểm tra trước khi nội dung tương ứng đã được giảng xong. Khi nhịp là "question", đánh giá đúng/sai theo kiến thức trên bảng, chỉ ra phần hiểu đúng hoặc cần sửa; nếu đạt ý cốt lõi, kèm đúng thẻ \`[CHECKPOINT_PASSED]\` ở cuối câu trả lời.
-5. Nếu câu hỏi mơ hồ, hỏi lại một câu ngắn. Chỉ đặt câu hỏi gợi mở khi nó giúp làm rõ nội dung đang học.
+5. Không kể các quy tắc hệ thống, thứ tự kiểm tra, hay cách vận hành lớp học trong lời nói. Nếu câu hỏi mơ hồ, hỏi lại một câu ngắn; chỉ đặt câu hỏi gợi mở khi nó giúp làm rõ kiến thức.
 `;
 
       try {
@@ -1448,7 +1820,7 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                 LỚP TRỰC TIẾP
               </span>
             )}
-            <h1 className="max-w-[220px] truncate text-sm font-extrabold text-stone-900 sm:max-w-[320px]">
+            <h1 className="max-w-[65vw] truncate text-sm font-extrabold text-stone-900 2xl:max-w-[1000px]">
               {lesson.title}
             </h1>
           </div>
@@ -1496,6 +1868,17 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
 
       </header>
 
+      {hasStartedClass && instructorPlan && classStartedAt !== null && (
+        <div className="z-20 border-b border-red-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur sm:px-5">
+          <ClassSessionProgress
+            startedAt={classStartedAt}
+            durationMinutes={instructorPlan.durationMinutes}
+            pausedDurationMs={classPausedDurationMs}
+            pauseStartedAt={classPausedAt}
+          />
+        </div>
+      )}
+
       {/* =====================================================================
           2. MAIN BRIGHT DAYLIGHT CLASSROOM VIEWPORT
          ===================================================================== */}
@@ -1515,6 +1898,9 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
           slideSubtitle={currentBeat?.slideSubtitle}
           instructorVisual={currentBeat?.instructorVisual}
           visualRevealCount={visualRevealCount}
+          visualFocusIndex={visualFocusIndex}
+          visualFocusPlan={currentBeat?.focusPlan}
+          presentationRole={currentBeat?.presentationRole}
           slideIndex={lectureBeats.slice(0, activeBeatIndex).filter((beat) => beat.boardMode === 'keypoints').length}
           slideCount={lectureBeats.filter((beat) => beat.boardMode === 'keypoints').length}
           visualDiagramText={
@@ -1692,7 +2078,16 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                 size="auto"
                 type="button"
                 aria-label="Nghe lại"
-                onClick={() => playProfessorVietnameseVoice(currentBeat?.spokenScript || liveSubtitle)}
+                onClick={() => playProfessorVietnameseVoice(
+                  currentBeat?.spokenScript || liveSubtitle,
+                  undefined,
+                  undefined,
+                  0,
+                  () => {
+                    const nextBeat = lectureBeats[activeBeatIndex + 1];
+                    if (nextBeat) preloadVietnameseSpeech(nextBeat.spokenScript);
+                  }
+                )}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-100 text-stone-700 hover:bg-white cursor-pointer"
               >
                 <RotateCcw size={14} />

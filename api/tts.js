@@ -708,7 +708,7 @@ async function startLocalService() {
       "--python",
       "3.13",
       "--with-requirements",
-      path2.join(root, "requirements-instructor-audio.txt"),
+      path2.join(root, "requirements-zerotts.txt"),
       "python",
       path2.join(root, "scripts/zerotts-server.py")
     ],

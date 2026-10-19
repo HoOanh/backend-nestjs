@@ -1,24 +1,19 @@
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { resolveFocusCue } from './focusSequence.ts';
 import {
-  Code2,
-  Cpu,
   Eraser,
-  Gauge,
-  GitBranch,
   Highlighter,
-  Layers,
-  Lightbulb,
   MousePointer2,
-  Network,
   PenTool,
-  Target,
   Redo2,
   Undo2
 } from 'lucide-react';
 import type {
   InstructorVisual,
-  InstructorVisualNode
+  InstructorVisualNode,
+  InstructorFocusCue,
+  InstructorPresentationRole
 } from '../../data/instructor-curriculum/types.ts';
 import { escapeHtml } from '../common/CodeViewer.tsx';
 import {
@@ -30,11 +25,7 @@ import {
   wrapSketchText,
   type SketchColorKey
 } from '../mindmap/sketchEngine.ts';
-import { Badge } from '../ui/badge.tsx';
 import { Button } from '../ui/button.tsx';
-import { Card } from '../ui/card.tsx';
-
-const ProcessMemory3DScene = React.lazy(() => import('./ProcessMemory3DScene.tsx'));
 
 export type BoardDisplayMode = 'keypoints' | 'diagram' | 'code' | 'question';
 export type InstructorStagePose =
@@ -59,6 +50,9 @@ export interface InteractiveSmartboardClassroomProps {
   slideSubtitle?: string;
   instructorVisual?: InstructorVisual;
   visualRevealCount?: number;
+  visualFocusIndex?: number;
+  visualFocusPlan?: InstructorFocusCue[];
+  presentationRole?: InstructorPresentationRole;
   slideIndex?: number;
   slideCount?: number;
   visualDiagramText: string;
@@ -104,39 +98,132 @@ export function visualEntryCount(visual: InstructorVisual): number {
   }
 }
 
-function RevealCard({
-  visible,
-  children,
-  className = ''
-}: {
-  visible: boolean;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  if (!visible) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.985 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
 const SKETCH_COLORS: SketchColorKey[] = ['blue', 'green', 'yellow', 'pink', 'purple', 'mint'];
 
-function SketchMarkup({ markup, label }: { markup: string; label: string }) {
+interface SketchFocusGeometry {
+  viewBox: string;
+  box: DOMRect | SVGRect;
+}
+
+function SketchMarkup({
+  markup,
+  label,
+  focusIndex = -1,
+  focusCue = 'none',
+  title,
+  subtitle
+}: {
+  markup: string;
+  label: string;
+  focusIndex?: number;
+  focusCue?: InstructorFocusCue;
+  title?: string;
+  subtitle?: string;
+}) {
   const diagramSvg = markup.trimStart().startsWith('<svg')
     ? markup
     : `<svg class="excalidraw-sketch-svg" viewBox="0 0 1280 640" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${escapeHtml(label)}">${markup}</svg>`;
-  const svg = diagramSvg.replace('<svg ', '<svg style="min-width:1100px;max-width:none" ');
+  let nodeIndex = 0;
+  const markedSvg = diagramSvg.replace(/<g class="(sketch-node-group(?: [^"]*)?)"/g, (_group, classes: string) => {
+    const isFocused = nodeIndex === focusIndex && focusCue !== 'none';
+    const markedGroup = `<g class="${classes}" data-focus-index="${nodeIndex}"${isFocused ? ` data-audio-focus="${focusCue}"` : ''}`;
+    nodeIndex += 1;
+    return markedGroup;
+  });
+  const focusStyle = '<style>@keyframes instructor-focus-pulse{0%,100%{filter:drop-shadow(0 0 4px rgba(220,38,38,.32))}50%{filter:drop-shadow(0 0 13px rgba(220,38,38,.72))}}.sketch-node-group{transition:filter .24s ease}.sketch-node-group[data-audio-focus="highlight"]{animation:instructor-focus-pulse .72s ease-in-out 2;filter:drop-shadow(0 0 7px rgba(220,38,38,.48))}.sketch-node-group[data-audio-focus="pointer"],.sketch-node-group[data-audio-focus="circle"]{filter:drop-shadow(0 0 4px rgba(220,38,38,.4))}</style>';
+  const svg = markedSvg
+    .replace('<svg ', '<svg style="width:100%;height:100%;max-width:100%;max-height:100%" ')
+    .replace('>', `>${focusStyle}`);
+  const svgHostRef = useRef<HTMLDivElement | null>(null);
+  const [focusGeometry, setFocusGeometry] = useState<SketchFocusGeometry | null>(null);
+
+  useLayoutEffect(() => {
+    const rootSvg = svgHostRef.current?.querySelector('svg');
+    if (!rootSvg) {
+      setFocusGeometry(null);
+      return;
+    }
+    const target = rootSvg.querySelector<SVGGElement>(`[data-focus-index="${focusIndex}"]`);
+    const viewBox = rootSvg.getAttribute('viewBox') || '0 0 1280 640';
+    setFocusGeometry(
+      target && focusIndex >= 0 && (focusCue === 'pointer' || focusCue === 'circle')
+        ? { viewBox, box: target.getBBox() }
+        : null
+    );
+  }, [markup, label, focusIndex, focusCue]);
+
+  const focusBox = focusGeometry?.box;
+  const focusCenterX = focusBox ? focusBox.x + focusBox.width / 2 : 0;
+  const focusCenterY = focusBox ? focusBox.y + focusBox.height / 2 : 0;
+  const pointerStartX = focusBox ? Math.max(focusBox.x - 54, 12) : 0;
+  const pointerStartY = focusBox ? Math.max(focusBox.y - 42, 12) : 0;
+
   return (
-    <div className="sketch-canvas-wrapper !mb-0 !max-w-full !p-2">
-      <div dangerouslySetInnerHTML={{ __html: svg }} />
+    <div className="sketch-canvas-wrapper !mb-0 !flex !h-full !min-h-0 !max-w-full !flex-1 !flex-col !overflow-hidden !p-2 sm:!p-3">
+      {(title || subtitle) && (
+        <header className="mb-2 shrink-0 border-b border-sky-100 pb-2">
+          <h2
+            className="text-sm font-extrabold leading-snug text-stone-900 sm:text-base lg:text-lg"
+            style={{ fontFamily: "'Playpen Sans', 'Patrick Hand', 'Comic Sans MS', cursive" }}
+          >
+            {title}
+          </h2>
+          {subtitle && <p className="mt-0.5 text-xs font-medium leading-5 text-stone-600 sm:text-sm">{subtitle}</p>}
+        </header>
+      )}
+      <motion.div
+        key={title || label}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: 'easeOut' }}
+        className="relative min-h-0 w-full flex-1 overflow-hidden"
+      >
+        <div ref={svgHostRef} className="h-full w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+        {focusGeometry && focusBox && (
+          <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox={focusGeometry.viewBox} preserveAspectRatio="xMidYMid meet">
+            {focusCue === 'circle' && (
+              <motion.ellipse
+                initial={{ opacity: 0, cx: focusCenterX, cy: focusCenterY, rx: focusBox.width / 2 + 3, ry: focusBox.height / 2 + 3 }}
+                animate={{ opacity: 1, cx: focusCenterX, cy: focusCenterY, rx: focusBox.width / 2 + 10, ry: focusBox.height / 2 + 8 }}
+                transition={{ duration: 0.42, ease: 'easeOut', repeat: 2, repeatType: 'reverse', repeatDelay: 0.08 }}
+                fill="none"
+                stroke="#dc2626"
+                strokeWidth="3"
+                strokeDasharray="8 6"
+              />
+            )}
+            {focusCue === 'pointer' && (
+              <>
+                <motion.path
+                  initial={{ opacity: 0, pathLength: 0 }}
+                  animate={{ opacity: 1, pathLength: 1, d: `M ${pointerStartX} ${pointerStartY} Q ${(pointerStartX + focusCenterX) / 2} ${pointerStartY + 8} ${focusCenterX - 8} ${focusCenterY - 8}` }}
+                  transition={{ duration: 0.42, ease: 'easeOut' }}
+                  fill="none"
+                  stroke="#dc2626"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  markerEnd="url(#sketch-focus-arrow)"
+                />
+                <motion.circle
+                  initial={{ opacity: 0, r: 6 }}
+                  animate={{ opacity: [0.35, 1, 0.35], r: [6, 12, 6] }}
+                  transition={{ duration: 0.8, ease: 'easeInOut', repeat: 2, delay: 0.42 }}
+                  cx={focusCenterX}
+                  cy={focusCenterY}
+                  fill="#f87171"
+                  stroke="#b91c1c"
+                  strokeWidth="2"
+                />
+              </>
+            )}
+            <defs>
+              <marker id="sketch-focus-arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8" fill="none" stroke="#dc2626" strokeWidth="2" />
+              </marker>
+            </defs>
+          </svg>
+        )}
+      </motion.div>
     </div>
   );
 }
@@ -168,22 +255,42 @@ function sketchNode(
 function flowSketch(nodes: InstructorVisualNode[], visibleCount: number): string {
   const visibleNodes = nodes.slice(0, visibleCount);
   const width = 1280;
-  const cardWidth = Math.min(274, (width - 100) / Math.max(1, nodes.length));
-  const gap = nodes.length > 1 ? (width - 80 - cardWidth * nodes.length) / (nodes.length - 1) : 0;
-  const cardHeight = 148;
-  const y = 245;
+  const cardWidth = nodes.length >= 4
+    ? 520
+    : nodes.length === 1
+      ? 900
+      : Math.min(390, (width - 100) / Math.max(1, nodes.length));
+  const cardHeight = nodes.length >= 4 ? 164 : 190;
+  const columns = nodes.length >= 4 ? 2 : Math.max(1, nodes.length);
+  const gapX = columns > 1 ? (width - 80 - cardWidth * columns) / (columns - 1) : 0;
+  const rowGap = 72;
+  const rowCount = Math.ceil(nodes.length / columns);
+  const height = 80 + rowCount * cardHeight + Math.max(0, rowCount - 1) * rowGap + 34;
   const content: string[] = [];
 
-  content.push(`<text x="54" y="96" class="sketch-loop-heading" font-size="24" fill="#3b6998">LUỒNG THỰC THI</text>`);
+  content.push(`<text x="54" y="44" class="sketch-loop-heading" font-size="24" fill="#3b6998">LUỒNG THỰC THI</text>`);
   visibleNodes.forEach((node, index) => {
-    const x = 40 + index * (cardWidth + gap);
+    const row = nodes.length >= 4 ? Math.floor(index / columns) : 0;
+    const column = nodes.length >= 4 && row % 2 === 1 ? 1 - (index % columns) : index % columns;
+    const x = columns === 1 ? (width - cardWidth) / 2 : 40 + column * (cardWidth + gapX);
+    const y = 74 + row * (cardHeight + rowGap);
     if (index < visibleNodes.length - 1) {
-      const nextX = 40 + (index + 1) * (cardWidth + gap);
-      content.push(sketchCurvedArrow(x + cardWidth + 6, y + cardHeight / 2, (x + cardWidth + nextX) / 2, y + cardHeight / 2 - 26, nextX - 6, y + cardHeight / 2, { seed: `flow_arrow_${nodes[index].id}` }));
+      const nextIndex = index + 1;
+      const nextRow = nodes.length >= 4 ? Math.floor(nextIndex / columns) : 0;
+      const nextColumn = nodes.length >= 4 && nextRow % 2 === 1 ? 1 - (nextIndex % columns) : nextIndex % columns;
+      const nextX = columns === 1 ? x : 40 + nextColumn * (cardWidth + gapX);
+      const nextY = 74 + nextRow * (cardHeight + rowGap);
+      if (row === nextRow && nextX > x) {
+        content.push(sketchCurvedArrow(x + cardWidth + 6, y + cardHeight / 2, x + cardWidth + gapX / 2, y + cardHeight / 2 - 22, nextX - 6, nextY + cardHeight / 2, { seed: `flow_arrow_${nodes[index].id}` }));
+      } else if (row === nextRow) {
+        content.push(sketchCurvedArrow(x - 6, y + cardHeight / 2, x - gapX / 2, y + cardHeight / 2 - 22, nextX + cardWidth + 6, nextY + cardHeight / 2, { seed: `flow_arrow_${nodes[index].id}` }));
+      } else {
+        content.push(sketchCurvedArrow(x + cardWidth / 2, y + cardHeight + 6, x + cardWidth / 2 + 24, (y + nextY + cardHeight) / 2, nextX + cardWidth / 2, nextY - 6, { seed: `flow_arrow_${nodes[index].id}` }));
+      }
     }
     content.push(sketchNode(node, x, y, cardWidth, cardHeight, SKETCH_COLORS[index % SKETCH_COLORS.length], `BƯỚC 0${index + 1}`, `flow_${node.id}`));
   });
-  return content.join('');
+  return `<svg class="excalidraw-sketch-svg" viewBox="0 0 ${width} ${height}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Luồng thực thi vẽ tay">${content.join('')}</svg>`;
 }
 
 function cycleSketch(visual: Extract<InstructorVisual, { kind: 'cycle' }>, visibleCount: number): string {
@@ -478,117 +585,230 @@ function connectionModelSketch(visual: Extract<InstructorVisual, { kind: 'connec
   return `<svg class="excalidraw-sketch-svg" viewBox="0 0 1280 640" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mô hình connection vẽ tay">${content.join('')}</svg>`;
 }
 
-function InstructorVisualPanel({ visual, visibleCount }: { visual: InstructorVisual; visibleCount: number }) {
+function textSlideSketch(visual: Extract<InstructorVisual, { kind: 'text-slide' }>, visibleCount: number): string {
+  const width = 1280;
+  const hasMetrics = Boolean(visual.metrics?.length);
+  const hasPoints = Boolean(visual.points?.length);
+  const compactIllustratedLayout = Boolean(visual.illustration && !hasPoints);
+  const height = compactIllustratedLayout ? 500 : 720;
+  const content: string[] = [];
+  const metricStart = 2;
+  const pointStart = 1 + (visual.metrics?.length ?? 0);
+  const questionIndex = pointStart + (visual.points?.length ?? 0);
+
+  if (visual.eyebrow) {
+    content.push(`<text x="72" y="60" class="sketch-loop-heading" font-size="21" fill="#3b6998">${escapeHtml(visual.eyebrow)}</text>`);
+  }
+  if (visibleCount >= 1) content.push(sketchLabeledNode({
+    x: 54,
+    y: compactIllustratedLayout ? 76 : 82,
+    w: compactIllustratedLayout ? 520 : visual.illustration ? 620 : 1172,
+    h: compactIllustratedLayout ? 212 : 174,
+    label: visual.lead,
+    color: 'purple',
+    fontSize: 25,
+    seed: `text_slide_lead_${visual.lead}`
+  }));
+
+  if (visual.illustration && visibleCount >= 1) {
+    const imageX = compactIllustratedLayout ? 610 : 700;
+    const imageY = compactIllustratedLayout ? 58 : 82;
+    const imageWidth = compactIllustratedLayout ? 616 : 526;
+    const imageHeight = compactIllustratedLayout ? 264 : 322;
+    content.push(`<image href="${escapeHtml(visual.illustration.src)}" x="${imageX}" y="${imageY}" width="${imageWidth}" height="${imageHeight}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(visual.illustration.alt)}" />`);
+    if (visual.illustration.caption) {
+      const captionX = compactIllustratedLayout ? imageX + imageWidth / 2 : 963;
+      const captionY = compactIllustratedLayout ? 330 : 420;
+      content.push(`<text x="${captionX}" y="${captionY}" text-anchor="middle" class="sketch-node-sub">${escapeHtml(visual.illustration.caption)}</text>`);
+    }
+  }
+
+  if (hasMetrics) {
+    const metrics = visual.metrics ?? [];
+    const gap = 22;
+    const cardWidth = (1172 - gap * (metrics.length - 1)) / metrics.length;
+    metrics.forEach((metric, index) => {
+      if (visibleCount < metricStart + index) return;
+      const x = 54 + index * (cardWidth + gap);
+      content.push(sketchLabeledNode({
+        x,
+        y: compactIllustratedLayout ? 350 : visual.illustration ? 438 : 286,
+        w: cardWidth,
+        h: compactIllustratedLayout ? 70 : 118,
+        label: metric.value,
+        subLabel: metric.label,
+        color: SKETCH_COLORS[index % SKETCH_COLORS.length],
+        badge: `SỐ LIỆU 0${index + 1}`,
+        fontSize: 19,
+        seed: `text_slide_metric_${metric.label}`
+      }));
+    });
+  }
+
+  if (hasPoints) {
+    const points = visual.points ?? [];
+    const columns = points.length > 2 ? 2 : points.length;
+    const rows = Math.ceil(points.length / columns);
+    const gapX = 20;
+    const gapY = 14;
+    const cardWidth = (1172 - gapX * (columns - 1)) / columns;
+    const cardHeight = rows > 1 ? 112 : 142;
+    const startY = visual.illustration ? (hasMetrics ? 570 : 438) : hasMetrics ? 430 : points.length > 2 ? 276 : 302;
+    points.forEach((point, index) => {
+      if (visibleCount < pointStart + index + 1) return;
+      const x = 54 + (index % columns) * (cardWidth + gapX);
+      const y = startY + Math.floor(index / columns) * (cardHeight + gapY);
+      content.push(sketchLabeledNode({
+        x,
+        y,
+        w: cardWidth,
+        h: cardHeight,
+        label: point.title,
+        subLabel: point.detail,
+        color: SKETCH_COLORS[(index + 1) % SKETCH_COLORS.length],
+        badge: `Ý ${String(index + 1).padStart(2, '0')}`,
+        fontSize: 17,
+        seed: `text_slide_point_${point.title}`
+      }));
+    });
+  }
+
+  const hasQuestion = Boolean(visual.question);
+  const pointRows = hasPoints ? Math.ceil((visual.points?.length ?? 0) / ((visual.points?.length ?? 0) > 2 ? 2 : (visual.points?.length ?? 1))) : 0;
+  const contentBottom = hasPoints
+    ? (visual.illustration ? (hasMetrics ? 570 : 438) : hasMetrics ? 430 : (visual.points?.length ?? 0) > 2 ? 276 : 302) + pointRows * (pointRows > 1 ? 112 : 142) + Math.max(0, pointRows - 1) * 14
+    : visual.illustration ? hasMetrics ? 556 : 404 : hasMetrics ? 404 : 276;
+  if (hasQuestion && visibleCount >= questionIndex + 1) {
+    content.push(sketchLabeledNode({
+      x: 54,
+      y: compactIllustratedLayout ? 432 : Math.min(height - 92, contentBottom + 14),
+      w: 1172,
+      h: compactIllustratedLayout ? 58 : 82,
+      label: visual.question ?? '',
+      color: 'yellow',
+      badge: 'CÂU HỎI DẪN ĐƯỜNG',
+      fontSize: 17,
+      seed: `text_slide_question_${visual.question}`
+    }));
+  }
+
+  return `<svg class="excalidraw-sketch-svg" viewBox="0 0 ${width} ${height}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nội dung bài học viết tay">${content.join('')}</svg>`;
+}
+
+function markdownAsVisual(markdown: string, title: string): Extract<InstructorVisual, { kind: 'text-slide' }> {
+  const diagramLabels = [...markdown.matchAll(/[A-Za-z0-9_-]+\[([^\]]+)\]|[A-Za-z0-9_-]+\(\(([^)]+)\)\)/g)]
+    .map((match) => match[1] || match[2] || '');
+  const lines = markdown
+    .replace(/```[a-zA-Z]*\n?/g, '')
+    .replace(/```/g, '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*(?:#+|[-*]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
+    .filter((line) => line && !/^(?:flowchart|graph)\s+/i.test(line) && !/^(?:subgraph|end)$/i.test(line));
+  const labels = diagramLabels.length > 0 ? diagramLabels : lines.slice(1, 7);
+
+  return {
+    kind: 'text-slide',
+    eyebrow: diagramLabels.length > 0 ? 'SƠ ĐỒ LUỒNG' : 'GHI CHÚ TRÊN BẢNG',
+    lead: lines[0] || title,
+    points: labels.map((label, index) => ({ title: `Bước ${index + 1}`, detail: label }))
+  };
+}
+
+function diagramNodeFocusIndex(visual: InstructorVisual, focusIndex: number, visibleCount: number): number {
+  if (focusIndex < 0) return -1;
+  if (visual.kind === 'process-memory' || visual.kind === 'memory-map') return focusIndex + 1;
+  if (visual.kind === 'decision-tree') return focusIndex === 0 ? 0 : 1 + (focusIndex - 1) * 2;
+  if (visual.kind === 'comparison') {
+    let entryOffset = 0;
+    let groupOffset = 0;
+    for (const column of visual.columns) {
+      const visibleInColumn = Math.min(column.points.length, Math.max(0, visibleCount - entryOffset));
+      if (visibleInColumn > 0) {
+        groupOffset += 1;
+        if (focusIndex < entryOffset + visibleInColumn) return groupOffset + focusIndex - entryOffset;
+        groupOffset += visibleInColumn;
+      }
+      entryOffset += column.points.length;
+    }
+    return -1;
+  }
+  return focusIndex;
+}
+
+function InstructorVisualPanel({
+  visual,
+  visibleCount,
+  focusIndex = -1,
+  focusPlan = [],
+  title,
+  subtitle
+}: {
+  visual: InstructorVisual;
+  visibleCount: number;
+  focusIndex?: number;
+  focusPlan?: InstructorFocusCue[];
+  title?: string;
+  subtitle?: string;
+}) {
+  const nodeFocusIndex = diagramNodeFocusIndex(visual, focusIndex, visibleCount);
+  const focusCue = resolveFocusCue(focusPlan, focusIndex);
+  const renderSketch = (markup: string, label: string) => (
+    <SketchMarkup
+      markup={markup}
+      label={label}
+      focusIndex={nodeFocusIndex}
+      focusCue={focusCue}
+      title={title}
+      subtitle={subtitle}
+    />
+  );
   if (visual.kind === 'text-slide') {
-    const pointStartIndex = 1 + (visual.metrics?.length || 0);
-    const questionIndex = pointStartIndex + (visual.points?.length || 0);
-
-    return (
-      <div className="mx-auto flex w-full flex-1 flex-col justify-center gap-4 py-2 sm:gap-5">
-        <RevealCard visible={visibleCount >= 1}>
-          <Card className="rounded-2xl border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-sm sm:p-8">
-            {visual.eyebrow && (
-              <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-sky-700 sm:text-sm">
-                {visual.eyebrow}
-              </p>
-            )}
-            <p className="max-w-6xl text-xl font-extrabold leading-snug text-stone-900 sm:text-3xl sm:leading-relaxed lg:text-4xl">
-              {visual.lead}
-            </p>
-          </Card>
-        </RevealCard>
-
-        {visual.metrics && visual.metrics.length > 0 && (
-          <div className={`grid gap-3 ${visual.metrics.length > 2 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            {visual.metrics.map((metric, index) => {
-              const visible = visibleCount >= index + 2;
-              return (
-                <RevealCard key={metric.label} visible={visible}>
-                  <Card className="h-full items-center justify-center rounded-2xl border-stone-200 bg-white px-3 py-4 text-center shadow-sm sm:py-6">
-                    <strong className="text-3xl font-black tracking-tight text-sky-700 sm:text-5xl">{metric.value}</strong>
-                    <span className="mt-1 text-xs font-bold leading-5 text-stone-600 sm:text-base">{metric.label}</span>
-                  </Card>
-                </RevealCard>
-              );
-            })}
-          </div>
-        )}
-
-        {visual.points && visual.points.length > 0 && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {visual.points.map((point, index) => {
-              const visible = visibleCount >= pointStartIndex + index + 1;
-              return (
-                <RevealCard key={point.title} visible={visible}>
-                  <Card className="h-full flex-row items-start gap-3 rounded-2xl border-stone-200 bg-white p-4 shadow-sm sm:p-5">
-                    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sm font-black text-sky-800">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <div>
-                      <h3 className="text-base font-extrabold leading-6 text-stone-900 sm:text-lg">{point.title}</h3>
-                      <p className="mt-1 text-sm leading-6 text-stone-600 sm:text-base">{point.detail}</p>
-                    </div>
-                  </Card>
-                </RevealCard>
-              );
-            })}
-          </div>
-        )}
-
-        {visual.question && (
-          <RevealCard visible={visibleCount >= questionIndex + 1}>
-            <Card className="rounded-2xl border-amber-300 bg-amber-50 px-5 py-4 shadow-sm sm:px-7 sm:py-5">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Câu hỏi dẫn đường</p>
-              <p className="mt-1.5 text-lg font-extrabold leading-snug text-stone-900 sm:text-2xl">{visual.question}</p>
-            </Card>
-          </RevealCard>
-        )}
-
-        {visual.note && visibleCount >= visualEntryCount(visual) && (
-          <p className="text-center text-xs leading-5 text-stone-500 sm:text-sm">{visual.note}</p>
-        )}
-      </div>
-    );
+    return renderSketch(textSlideSketch(visual, visibleCount), 'Slide nội dung viết tay');
   }
 
   if (visual.kind === 'process-memory') {
-    return (
-      <Card className="gap-3 overflow-hidden rounded-2xl border-sky-200 bg-gradient-to-b from-sky-50 to-white p-3 text-stone-900 shadow-sm sm:p-4">
-        <div className="flex items-center justify-between px-1">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-700">Không gian địa chỉ</p>
-            <h3 className="text-base font-black sm:text-lg">Một process · nhiều thread</h3>
-          </div>
-          <Badge variant="outline" className="border-sky-200 bg-white text-sky-800">PID</Badge>
-        </div>
-        <div className="h-[230px] overflow-hidden rounded-xl border border-sky-100 bg-white sm:h-[310px]">
-          <Suspense fallback={<div className="p-6 text-sm text-stone-600">Đang dựng mô phỏng process và thread…</div>}>
-            <ProcessMemory3DScene regions={visual.regions.slice(0, visibleCount)} />
-          </Suspense>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {visual.regions.slice(0, visibleCount).map((region) => (
-            <RevealCard key={region.id} visible>
-              <div className="h-full rounded-lg border border-stone-200 bg-white px-2 py-2 sm:px-3">
-                <strong className="text-[11px] font-extrabold sm:text-xs">{region.title}</strong>
-                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-stone-600 sm:text-xs sm:leading-5">{region.detail}</p>
-              </div>
-            </RevealCard>
-          ))}
-        </div>
-      </Card>
-    );
+    return renderSketch(memoryMapSketch(visual.regions, visibleCount), 'Sơ đồ process và thread vẽ tay');
   }
 
-  if (visual.kind === 'flow') return <SketchMarkup markup={flowSketch(visual.nodes, visibleCount)} label="Luồng thực thi vẽ tay" />;
-  if (visual.kind === 'cycle') return <SketchMarkup markup={cycleSketch(visual, visibleCount)} label="Vòng lặp thực thi" />;
-  if (visual.kind === 'decision-tree') return <SketchMarkup markup={decisionTreeSketch(visual, visibleCount)} label="Cây quyết định" />;
-  if (visual.kind === 'architecture-comparison') return <SketchMarkup markup={architectureSketch(visual, visibleCount)} label="Đối chiếu hai luồng kiến trúc" />;
-  if (visual.kind === 'comparison') return <SketchMarkup markup={comparisonSketch(visual, visibleCount)} label="Sơ đồ đối chiếu" />;
-  if (visual.kind === 'latency-scale') return <SketchMarkup markup={latencySketch(visual, visibleCount)} label="Thang độ trễ" />;
-  if (visual.kind === 'timeline') return <SketchMarkup markup={timelineSketch(visual, visibleCount)} label="Dòng thời gian" />;
-  if (visual.kind === 'memory-map') return <SketchMarkup markup={memoryMapSketch(visual.regions, visibleCount)} label="Bản đồ bộ nhớ" />;
-  return <SketchMarkup markup={connectionModelSketch(visual, visibleCount)} label="Mô hình connection và tài nguyên" />;
+  if (visual.kind === 'flow') {
+    return renderSketch(flowSketch(visual.nodes, visibleCount), 'Luồng thực thi vẽ tay');
+  }
+  if (visual.kind === 'cycle') {
+    return renderSketch(cycleSketch(visual, visibleCount), 'Vòng lặp thực thi');
+  }
+  if (visual.kind === 'decision-tree') {
+    return renderSketch(decisionTreeSketch(visual, visibleCount), 'Cây quyết định');
+  }
+  if (visual.kind === 'architecture-comparison') {
+    return renderSketch(architectureSketch(visual, visibleCount), 'Đối chiếu hai luồng kiến trúc');
+  }
+  if (visual.kind === 'comparison') {
+    return renderSketch(comparisonSketch(visual, visibleCount), 'Sơ đồ đối chiếu');
+  }
+  if (visual.kind === 'latency-scale') {
+    return renderSketch(latencySketch(visual, visibleCount), 'Thang độ trễ');
+  }
+  if (visual.kind === 'timeline') {
+    return renderSketch(timelineSketch(visual, visibleCount), 'Dòng thời gian');
+  }
+  if (visual.kind === 'memory-map') {
+    return renderSketch(memoryMapSketch(visual.regions, visibleCount), 'Bản đồ bộ nhớ');
+  }
+  return renderSketch(connectionModelSketch(visual, visibleCount), 'Mô hình connection và tài nguyên');
+}
+
+function TitleSlide({ title, subtitle }: { title?: string; subtitle?: string }) {
+  return (
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center px-8 text-center">
+      {subtitle && <p className="mb-4 text-xs font-extrabold uppercase tracking-[0.18em] text-sky-700 sm:text-sm">{subtitle}</p>}
+      <h1
+        className="max-w-6xl text-[clamp(2rem,4.5vw,5rem)] font-black leading-[1.12] text-stone-900"
+        style={{ fontFamily: "'Playpen Sans', 'Patrick Hand', 'Comic Sans MS', cursive" }}
+      >
+        {title || 'Bài học hôm nay'}
+      </h1>
+    </div>
+  );
 }
 
 const PEN_COLORS = ['#0284c7', '#059669', '#d97706', '#e11d48', '#1e293b'];
@@ -703,160 +923,66 @@ function SmartboardPanel(props: InteractiveSmartboardClassroomProps) {
 
   return (
         <div className="pointer-events-auto flex h-full min-h-0 w-full max-w-none flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#f8fafc] text-stone-800 shadow-[0_10px_32px_rgba(28,39,54,0.1)]">
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-white px-4 py-2.5">
-            {!props.continuousLesson && (
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-sky-600 px-2.5 py-0.5 text-[13px] font-extrabold text-white">
-                  PHẦN {props.stepIndex + 1}/{props.totalSteps}
-                </span>
-                <span className="max-w-[520px] truncate text-sm font-bold text-stone-800">
-                  {props.stepTitle}
-                </span>
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-              {(
-                [
-                  { id: 'keypoints', label: 'Ý chính', icon: Lightbulb },
-                  { id: 'diagram', label: 'Sơ đồ', icon: GitBranch },
-                  { id: 'code', label: 'Code', icon: Code2 }
-                ] as const
-              ).map((tab) => {
-                const Icon = tab.icon;
-                const active = props.boardMode === tab.id;
-                return (
-                  <Button
-                    variant="ghost"
-                    size="auto"
-                    key={tab.id}
-                    type="button"
-                    onClick={() => props.onSwitchBoardMode?.(tab.id)}
-                    className={`inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-bold ${
-                      active
-                        ? 'bg-sky-600 text-white'
-                        : 'border border-stone-200 bg-white text-stone-600'
-                    }`}
-                  >
-                    <Icon size={13} />
-                    {tab.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="relative min-h-0 flex-1 bg-white">
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
             <div
-              className="grid h-full min-h-0 w-full grid-cols-1 overflow-y-auto p-3 sm:p-4 lg:p-5"
+              className="grid h-full min-h-0 w-full grid-cols-1 overflow-hidden p-2 sm:p-3 lg:p-4"
               style={{
                 backgroundImage: 'radial-gradient(#d6dde6 0.8px, transparent 0.8px)',
                 backgroundSize: '18px 18px'
               }}
             >
-              <div className="flex min-h-full w-full flex-col">
+              <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
                 {props.boardMode === 'keypoints' && props.instructorVisual && (
-                  <div className="mx-auto flex min-h-full w-full max-w-none flex-1 flex-col py-1">
-                    <div className="mb-3 shrink-0">
-                      <h2 className="text-[clamp(1.45rem,2.25vw,2.8rem)] font-black leading-tight text-stone-900">
-                        {props.slideTitle || 'Nội dung bài học'}
-                      </h2>
-                      {props.slideSubtitle && (
-                        <p className="mt-1.5 text-sm font-medium leading-6 text-stone-600 sm:text-base">
-                          {props.slideSubtitle}
-                        </p>
-                      )}
-                    </div>
-                    <InstructorVisualPanel
-                      visual={props.instructorVisual}
-                      visibleCount={props.visualRevealCount ?? 0}
-                    />
-                    {(props.visualRevealCount ?? 0) > 0 && props.instructorVisual.kind !== 'architecture-comparison' && props.instructorVisual.kind !== 'text-slide' && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <Card className="mt-4 flex-row items-start gap-3 rounded-xl border-amber-200 bg-amber-50/80 p-4 text-stone-900 shadow-none">
-                          <Lightbulb className="mt-0.5 shrink-0 text-amber-700" size={17} />
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-800">Điểm cần nhớ</p>
-                            <p className="mt-1 text-sm font-bold leading-6 sm:text-base">{props.slideTakeaway}</p>
-                          </div>
-                        </Card>
-                      </motion.div>
+                  <div className="mx-auto flex h-full min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden">
+                    {props.presentationRole === 'title' ? (
+                      <TitleSlide title={props.slideTitle} subtitle={props.slideSubtitle} />
+                    ) : (
+                      <InstructorVisualPanel
+                        visual={props.instructorVisual}
+                        visibleCount={props.visualRevealCount ?? 0}
+                        focusIndex={props.visualFocusIndex}
+                        focusPlan={props.visualFocusPlan}
+                        title={props.slideTitle}
+                        subtitle={props.slideSubtitle}
+                      />
                     )}
                   </div>
                 )}
 
                 {props.boardMode === 'keypoints' && !props.instructorVisual && (
-                  <div className="mx-auto flex min-h-full w-full max-w-none flex-col justify-center py-2">
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-sm font-black text-white shadow-sm">
-                        {String((props.slideIndex ?? props.activePointIndex) + 1).padStart(2, '0')}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-sky-700">
-                          {props.lessonTitle}
-                        </p>
-                        <h2 className="mt-1 text-xl font-black leading-tight text-stone-900 sm:text-2xl lg:text-3xl">
-                          {props.slideTitle || 'Nội dung bài học'}
-                        </h2>
-                      </div>
-                    </div>
-                    <div className="my-5 h-1 w-20 rounded-full bg-amber-400" />
-                    <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-white p-5 shadow-sm sm:p-7">
-                      <div className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-sky-700">
-                        <Lightbulb size={15} /> Ý cốt lõi
-                      </div>
-                      <p className="text-lg font-bold leading-8 text-stone-900 sm:text-xl">
-                        {props.slideTakeaway || props.keyPoints[props.activePointIndex] || props.keyPoints[0]}
-                      </p>
-                    </div>
-                    {(props.slidePoints?.length ?? 0) > 0 && (
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        {props.slidePoints?.slice(0, 4).map((point, index) => {
-                          const [label, ...detailParts] = point.split(/:\s+/, 2);
-                          const hasLabel = detailParts.length > 0 && label.length < 72;
-                          const searchText = point.toLocaleLowerCase('vi');
-                          const PointIcon = /cpu|phần cứng|bộ xử lý|processor/.test(searchText)
-                            ? Cpu
-                            : /bộ nhớ|cache|ram|lưu trữ/.test(searchText)
-                              ? Layers
-                              : /mạng|i\/o|độ trễ|latency/.test(searchText)
-                                ? Network
-                                : /mục tiêu|đầu ra|kết quả/.test(searchText)
-                                  ? Target
-                                  : /đo lường|hiệu năng|tốc độ|throughput/.test(searchText)
-                                    ? Gauge
-                                    : GitBranch;
-                          return (
-                            <article
-                              key={`${point}-${index}`}
-                              className="flex min-h-28 gap-3 rounded-xl border border-stone-200 bg-white/95 p-4 shadow-[0_2px_8px_rgba(28,39,54,0.04)]"
-                            >
-                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-100">
-                                <PointIcon size={19} strokeWidth={2.2} />
-                              </span>
-                              <div className="min-w-0">
-                                {hasLabel && (
-                                  <h3 className="mb-1 text-sm font-extrabold text-stone-900">
-                                    {label}
-                                  </h3>
-                                )}
-                                <p className="line-clamp-4 text-sm font-medium leading-6 text-stone-600">
-                                  {hasLabel ? detailParts.join(': ') : point}
-                                </p>
-                              </div>
-                            </article>
-                          );
-                        })}
-                      </div>
-                    )}
+                  <div
+                    className={`mx-auto flex h-full min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden py-2 ${props.presentationRole === 'title' ? 'items-center justify-center px-8 text-center' : 'justify-center'}`}
+                    style={{ fontFamily: "'Playpen Sans', 'Patrick Hand', 'Comic Sans MS', cursive" }}
+                  >
+                    {props.presentationRole === 'title' ? (
+                      <TitleSlide title={props.slideTitle} subtitle={props.slideSubtitle} />
+                    ) : null}
+                    {props.presentationRole !== 'title' && <div className="min-h-0 flex-1">
+                      <InstructorVisualPanel
+                        visual={{
+                          kind: 'text-slide',
+                          eyebrow: 'Ý CHÍNH',
+                          lead: props.slideTakeaway || props.keyPoints[props.activePointIndex] || props.keyPoints[0] || '',
+                          points: props.slidePoints?.slice(0, 4).map((point, index) => {
+                            const [label, ...detailParts] = point.split(/:\s+/, 2);
+                            const hasLabel = detailParts.length > 0 && label.length < 72;
+                            return {
+                              title: hasLabel ? label : `Ý ${index + 1}`,
+                              detail: hasLabel ? detailParts.join(': ') : point
+                            };
+                          })
+                        }}
+                        visibleCount={1 + (props.slidePoints?.slice(0, 4).length ?? 0)}
+                        focusIndex={props.visualFocusIndex}
+                        title={props.slideTitle}
+                        subtitle={props.slideSubtitle}
+                      />
+                    </div>}
                   </div>
                 )}
 
                 {props.boardMode === 'code' && (
-                  <div className="h-full overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-2 font-mono text-[13px]">
+                  <div className="h-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 p-2 font-mono text-[13px]">
                     {codeLines.map((lineText, index) => {
                       const focused = index === props.activeCodeLine;
                       return (
@@ -879,17 +1005,21 @@ function SmartboardPanel(props: InteractiveSmartboardClassroomProps) {
                 )}
 
                 {props.boardMode === 'diagram' && (
-                  <pre className="h-full overflow-auto rounded-xl border border-sky-200 bg-sky-50/50 p-3 font-mono text-[12px] leading-relaxed text-stone-800">
-                    {props.visualDiagramText
-                      .replace(/```[a-zA-Z]*\n?/g, '')
-                      .replace(/```/g, '')
-                      .trim()}
-                  </pre>
+                  <div className="flex h-full min-h-0 w-full overflow-hidden">
+                    <InstructorVisualPanel
+                      visual={props.instructorVisual || markdownAsVisual(props.visualDiagramText, props.slideTitle || 'Sơ đồ bài học')}
+                      visibleCount={props.instructorVisual ? visualEntryCount(props.instructorVisual) : 7}
+                      focusIndex={props.visualFocusIndex}
+                    />
+                  </div>
                 )}
 
                 {props.boardMode === 'question' && (
-                  <div className="flex min-h-full w-full items-center justify-center p-4 sm:p-8">
-                    <div className="w-full max-w-6xl rounded-3xl border-2 border-amber-400 bg-amber-50 p-5 shadow-sm sm:p-8 lg:p-10">
+                  <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden p-4 sm:p-8">
+                    <div
+                      className="w-full max-w-6xl rounded-3xl border-2 border-amber-400 bg-amber-50 p-5 shadow-sm sm:p-8 lg:p-10"
+                      style={{ fontFamily: "'Playpen Sans', 'Patrick Hand', 'Comic Sans MS', cursive" }}
+                    >
                       <div className="text-sm font-extrabold uppercase tracking-wide text-amber-800">
                         Câu hỏi tại lớp
                       </div>

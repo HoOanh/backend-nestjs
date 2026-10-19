@@ -7,8 +7,6 @@
     "dev": "vite",
     "build": "tsc && tsc -p tsconfig.api.json && node scripts/build-api.mjs && vite build",
     "preview": "vite preview",
-    "audio:export:c1-l1": "bun scripts/export-instructor-audio.ts",
-    "audio:generate:c1-l1": "bun scripts/export-instructor-audio.ts && uv run --no-project --python 3.13 --with-requirements requirements-instructor-audio.txt python scripts/generate-instructor-audio.py",
     "test:admin": "bun test/adminReview.probe.ts && bun test/adminCommands.test.ts && bun test/e2e.test.ts && bun test/adminData.test.ts && bun test/sqliteChat.test.ts && bun test/dataOperations.test.ts",
     "store:review": "bun scripts/review-store.ts",
     "curriculum:validate": "bun .agents/skills/curriculum-authoring/scripts/validate-lesson.ts"

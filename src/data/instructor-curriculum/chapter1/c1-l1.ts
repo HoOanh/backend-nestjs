@@ -13,12 +13,11 @@ export const instructor_c1_l1: InstructorLessonPlan = {
     title: '50.000 kết nối, chỉ 10 socket có dữ liệu mới',
     subtitle: 'Một tình huống production để đặt câu hỏi trước khi học cơ chế',
     narration:
-      'Mình bắt đầu bằng một tình huống, chưa cần bạn biết trước đáp án. Một API giữ năm mươi nghìn kết nối TCP đang mở. Trong một khoảnh khắc, chỉ mười socket có dữ liệu mới; gần như tất cả kết nối còn lại chỉ đang chờ. Nếu ứng dụng cứ hỏi từng socket rằng đã có việc chưa, hoặc tạo một thread cho mỗi kết nối, phần tài nguyên nào sẽ tăng trước? Và liệu cứ có một kết nối thì nhất thiết phải có một thread đang chạy hay không? Đây là bài toán mình sẽ giải trong buổi học. Các con số chỉ là ví dụ để dễ hình dung, không phải cam kết benchmark. Mình sẽ đi từ khái niệm chương trình, process và thread; theo dấu vòng đời dữ liệu trong server; rồi mới đến event loop, readiness và các chỉ số cần xem khi production chậm. Chưa cần đoán đúng ngay lúc này; mình sẽ quay lại câu hỏi sau khi đã học đủ các cơ chế.',
+      'Trong dashboard production, API đang giữ 50.000 kết nối TCP mở. Snapshot I/O báo chỉ 10 socket vừa có dữ liệu mới sẵn sàng. 49.990 kết nối còn lại vẫn tồn tại nhưng đang chờ, không cần CPU chạy liên tục. Nếu mỗi kết nối có một thread riêng, hàng chục nghìn stack và ngữ cảnh lập lịch vẫn phải được quản lý. Runtime nhận ra đúng socket cần xử lý bằng cách nào?',
     takeaway: 'Câu hỏi của buổi học: làm sao giữ nhiều kết nối mà không trả chi phí như thể tất cả đều đang chạy?',
     visual: {
       kind: 'text-slide',
-      eyebrow: 'TÌNH HUỐNG MỞ BÀI · API CÓ NHIỀU KẾT NỐI CHỜ',
-      lead: 'Một server đang giữ 50.000 kết nối TCP mở. Chỉ 10 socket vừa có dữ liệu mới.',
+      lead: 'Một server giữ nhiều kết nối cùng lúc; runtime chỉ cần xử lý những socket có dữ liệu mới.',
       metrics: [
         { value: '50.000', label: 'kết nối đang mở' },
         { value: '10', label: 'socket có dữ liệu mới' },
@@ -26,14 +25,14 @@ export const instructor_c1_l1: InstructorLessonPlan = {
       ],
       question: 'Ứng dụng phải trả chi phí gì để biết socket nào thực sự cần được xử lý?',
       note: 'Số liệu là ví dụ đặt vấn đề; chi phí thật phụ thuộc hệ điều hành, cấu hình và workload.'
-    }
+    },
   },
   roadmap: {
     id: 'lesson-roadmap',
     title: 'Mình sẽ lần theo câu hỏi này từ trong ra ngoài',
     subtitle: 'Bốn chặng nối thành một bài học liền mạch',
     narration:
-      'Trước khi đi vào sơ đồ, mình thống nhất đường đi của buổi học. Đầu tiên, mình làm rõ process và thread để biết hệ điều hành đang cấp phát và lập lịch cái gì. Tiếp theo, mình nhìn vào server sống lâu để hiểu vì sao dữ liệu của hai request có thể va vào nhau. Sau đó mình theo một request qua main thread, event loop và kernel I/O, rồi dùng latency và định luật Little để tính công việc đang nằm trong hệ thống. Cuối cùng, mình quay lại năm mươi nghìn kết nối và ghép các metric thành cách chẩn đoán production. Mỗi phần sẽ giải thích cơ chế trước, minh họa bằng tình huống sau, rồi mới hỏi bạn vận dụng. Các sơ đồ là công cụ để nhìn một quan hệ cụ thể; có đoạn mình chỉ dùng vài dòng chữ hoặc công thức vì như vậy rõ hơn.',
+      'Ta sẽ giải câu hỏi production qua bốn lớp, mỗi lớp mở ra một manh mối của cùng một sự cố. Trước hết, phân biệt chương trình, process, thread và vùng nhớ mà hệ điều hành thực sự quản lý. Kế đó, xem server sống qua nhiều request ra sao và trạng thái nào đang được chia sẻ. Rồi lần theo một request qua main thread, event loop đến kernel I/O để tìm chỗ nó phải chờ. Cuối cùng, đối chiếu latency, request đang xử lý và memory metrics để quyết định cần kiểm tra gì trong production.',
     takeaway: 'Một bài xuyên suốt: từ process/thread đến runtime, I/O và quyết định vận hành.',
     visual: {
       kind: 'text-slide',
@@ -44,9 +43,8 @@ export const instructor_c1_l1: InstructorLessonPlan = {
         { title: 'Vòng đời request', detail: 'Server singleton, trạng thái dùng chung và điểm await.' },
         { title: 'Runtime và I/O', detail: 'Main thread, event loop, độ trễ và socket readiness.' },
         { title: 'Đọc production', detail: 'Nối latency, CPU, in-flight request và memory metrics.' }
-      ],
-      note: 'Mỗi câu hỏi kiểm tra xuất hiện sau phần giảng và ví dụ tương ứng.'
-    }
+      ]
+    },
   },
   sections: [
     {
@@ -88,7 +86,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'stack-a', title: 'Stack A', detail: 'Ngữ cảnh thực thi riêng', position: [-1.7, 0.6, 0.25], color: '#0284c7' },
               { id: 'stack-b', title: 'Stack B', detail: 'Ngữ cảnh thực thi riêng', position: [1.7, 0.6, 0.25], color: '#d97706' }
             ]
-          }
+          },
         },
         {
           id: 'thread-context',
@@ -104,7 +102,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'stack-a', title: 'Stack A', detail: 'Biến cục bộ của luồng A' },
               { id: 'stack-b', title: 'Stack B', detail: 'Biến cục bộ của luồng B' }
             ]
-          }
+          },
         },
         {
           id: 'virtual-address-space',
@@ -138,7 +136,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'runtime-handle', title: 'Runtime handle', detail: 'Node/libuv gắn callback và trạng thái' },
               { id: 'close-fd', title: 'close()', detail: 'Giải phóng descriptor; số có thể được tái dùng' }
             ]
-          }
+          },
         }
       ],
       check: {
@@ -153,7 +151,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
         correctIndex: 0,
         explanation: 'Các thread trong cùng process chia sẻ không gian địa chỉ, bao gồm heap và bảng file descriptor. Mỗi thread vẫn có stack và trạng thái thanh ghi riêng để lưu ngữ cảnh thực thi.'
       },
-      explanation: 'Chỉ hỏi sau khi đã trình bày ba slide: program → process, ranh giới thread/process và bản đồ bộ nhớ.'
+      explanation: 'Process sở hữu không gian địa chỉ và tài nguyên dùng chung; mỗi thread giữ stack cùng trạng thái thực thi riêng.'
     },
     {
       id: 'long-running-state',
@@ -194,7 +192,8 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { time: '3 ms', actor: 'Request B', action: 'Ghi clinic-hanoi lên cùng thuộc tính' },
               { time: '8 ms', actor: 'Request A', action: 'Tiếp tục và đọc nhầm clinic-hanoi' }
             ]
-          }
+          },
+          focusPlan: ['highlight', 'highlight', 'circle', 'highlight']
         },
         {
           id: 'stateless-repair',
@@ -272,13 +271,14 @@ export const instructor_c1_l1: InstructorLessonPlan = {
             'Node.js thường thực thi JavaScript ứng dụng trên một main thread. Khi handler gặp thao tác I/O bất đồng bộ, runtime đăng ký việc chờ với hệ điều hành hoặc libuv rồi trả quyền cho event loop. Trong thời gian socket chờ, main thread chạy callback khác đã sẵn sàng. Khi dữ liệu về, callback của request đầu được xếp để chạy tiếp. Vì vậy nhiều request có thể đang chờ đồng thời mà không cần một JavaScript thread riêng cho từng request. Nhưng hai đoạn JavaScript đồng bộ trên cùng isolate không chạy song song trên hai lõi.',
           takeaway: 'Node.js tăng concurrency bằng cách không giữ main thread trong lúc chờ I/O.',
           visual: {
-            kind: 'timeline',
-            events: [
-              { time: 't0', actor: 'Request A', action: 'Gửi truy vấn DB, đăng ký callback' },
-              { time: 't1', actor: 'Main thread', action: 'Chạy handler của Request B' },
-              { time: 't2', actor: 'Kernel', action: 'Báo socket A đã có dữ liệu' },
-              { time: 't3', actor: 'Event loop', action: 'Đưa callback A vào lượt chạy' }
-            ]
+            kind: 'text-slide',
+            eyebrow: 'REQUEST I/O · MAIN THREAD · CALLBACK',
+            lead: 'Trong lúc libuv chờ I/O, main thread tiếp tục chạy việc khác. Khi I/O hoàn tất, callback được đưa về để chạy khi thread sẵn sàng.',
+            illustration: {
+              src: 'https://dev-to-uploads.s3.amazonaws.com/uploads/articles/5dnrdqoql3sp9rw0gt1x.gif',
+              alt: 'GIF minh họa JavaScript tiếp tục chạy trong khi libuv xử lý I/O, sau đó callback được đưa về event loop.',
+              caption: 'Andrew Hu & Fabrizio Lallo · Node Doctors · mô hình minh họa giản lược'
+            }
           }
         },
         {
@@ -332,7 +332,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'microtasks', title: 'Microtasks', detail: 'Promise reactions và nextTick theo quy tắc runtime' },
               { id: 'next-work', title: 'Công việc kế tiếp', detail: 'Event loop tiếp tục khi main thread được trả quyền' }
             ]
-          }
+          },
         },
         {
           id: 'microtask-starvation',
@@ -423,7 +423,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'wait-500', title: '× 0,5 s', detail: '500 ms latency → khoảng 1.000 request in-flight' },
               { id: 'capacity-cost', title: 'Tài nguyên', detail: 'Socket, object, timeout, pool và queue' }
             ]
-          }
+          },
         },
         {
           id: 'latency-waterfall',
@@ -497,7 +497,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'ready', title: 'Ready list', detail: 'Chỉ các socket có sự kiện' },
               { id: 'callback', title: 'Callback', detail: 'Event loop tiếp tục xử lý' }
             ]
-          }
+          },
         },
         {
           id: 'poll-vs-epoll-architecture',
@@ -529,7 +529,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               ]
             },
             bridge: '50.000 kết nối đang mở, 10 sự kiện mới: event loop làm việc với tập readiness vừa được kernel báo.'
-          }
+          },
         },
         {
           id: 'socket-event-trace',
@@ -546,7 +546,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { time: '3', actor: 'Kernel/NIC', action: 'Packet đến; FD chuyển sang ready' },
               { time: '4', actor: 'Event loop', action: 'Callback được gọi để xử lý dữ liệu' }
             ]
-          }
+          },
         },
         {
           id: 'connection-capacity-limits',
@@ -563,7 +563,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
               { id: 'app-inflight', title: 'Application in-flight', detail: 'Object request, timeout và queue' },
               { id: 'downstream-pool', title: 'Downstream', detail: 'DB pool, rate limit và backpressure' }
             ]
-          }
+          },
         }
       ],
       check: {
@@ -770,7 +770,7 @@ export const instructor_c1_l1: InstructorLessonPlan = {
         correctIndex: 1,
         explanation: 'CPU thấp trong khi database latency và in-flight cùng tăng phù hợp với nghẽn chờ downstream hoặc queueing. Cần kiểm tra giới hạn pool, timeout và backpressure trước khi tăng tài nguyên mù quáng.'
       },
-      explanation: 'Đây là bài kiểm tra tổng hợp sau khi đã học đủ các cơ chế, không xuất hiện ở phần mở đầu.'
+      explanation: 'CPU thấp đi cùng database latency và số request in-flight tăng cho thấy nhiều công việc đang chờ downstream hoặc queue. Kiểm tra pool, timeout và backpressure sẽ giúp xác định điểm nghẽn.'
     }
   ],
   closing: {

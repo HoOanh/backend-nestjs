@@ -81,9 +81,17 @@ function localBackendApi(): Plugin {
               typeof payload.text === 'string'
                 ? payload.text
                 : '';
+            const sentences =
+              payload && typeof payload === 'object' && 'sentences' in payload &&
+              Array.isArray(payload.sentences) &&
+              payload.sentences.every((sentence: unknown) => typeof sentence === 'string')
+                ? payload.sentences
+                : text
+                  ? [text]
+                  : [];
             try {
               if (ttsPath === '/api/tts/stream') {
-                const result = await streamWithZeroTts(text);
+                const result = await streamWithZeroTts(sentences);
                 response.statusCode = result.status;
                 for (const [name, value] of result.headers) response.setHeader(name, value);
                 if (!result.body) {

@@ -1,1 +1,2 @@
--r requirements-zerotts.txt
+zerotts==0.1.5
+numpy>=1.24

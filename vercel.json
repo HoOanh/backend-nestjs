@@ -13,7 +13,8 @@
       "maxDuration": 60
     },
     "api/zerotts.py": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "excludeFiles": "node_modules/**"
     },
     "api/index.js": {
       "maxDuration": 15

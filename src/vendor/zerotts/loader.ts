@@ -7,6 +7,8 @@
  */
 
 import * as ort from 'onnxruntime-web';
+import ortModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.mjs?url';
+import ortWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
 
 import { fetchWithCache, ProgressFn, totalBytes } from './cache';
 import { CodecMeta, MossCodecDecoder } from './codec';
@@ -63,6 +65,13 @@ export async function loadModel(options: LoadOptions = {}): Promise<LoadedModel>
     options.threads ?? (isolated ? Math.min(4, navigator.hardwareConcurrency || 4) : 1);
   ort.env.wasm.numThreads = wasmThreads;
   ort.env.wasm.simd = true;
+  // Keep Emscripten's import.meta.url pointing at its own module. Bundling it
+  // into worker.ts makes pthreads reload our application worker and hang init.
+  ort.env.wasm.wasmPaths = {
+    mjs: new URL(ortModuleUrl, self.location.href).href,
+    wasm: new URL(ortWasmUrl, self.location.href).href,
+  };
+  ort.env.wasm.initTimeout = 60_000;
   console.info(`[ZeroTTS] ONNX WASM threads=${wasmThreads}; cross-origin isolated=${isolated}`);
 
   // WASM only. WebGPU's kernels are not bit-identical to the CPU path, and this

@@ -47,6 +47,12 @@ import {
   splitIntoVietnameseSentences
 } from '../../services/vietnameseVoiceService.ts';
 import {
+  getZeroTtsInstallState,
+  subscribeZeroTtsInstallState,
+  type ZeroTtsInstallState
+} from '../../services/zeroTtsBrowser.ts';
+import { ZeroTtsInstallPage } from './ZeroTtsInstallPage.tsx';
+import {
   InteractiveSmartboardClassroom,
   type BoardDisplayMode,
   visualEntryCount
@@ -791,6 +797,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const [classStartedAt, setClassStartedAt] = useState<number | null>(null);
   const [classPausedAt, setClassPausedAt] = useState<number | null>(null);
   const [classPausedDurationMs, setClassPausedDurationMs] = useState(0);
+  const [zeroTtsInstallState, setZeroTtsInstallState] = useState<ZeroTtsInstallState>(getZeroTtsInstallState);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(() => {
     const savedIdx = savedClassroomProgress?.currentCheckpointIndex ?? 0;
     return Math.min(Math.max(0, savedIdx), Math.max(0, checkpoints.length - 1));
@@ -842,6 +849,30 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const resumeAfterQuestionRef = useRef<LectureResumePoint | null>(null);
   const tutorRequestControllerRef = useRef<AbortController | null>(null);
   const pendingTutorAssistantIdRef = useRef<string | null>(null);
+  const installPauseRef = useRef(false);
+  const usesBrowserZeroTts = import.meta.env.PROD && import.meta.env.VITE_ZEROTTS_ENABLED !== 'true';
+
+  useEffect(
+    () => subscribeZeroTtsInstallState(setZeroTtsInstallState),
+    []
+  );
+
+  useEffect(() => {
+    if (!usesBrowserZeroTts || !hasStartedClass || classStartedAt === null) return;
+
+    if (zeroTtsInstallState.status === 'loading' && classPausedAt === null) {
+      installPauseRef.current = true;
+      setClassPausedAt(Date.now());
+    } else if (
+      zeroTtsInstallState.status === 'ready' &&
+      installPauseRef.current &&
+      classPausedAt !== null
+    ) {
+      setClassPausedDurationMs((previous) => previous + Date.now() - classPausedAt);
+      setClassPausedAt(null);
+      installPauseRef.current = false;
+    }
+  }, [usesBrowserZeroTts, hasStartedClass, classStartedAt, classPausedAt, zeroTtsInstallState.status]);
 
   const setLectureAutoPlay = useCallback((enabled: boolean) => {
     const wasEnabled = lectureAutoPlayRef.current;
@@ -849,7 +880,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     if (classStartedAt === null || wasEnabled === enabled) return;
     if (!enabled && classPausedAt === null) {
       setClassPausedAt(Date.now());
-    } else if (enabled && classPausedAt !== null) {
+    } else if (enabled && classPausedAt !== null && !installPauseRef.current) {
       setClassPausedDurationMs((previous) => previous + Date.now() - classPausedAt);
       setClassPausedAt(null);
     }
@@ -896,6 +927,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     setClassStartedAt(null);
     setClassPausedAt(null);
     setClassPausedDurationMs(0);
+    installPauseRef.current = false;
     setActiveStepIndex(
       Math.min(
         Math.max(0, savedClassroomProgress?.currentCheckpointIndex ?? 0),
@@ -1780,6 +1812,14 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#F5F0E6] text-stone-800">
       <Toaster position="top-center" richColors theme="light" />
+
+      {usesBrowserZeroTts && hasStartedClass &&
+        (zeroTtsInstallState.status === 'loading' || zeroTtsInstallState.status === 'error') && (
+          <ZeroTtsInstallPage
+            state={zeroTtsInstallState}
+            onRetry={() => playCurrentBeatFromCurrentSentence(lectureAutoPlayRef.current)}
+          />
+        )}
 
       {/* =====================================================================
           1. TOP BRIGHT CLASSROOM HEADER BAR

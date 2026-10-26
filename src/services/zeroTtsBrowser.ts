@@ -1,11 +1,15 @@
-import { toast } from 'sonner';
 import { textSegments } from '../vendor/zerotts/chunking';
 import { normalizeViText } from '../vendor/zerotts/textNorm';
 import { TtsWorker } from '../vendor/zerotts/workerClient';
 
 const MODEL_REPO = 'zeroweight-ai/ZeroTTS';
 const VOICE = 'quangminh';
-const LOAD_TOAST_ID = 'zerotts-browser-model';
+export interface ZeroTtsInstallState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  loadedBytes: number;
+  totalBytes: number;
+  errorMessage?: string;
+}
 
 type SpeechController = { cancelled: boolean };
 type FrameHandler = (samples: Float32Array<ArrayBuffer>, sampleRate: number, sentenceIndex: number) => void;
@@ -15,6 +19,29 @@ let loadedSampleRate = 0;
 let loadPromise: Promise<void> | null = null;
 let generationTail: Promise<void> = Promise.resolve();
 let activeCancellation: (() => void) | null = null;
+let installState: ZeroTtsInstallState = {
+  status: 'idle',
+  loadedBytes: 0,
+  totalBytes: 0,
+};
+const installStateListeners = new Set<(state: ZeroTtsInstallState) => void>();
+
+function publishInstallState(nextState: ZeroTtsInstallState): void {
+  installState = nextState;
+  installStateListeners.forEach((listener) => listener(installState));
+}
+
+export function getZeroTtsInstallState(): ZeroTtsInstallState {
+  return installState;
+}
+
+export function subscribeZeroTtsInstallState(
+  listener: (state: ZeroTtsInstallState) => void,
+): () => void {
+  installStateListeners.add(listener);
+  listener(installState);
+  return () => installStateListeners.delete(listener);
+}
 
 function getWorker(): TtsWorker {
   worker ??= new TtsWorker();
@@ -24,30 +51,34 @@ function getWorker(): TtsWorker {
 async function ensureModelLoaded(): Promise<void> {
   if (!loadPromise) {
     const modelWorker = getWorker();
-    toast.loading('Đang tải ZeroTTS lần đầu (~900 MB). Giữ trang mở đến khi xong.', {
-      id: LOAD_TOAST_ID,
-      duration: Infinity,
+    publishInstallState({
+      status: 'loading',
+      loadedBytes: 0,
+      totalBytes: 0,
     });
     loadPromise = modelWorker
       .load(MODEL_REPO, (progress) => {
-        const percent = progress.overallTotal > 0
-          ? Math.floor((progress.overallLoaded / progress.overallTotal) * 100)
-          : 0;
-        toast.loading(`Đang tải ZeroTTS ${percent}% · ${(progress.overallLoaded / 1e6).toFixed(0)} / ${(progress.overallTotal / 1e6).toFixed(0)} MB`, {
-          id: LOAD_TOAST_ID,
-          duration: Infinity,
+        publishInstallState({
+          status: 'loading',
+          loadedBytes: progress.overallLoaded,
+          totalBytes: progress.overallTotal,
         });
       }, 'onnx')
       .then((loaded) => {
         loadedSampleRate = loaded.sampleRate;
-        toast.success('ZeroTTS đã sẵn sàng trên thiết bị.', {
-          id: LOAD_TOAST_ID,
-          duration: 4000,
+        publishInstallState({
+          status: 'ready',
+          loadedBytes: installState.totalBytes,
+          totalBytes: installState.totalBytes,
         });
       })
       .catch((error: unknown) => {
         loadPromise = null;
-        toast.dismiss(LOAD_TOAST_ID);
+        publishInstallState({
+          ...installState,
+          status: 'error',
+          errorMessage: error instanceof Error ? error.message : 'Không tải được tài nguyên ZeroTTS.',
+        });
         throw error;
       });
   }

@@ -1,7 +1,26 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type PreviewServer, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
+
+function crossOriginIsolation(): Plugin {
+  const configure = (server: ViteDevServer | PreviewServer) => {
+    server.middlewares.use((request, response, next) => {
+      // Workers need COEP on their own response, including Vite's source URLs.
+      response.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+      if ((request.url || '').split('?')[0].startsWith('/ai-classroom/')) {
+        response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+      }
+      next();
+    });
+  };
+
+  return {
+    name: 'cross-origin-isolation',
+    configureServer: configure,
+    configurePreviewServer: configure
+  };
+}
 
 function localBackendApi(): Plugin {
   return {
@@ -24,13 +43,6 @@ function localBackendApi(): Plugin {
       ]);
       server.httpServer?.once('close', () => {
         void stopLocalZeroTtsService();
-      });
-      server.middlewares.use((request, response, next) => {
-        if ((request.url || '').split('?')[0].startsWith('/ai-classroom/')) {
-          response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-          response.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
-        }
-        next();
       });
       void warmLocalZeroTtsService().catch((error: unknown) => {
         console.error('ZeroTTS warmup failed:', error);
@@ -266,7 +278,7 @@ export default defineConfig(({ mode }) => {
   process.env.ADMIN_PASSWORD = env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
   return {
-    plugins: [react(), tailwindcss(), localBackendApi()],
+    plugins: [react(), tailwindcss(), crossOriginIsolation(), localBackendApi()],
     optimizeDeps: {
       exclude: ['onnxruntime-web']
     },

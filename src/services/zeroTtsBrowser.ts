@@ -45,13 +45,18 @@ export function subscribeZeroTtsInstallState(
 }
 
 function getWorker(): TtsWorker {
+  if (worker?.isCrashed) {
+    worker = null;
+    loadPromise = null;
+    loadedSampleRate = 0;
+  }
   worker ??= new TtsWorker();
   return worker;
 }
 
 async function ensureModelLoaded(): Promise<void> {
+  const modelWorker = getWorker();
   if (!loadPromise) {
-    const modelWorker = getWorker();
     publishInstallState({
       status: 'loading',
       phase: 'checking',

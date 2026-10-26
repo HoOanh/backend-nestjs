@@ -29,6 +29,7 @@ export class TtsWorker {
 
   private pending = new Map<number, Pending>();
   private nextId = 1;
+  private crashed = false;
 
   constructor() {
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
@@ -50,11 +51,31 @@ export class TtsWorker {
     };
     // A worker that dies (OOM on a 900 MB model is the realistic cause) would
     // otherwise leave every caller awaiting forever.
-    this.worker.onerror = (event) => this.failAll(event.message || 'worker crashed');
+    this.worker.onerror = (event) => {
+      const error = event.error as unknown;
+      const message = error instanceof Error ? error.message : event.message;
+      const location = event.filename
+        ? ` (${event.filename}:${event.lineno}:${event.colno})`
+        : '';
+      console.error('[ZeroTTS] synthesis worker crashed', {
+        message: message || 'worker crashed',
+        filename: event.filename,
+        line: event.lineno,
+        column: event.colno,
+        error,
+      });
+      this.failAll(`${message || 'worker crashed'}${location}`);
+    };
     this.worker.onmessageerror = () => this.failAll('worker sent an unreadable message');
   }
 
+  get isCrashed(): boolean {
+    return this.crashed;
+  }
+
   private failAll(message: string): void {
+    this.crashed = true;
+    this.worker.terminate();
     for (const [, entry] of this.pending) entry.reject(new Error(message));
     this.pending.clear();
   }
@@ -62,6 +83,7 @@ export class TtsWorker {
   private request<T>(
     message: WorkerRequest, hooks: Omit<Pending, 'resolve' | 'reject'> = {},
   ): Promise<T> {
+    if (this.crashed) return Promise.reject(new Error('ZeroTTS worker đã dừng sau lỗi trước đó.'));
     return new Promise<T>((resolve, reject) => {
       this.pending.set(message.id, { resolve: resolve as Pending['resolve'], reject, ...hooks });
       this.worker.postMessage(message);

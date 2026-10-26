@@ -37,9 +37,9 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
             ? isDownloading
               ? 'Đang thực hiện tải tài nguyên lần đầu'
               : isChecking
-                ? 'Đang kiểm tra tài nguyên trên thiết bị'
+                ? 'Đang kiểm tra tài nguyên'
                 : 'Đang chuẩn bị tài nguyên'
-            : 'Chưa tải xong tài nguyên'}
+            : 'Chưa thể chuẩn bị tài nguyên'}
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-stone-600">
           {isLoading
@@ -48,7 +48,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
               : isChecking
                 ? 'Đang kiểm tra tài nguyên đã lưu để tiếp tục buổi học.'
                 : 'Tài nguyên đã có trên thiết bị. Đang chuẩn bị để tiếp tục buổi học.'
-            : 'Không tải được tài nguyên. Kiểm tra kết nối mạng rồi thử lại.'}
+            : 'Tài nguyên chưa sẵn sàng. Thử lại để tiếp tục buổi học.'}
         </p>
 
         {isLoading && isDownloading ? (
@@ -84,7 +84,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
         ) : isLoading ? (
           <div className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-sky-700">
             <LoaderCircle size={18} className="animate-spin" />
-            {isChecking ? 'Đang kiểm tra tài nguyên trên thiết bị' : 'Đang chuẩn bị tài nguyên'}
+            {isChecking ? 'Đang kiểm tra tài nguyên' : 'Đang chuẩn bị tài nguyên'}
           </div>
         ) : (
           <Button
@@ -95,7 +95,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
             className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-700 px-5 py-3 font-bold text-white transition hover:bg-sky-800"
           >
             <RotateCcw size={17} />
-            Thử tải lại
+            Thử lại
           </Button>
         )}
       </section>

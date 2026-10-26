@@ -1007,12 +1007,15 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           finishPlayback(true);
         },
         onError: (message) => {
-          toast.error(message);
+          console.error('[Classroom] Speech playback failed:', message);
+          toast.error(usesBrowserZeroTts
+            ? 'Không thể chuẩn bị tài nguyên. Thử lại để tiếp tục buổi học.'
+            : message);
           finishPlayback(false);
         }
       });
     },
-    [voiceEnabled, speechRate]
+    [usesBrowserZeroTts, voiceEnabled, speechRate]
   );
 
   const playProfessorVietnameseStream = useCallback(
@@ -1051,12 +1054,15 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         },
         onEnd: finishPlayback,
         onError: (message) => {
-          toast.error(message);
+          console.error('[Classroom] Speech playback failed:', message);
+          toast.error(usesBrowserZeroTts
+            ? 'Không thể chuẩn bị tài nguyên. Thử lại để tiếp tục buổi học.'
+            : message);
           finishPlayback();
         }
       });
     },
-    [voiceEnabled, speechRate]
+    [usesBrowserZeroTts, voiceEnabled, speechRate]
   );
 
   const preloadUpcomingLectureBeats = useCallback((currentIndex: number) => {

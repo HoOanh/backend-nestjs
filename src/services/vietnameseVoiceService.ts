@@ -1,6 +1,6 @@
 // ZeroTTS Vietnamese lecture audio with Web Audio amplitude tracking.
 
-import { streamZeroTtsInBrowser, stopBrowserZeroTts } from './zeroTtsBrowser';
+import { streamZeroTtsInBrowser, stopBrowserZeroTts, type SpeechController } from './zeroTtsBrowser';
 
 export interface SpeakVietnameseOptions {
   text: string;
@@ -21,6 +21,7 @@ const activeAudioObjectUrls = new Set<string>();
 const activeStreamAudioSources = new Set<AudioBufferSourceNode>();
 let activeTtsRequest: AbortController | null = null;
 const preloadedTtsAudio = new Map<string, PreparedSpeechTask>();
+let activePreparedSpeechTask: PreparedSpeechTask | null = null;
 
 function usesBrowserZeroTts(): boolean {
   return import.meta.env.PROD && import.meta.env.VITE_ZEROTTS_ENABLED !== 'true';
@@ -76,7 +77,13 @@ export function splitIntoVietnameseSentences(text: string): string[] {
 /**
  * Stop any ongoing Vietnamese speech playback immediately.
  */
-export function stopVietnameseSpeech(): void {
+export function stopVietnameseSpeech(preservePreloads = false): void {
+  activePreparedSpeechTask?.cancel();
+  activePreparedSpeechTask = null;
+  if (!preservePreloads) {
+    for (const task of preloadedTtsAudio.values()) task.cancel();
+    preloadedTtsAudio.clear();
+  }
   if (activeStopController) {
     activeStopController.cancelled = true;
     activeStopController = null;
@@ -297,6 +304,7 @@ interface PreparedSpeechTask {
   sentences: string[];
   queue: PreparedSpeechQueue;
   producer: Promise<void>;
+  cancel: () => void;
 }
 
 async function requestZeroTtsAudio(
@@ -349,8 +357,20 @@ export function preloadVietnameseSpeech(rawText: string): void {
     const [oldestText, oldestTask] = preloadedTtsAudio.entries().next().value ?? [];
     if (typeof oldestText !== 'string' || !oldestTask) break;
     preloadedTtsAudio.delete(oldestText);
-    oldestTask.queue.discard();
+    oldestTask.cancel();
   }
+}
+
+/** Replace stale lookahead before it can hold up the next narrated beat. */
+export function preloadVietnameseSpeechSequence(rawTexts: string[]): void {
+  const texts = rawTexts.map(normalizeTextForVietnameseSpeech).filter(Boolean).slice(0, 3);
+  const upcoming = new Set(texts);
+  for (const [text, task] of preloadedTtsAudio) {
+    if (upcoming.has(text)) continue;
+    preloadedTtsAudio.delete(text);
+    task.cancel();
+  }
+  for (const text of texts) preloadVietnameseSpeech(text);
 }
 
 function createStreamAudioSession(): StreamAudioSession | null {
@@ -393,16 +413,19 @@ async function streamZeroTtsSentence(
 
 export async function fetchZeroTtsPcmFrames(
   sentences: string[],
-  controller: { cancelled: boolean },
+  controller: SpeechController,
   onFrame: (samples: Float32Array<ArrayBuffer>, sampleRate: number, sentenceIndex: number) => void,
   trackAsActive = true
 ): Promise<void> {
+  if (controller.cancelled || controller.signal?.aborted) return;
   if (usesBrowserZeroTts()) {
     await streamZeroTtsInBrowser(sentences, controller, onFrame, trackAsActive);
     return;
   }
 
   const requestController = new AbortController();
+  const abort = () => requestController.abort();
+  controller.signal?.addEventListener('abort', abort, { once: true });
   if (trackAsActive) activeTtsRequest = requestController;
   try {
     const response = await fetch('/api/tts/stream', {
@@ -462,6 +485,7 @@ export async function fetchZeroTtsPcmFrames(
       reader.releaseLock();
     }
   } finally {
+    controller.signal?.removeEventListener('abort', abort);
     if (trackAsActive && activeTtsRequest === requestController) activeTtsRequest = null;
   }
 }
@@ -503,14 +527,20 @@ function schedulePcmFrame(
 function createPreparedSpeechTask(text: string): PreparedSpeechTask {
   const sentences = splitIntoVietnameseSentences(text);
   const queue = new PreparedSpeechQueue();
+  const abort = new AbortController();
+  const controller: SpeechController = { cancelled: false, signal: abort.signal };
   const task: PreparedSpeechTask = {
     sentences,
     queue,
-    producer: Promise.resolve()
+    producer: Promise.resolve(),
+    cancel: () => {
+      controller.cancelled = true;
+      abort.abort();
+      queue.discard();
+    }
   };
   task.producer = (async () => {
     try {
-      const controller = { cancelled: false };
       let activeSentenceIndex = -1;
       await fetchZeroTtsPcmFrames(sentences, controller, (samples, sampleRate, sentenceIndex) => {
         if (activeSentenceIndex >= 0 && sentenceIndex !== activeSentenceIndex) {
@@ -539,6 +569,7 @@ function createPreparedSpeechTask(text: string): PreparedSpeechTask {
       queue.close();
     } catch (error) {
       queue.close(error);
+      if (preloadedTtsAudio.get(text) === task) preloadedTtsAudio.delete(text);
     }
   })();
   return task;
@@ -1007,7 +1038,7 @@ async function* iterateSentences(sentences: string[]): AsyncGenerator<string, vo
  * while these scheduled frames are still playing.
  */
 export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<void> {
-  stopVietnameseSpeech();
+  stopVietnameseSpeech(true);
   const controller = { cancelled: false };
   activeStopController = controller;
   const rate = options.rate ?? 1.05;
@@ -1019,8 +1050,15 @@ export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<
 
   options.onStart?.();
   try {
+    if (!preloadedTtsAudio.has(cleanedText)) preloadVietnameseSpeechSequence([]);
+    for (const [text, task] of preloadedTtsAudio) {
+      if (text === cleanedText) break;
+      preloadedTtsAudio.delete(text);
+      task.cancel();
+    }
     const preparedTask = preloadedTtsAudio.get(cleanedText) ?? createPreparedSpeechTask(cleanedText);
     preloadedTtsAudio.delete(cleanedText);
+    activePreparedSpeechTask = preparedTask;
 
     if (controller.cancelled) return;
     if (preparedTask) {
@@ -1036,7 +1074,10 @@ export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<
       options.onAmplitude?.(0);
     }
   } finally {
-    if (activeStopController === controller) activeStopController = null;
+    if (activeStopController === controller) {
+      activeStopController = null;
+      activePreparedSpeechTask = null;
+    }
   }
 }
 

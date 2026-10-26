@@ -12,7 +12,7 @@ export interface ZeroTtsInstallState {
   errorMessage?: string;
 }
 
-type SpeechController = { cancelled: boolean };
+export type SpeechController = { cancelled: boolean; signal?: AbortSignal };
 type FrameHandler = (samples: Float32Array<ArrayBuffer>, sampleRate: number, sentenceIndex: number) => void;
 
 let worker: TtsWorker | null = null;
@@ -125,12 +125,12 @@ export async function streamZeroTtsInBrowser(
   trackAsActive = true,
 ): Promise<void> {
   await ensureModelLoaded();
-  if (controller.cancelled) return;
+  if (controller.cancelled || controller.signal?.aborted) return;
 
   await withGenerationLock(async () => {
     const modelWorker = getWorker();
     for (let sentenceIndex = 0; sentenceIndex < sentences.length; sentenceIndex += 1) {
-      if (controller.cancelled) return;
+      if (controller.cancelled || controller.signal?.aborted) return;
       const segments = textSegments(normalizeViText(sentences[sentenceIndex]));
       if (!segments.length) continue;
 
@@ -139,6 +139,7 @@ export async function streamZeroTtsInBrowser(
         voiceName: VOICE,
         options: {},
       });
+      controller.signal?.addEventListener('abort', run.cancel, { once: true });
       if (trackAsActive) activeCancellation = run.cancel;
       try {
         for await (const chunk of run.chunks) {
@@ -149,6 +150,7 @@ export async function streamZeroTtsInBrowser(
           onFrame(new Float32Array(chunk), loadedSampleRate, sentenceIndex);
         }
       } finally {
+        controller.signal?.removeEventListener('abort', run.cancel);
         if (activeCancellation === run.cancel) activeCancellation = null;
       }
     }

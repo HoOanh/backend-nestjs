@@ -43,7 +43,7 @@ import { MODEL_OPTIONS } from '../../context/TutorChatContext.tsx';
 import {
   speakVietnamese,
   speakVietnameseStream,
-  preloadVietnameseSpeech,
+  preloadVietnameseSpeechSequence,
   stopVietnameseSpeech,
   splitIntoVietnameseSentences
 } from '../../services/vietnameseVoiceService.ts';
@@ -59,6 +59,7 @@ import {
   visualEntryCount
 } from './InteractiveSmartboardClassroom.tsx';
 import { buildStableFocusSequence, resolveFocusSequenceIndex } from './focusSequence.ts';
+import { scheduleLectureAdvance } from './lecturePlayback.ts';
 import { CodeSandboxTab } from '../lesson/CodeSandboxTab.tsx';
 import { Button } from '../ui/button.tsx';
 import { Input } from '../ui/input.tsx';
@@ -574,10 +575,10 @@ function buildLectureBeatsForStep(
       boardMode: 'keypoints',
       pointIndex: 0,
       codeLineIndex: 0,
-      slideTitle: 'Dừng lại và cô đọng',
+      slideTitle: 'Cô đọng phần vừa học',
       slideTakeaway: '',
       slidePoints: [],
-      slideSubtitle: 'Nhìn lại các ý vừa học, rồi tự nói lại bằng lời của mình.',
+      slideSubtitle: 'Hệ thống lại các ý chính trước câu hỏi áp dụng.',
       instructorVisual: {
         kind: 'text-slide',
         eyebrow: 'CÔ ĐỌNG SAU PHẦN HỌC',
@@ -585,8 +586,7 @@ function buildLectureBeatsForStep(
         points: recapPoints,
         question: 'Nếu chỉ giữ lại một điều từ phần này, em sẽ nói điều gì?'
       },
-      spokenScript: `Mình vừa đi qua ${instructorSection.title}. ${recapTakeaways.join(' ')} ${recapLead ? `Các ý này liên kết với nhau ở điểm: ${recapLead}` : ''} Bây giờ mình dừng một nhịp. Hãy tự nói lại ý quan trọng nhất bằng một hoặc hai câu, và nghĩ xem vì sao nó đúng. Khi sẵn sàng, mình tiếp tục với câu hỏi áp dụng.`,
-      pauseAfterNarration: true,
+      spokenScript: `Mình vừa đi qua ${instructorSection.title}. ${recapTakeaways.join(' ')} ${recapLead ? `Các ý này liên kết với nhau ở điểm: ${recapLead}` : ''} Hãy giữ lại ý quan trọng nhất và nghĩ xem vì sao nó đúng. Mình chuyển sang câu hỏi áp dụng.`,
       presentationRole: 'recap'
     });
 
@@ -714,10 +714,10 @@ function buildLectureBeatsForStep(
     boardMode: 'keypoints',
     pointIndex: 0,
     codeLineIndex: 0,
-    slideTitle: 'Dừng lại và cô đọng',
+    slideTitle: 'Cô đọng phần vừa học',
     slideTakeaway: '',
     slidePoints: [],
-    slideSubtitle: 'Nhìn lại các ý vừa học, rồi tự nói lại bằng lời của mình.',
+    slideSubtitle: 'Hệ thống lại các ý chính trước câu hỏi áp dụng.',
     instructorVisual: {
       kind: 'text-slide',
       eyebrow: 'CÔ ĐỌNG SAU PHẦN HỌC',
@@ -725,8 +725,7 @@ function buildLectureBeatsForStep(
       points: recapPoints,
       question: 'Nếu chỉ giữ lại một điều từ phần này, em sẽ nói điều gì?'
     },
-    spokenScript: `Mình vừa học xong ${checkpoint.title}. ${recapPoints.map((point) => point.detail).join(' ')} Bây giờ mình dừng một nhịp. Hãy tự nói lại ý quan trọng nhất bằng một hoặc hai câu, rồi nghĩ xem nó giải thích được điều gì trong tình huống thực tế. Khi sẵn sàng, mình tiếp tục với câu hỏi áp dụng.`,
-    pauseAfterNarration: true,
+    spokenScript: `Mình vừa học xong ${checkpoint.title}. ${recapPoints.map((point) => point.detail).join(' ')} Hãy giữ lại ý quan trọng nhất và liên hệ với tình huống thực tế. Mình chuyển sang câu hỏi áp dụng.`,
     presentationRole: 'recap'
   });
 
@@ -846,6 +845,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const raisingHandRef = useRef(false);
   const lectureAutoPlayRef = useRef(true);
+  const cancelLectureAdvanceRef = useRef<(() => void) | null>(null);
   const activeNarrationSentenceIndexRef = useRef(0);
   const activeNarrationFocusIndexRef = useRef(-1);
   const resumeAfterQuestionRef = useRef<LectureResumePoint | null>(null);
@@ -877,6 +877,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   }, [usesBrowserZeroTts, hasStartedClass, classStartedAt, classPausedAt, zeroTtsInstallState.status]);
 
   const setLectureAutoPlay = useCallback((enabled: boolean) => {
+    if (!enabled) cancelLectureAdvanceRef.current?.();
     const wasEnabled = lectureAutoPlayRef.current;
     lectureAutoPlayRef.current = enabled;
     if (classStartedAt === null || wasEnabled === enabled) return;
@@ -955,6 +956,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   useEffect(() => {
     return () => {
       tutorRequestControllerRef.current?.abort();
+      cancelLectureAdvanceRef.current?.();
       stopVietnameseSpeech();
     };
   }, []);
@@ -968,6 +970,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       sentenceOffset = 0,
       onAudioReady?: () => void
     ) => {
+      cancelLectureAdvanceRef.current?.();
       setLiveSubtitle(scriptText);
       if (!voiceEnabled) {
         stopVietnameseSpeech();
@@ -1066,11 +1069,12 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   );
 
   const preloadUpcomingLectureBeats = useCallback((currentIndex: number) => {
-    const lookaheadEnd = Math.min(lectureBeats.length, currentIndex + 4);
-    for (let index = currentIndex + 1; index < lookaheadEnd; index += 1) {
-      preloadVietnameseSpeech(lectureBeats[index].spokenScript);
-    }
+    preloadVietnameseSpeechSequence(
+      lectureBeats.slice(currentIndex + 1, currentIndex + 4).map((beat) => beat.spokenScript)
+    );
   }, [lectureBeats]);
+
+  useEffect(() => () => cancelLectureAdvanceRef.current?.(), [activeStepIndex, activeBeatIndex]);
 
   // Automatically run the current Lecture Beat when class is active and not interrupted
   useEffect(() => {
@@ -1144,11 +1148,12 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           beat.boardMode !== 'question' &&
           activeBeatIndex < lectureBeats.length - 1
         ) {
-          setTimeout(() => {
-            setActiveBeatIndex((prev) => prev === activeBeatIndex
-              ? Math.min(prev + 1, lectureBeats.length - 1)
-              : prev);
-          }, 3500);
+          cancelLectureAdvanceRef.current = scheduleLectureAdvance(
+            () => setActiveBeatIndex((previous) => previous === activeBeatIndex
+              ? Math.min(previous + 1, lectureBeats.length - 1)
+              : previous),
+            () => lectureAutoPlayRef.current && !raisingHandRef.current
+          );
         }
       },
       (sentenceIndex) => {
@@ -1330,11 +1335,12 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           currentBeat.boardMode !== 'question' &&
           activeBeatIndex < lectureBeats.length - 1
         ) {
-          setTimeout(() => {
-            setActiveBeatIndex((previous) => previous === activeBeatIndex
+          cancelLectureAdvanceRef.current = scheduleLectureAdvance(
+            () => setActiveBeatIndex((previous) => previous === activeBeatIndex
               ? Math.min(previous + 1, lectureBeats.length - 1)
-              : previous);
-          }, 3500);
+              : previous),
+            () => lectureAutoPlayRef.current && !raisingHandRef.current
+          );
         }
       },
       (sentenceIndex) => {

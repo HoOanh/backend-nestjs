@@ -6,6 +6,7 @@ const MODEL_REPO = 'zeroweight-ai/ZeroTTS';
 const VOICE = 'quangminh';
 export interface ZeroTtsInstallState {
   status: 'idle' | 'loading' | 'ready' | 'error';
+  phase?: 'checking' | 'downloading' | 'preparing';
   loadedBytes: number;
   totalBytes: number;
   errorMessage?: string;
@@ -53,21 +54,33 @@ async function ensureModelLoaded(): Promise<void> {
     const modelWorker = getWorker();
     publishInstallState({
       status: 'loading',
+      phase: 'checking',
       loadedBytes: 0,
       totalBytes: 0,
     });
     loadPromise = modelWorker
-      .load(MODEL_REPO, (progress) => {
+      .downloadInfo(MODEL_REPO, 'onnx')
+      .then(async (downloadInfo) => {
         publishInstallState({
           status: 'loading',
-          loadedBytes: progress.overallLoaded,
-          totalBytes: progress.overallTotal,
+          phase: downloadInfo.cached ? 'preparing' : 'downloading',
+          loadedBytes: 0,
+          totalBytes: downloadInfo.bytes,
         });
-      }, 'onnx')
+        return modelWorker.load(MODEL_REPO, (progress) => {
+          publishInstallState({
+            status: 'loading',
+            phase: downloadInfo.cached ? 'preparing' : 'downloading',
+            loadedBytes: progress.overallLoaded,
+            totalBytes: progress.overallTotal,
+          });
+        }, 'onnx');
+      })
       .then((loaded) => {
         loadedSampleRate = loaded.sampleRate;
         publishInstallState({
           status: 'ready',
+          phase: undefined,
           loadedBytes: installState.totalBytes,
           totalBytes: installState.totalBytes,
         });
@@ -77,6 +90,7 @@ async function ensureModelLoaded(): Promise<void> {
         publishInstallState({
           ...installState,
           status: 'error',
+          phase: undefined,
           errorMessage: error instanceof Error ? error.message : 'Không tải được tài nguyên ZeroTTS.',
         });
         throw error;

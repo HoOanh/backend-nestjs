@@ -36,14 +36,6 @@ export interface ChatLog {
   timestamp: string;
 }
 
-export interface SqlQueryResult<T = Record<string, unknown>> {
-  rows: T[];
-  rowCount: number;
-  columns: string[];
-  executionTimeMs: number;
-  error?: string;
-}
-
 export interface ContextWindowInfo {
   sessionMessageCount: number;
   includedInContextCount: number;

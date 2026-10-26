@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { Lesson } from '../data/curriculum.ts';
-import type { ChatSession, ChatMessage, ChatLog, SqlQueryResult } from '../types/chat.ts';
+import type { ChatSession, ChatMessage, ChatLog } from '../types/chat.ts';
 import { chatDbService } from '../services/db/chatDbService.ts';
 
 export interface ModelOption {
@@ -46,15 +46,11 @@ interface TutorChatContextType {
   isHistoryOpen: boolean;
   setIsHistoryOpen: (open: boolean) => void;
   toggleHistory: () => void;
-  isSqlConsoleOpen: boolean;
-  setIsSqlConsoleOpen: (open: boolean) => void;
-  toggleSqlConsole: () => void;
   contextWindowCount: number;
   sendMessage: (questionOverride?: string) => Promise<void>;
   createNewSession: (customTitle?: string) => Promise<void>;
   switchSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  executeRawSql: (sql: string, params?: unknown[]) => Promise<SqlQueryResult>;
   getLogs: (limit?: number) => Promise<ChatLog[]>;
   reloadSessions: () => Promise<void>;
 }
@@ -81,7 +77,6 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
-  const [isSqlConsoleOpen, setIsSqlConsoleOpen] = useState<boolean>(false);
 
   const activeAssistantMsgIdRef = useRef<string | null>(null);
   const currentLessonRef = useRef<Lesson | null>(null);
@@ -524,7 +519,7 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
           throw new Error('Tutor không trả về nội dung.');
         }
 
-        // Commit full assistant content to SQLite
+        // Persist the completed assistant response through the chat API.
         if (assistantMsg.id) {
           await chatDbService.updateMessageContent(assistantMsg.id, accumulatedText);
         }
@@ -606,12 +601,6 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
   };
 
   const toggleHistory = () => setIsHistoryOpen((prev) => !prev);
-  const toggleSqlConsole = () => setIsSqlConsoleOpen((prev) => !prev);
-
-  const executeRawSql = async (sql: string, params?: unknown[]): Promise<SqlQueryResult> => {
-    return chatDbService.executeRawSql(sql, params);
-  };
-
   const getLogs = async (limit = 100): Promise<ChatLog[]> => {
     return chatDbService.getLogs({
       sessionId: currentSession?.id,
@@ -641,15 +630,11 @@ export const TutorChatProvider: React.FC<{ children: React.ReactNode; userId?: s
         isHistoryOpen,
         setIsHistoryOpen,
         toggleHistory,
-        isSqlConsoleOpen,
-        setIsSqlConsoleOpen,
-        toggleSqlConsole,
         contextWindowCount,
         sendMessage,
         createNewSession,
         switchSession,
         deleteSession,
-        executeRawSql,
         getLogs,
         reloadSessions
       }}

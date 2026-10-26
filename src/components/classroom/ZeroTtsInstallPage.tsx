@@ -16,6 +16,8 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
   const loadedBytes = Math.min(state.loadedBytes, totalBytes);
   const percent = Math.min(100, Math.floor((loadedBytes / totalBytes) * 100));
   const isLoading = state.status === 'loading';
+  const isDownloading = state.phase === 'downloading';
+  const isChecking = state.phase === 'checking';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#f5f0e6] px-4 py-8">
@@ -31,15 +33,25 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
           Chuẩn bị giọng đọc
         </p>
         <h1 id="resource-install-title" className="mt-3 text-center text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
-          {isLoading ? 'Đang thực hiện tải tài nguyên lần đầu' : 'Chưa tải xong tài nguyên'}
+          {isLoading
+            ? isDownloading
+              ? 'Đang thực hiện tải tài nguyên lần đầu'
+              : isChecking
+                ? 'Đang kiểm tra tài nguyên trên thiết bị'
+                : 'Đang chuẩn bị giọng đọc'
+            : 'Chưa tải xong tài nguyên'}
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-stone-600">
           {isLoading
-            ? 'Đang tải tài nguyên cần thiết để chuẩn bị giọng đọc. Buổi học sẽ bắt đầu sau khi hoàn tất.'
+            ? isDownloading
+              ? 'Đang tải tài nguyên cần thiết để chuẩn bị giọng đọc. Buổi học sẽ bắt đầu sau khi hoàn tất.'
+              : isChecking
+                ? 'Đang kiểm tra tài nguyên đã lưu để tiếp tục buổi học.'
+                : 'Tài nguyên đã có trên thiết bị. Đang khởi tạo giọng đọc để tiếp tục buổi học.'
             : 'Không tải được tài nguyên. Kiểm tra kết nối mạng rồi thử lại.'}
         </p>
 
-        {isLoading ? (
+        {isLoading && isDownloading ? (
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-stone-700">
               <span>Tiến trình tải</span>
@@ -62,12 +74,17 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
               <span>{toMegabytes(loadedBytes)} / {toMegabytes(totalBytes)} MB</span>
               <span className="inline-flex items-center gap-1.5">
                 <LoaderCircle size={14} className="animate-spin" />
-                Đang tải
+                {percent >= 100 ? 'Đang hoàn tất' : 'Đang tải'}
               </span>
             </div>
             <p className="mt-6 text-center text-xs leading-5 text-stone-500">
               Đây là bước chuẩn bị một lần trên thiết bị. Sau khi tải xong, buổi học sẽ tự tiếp tục.
             </p>
+          </div>
+        ) : isLoading ? (
+          <div className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-sky-700">
+            <LoaderCircle size={18} className="animate-spin" />
+            {isChecking ? 'Đang kiểm tra trên thiết bị' : 'Đang khởi tạo trên thiết bị'}
           </div>
         ) : (
           <Button

@@ -8,7 +8,6 @@ import { apiFetch } from '../../services/apiClient.ts';
 import { chatDbService } from '../../services/db/chatDbService.ts';
 import type { ChatLog } from '../../types/chat.ts';
 import './SqliteConsolePane.css';
-import { SqliteConsolePane } from './SqliteConsolePane.tsx';
 
 interface DatabaseSnapshot {
   usage?: StorageUsage;
@@ -33,7 +32,7 @@ export const ServerDatabasePane: React.FC<{ initialTab?: 'data' | 'logs' }> = ({
   const [offset, setOffset] = useState(0);
   const [data, setData] = useState<DatabaseSnapshot | null>(null);
   const [logs, setLogs] = useState<ChatLog[]>([]);
-  const [tab, setTab] = useState<'data' | 'logs' | 'legacy'>(initialTab);
+  const [tab, setTab] = useState<'data' | 'logs'>(initialTab);
   const [level, setLevel] = useState('ALL');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -158,23 +157,13 @@ export const ServerDatabasePane: React.FC<{ initialTab?: 'data' | 'logs' }> = ({
         >
           AI Chat Logs ({logs.length})
         </button>
-        <button
-          role="tab"
-          className="sqlite-tab-btn"
-          aria-selected={tab === 'legacy'}
-          onClick={() => setTab('legacy')}
-        >
-          Dữ liệu trình duyệt cũ
-        </button>
       </div>
       {error && (
         <div className="sqlite-error-box" role="alert">
           {error}
         </div>
       )}
-      {tab === 'legacy' ? (
-        <SqliteConsolePane />
-      ) : tab === 'data' ? (
+      {tab === 'data' ? (
         <>
           <div className="sqlite-presets">
             {data?.tables.map((t) => (

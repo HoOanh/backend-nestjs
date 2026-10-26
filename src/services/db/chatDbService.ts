@@ -1,6 +1,5 @@
-import { sqliteEngine } from './sqliteEngine.ts';
 import { apiFetch } from '../apiClient.ts';
-import type { ChatSession, ChatMessage, ChatLog, SqlQueryResult } from '../../types/chat.ts';
+import type { ChatSession, ChatMessage, ChatLog } from '../../types/chat.ts';
 
 export function stripLegacyFallbackNote(text: string): string {
   if (!text || !text.includes('điều phối')) return text;
@@ -429,14 +428,6 @@ class ChatDbService {
     );
   }
 
-  // Legacy browser data stays available for inspection; server storage is JSON, not SQL.
-  public async executeRawSql<T = Record<string, unknown>>(
-    sql: string,
-    params: unknown[] = []
-  ): Promise<SqlQueryResult<T>> {
-    await sqliteEngine.ready();
-    return sqliteEngine.execute<T>(sql, params);
-  }
 }
 
 export const chatDbService = new ChatDbService();

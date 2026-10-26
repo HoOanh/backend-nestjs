@@ -51,7 +51,7 @@ export async function loadModel(options: LoadOptions = {}): Promise<LoadedModel>
   const base = repoBaseUrl(options.repo ?? defaultRepo(backend), options.revision);
 
   // Multi-threaded WASM needs SharedArrayBuffer, which needs the page to be
-  // cross-origin isolated (the COOP/COEP headers in vite.config.ts). Asking for
+  // cross-origin isolated (the COOP/COEP headers on the classroom page). Asking for
   // threads without it is not an error, just a silent fallback — say so instead,
   // because the difference is several times the generation time.
   const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated;
@@ -59,9 +59,11 @@ export async function loadModel(options: LoadOptions = {}): Promise<LoadedModel>
     console.warn('not cross-origin isolated — running single-threaded WASM (slower); '
       + 'serve with COOP: same-origin and COEP: require-corp for threads');
   }
-  ort.env.wasm.numThreads =
+  const wasmThreads =
     options.threads ?? (isolated ? Math.min(4, navigator.hardwareConcurrency || 4) : 1);
+  ort.env.wasm.numThreads = wasmThreads;
   ort.env.wasm.simd = true;
+  console.info(`[ZeroTTS] ONNX WASM threads=${wasmThreads}; cross-origin isolated=${isolated}`);
 
   // WASM only. WebGPU's kernels are not bit-identical to the CPU path, and this
   // model samples INSIDE the graph — small numeric differences change which

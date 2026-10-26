@@ -634,14 +634,6 @@ async function playPreparedTtsTask(
   }
 }
 
-interface BufferedSpeechSentence {
-  sentence: string;
-  sentenceIndex: number;
-  sampleRate: number;
-  frames: Float32Array<ArrayBuffer>[];
-  sampleCount: number;
-}
-
 async function playPreparedBrowserTtsTask(
   task: PreparedSpeechTask,
   options: Omit<SpeakVietnameseOptions, 'text'>,
@@ -663,69 +655,113 @@ async function playPreparedBrowserTtsTask(
   };
   animationFrame = requestAnimationFrame(pumpAmplitude);
 
-  const bufferedSentences: BufferedSpeechSentence[] = [];
   let streamFailure: Error | null = null;
+  let activeSentenceIndex = -1;
+  let activeSentence = '';
+  let activeSampleRate = 0;
+  let activeFrames: Float32Array<ArrayBuffer>[] = [];
+  let activeSampleCount = 0;
+  let pendingSeconds = 0;
+  let audioReadySent = false;
+  let sentenceStartScheduled = false;
+  let hasScheduledAudio = false;
+  const initialBufferSeconds = 1.2;
+  const playbackChunkSeconds = 0.8;
+
+  const flushActiveFrames = () => {
+    if (activeSampleCount === 0 || activeSampleRate === 0 || controller.cancelled) return;
+    const sentenceText = activeSentence;
+    const sentenceIndex = activeSentenceIndex;
+    const samples = new Float32Array(activeSampleCount);
+    let offset = 0;
+    for (const frame of activeFrames) {
+      samples.set(frame, offset);
+      offset += frame.length;
+    }
+    const { startAt, endAt } = schedulePcmFrame(
+      samples,
+      activeSampleRate,
+      rate,
+      session,
+      controller
+    );
+    if (!sentenceStartScheduled) {
+      sentenceStartScheduled = true;
+      scheduleFocusCallback(
+        () => options.onSentenceChange?.(sentenceText, sentenceIndex, task.sentences.length),
+        session.context,
+        startAt,
+        controller
+      );
+    }
+    hasScheduledAudio = true;
+    if (!audioReadySent) {
+      audioReadySent = true;
+      options.onAudioReady?.();
+    }
+    pendingSeconds = Math.max(0, pendingSeconds - activeSampleCount / activeSampleRate);
+    activeFrames = [];
+    activeSampleCount = 0;
+    return endAt;
+  };
+
+  const finishActiveSentence = () => {
+    if (activeSentenceIndex < 0) return;
+    const sentenceText = activeSentence;
+    const sentenceIndex = activeSentenceIndex;
+    const endAt = flushActiveFrames() ?? session.scheduleCursor;
+    if (sentenceStartScheduled) {
+      scheduleFocusCallback(
+        () => options.onSentenceEnd?.(sentenceText, sentenceIndex, task.sentences.length),
+        session.context,
+        endAt,
+        controller
+      );
+    }
+    activeSentenceIndex = -1;
+    activeSentence = '';
+    activeSampleRate = 0;
+    activeFrames = [];
+    activeSampleCount = 0;
+    sentenceStartScheduled = false;
+  };
 
   try {
     try {
       for await (const event of task.queue.read()) {
         if (controller.cancelled) break;
         if (event.type === 'frame') {
-          let buffered = bufferedSentences[bufferedSentences.length - 1];
-          if (!buffered || buffered.sentenceIndex !== event.sentenceIndex) {
-            buffered = {
-              sentence: event.sentence,
-              sentenceIndex: event.sentenceIndex,
-              sampleRate: event.sampleRate,
-              frames: [],
-              sampleCount: 0
-            };
-            bufferedSentences.push(buffered);
+          if (activeSentenceIndex >= 0 && activeSentenceIndex !== event.sentenceIndex) {
+            finishActiveSentence();
           }
-          buffered.frames.push(event.samples);
-          buffered.sampleCount += event.samples.length;
+          if (activeSentenceIndex < 0) {
+            activeSentenceIndex = event.sentenceIndex;
+            activeSentence = event.sentence;
+            activeSampleRate = event.sampleRate;
+          }
+          activeFrames.push(event.samples);
+          activeSampleCount += event.samples.length;
+          pendingSeconds += event.samples.length / event.sampleRate;
+          if (
+            (audioReadySent && activeSampleCount / activeSampleRate >= playbackChunkSeconds) ||
+            (!audioReadySent && pendingSeconds >= initialBufferSeconds)
+          ) {
+            flushActiveFrames();
+          }
+        } else {
+          finishActiveSentence();
         }
       }
     } catch (error) {
       streamFailure = error instanceof Error ? error : new Error(String(error));
     }
 
-    const totalSamples = bufferedSentences.reduce((total, sentence) => total + sentence.sampleCount, 0);
-    if (controller.cancelled || totalSamples === 0) {
+    finishActiveSentence();
+    if (controller.cancelled || !hasScheduledAudio) {
       if (streamFailure && !controller.cancelled) throw streamFailure;
       return;
     }
 
-    const sampleRate = bufferedSentences[0].sampleRate;
-    const samples = new Float32Array(totalSamples);
-    let sampleOffset = 0;
-    for (const sentence of bufferedSentences) {
-      for (const frame of sentence.frames) {
-        samples.set(frame, sampleOffset);
-        sampleOffset += frame.length;
-      }
-    }
-
-    const { startAt } = schedulePcmFrame(samples, sampleRate, rate, session, controller);
-    let elapsedSamples = 0;
-    for (const sentence of bufferedSentences) {
-      const sentenceStartAt = startAt + elapsedSamples / sampleRate / rate;
-      elapsedSamples += sentence.sampleCount;
-      const sentenceEndAt = startAt + elapsedSamples / sampleRate / rate;
-      scheduleFocusCallback(
-        () => options.onSentenceChange?.(sentence.sentence, sentence.sentenceIndex, task.sentences.length),
-        session.context,
-        sentenceStartAt,
-        controller
-      );
-      scheduleFocusCallback(
-        () => options.onSentenceEnd?.(sentence.sentence, sentence.sentenceIndex, task.sentences.length),
-        session.context,
-        sentenceEndAt,
-        controller
-      );
-    }
-    options.onAudioReady?.();
     await waitForStreamPlayback(session, controller);
     if (streamFailure && !controller.cancelled) options.onError?.(streamFailure.message);
   } finally {

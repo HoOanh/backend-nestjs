@@ -25,6 +25,13 @@ function localBackendApi(): Plugin {
       server.httpServer?.once('close', () => {
         void stopLocalZeroTtsService();
       });
+      server.middlewares.use((request, response, next) => {
+        if ((request.url || '').split('?')[0].startsWith('/ai-classroom/')) {
+          response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+          response.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+        }
+        next();
+      });
       void warmLocalZeroTtsService().catch((error: unknown) => {
         console.error('ZeroTTS warmup failed:', error);
       });

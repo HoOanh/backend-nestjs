@@ -12,6 +12,7 @@ import {
   Send,
   Play,
   Pause,
+  LoaderCircle,
   SkipForward,
   RotateCcw,
   Hand,
@@ -823,6 +824,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [speechRate, setSpeechRate] = useState<number>(0.95);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPreparingSpeech, setIsPreparingSpeech] = useState(false);
   const [liveSubtitle, setLiveSubtitle] = useState<string>(
     'Nhấn "Bắt Đầu Tiết Học" để cùng học qua các slide có lời giải thích tiếng Việt.'
   );
@@ -969,6 +971,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       setLiveSubtitle(scriptText);
       if (!voiceEnabled) {
         stopVietnameseSpeech();
+        setIsPreparingSpeech(false);
         setIsSpeaking(false);
         onFinishedBeat?.();
         return;
@@ -978,6 +981,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       const finishPlayback = (completed: boolean) => {
         if (didFinish) return;
         didFinish = true;
+        setIsPreparingSpeech(false);
         setIsSpeaking(false);
         if (completed) onFinishedBeat?.();
       };
@@ -986,14 +990,19 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         text: scriptText,
         rate: speechRate,
         onStart: () => {
-          setIsSpeaking(true);
+          setIsPreparingSpeech(true);
+          setIsSpeaking(false);
         },
         onSentenceChange: (sentence, index, total) => {
           activeNarrationSentenceIndexRef.current = sentenceOffset + index;
           setLiveSubtitle(sentence);
           onSentenceStarted?.(index, total);
         },
-        onAudioReady,
+        onAudioReady: () => {
+          setIsPreparingSpeech(false);
+          setIsSpeaking(true);
+          onAudioReady?.();
+        },
         onEnd: () => {
           finishPlayback(true);
         },
@@ -1012,11 +1021,13 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       const finishPlayback = () => {
         if (didFinish) return;
         didFinish = true;
+        setIsPreparingSpeech(false);
         setIsSpeaking(false);
         onFinished?.();
       };
 
       if (!voiceEnabled) {
+        setIsPreparingSpeech(false);
         setIsSpeaking(false);
         void (async () => {
           for await (const _sentence of sentences) {
@@ -1029,11 +1040,19 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
       void speakVietnameseStream(sentences, {
         rate: speechRate,
-        onStart: () => setIsSpeaking(true),
+        onStart: () => {
+          setIsPreparingSpeech(true);
+          setIsSpeaking(false);
+        },
         onSentenceChange: (sentence) => setLiveSubtitle(sentence),
+        onAudioReady: () => {
+          setIsPreparingSpeech(false);
+          setIsSpeaking(true);
+        },
         onEnd: finishPlayback,
         onError: (message) => {
           toast.error(message);
+          finishPlayback();
         }
       });
     },
@@ -1211,6 +1230,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
     raisingHandRef.current = true;
     stopVietnameseSpeech();
+    setIsPreparingSpeech(false);
     setIsSpeaking(false);
     setIsRaisingHand(true);
     setLectureAutoPlay(false);
@@ -1367,6 +1387,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     raisingHandRef.current = false;
     resumeAfterQuestionRef.current = null;
     stopVietnameseSpeech();
+    setIsPreparingSpeech(false);
     setIsSpeaking(false);
     setActiveStepIndex(idx);
     setActiveBeatIndex(0);
@@ -1408,6 +1429,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       recognitionRef.current = null;
       setIsListeningMic(false);
       stopVietnameseSpeech();
+      setIsPreparingSpeech(false);
       setIsSpeaking(false);
       finishQuestion(false, currentBeat?.boardMode === 'question');
     }
@@ -2069,6 +2091,7 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                   setVoiceEnabled(next);
                   if (!next) {
                     stopVietnameseSpeech();
+                    setIsPreparingSpeech(false);
                     setIsSpeaking(false);
                     if (raisingHandRef.current && !isAiThinking) {
                       finishQuestion(false, currentBeat?.boardMode === 'question');
@@ -2104,10 +2127,11 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                 variant="ghost"
                 size="auto"
                 type="button"
-                aria-label={isSpeaking ? 'Tạm dừng' : 'Nghe tiếp'}
+                aria-label={isPreparingSpeech ? 'Dừng chuẩn bị giọng đọc' : isSpeaking ? 'Tạm dừng' : 'Nghe tiếp'}
                 onClick={() => {
-                  if (isSpeaking) {
+                  if (isPreparingSpeech || isSpeaking) {
                     stopVietnameseSpeech();
+                    setIsPreparingSpeech(false);
                     setIsSpeaking(false);
                     setLectureAutoPlay(false);
                   } else {
@@ -2116,7 +2140,7 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                 }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-100 text-stone-700 hover:border-sky-400 hover:bg-white cursor-pointer"
               >
-                {isSpeaking ? <Pause size={14} /> : <Play size={14} />}
+                {isPreparingSpeech ? <LoaderCircle size={14} className="animate-spin" /> : isSpeaking ? <Pause size={14} /> : <Play size={14} />}
               </Button>
 
               <Button

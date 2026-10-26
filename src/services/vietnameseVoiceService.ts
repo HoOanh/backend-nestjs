@@ -665,11 +665,17 @@ async function playPreparedBrowserTtsTask(
   let audioReadySent = false;
   let sentenceStartScheduled = false;
   let hasScheduledAudio = false;
+  let underrunWarnings = 0;
   const initialBufferSeconds = 1.2;
   const playbackChunkSeconds = 0.8;
 
   const flushActiveFrames = () => {
     if (activeSampleCount === 0 || activeSampleRate === 0 || controller.cancelled) return;
+    const underrunSeconds = session.context.currentTime - session.scheduleCursor;
+    if (hasScheduledAudio && underrunSeconds >= 0.12 && underrunWarnings < 3) {
+      underrunWarnings += 1;
+      console.warn(`[ZeroTTS] playback buffer underrun: ${underrunSeconds.toFixed(2)}s`);
+    }
     const sentenceText = activeSentence;
     const sentenceIndex = activeSentenceIndex;
     const samples = new Float32Array(activeSampleCount);

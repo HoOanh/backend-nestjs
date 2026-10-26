@@ -57,7 +57,7 @@ export async function loadModel(options: LoadOptions = {}): Promise<LoadedModel>
   const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated;
   if (!isolated) {
     console.warn('not cross-origin isolated — running single-threaded WASM (slower); '
-      + 'serve with COOP: same-origin and COEP: require-corp for threads');
+      + 'serve with COOP: same-origin and COEP: require-corp or credentialless for threads');
   }
   const wasmThreads =
     options.threads ?? (isolated ? Math.min(4, navigator.hardwareConcurrency || 4) : 1);

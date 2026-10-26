@@ -822,7 +822,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   // Vietnamese Voice & Real-Time Lip-Sync State
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [speechRate, setSpeechRate] = useState<number>(0.95);
+  const [speechRate, setSpeechRate] = useState<number>(1);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPreparingSpeech, setIsPreparingSpeech] = useState(false);
   const [liveSubtitle, setLiveSubtitle] = useState<string>(
@@ -1842,7 +1842,8 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
       <Toaster position="top-center" richColors theme="light" />
 
       {usesBrowserZeroTts && hasStartedClass &&
-        (zeroTtsInstallState.status === 'loading' || zeroTtsInstallState.status === 'error') && (
+        (zeroTtsInstallState.status === 'error' ||
+          (zeroTtsInstallState.status === 'loading' && zeroTtsInstallState.phase !== 'preparing')) && (
           <ZeroTtsInstallPage
             state={zeroTtsInstallState}
             onRetry={() => playCurrentBeatFromCurrentSentence(lectureAutoPlayRef.current)}
@@ -2127,7 +2128,7 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                 variant="ghost"
                 size="auto"
                 type="button"
-                aria-label={isPreparingSpeech ? 'Dừng chuẩn bị giọng đọc' : isSpeaking ? 'Tạm dừng' : 'Nghe tiếp'}
+                aria-label={isPreparingSpeech ? 'Dừng chuẩn bị tài nguyên' : isSpeaking ? 'Tạm dừng' : 'Nghe tiếp'}
                 onClick={() => {
                   if (isPreparingSpeech || isSpeaking) {
                     stopVietnameseSpeech();

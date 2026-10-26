@@ -30,7 +30,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
           {isLoading ? <Download size={26} /> : <RotateCcw size={26} />}
         </div>
         <p className="text-center text-xs font-bold uppercase tracking-[0.14em] text-sky-700">
-          Chuẩn bị giọng đọc
+          Chuẩn bị tài nguyên
         </p>
         <h1 id="resource-install-title" className="mt-3 text-center text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
           {isLoading
@@ -38,16 +38,16 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
               ? 'Đang thực hiện tải tài nguyên lần đầu'
               : isChecking
                 ? 'Đang kiểm tra tài nguyên trên thiết bị'
-                : 'Đang chuẩn bị giọng đọc'
+                : 'Đang chuẩn bị tài nguyên'
             : 'Chưa tải xong tài nguyên'}
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-stone-600">
           {isLoading
             ? isDownloading
-              ? 'Đang tải tài nguyên cần thiết để chuẩn bị giọng đọc. Buổi học sẽ bắt đầu sau khi hoàn tất.'
+              ? 'Đang tải tài nguyên cần thiết. Buổi học sẽ bắt đầu sau khi hoàn tất.'
               : isChecking
                 ? 'Đang kiểm tra tài nguyên đã lưu để tiếp tục buổi học.'
-                : 'Tài nguyên đã có trên thiết bị. Đang khởi tạo giọng đọc để tiếp tục buổi học.'
+                : 'Tài nguyên đã có trên thiết bị. Đang chuẩn bị để tiếp tục buổi học.'
             : 'Không tải được tài nguyên. Kiểm tra kết nối mạng rồi thử lại.'}
         </p>
 
@@ -84,7 +84,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
         ) : isLoading ? (
           <div className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-sky-700">
             <LoaderCircle size={18} className="animate-spin" />
-            {isChecking ? 'Đang kiểm tra trên thiết bị' : 'Đang khởi tạo trên thiết bị'}
+            {isChecking ? 'Đang kiểm tra tài nguyên trên thiết bị' : 'Đang chuẩn bị tài nguyên'}
           </div>
         ) : (
           <Button

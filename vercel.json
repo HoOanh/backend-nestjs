@@ -16,22 +16,15 @@
       "maxDuration": 15
     }
   },
-  "headers": [
-    {
-      "source": "/ai-classroom/:path*",
-      "headers": [
-        {
-          "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin"
-        },
-        {
-          "key": "Cross-Origin-Embedder-Policy",
-          "value": "credentialless"
-        }
-      ]
-    }
-  ],
   "routes": [
+    {
+      "src": "/ai-classroom/.*",
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "credentialless"
+      },
+      "continue": true
+    },
     { "src": "/api/tts/stream", "dest": "/api/tts-stream.js" },
     { "src": "/api/tts", "dest": "/api/tts.js" },
     { "src": "/api/tutor", "dest": "/api/tutor.js" },

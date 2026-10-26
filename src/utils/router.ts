@@ -189,6 +189,19 @@ export function getRouteUrl(route: AppRoute): string {
  */
 export function navigateTo(target: string | AppRoute, replace = false): void {
   const url = typeof target === 'string' ? target : getRouteUrl(target);
+  const targetPath = new URL(url, window.location.href).pathname;
+  const isEnteringClassroom =
+    targetPath.startsWith('/ai-classroom/') &&
+    !window.location.pathname.startsWith('/ai-classroom/');
+
+  // Cross-origin isolation is established by response headers, so an SPA
+  // pushState from the regular app shell cannot enable threaded WASM. Load the
+  // classroom document once; subsequent lesson changes stay inside this SPA.
+  if (isEnteringClassroom && typeof crossOriginIsolated === 'boolean' && !crossOriginIsolated) {
+    window.location.assign(url);
+    return;
+  }
+
   if (replace) {
     window.history.replaceState(null, '', url);
   } else {

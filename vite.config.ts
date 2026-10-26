@@ -260,6 +260,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss(), localBackendApi()],
+    optimizeDeps: {
+      exclude: ['onnxruntime-web']
+    },
+    worker: {
+      format: 'es'
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

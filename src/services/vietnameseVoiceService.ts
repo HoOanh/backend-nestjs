@@ -1,5 +1,7 @@
 // ZeroTTS Vietnamese lecture audio with Web Audio amplitude tracking.
 
+import { streamZeroTtsInBrowser, stopBrowserZeroTts } from './zeroTtsBrowser';
+
 export interface SpeakVietnameseOptions {
   text: string;
   rate?: number;
@@ -20,102 +22,8 @@ const activeStreamAudioSources = new Set<AudioBufferSourceNode>();
 let activeTtsRequest: AbortController | null = null;
 const preloadedTtsAudio = new Map<string, PreparedSpeechTask>();
 
-function usesBrowserSpeech(): boolean {
+function usesBrowserZeroTts(): boolean {
   return import.meta.env.PROD && import.meta.env.VITE_ZEROTTS_ENABLED !== 'true';
-}
-
-function speakBrowserSentence(
-  sentence: string,
-  index: number,
-  total: number,
-  rate: number,
-  controller: { cancelled: boolean },
-  options: Omit<SpeakVietnameseOptions, 'text'>
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const synthesis = window.speechSynthesis;
-    if (!synthesis) {
-      reject(new Error('Trình duyệt này không hỗ trợ giọng đọc tích hợp.'));
-      return;
-    }
-
-    const voices = synthesis.getVoices();
-    const voice = voices.find((item) => item.lang.toLowerCase() === 'vi-vn') ||
-      voices.find((item) => item.lang.toLowerCase().startsWith('vi-')) ||
-      voices.find((item) => item.lang.toLowerCase() === 'vi');
-    if (voices.length > 0 && !voice) {
-      reject(new Error('Thiết bị chưa cài giọng đọc tiếng Việt. Hãy cài voice Tiếng Việt trong cài đặt hệ điều hành.'));
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(sentence);
-    utterance.lang = voice?.lang || 'vi-VN';
-    if (voice) utterance.voice = voice;
-    utterance.rate = Math.min(1.5, Math.max(0.8, rate));
-
-    let animationFrame = 0;
-    let settled = false;
-    const cleanup = () => {
-      if (settled) return;
-      settled = true;
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-      options.onAmplitude?.(0);
-    };
-    const animateMouth = () => {
-      if (controller.cancelled || synthesis.paused) {
-        options.onAmplitude?.(0);
-        return;
-      }
-      const time = performance.now() * 0.014;
-      options.onAmplitude?.(Math.abs(Math.sin(time) * Math.cos(time * 0.65)) * 0.7 + 0.15);
-      animationFrame = requestAnimationFrame(animateMouth);
-    };
-
-    utterance.onstart = () => {
-      options.onSentenceChange?.(sentence, index, total);
-      if (index === 0) options.onAudioReady?.();
-      animateMouth();
-    };
-    utterance.onboundary = () => options.onAmplitude?.(0.8);
-    utterance.onend = () => {
-      cleanup();
-      options.onSentenceEnd?.(sentence, index, total);
-      resolve();
-    };
-    utterance.onerror = (event) => {
-      cleanup();
-      if (controller.cancelled || event.error === 'canceled' || event.error === 'interrupted') {
-        resolve();
-      } else {
-        reject(new Error(`Giọng đọc trình duyệt gặp lỗi: ${event.error}.`));
-      }
-    };
-
-    synthesis.speak(utterance);
-  });
-}
-
-async function speakBrowserSentences(
-  sentences: AsyncIterable<string>,
-  options: Omit<SpeakVietnameseOptions, 'text'>,
-  controller: { cancelled: boolean },
-  rate: number,
-  knownTotal = 0
-): Promise<void> {
-  let sentenceIndex = 0;
-  let audioReadySent = false;
-  for await (const rawSentence of sentences) {
-    for (const sentence of splitIntoVietnameseSentences(rawSentence)) {
-      if (controller.cancelled) return;
-      const index = sentenceIndex++;
-      const sentenceOptions = audioReadySent
-        ? { ...options, onAudioReady: undefined }
-        : options;
-      await speakBrowserSentence(sentence, index, knownTotal, rate, controller, sentenceOptions);
-      audioReadySent ||= !controller.cancelled;
-    }
-  }
-  if (!audioReadySent && !controller.cancelled) options.onAudioReady?.();
 }
 
 /**
@@ -177,6 +85,7 @@ export function stopVietnameseSpeech(): void {
     activeTtsRequest.abort();
     activeTtsRequest = null;
   }
+  stopBrowserZeroTts();
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
@@ -427,7 +336,6 @@ async function requestZeroTtsAudio(
 
 /** Start one lookahead request while the current beat's audio is playing. */
 export function preloadVietnameseSpeech(rawText: string): void {
-  if (usesBrowserSpeech()) return;
   const text = normalizeTextForVietnameseSpeech(rawText);
   if (!text || preloadedTtsAudio.has(text)) return;
 
@@ -489,6 +397,11 @@ export async function fetchZeroTtsPcmFrames(
   onFrame: (samples: Float32Array<ArrayBuffer>, sampleRate: number, sentenceIndex: number) => void,
   trackAsActive = true
 ): Promise<void> {
+  if (usesBrowserZeroTts()) {
+    await streamZeroTtsInBrowser(sentences, controller, onFrame, trackAsActive);
+    return;
+  }
+
   const requestController = new AbortController();
   if (trackAsActive) activeTtsRequest = requestController;
   try {
@@ -697,6 +610,7 @@ async function playPreparedTtsTask(
     }
 
     if (streamFailure && scheduledFrames === 0 && !controller.cancelled) {
+      if (usesBrowserZeroTts()) throw streamFailure;
       await playStreamedSentences(iterateSentences(task.sentences), options, controller, rate);
       return;
     }
@@ -889,6 +803,13 @@ async function playStreamedSentences(
           }
           if (session) await waitForStreamPlayback(session, controller);
           if (controller.cancelled) break;
+          if (usesBrowserZeroTts()) {
+            failed = true;
+            options.onError?.(
+              error instanceof Error ? error.message : 'Không thể phát giọng ZeroTTS trên trình duyệt.'
+            );
+            continue;
+          }
           try {
             const audioUrl = await requestZeroTtsAudio(sentence, controller);
             options.onSentenceChange?.(sentence, currentSentenceIndex, sentenceIndex);
@@ -945,21 +866,6 @@ export async function speakVietnamese(options: SpeakVietnameseOptions): Promise<
 
   options.onStart?.();
   try {
-    if (usesBrowserSpeech()) {
-      const browserSentences = splitIntoVietnameseSentences(cleanedText);
-      await speakBrowserSentences(
-        (async function* () {
-          for (const sentence of browserSentences) yield sentence;
-        })(),
-        options,
-        controller,
-        rate,
-        browserSentences.length
-      );
-      if (!controller.cancelled) options.onEnd?.();
-      return;
-    }
-
     const preparedTask = preloadedTtsAudio.get(cleanedText) ?? createPreparedSpeechTask(cleanedText);
     preloadedTtsAudio.delete(cleanedText);
 
@@ -994,12 +900,6 @@ export async function speakVietnameseStream(
   activeStopController = controller;
   options.onStart?.();
   try {
-    if (usesBrowserSpeech()) {
-      await speakBrowserSentences(sentenceStream, options, controller, options.rate ?? 1.05);
-      if (!controller.cancelled) options.onEnd?.();
-      return;
-    }
-
     await playStreamedSentences(sentenceStream, options, controller, options.rate ?? 1.05);
     if (!controller.cancelled) options.onEnd?.();
   } catch (error) {

@@ -1,6 +1,6 @@
 # ZeroTTS cho lớp học
 
-Toàn bộ lời giảng dùng ZeroTTS với giọng `quangminh`; trình duyệt không tải bộ MP3 dựng sẵn. Audio dùng `/api/tts/stream` theo từng câu và phát từng frame PCM ngay khi nhận được, không chờ tải hết WAV. Khi beat kế tiếp đang được chuẩn bị, frame được đưa vào hàng đợi ngay khi ZeroTTS tạo ra; lúc chuyển beat, trình phát dùng phần đã có và tiếp tục nhận phần còn lại trong lúc phát. Ứng dụng giữ tối đa hai beat đã chuẩn bị trong bộ nhớ, không gộp cả bài thành một request.
+Toàn bộ lời giảng dùng ZeroTTS với giọng `quangminh`; trình duyệt không tải bộ MP3 dựng sẵn. Ở production mặc định, ZeroTTS chạy trực tiếp bằng WebAssembly trong worker của trình duyệt; lần đầu tải khoảng 900 MB từ Hugging Face và lưu vào cache. Khi cấu hình `VITE_ZEROTTS_ENABLED=true`, app dùng `/api/tts/stream` theo từng câu và phát từng frame PCM từ API. Local dev vẫn dùng sidecar ZeroTTS như trước.
 
 ## Chạy local
 
@@ -20,6 +20,6 @@ Vercel tiếp tục xác thực `arc_session` ở `/api/tts` và `/api/tts/strea
 
 - `ZEROTTS_URL`: URL HTTPS của Cloud Run service.
 - `ZEROTTS_API_KEY`: cùng khóa bí mật đã cấu hình cho Cloud Run.
-- `VITE_ZEROTTS_ENABLED=true`: bật lời đọc ZeroTTS trên frontend production; cần redeploy frontend để áp dụng.
+- `VITE_ZEROTTS_ENABLED=true`: dùng API ZeroTTS từ Cloud Run; cần redeploy frontend để áp dụng.
 
-Nếu chưa bật `VITE_ZEROTTS_ENABLED`, production tiếp tục dùng giọng tiếng Việt cài trong trình duyệt. Local dev vẫn khởi chạy sidecar ZeroTTS như trước.
+Nếu không bật `VITE_ZEROTTS_ENABLED`, production chạy model ZeroTTS thật trong trình duyệt với voice `quangminh`; lần đầu tải khoảng 900 MB và lưu cache trên thiết bị. Đây không phải `window.speechSynthesis` của hệ điều hành. Local dev vẫn khởi chạy sidecar ZeroTTS như trước.

@@ -345,7 +345,7 @@ export function preloadVietnameseSpeech(rawText: string): void {
     if (preloadedTtsAudio.get(text) === task) preloadedTtsAudio.delete(text);
   });
 
-  while (preloadedTtsAudio.size > 1) {
+  while (preloadedTtsAudio.size > 3) {
     const [oldestText, oldestTask] = preloadedTtsAudio.entries().next().value ?? [];
     if (typeof oldestText !== 'string' || !oldestTask) break;
     preloadedTtsAudio.delete(oldestText);
@@ -550,6 +550,17 @@ async function playPreparedTtsTask(
   controller: { cancelled: boolean },
   rate: number
 ): Promise<void> {
+  if (usesBrowserZeroTts()) {
+    const browserSession = createStreamAudioSession();
+    if (!browserSession) {
+      await task.producer;
+      await playPreparedPcmWithoutWebAudio(task, options, controller, rate);
+      return;
+    }
+    await playPreparedBrowserTtsTask(task, options, controller, rate, browserSession);
+    return;
+  }
+
   const session = createStreamAudioSession();
   if (!session) {
     await task.producer;
@@ -615,6 +626,138 @@ async function playPreparedTtsTask(
       return;
     }
     options.onAudioReady?.();
+    await waitForStreamPlayback(session, controller);
+    if (streamFailure && !controller.cancelled) options.onError?.(streamFailure.message);
+  } finally {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    options.onAmplitude?.(0);
+  }
+}
+
+interface BufferedSpeechSentence {
+  sentence: string;
+  sentenceIndex: number;
+  sampleRate: number;
+  samples: Float32Array<ArrayBuffer>;
+}
+
+async function playPreparedBrowserTtsTask(
+  task: PreparedSpeechTask,
+  options: Omit<SpeakVietnameseOptions, 'text'>,
+  controller: { cancelled: boolean },
+  rate: number,
+  session: StreamAudioSession
+): Promise<void> {
+  if (session.context.state === 'suspended') await session.context.resume();
+
+  const dataArray = new Uint8Array(new ArrayBuffer(session.analyser.frequencyBinCount));
+  let animationFrame = 0;
+  const pumpAmplitude = () => {
+    if (controller.cancelled) return;
+    session.analyser.getByteFrequencyData(dataArray);
+    let sum = 0;
+    for (let index = 1; index < Math.min(28, dataArray.length); index += 1) sum += dataArray[index];
+    options.onAmplitude?.(Math.min(1, Math.max(0, (sum / (dataArray.length * 255)) * 2.4)));
+    animationFrame = requestAnimationFrame(pumpAmplitude);
+  };
+  animationFrame = requestAnimationFrame(pumpAmplitude);
+
+  let activeSentenceIndex = -1;
+  let activeSentence = '';
+  let activeSampleRate = 0;
+  let activeSamples: Float32Array<ArrayBuffer>[] = [];
+  let activeSampleCount = 0;
+  let bufferedSeconds = 0;
+  let audioReadySent = false;
+  let scheduledSentences = 0;
+  let streamFailure: Error | null = null;
+  const pendingSentences: BufferedSpeechSentence[] = [];
+  const prebufferSeconds = Math.max(2, rate * 2.5);
+
+  const scheduleSentence = (buffered: BufferedSpeechSentence) => {
+    const { startAt, endAt } = schedulePcmFrame(
+      buffered.samples,
+      buffered.sampleRate,
+      rate,
+      session,
+      controller
+    );
+    scheduledSentences += 1;
+    scheduleFocusCallback(
+      () => options.onSentenceChange?.(buffered.sentence, buffered.sentenceIndex, task.sentences.length),
+      session.context,
+      startAt,
+      controller
+    );
+    scheduleFocusCallback(
+      () => options.onSentenceEnd?.(buffered.sentence, buffered.sentenceIndex, task.sentences.length),
+      session.context,
+      endAt,
+      controller
+    );
+    if (!audioReadySent) {
+      audioReadySent = true;
+      options.onAudioReady?.();
+    }
+  };
+
+  const flushPendingSentences = () => {
+    while (pendingSentences.length) scheduleSentence(pendingSentences.shift() as BufferedSpeechSentence);
+  };
+
+  const finishActiveSentence = () => {
+    if (activeSentenceIndex < 0 || activeSampleCount === 0 || activeSampleRate === 0) return;
+    const samples = new Float32Array(activeSampleCount);
+    let offset = 0;
+    for (const frame of activeSamples) {
+      samples.set(frame, offset);
+      offset += frame.length;
+    }
+    const sentence: BufferedSpeechSentence = {
+      sentence: activeSentence,
+      sentenceIndex: activeSentenceIndex,
+      sampleRate: activeSampleRate,
+      samples
+    };
+    const durationSeconds = samples.length / activeSampleRate;
+    bufferedSeconds += durationSeconds;
+    pendingSentences.push(sentence);
+    activeSentenceIndex = -1;
+    activeSentence = '';
+    activeSampleRate = 0;
+    activeSamples = [];
+    activeSampleCount = 0;
+    if (!audioReadySent && bufferedSeconds < prebufferSeconds) return;
+    flushPendingSentences();
+  };
+
+  try {
+    try {
+      for await (const event of task.queue.read()) {
+        if (controller.cancelled) break;
+        if (event.type === 'frame') {
+          if (activeSentenceIndex < 0) {
+            activeSentenceIndex = event.sentenceIndex;
+            activeSentence = event.sentence;
+            activeSampleRate = event.sampleRate;
+          }
+          activeSamples.push(event.samples);
+          activeSampleCount += event.samples.length;
+        } else {
+          finishActiveSentence();
+        }
+      }
+    } catch (error) {
+      streamFailure = error instanceof Error ? error : new Error(String(error));
+    }
+
+    finishActiveSentence();
+    if (!audioReadySent) flushPendingSentences();
+    if (streamFailure && scheduledSentences === 0 && !controller.cancelled) throw streamFailure;
+    if (!audioReadySent) {
+      audioReadySent = true;
+      options.onAudioReady?.();
+    }
     await waitForStreamPlayback(session, controller);
     if (streamFailure && !controller.cancelled) options.onError?.(streamFailure.message);
   } finally {

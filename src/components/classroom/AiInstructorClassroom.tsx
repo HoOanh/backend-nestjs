@@ -1040,6 +1040,13 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     [voiceEnabled, speechRate]
   );
 
+  const preloadUpcomingLectureBeats = useCallback((currentIndex: number) => {
+    const lookaheadEnd = Math.min(lectureBeats.length, currentIndex + 4);
+    for (let index = currentIndex + 1; index < lookaheadEnd; index += 1) {
+      preloadVietnameseSpeech(lectureBeats[index].spokenScript);
+    }
+  }, [lectureBeats]);
+
   // Automatically run the current Lecture Beat when class is active and not interrupted
   useEffect(() => {
     if (!hasStartedClass || isRaisingHand || showLaptopSandbox) return;
@@ -1140,8 +1147,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       },
       sentenceOffset,
       () => {
-        const nextBeat = lectureBeats[activeBeatIndex + 1];
-        if (nextBeat) preloadVietnameseSpeech(nextBeat.spokenScript);
+        preloadUpcomingLectureBeats(activeBeatIndex);
       }
     );
   }, [
@@ -1149,6 +1155,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     activeStepIndex,
     activeBeatIndex,
     lectureBeats,
+    preloadUpcomingLectureBeats,
     isRaisingHand,
     showLaptopSandbox,
     voiceEnabled,
@@ -1322,8 +1329,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       },
       sentenceOffset,
       () => {
-        const nextBeat = lectureBeats[activeBeatIndex + 1];
-        if (nextBeat) preloadVietnameseSpeech(nextBeat.spokenScript);
+        preloadUpcomingLectureBeats(activeBeatIndex);
       }
     );
   };
@@ -2123,10 +2129,7 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
                   undefined,
                   undefined,
                   0,
-                  () => {
-                    const nextBeat = lectureBeats[activeBeatIndex + 1];
-                    if (nextBeat) preloadVietnameseSpeech(nextBeat.spokenScript);
-                  }
+                  () => preloadUpcomingLectureBeats(activeBeatIndex)
                 )}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-100 text-stone-700 hover:bg-white cursor-pointer"
               >

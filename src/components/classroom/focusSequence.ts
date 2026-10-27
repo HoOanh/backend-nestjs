@@ -35,5 +35,5 @@ export function resolveFocusCue(
   focusIndex: number
 ): 'highlight' | 'pointer' | 'circle' | 'none' {
   if (focusIndex < 0) return 'none';
-  return focusPlan?.[focusIndex] ?? 'none';
+  return focusPlan?.[focusIndex] ?? 'highlight';
 }

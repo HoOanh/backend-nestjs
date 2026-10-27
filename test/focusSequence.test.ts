@@ -35,7 +35,7 @@ describe('resolveFocusSequenceIndex', () => {
       const sequence = slide.focusSequence ?? [];
       const entryCount = slide.visual.kind === 'text-slide'
         ? 1 + (slide.visual.metrics?.length ?? 0) + (slide.visual.points?.length ?? 0) + Number(Boolean(slide.visual.question))
-        : 0;
+        : slide.visual.kind === 'worked-example' ? slide.visual.steps.length + 2 : 0;
 
       expect(sequence).toHaveLength(sentences.length);
       expect(sequence.every((index) => index >= 0 && index < entryCount)).toBe(true);

@@ -9,7 +9,26 @@ export interface InstructorVisualNode {
 export type InstructorPresentationRole = 'title' | 'overview' | 'detail' | 'recap' | 'closing';
 export type InstructorFocusCue = 'highlight' | 'pointer' | 'circle' | 'none';
 
+export interface InstructorStoryboard {
+  kind: 'process' | 'request-race' | 'event-loop' | 'queue' | 'multiplexing' | 'memory' | 'diagnosis';
+  caption: string;
+  variant?: 'isolated' | 'shared' | 'local' | 'blocked' | 'io' | 'threads' | 'fd';
+}
+
 export type InstructorVisual =
+  | {
+      kind: 'worked-example';
+      storyboard?: InstructorStoryboard;
+      lead: string;
+      exhibit: {
+        label: string;
+        code?: string;
+        language?: string;
+        rows?: Array<{ label: string; value: string }>;
+      };
+      steps: Array<{ title: string; detail: string; lines?: number[] }>;
+      result: string;
+    }
   | {
       kind: 'text-slide';
       eyebrow?: string;

@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { resolveFocusCue } from './focusSequence.ts';
+import { WorkedExampleSlide } from './WorkedExampleSlide.tsx';
 import {
   Eraser,
   Highlighter,
@@ -73,6 +74,8 @@ type BoardTool = 'select' | 'pen' | 'marker' | 'eraser';
 
 export function visualEntryCount(visual: InstructorVisual): number {
   switch (visual.kind) {
+    case 'worked-example':
+      return visual.steps.length + 2;
     case 'text-slide':
       return 1 + (visual.metrics?.length || 0) + (visual.points?.length || 0) + Number(Boolean(visual.question));
     case 'flow':
@@ -762,6 +765,9 @@ function InstructorVisualPanel({
       subtitle={subtitle}
     />
   );
+  if (visual.kind === 'worked-example') {
+    return <WorkedExampleSlide visual={visual} title={title} subtitle={subtitle} visibleCount={visibleCount} focusIndex={focusIndex} />;
+  }
   if (visual.kind === 'text-slide') {
     return renderSketch(textSlideSketch(visual, visibleCount), 'Slide nội dung viết tay');
   }

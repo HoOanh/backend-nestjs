@@ -141,6 +141,8 @@ interface LectureBeat {
 
 function visualEntryLabels(visual: InstructorVisual): string[] {
   switch (visual.kind) {
+    case 'worked-example':
+      return [visual.lead, ...visual.steps.map((step) => `${step.title} ${step.detail}`), visual.result];
     case 'text-slide':
       return [
         visual.lead,
@@ -509,7 +511,7 @@ function buildLectureBeatsForStep(
         boardMode: 'keypoints',
         pointIndex: 0,
         codeLineIndex: 0,
-        slideTitle: 'Tình huống production',
+        slideTitle: openingSlide.title,
         slideTakeaway: openingSlide.takeaway,
         slidePoints: [],
         instructorVisual: openingSlide.visual,
@@ -906,7 +908,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         activeStepIndex === 0 ? instructorPlan?.opening : undefined,
         activeStepIndex === 0 ? instructorPlan?.roadmap : undefined,
         activeStepIndex === checkpoints.length - 1 ? instructorPlan?.closing : undefined,
-        lesson.title
+        instructorPlan?.title || lesson.title
       )),
     [currentCheckpoint, currentInstructorSection, activeStepIndex, checkpoints.length, instructorPlan, lesson.title]
   );

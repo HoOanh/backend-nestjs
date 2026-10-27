@@ -1,794 +1,461 @@
-import type { InstructorLessonPlan } from '../types.ts';
+import type { InstructorLessonPlan, InstructorSlide } from '../types';
+import { guidedSlide } from '../guidedSlide';
+import { c1l1Storyboards } from './c1-l1-storyboards';
 
-/**
- * Giáo trình lớp 1-1 cho một buổi liền mạch 90 phút, gồm giảng giải,
- * thời gian dừng trao đổi, bài tập có hướng dẫn và câu hỏi kiểm tra hiểu bài.
+function teach(input: Parameters<typeof guidedSlide>[0]): InstructorSlide {
+  return guidedSlide({ ...input, storyboard: c1l1Storyboards[input.id] });
+}
+
+/** Same case throughout: a clinic API serving two tenants and many waiting sockets.
+ * On-screen evidence is deliberately shorter than the spoken explanation.
+ * Section IDs remain stable because saved classroom checkpoints reference them.
  */
+function overview(input: Parameters<typeof teach>[0]): InstructorSlide {
+  const slide = teach(input);
+  return {
+    ...slide,
+    presentationRole: 'overview'
+  };
+}
+
 export const instructor_c1_l1: InstructorLessonPlan = {
   lessonId: 'c1-l1',
-  title: 'Từ phần cứng đến runtime: tiến trình dài hạn và bài toán C10K',
+  title: 'Từ một request đặt lịch đến cách Node.js phục vụ nhiều kết nối',
   durationMinutes: 90,
-  opening: {
+  opening: overview({
     id: 'opening-incident',
-    title: '50.000 kết nối, chỉ 10 socket có dữ liệu mới',
-    subtitle: 'Một tình huống production để đặt câu hỏi trước khi học cơ chế',
-    narration:
-      'Trong dashboard production, API đang giữ 50.000 kết nối TCP mở. Snapshot I/O báo chỉ 10 socket vừa có dữ liệu mới sẵn sàng. 49.990 kết nối còn lại vẫn tồn tại nhưng đang chờ, không cần CPU chạy liên tục. Nếu mỗi kết nối có một thread riêng, hàng chục nghìn stack và ngữ cảnh lập lịch vẫn phải được quản lý. Runtime nhận ra đúng socket cần xử lý bằng cách nào?',
-    takeaway: 'Câu hỏi của buổi học: làm sao giữ nhiều kết nối mà không trả chi phí như thể tất cả đều đang chạy?',
-    visual: {
-      kind: 'text-slide',
-      lead: 'Một server giữ nhiều kết nối cùng lúc; runtime chỉ cần xử lý những socket có dữ liệu mới.',
-      metrics: [
-        { value: '50.000', label: 'kết nối đang mở' },
-        { value: '10', label: 'socket có dữ liệu mới' },
-        { value: '49.990', label: 'socket còn lại đang chờ' }
-      ],
-      question: 'Ứng dụng phải trả chi phí gì để biết socket nào thực sự cần được xử lý?',
-      note: 'Số liệu là ví dụ đặt vấn đề; chi phí thật phụ thuộc hệ điều hành, cấu hình và workload.'
-    },
-  },
-  roadmap: {
-    id: 'lesson-roadmap',
-    title: 'Mình sẽ lần theo câu hỏi này từ trong ra ngoài',
-    subtitle: 'Bốn chặng nối thành một bài học liền mạch',
-    narration:
-      'Ta sẽ giải câu hỏi production qua bốn lớp, mỗi lớp mở ra một manh mối của cùng một sự cố. Trước hết, phân biệt chương trình, process, thread và vùng nhớ mà hệ điều hành thực sự quản lý. Kế đó, xem server sống qua nhiều request ra sao và trạng thái nào đang được chia sẻ. Rồi lần theo một request qua main thread, event loop đến kernel I/O để tìm chỗ nó phải chờ. Cuối cùng, đối chiếu latency, request đang xử lý và memory metrics để quyết định cần kiểm tra gì trong production.',
-    takeaway: 'Một bài xuyên suốt: từ process/thread đến runtime, I/O và quyết định vận hành.',
-    visual: {
-      kind: 'text-slide',
-      eyebrow: 'LỘ TRÌNH BUỔI HỌC · 90 PHÚT',
-      lead: 'Mình sẽ lần từ tài nguyên bên trong process ra tới hành vi của cả server.',
-      points: [
-        { title: 'Nền tảng thực thi', detail: 'Program, process, thread và không gian địa chỉ.' },
-        { title: 'Vòng đời request', detail: 'Server singleton, trạng thái dùng chung và điểm await.' },
-        { title: 'Runtime và I/O', detail: 'Main thread, event loop, độ trễ và socket readiness.' },
-        { title: 'Đọc production', detail: 'Nối latency, CPU, in-flight request và memory metrics.' }
-      ]
-    },
-  },
+    title: 'Chỉ có vài người đặt lịch, vì sao API vẫn trả chậm?',
+    subtitle: 'Theo một ứng dụng phòng khám từ lúc chạy đến lúc gặp sự cố',
+    lead: 'Một API đặt lịch: lúc chạy đúng, lúc trả chậm, có lúc đọc nhầm dữ liệu phòng khám.',
+    intro: 'Hãy hình dung mình vừa đưa một API đặt lịch khám lên server. Người dùng gửi yêu cầu, ứng dụng đọc database rồi trả về các khung giờ còn trống. Khi thử một mình, mọi thứ có vẻ đúng. Nhưng khi hai phòng khám cùng sử dụng, có lúc dữ liệu bị lẫn, có lúc chờ rất lâu. Mình chưa vội tăng cấu hình máy. Ta sẽ lần theo chính yêu cầu đặt lịch để biết điều gì đang diễn ra.',
+    exhibit: { label: 'Ca xuyên suốt' },
+    steps: [
+      { title: 'Ai đang giữ dữ liệu?', detail: 'File chương trình, process và service không có cùng vòng đời.', speech: 'Trước hết, ta cần biết thứ gì đang chạy và dữ liệu đang nằm ở đâu. File được deploy không phải bản thân server đang sống. Cũng không phải cứ có request mới là hệ điều hành tạo một server mới. Nếu hiểu nhầm điều này, mình rất dễ đặt dữ liệu của một người dùng vào nơi nhiều người cùng dùng.' },
+      { title: 'Thời gian đã đi đâu?', detail: 'Tách thời gian chạy code khỏi thời gian chờ database.', speech: 'Tiếp theo, mình tách hai việc rất hay bị gọi chung là xử lý request. Có lúc CPU thực sự đang chạy code. Có lúc ứng dụng chỉ đang chờ database hoặc mạng. Hai loại thời gian này cần hai cách sửa khác nhau. Một máy có CPU còn rảnh vẫn có thể trả lời rất chậm.' },
+      { title: 'Đọc bằng chứng trước khi sửa', detail: 'Dùng trace, số request chờ và số liệu bộ nhớ để kiểm chứng.', speech: 'Cuối cùng, mình sẽ đưa ra một bộ số liệu rồi cùng chọn bước kiểm tra tiếp theo. Không cần thuộc hết tên công cụ ngay từ đầu. Mỗi thuật ngữ chỉ xuất hiện khi ta cần nó để giải thích một hiện tượng đã thấy trong ví dụ.' }
+    ],
+    takeaway: 'Câu hỏi xuyên suốt: request đang chạy, đang chờ, hay đang dùng nhầm dữ liệu?',
+    conclusion: 'Kết thúc bài, mục tiêu không phải là đọc lại định nghĩa Node.js. Mục tiêu là giải thích được vì sao API trong ví dụ sai hoặc chậm, và đề xuất một phép đo cụ thể để kiểm tra cách hiểu của mình.'
+  }),
+  roadmap: overview({
+    id: 'lesson-roadmap', title: 'Mỗi chặng trả lời một câu hỏi',
+    subtitle: 'Đi từ hiện tượng quen thuộc đến cơ chế bên trong',
+    lead: 'Mình giữ nguyên một API và thay đổi từng điều kiện để quan sát kết quả.',
+    intro: 'Ta không bắt đầu bằng một danh sách dài thuật ngữ. Mình sẽ đi theo bốn câu hỏi, và câu trả lời trước sẽ làm nền cho câu tiếp theo.',
+    exhibit: { label: 'Lộ trình' },
+    steps: [
+      { title: 'Chạy server nghĩa là gì?', detail: 'Program → process → thread → tài nguyên.', speech: 'Đầu tiên, chạy server thực sự tạo ra những gì? Mình sẽ mở hai lần cùng một chương trình, nhìn mã tiến trình, rồi phân biệt phần nào được dùng chung và phần nào thuộc riêng từng lần chạy.' },
+      { title: 'Hai request có đụng nhau không?', detail: 'Theo từng dòng code qua một lần await.', speech: 'Sau đó, hai request có thể đụng nhau như thế nào dù JavaScript thường chạy trên một main thread? Mình sẽ đi từng dòng qua một lần chờ, thay vì chỉ nói chung rằng trạng thái dùng chung là nguy hiểm.' },
+      { title: 'Chờ nhiều có cần nhiều thread?', detail: 'CPU, event loop, socket và hàng đợi.', speech: 'Kế tiếp, khi hàng nghìn kết nối đang chờ, ai theo dõi chúng? Từ đó ta mới cần đến event loop, cơ chế theo dõi I/O và cách tính số request còn nằm trong hệ thống.' },
+      { title: 'Sửa gì trước trong production?', detail: 'Đọc latency, pool, CPU và bộ nhớ cùng nhau.', speech: 'Cuối cùng, mình ghép các mảnh lại để xử lý sự cố. Mỗi chặng có một câu hỏi áp dụng. Hãy thử đoán kết quả trước khi xem lời giải, vì đoán sai ở đây giúp mình thấy chính xác chỗ mô hình tư duy còn thiếu.' }
+    ],
+    takeaway: 'Quan sát → dự đoán → lần theo cơ chế → kiểm chứng → rút quy tắc.',
+    conclusion: 'Ta bắt đầu với thao tác quen thuộc nhất, gõ lệnh chạy ứng dụng. Chưa cần biết epoll hay V8 hoạt động chi tiết ra sao. Trước tiên, hãy xác định ai đang sở hữu socket và dữ liệu của server.'
+  }),
   sections: [
     {
-      id: 'process-model',
-      title: 'Chương trình, tiến trình và luồng',
-      objective: 'Phân biệt file chương trình, tiến trình đang chạy và luồng được CPU lập lịch.',
-      durationMinutes: 12,
+      id: 'process-model', title: 'Chạy server thực sự tạo ra những gì?', durationMinutes: 11,
+      objective: 'Từ hai lần chạy cùng một file, phân biệt program, process, thread và tài nguyên của từng process.',
       slides: [
-        {
-          id: 'program-to-process',
-          title: 'Từ file trên đĩa đến tiến trình sống',
-          subtitle: 'Một file không tự chạy; hệ điều hành phải cấp ngữ cảnh thực thi',
-          narration:
-            'Chương trình là nội dung tĩnh được lưu trên đĩa: mã đã biên dịch, thư viện và cấu hình. Khi chạy node dist/main.js, hệ điều hành tạo một tiến trình, gán PID, ánh xạ các trang bộ nhớ ảo và chuẩn bị tài nguyên như file descriptor. Runtime V8 và mã ứng dụng lúc này mới có không gian để thực thi. Vì vậy, xóa một file khỏi danh sách trên màn hình không đồng nghĩa tiến trình đã dừng; ngược lại, một tiến trình có thể vẫn chạy sau khi câu lệnh khởi động kết thúc ở terminal. Trong vận hành, cần phân biệt artefact được deploy với process đang giữ socket, heap và các kết nối thật.',
-          takeaway: 'Program là bản mô tả tĩnh; process là thực thể đang chạy với PID và không gian tài nguyên riêng.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'KHÁI NIỆM NỀN · TĨNH KHÁC VỚI ĐANG CHẠY',
-            lead: 'File chương trình là thứ được lưu trên đĩa. Process là lần chạy thật mà hệ điều hành đang quản lý.',
-            points: [
-              { title: 'Program', detail: 'Mã, thư viện và cấu hình; bản thân file không giữ socket đang mở.' },
-              { title: 'Process', detail: 'Có PID, không gian địa chỉ, file descriptor và tài nguyên runtime.' },
-              { title: 'Runtime', detail: 'V8 cùng ứng dụng thực thi bên trong vòng đời của process.' }
-            ],
-            question: 'Khi server đang chạy, mình cần điều tra file deploy hay process đang giữ kết nối?'
-          }
-        },
-        {
-          id: 'process-and-thread',
-          title: 'Process sở hữu tài nguyên, thread thực thi lệnh',
-          subtitle: 'Hai khái niệm khác nhau, phối hợp với nhau',
-          narration:
-            'Tiến trình là ranh giới quản lý tài nguyên và cô lập địa chỉ bộ nhớ. Luồng là đơn vị mà bộ lập lịch đưa lên lõi CPU. Một tiến trình thường có nhiều luồng; các luồng trong cùng process dùng chung heap và file descriptor, nhưng mỗi luồng có thanh ghi và call stack riêng. Khi debug, câu hỏi “request này ở process nào?” và “đoạn code này đang chạy trên thread nào?” dẫn tới hai loại nguyên nhân khác nhau: chia sẻ trạng thái giữa request liên quan heap; block đồng bộ liên quan thời gian thread giữ CPU hoặc không trả về event loop.',
-          takeaway: 'Process chia sẻ vùng tài nguyên; mỗi thread có ngữ cảnh thực thi riêng.',
-          visual: {
-            kind: 'process-memory',
-            regions: [
-              { id: 'heap', title: 'Shared heap', detail: 'Đối tượng dùng chung trong process', position: [0, 1.4, 0], color: '#0f9f79' },
-              { id: 'stack-a', title: 'Stack A', detail: 'Ngữ cảnh thực thi riêng', position: [-1.7, 0.6, 0.25], color: '#0284c7' },
-              { id: 'stack-b', title: 'Stack B', detail: 'Ngữ cảnh thực thi riêng', position: [1.7, 0.6, 0.25], color: '#d97706' }
-            ]
-          },
-        },
-        {
-          id: 'thread-context',
-          title: 'Điều gì nằm riêng và điều gì được chia sẻ?',
-          subtitle: 'Mô hình bộ nhớ tối thiểu để đọc bug concurrency',
-          narration:
-            'Hãy nhìn process như một vùng địa chỉ chung. Hai thread A và B cùng nhìn thấy object trên heap, vì thế một thread sửa thuộc tính dùng chung thì thread kia có thể quan sát giá trị mới. Nhưng mỗi thread có stack riêng để lưu biến cục bộ và chuỗi lời gọi hàm. Trong JavaScript trên Node.js, đa số callback ứng dụng chạy trên main thread; tuy vậy, I/O vẫn có thể chồng lấp theo thời gian vì main thread nhường quyền khi chờ bất đồng bộ. Chia sẻ bộ nhớ của process không tự biến mỗi request thành vùng độc lập. Ranh giới request phải được giữ bằng cách truyền dữ liệu qua tham số hoặc context an toàn.',
-          takeaway: 'Biến cục bộ thuộc lần gọi; thuộc tính service singleton thuộc đối tượng dùng chung.',
-          visual: {
-            kind: 'memory-map',
-            regions: [
-              { id: 'heap', title: 'Shared heap', detail: 'Object và thuộc tính singleton' },
-              { id: 'stack-a', title: 'Stack A', detail: 'Biến cục bộ của luồng A' },
-              { id: 'stack-b', title: 'Stack B', detail: 'Biến cục bộ của luồng B' }
-            ]
-          },
-        },
-        {
-          id: 'virtual-address-space',
-          title: 'Không gian địa chỉ ảo tạo ranh giới cho process',
-          subtitle: 'PID là danh tính; page table và MMU quyết định process nhìn thấy vùng nhớ nào',
-          narration:
-            'Mỗi process có không gian địa chỉ ảo riêng. Con trỏ trong chương trình không nhất thiết là địa chỉ RAM vật lý; MMU dịch địa chỉ ảo thông qua page table của process đang chạy. Điều đó cho phép hai process dùng cùng một giá trị địa chỉ ảo nhưng ánh xạ đến các trang vật lý khác nhau. Bản đồ thường có vùng mã thực thi, dữ liệu, heap, thư viện dùng chung được ánh xạ và stack của thread. Các vùng này không phải những chiếc hộp RAM cố định có kích thước bằng đúng phần dữ liệu đang dùng: kernel có thể reserve không gian ảo, cấp phát trang vật lý theo nhu cầu, chia sẻ trang read-only hoặc thu hồi trang. Khi process bị kill, kernel thu hồi các tài nguyên gắn với nó; khi chỉ một request lỗi, process vẫn tiếp tục chạy. Đây là lý do crash isolation và memory accounting cần nhìn ở ranh giới process, không chỉ nhìn một object JavaScript.',
-          takeaway: 'Địa chỉ ảo được dịch qua MMU/page table; mỗi process có ranh giới ánh xạ và vòng đời tài nguyên riêng.',
-          visual: {
-            kind: 'memory-map',
-            regions: [
-              { id: 'text-region', title: 'Text / code', detail: 'Mã thực thi, thường có thể được chia sẻ read-only' },
-              { id: 'heap-region', title: 'Heap', detail: 'Object runtime cấp phát và quản lý' },
-              { id: 'shared-region', title: 'Mapped libraries', detail: 'Thư viện và vùng ánh xạ chung' },
-              { id: 'stack-region', title: 'Thread stacks', detail: 'Ngữ cảnh lời gọi riêng của từng thread' }
-            ]
-          }
-        },
-        {
-          id: 'file-descriptor-ownership',
-          title: 'File descriptor là tay cầm của process tới tài nguyên kernel',
-          subtitle: 'Socket, pipe và file đều được biểu diễn bằng descriptor trong process',
-          narration:
-            'File descriptor là một số nguyên nhỏ trong bảng descriptor của process, dùng để tham chiếu tới một open file description hoặc đối tượng kernel tương ứng. Socket số 41 trong process A không phải cùng một danh tính toàn hệ thống với số 41 của process B. Khi gọi accept, server nhận descriptor mới cho kết nối; runtime giữ mapping từ descriptor tới trạng thái socket và callback. Descriptor có thể bị đóng rồi con số đó được tái sử dụng, vì vậy log một con số FD mà không gắn vòng đời và process ID có thể gây nhầm. Nếu ứng dụng rò rỉ descriptor, số FD mở tăng dần dù heap không đổi; lỗi cuối cùng có thể là EMFILE khi chạm giới hạn. Đọc process model qua FD giúp nối phần hệ điều hành với bài toán socket readiness ở phần sau.',
-          takeaway: 'FD là handle theo bảng của process; theo dõi cả vòng đời mở/đóng và giới hạn FD khi chẩn đoán.',
-          visual: {
-            kind: 'flow',
-            nodes: [
-              { id: 'accept-socket', title: 'accept()', detail: 'Kernel trả descriptor cho kết nối mới' },
-              { id: 'fd-table', title: 'Process FD table', detail: 'Số FD ánh xạ tới trạng thái kernel' },
-              { id: 'runtime-handle', title: 'Runtime handle', detail: 'Node/libuv gắn callback và trạng thái' },
-              { id: 'close-fd', title: 'close()', detail: 'Giải phóng descriptor; số có thể được tái dùng' }
-            ]
-          },
-        }
+        teach({
+          id: 'program-to-process', title: 'Cùng một file, hai lần chạy khác nhau',
+          subtitle: 'Bắt đầu bằng một thí nghiệm có thể tự làm trong terminal',
+          lead: 'Program là bản mã lưu trên đĩa; process là một lần chạy của bản mã đó.',
+          intro: 'Mình có file server.mjs đã được viết xong. Khi file còn nằm trên đĩa, nó chưa nhận request và chưa giữ một kết nối database nào. Hãy mở hai terminal và chạy lần lượt hai câu lệnh trên bảng. Hai cổng khác nhau giúp cả hai lần chạy cùng tồn tại mà không tranh một cổng lắng nghe.',
+          exhibit: { label: 'server.mjs · Node.js built-in HTTP', language: 'javascript', code: "import { createServer } from 'node:http';\nconst port = Number(process.env.PORT ?? 3000);\ncreateServer((_req, res) => {\n  res.end(`PID=${process.pid}`);\n}).listen(port);\n\n// Terminal A: PORT=3000 node server.mjs\n// Terminal B: PORT=3001 node server.mjs\n// curl localhost:3000 ; curl localhost:3001" },
+          steps: [
+            { title: 'Một program', detail: 'Hai lệnh đều đọc cùng file server.mjs.', lines: [1, 2], speech: 'Dòng đầu lấy bộ tạo HTTP server có sẵn trong Node.js. Dòng hai đọc cổng từ biến môi trường. Cả hai terminal vẫn dùng cùng nội dung file. Ta gọi bản mã tĩnh này là chương trình, hay program. Đến đây chưa có lý do gì để cho rằng hai lần chạy phải dùng chung một object trong RAM.' },
+            { title: 'Hai process', detail: 'Mỗi lần chạy có PID và trạng thái riêng.', lines: [3, 4, 5], speech: 'Khi thực thi lệnh, hệ điều hành tạo tiến trình, hay process. Gửi request tới mỗi cổng, mình sẽ thấy hai mã PID khác nhau. Mỗi process có ngữ cảnh tài nguyên của riêng nó. Nếu process A tạo một object mới, điều đó không tự tạo object tương ứng trong process B. Dùng chung file trên đĩa không có nghĩa dùng chung heap.' },
+            { title: 'Kiểm chứng ranh giới', detail: 'Dừng A rồi gọi lại cả hai cổng.', lines: [7, 8, 9], speech: 'Bây giờ dừng terminal A bằng tổ hợp Control C. Cổng ba nghìn không còn được server A phục vụ, trong khi cổng ba nghìn lẻ một vẫn trả lời. Đây là bằng chứng đơn giản cho hai vòng đời khác nhau. Nếu thấy lỗi cổng đã được sử dụng khi chạy cùng cổng, đó là tranh tài nguyên lắng nghe, không phải hai lệnh đã nhập thành một process.' }
+          ],
+          takeaway: 'Một artefact có thể được chạy thành nhiều process; điều tra lần chạy bằng PID và cổng.',
+          conclusion: 'Khi vận hành, mình phải hỏi bản mã nào đang được chạy và process nào đang nhận request. Deploy file mới và khởi động lại process là hai thao tác liên quan nhưng không đồng nhất. Tiếp theo, ta nhìn vào bên trong một process.'
+        }),
+        teach({
+          id: 'process-and-thread', title: 'Một nơi giữ tài nguyên, một nơi thực thi lệnh',
+          subtitle: 'Tách câu hỏi “dữ liệu ở đâu?” khỏi “ai đang chạy?”',
+          lead: 'Process cung cấp ranh giới tài nguyên; thread mang ngữ cảnh thực thi được bộ lập lịch quản lý.',
+          intro: 'Trong ví dụ hai terminal, mỗi process giống một lần mở xưởng làm việc độc lập. Nhưng hình ảnh cái xưởng chưa giải thích ai đang thực hiện từng lệnh. Ta cần thêm khái niệm luồng thực thi, hay thread. Phép ví von chỉ để phân biệt vai trò, không thay thế mô hình bộ nhớ thật.',
+          exhibit: { label: 'Bên trong process A', rows: [{ label: 'Dùng chung trong process', value: 'không gian địa chỉ, tài nguyên' }, { label: 'Mỗi OS thread', value: 'registers + stack' }, { label: 'JavaScript ứng dụng thông thường', value: 'main thread của một isolate' }, { label: 'Node.js còn có', value: 'thread nền, worker pool' }] },
+          steps: [
+            { title: 'Process giữ ranh giới', detail: 'Các thread cùng process có thể truy cập vùng nhớ chung.', speech: 'Process có không gian địa chỉ ảo và các tham chiếu tới tài nguyên hệ điều hành. Trong mô hình thread thông thường, những thread cùng process nhìn vào cùng không gian địa chỉ. Vì vậy, khi một thread sửa vùng nhớ chia sẻ, thread khác có thể quan sát thay đổi nếu truy cập và đồng bộ đúng. Hai process khác nhau không tự có quyền như vậy.' },
+            { title: 'Thread giữ vị trí đang chạy', detail: 'Thanh ghi và stack cho biết đang thực thi tới đâu.', speech: 'Mỗi thread có trạng thái thanh ghi và stack riêng. Khi bộ lập lịch đổi thread đang chạy trên lõi CPU, nó phải bảo toàn ngữ cảnh để sau đó tiếp tục đúng chỗ. Nhiều thread không đồng nghĩa tất cả luôn chạy đồng thời. Số lõi, tải hệ thống và chính sách lập lịch quyết định điều gì thực sự diễn ra.' },
+            { title: 'Đọc đúng câu “Node đơn luồng”', detail: 'Một main thread chạy JS không có nghĩa process chỉ có một thread.', speech: 'Khi nói Node.js đơn luồng, thường ta đang nói phần JavaScript ứng dụng trên một isolate. Cả process vẫn có thread phục vụ runtime và một số công việc nền. Worker Threads còn tạo isolate JavaScript riêng. Chúng không tự chia sẻ các object JavaScript thông thường; muốn chia sẻ dữ liệu phải dùng cơ chế như truyền thông điệp hoặc SharedArrayBuffer. Đừng suy từ bộ nhớ process sang việc mọi object đều dùng chung giữa các worker.' }
+          ],
+          takeaway: 'Nhìn process để hỏi về ownership; nhìn thread và isolate để hỏi về thực thi và chia sẻ dữ liệu.',
+          conclusion: 'Trong bài này, hai request đặt lịch chủ yếu chạy trên cùng main thread và cùng service của một ứng dụng NestJS. Mình sẽ tập trung vào trường hợp đó trước, thay vì đưa thêm nhiều worker vào khi chưa có nhu cầu.'
+        }),
+        teach({
+          id: 'thread-context', title: 'Hai request, cùng một object service',
+          subtitle: 'Mô hình cần dùng để hiểu lỗi ở phần tiếp theo',
+          lead: 'Request mới không có nghĩa là service singleton được tạo mới.',
+          intro: 'Giả sử NestJS đã khởi tạo một AppointmentService. Hai người dùng gửi hai request liên tiếp tới controller. Mỗi lần gọi phương thức tạo một ngữ cảnh gọi riêng, nhưng cả hai vẫn có thể gọi lên đúng một object service đã được khởi tạo từ trước.',
+          exhibit: { label: 'Hai lần gọi lên cùng service', language: 'typescript', code: "class AppointmentService {\n  lastTenant = '';\n  list(tenantId: string) {\n    const requestedTenant = tenantId;\n    this.lastTenant = tenantId;\n    return requestedTenant;\n  }\n}\nconst service = new AppointmentService();\nservice.list('saigon');\nservice.list('hanoi');" },
+          steps: [
+            { title: 'Tham số thuộc lần gọi', detail: 'tenantId được nhận riêng cho mỗi invocation.', lines: [3, 4], speech: 'Nhìn vào tham số tenantId và biến requestedTenant. Lần gọi của Sài Gòn nhận giá trị Sài Gòn; lần gọi của Hà Nội nhận giá trị Hà Nội. Ta có thể truyền ngữ cảnh nghiệp vụ như vậy mà không ghi nó lên object service. Đây là ranh giới dễ nhìn thấy ngay trên chữ ký hàm.' },
+            { title: 'Thuộc tính thuộc object', detail: 'this.lastTenant chỉ có một vị trí trên service đang dùng.', lines: [2, 5, 9], speech: 'Ngược lại, lastTenant là thuộc tính của object được tạo ở dòng chín. Hai lần gọi cùng ghi vào một vị trí đó. Sau hai lần gọi, giá trị cuối cùng là Hà Nội. Trong đoạn đồng bộ ngắn này chưa có dữ liệu trả sai, nhưng mình đã xác định được nơi có thể bị ghi đè khi những lần gọi chạy xen kẽ.' },
+            { title: 'Đừng suy vị trí vật lý từ cú pháp', detail: 'Vòng đời của biến quan trọng hơn hình dung “mọi biến cục bộ đều ở stack”.', speech: 'Mình dùng khái niệm phạm vi lần gọi để giải thích ownership, không khẳng định mọi biến JavaScript đều nằm vật lý trên stack. Closure và hàm async có thể giữ dữ liệu sống trên heap. Điểm cần giữ ở đây là hai tham số độc lập không tự biến thành một thuộc tính dùng chung.' }
+          ],
+          takeaway: 'Phân biệt dữ liệu của lần gọi với dữ liệu của object sống qua nhiều lần gọi.',
+          conclusion: 'Ở phần tiếp theo, mình chỉ cần thêm một lần await để biến rủi ro ghi đè vừa thấy thành một bug có thể tái hiện được. Trước đó, ta hoàn thiện ranh giới giữa hai process.'
+        }),
+        teach({
+          id: 'virtual-address-space', title: 'Vì sao cùng một địa chỉ chưa chắc cùng dữ liệu?',
+          subtitle: 'Giải thích địa chỉ ảo từ một phép so sánh cụ thể',
+          lead: 'Một địa chỉ chỉ có nghĩa trong ngữ cảnh ánh xạ của process đang dùng nó.',
+          intro: 'Hãy nghĩ tới số phòng hai không một. Hai toà nhà đều có thể có phòng mang số đó, nhưng không phải cùng một căn phòng. Tương tự, một giá trị địa chỉ trong process A và một giá trị giống hệt trong process B chưa đủ để kết luận chúng trỏ tới cùng dữ liệu vật lý.',
+          exhibit: { label: 'Mô hình giản lược · không phải địa chỉ lấy từ máy thật', rows: [{ label: 'Process A · địa chỉ ảo 0x1000', value: 'ánh xạ → trang vật lý X' }, { label: 'Process B · địa chỉ ảo 0x1000', value: 'ánh xạ → trang vật lý Y' }, { label: 'Page table', value: 'mô tả ánh xạ' }, { label: 'MMU', value: 'dịch địa chỉ khi truy cập' }] },
+          steps: [
+            { title: 'Địa chỉ ứng dụng thấy là địa chỉ ảo', detail: 'Không đọc một con trỏ như số thứ tự trực tiếp của ô RAM.', speech: 'Ứng dụng thông thường sử dụng địa chỉ ảo. Hệ điều hành thiết lập ánh xạ, còn phần cứng quản lý bộ nhớ, gọi là MMU, tham gia dịch địa chỉ khi truy cập. Cùng một con số có thể ánh xạ tới hai trang vật lý khác nhau trong hai process.' },
+            { title: 'Ánh xạ có quyền truy cập', detail: 'Cô lập còn dựa trên quyền đọc, ghi, thực thi.', speech: 'Ánh xạ không chỉ nói dữ liệu ở đâu. Nó còn có quyền truy cập, chẳng hạn trang được đọc nhưng không được ghi. Nhờ vậy, một process không được tuỳ ý đọc hoặc sửa dữ liệu của process khác chỉ bằng cách đoán địa chỉ. Chia sẻ bộ nhớ giữa process cần cơ chế được thiết lập rõ.' },
+            { title: 'Bộ nhớ ảo không bằng RAM đang dùng', detail: 'Reserve địa chỉ chưa chắc đã có đủ trang resident.', speech: 'Một vùng địa chỉ được dành trước không có nghĩa toàn bộ dung lượng đó đã nằm trong RAM. Một số trang được cấp theo nhu cầu; một số trang đọc có thể được chia sẻ. Vì thế, số bộ nhớ ảo lớn không tự chứng minh máy đang dùng từng ấy RAM. Điều này sẽ giúp ta tránh đọc sai chỉ số RSS ở cuối bài.' }
+          ],
+          takeaway: 'Tách ba thứ: địa chỉ ảo, ánh xạ và các trang thực sự resident trong RAM.',
+          conclusion: 'Mình chưa cần đi sâu vào cấu trúc từng cấp page table. Ta chỉ cần đủ mô hình để hiểu vì sao hai process có vùng riêng và vì sao một chỉ số bộ nhớ không thể kể hết mọi thứ.'
+        }),
+        teach({
+          id: 'file-descriptor-ownership', title: 'Một kết nối đang mở nằm ở đâu?',
+          subtitle: 'Nối lại từ process tới request đặt lịch',
+          lead: 'Ứng dụng giữ handle tới socket; kernel giữ trạng thái của kết nối.',
+          intro: 'Khi trình duyệt kết nối tới API, mình thường chỉ nhìn thấy một object request trong code. Nhưng bên dưới còn có socket và trạng thái mạng do kernel quản lý. Trên hệ điều hành kiểu Unix, process thao tác với nhiều tài nguyên thông qua mô tả tập tin, gọi là file descriptor, hay FD.',
+          exhibit: { label: 'Ví dụ quan sát trên Linux · số FD chỉ là minh hoạ', code: '$ ls -l /proc/1234/fd\n0 -> /dev/null\n1 -> pipe:[...]\n7 -> socket:[...]\n8 -> socket:[...]\n\n# PID 1234 phải là process cần điều tra' },
+          steps: [
+            { title: 'FD là một số tra cứu', detail: 'Số 7 có nghĩa trong bảng FD của process đó.', speech: 'FD là số nguyên dùng để tra một mục trong bảng tài nguyên của process. Số bảy ở process A không nhất thiết là cùng tài nguyên với số bảy ở process B. Kernel dùng mục được tra để biết mình muốn thao tác với socket hay tập tin nào.' },
+            { title: 'Kết nối chờ vẫn tốn tài nguyên', detail: 'Socket, buffer và metadata vẫn có vòng đời.', speech: 'Một socket không có dữ liệu mới vẫn có thể cần bộ nhớ, buffer và các cấu trúc quản lý. Chờ không tốn CPU chạy code liên tục, nhưng không miễn phí. Đây là lý do giữ nhiều kết nối có thể chạm giới hạn FD hoặc bộ nhớ trước khi CPU lên cao.' },
+            { title: 'Công cụ phụ thuộc môi trường', detail: '/proc là ví dụ Linux; macOS có công cụ khác.', speech: 'Lệnh trên dùng hệ thống tập tin proc của Linux và cần quyền đọc phù hợp. Nếu đang dùng macOS, mình có thể quan sát process và socket bằng công cụ khác như lsof. Đừng sao chép lệnh rồi coi việc không có thư mục proc là lỗi của Node.js. Ta đang học loại bằng chứng cần tìm, không học thuộc một đường dẫn.' }
+          ],
+          takeaway: 'Process sống lâu sẽ giữ tài nguyên sống lâu; phải đóng và giới hạn chúng theo đúng vòng đời.',
+          conclusion: 'Đến đây, mình đã xác định được nơi dữ liệu và socket tồn tại. Bây giờ quay về AppointmentService để xem hai request trong cùng process có thể làm sai dữ liệu ra sao.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q1',
-        question: 'Hai thread thuộc cùng một process có chia sẻ heap không, và mỗi thread giữ riêng phần nào?',
-        options: [
-          'Có; mỗi thread có stack và bộ thanh ghi riêng.',
-          'Không; mỗi thread có heap và file descriptor riêng.',
-          'Có; nhưng toàn bộ stack cũng dùng chung.',
-          'Không; process và thread đều là đơn vị lập lịch CPU.'
-        ],
-        correctIndex: 0,
-        explanation: 'Các thread trong cùng process chia sẻ không gian địa chỉ, bao gồm heap và bảng file descriptor. Mỗi thread vẫn có stack và trạng thái thanh ghi riêng để lưu ngữ cảnh thực thi.'
-      },
-      explanation: 'Process sở hữu không gian địa chỉ và tài nguyên dùng chung; mỗi thread giữ stack cùng trạng thái thực thi riêng.'
+      check: { id: 'c1-l1-live-process-q1', question: 'Hai lần chạy cùng server.mjs trên hai cổng có PID khác nhau. Điều gì hợp lý nhất?', options: ['Dùng chung file không khiến heap hai process tự dùng chung.', 'Cùng file nên thay object ở A sẽ tự thay object ở B.', 'Khác cổng khiến mọi request có một OS thread riêng.', 'Cùng runtime nên hai PID thực chất là một process.'], correctIndex: 0, explanation: 'Program là artefact tĩnh, còn mỗi process là một lần thực thi với ranh giới tài nguyên riêng. Muốn chia sẻ dữ liệu giữa hai process phải có cơ chế rõ ràng, không thể suy từ việc dùng chung file.' },
+      explanation: 'Dùng PID xác định lần chạy; phân biệt trạng thái của request, object service và tài nguyên của process.'
     },
     {
-      id: 'long-running-state',
-      title: 'Máy chủ sống lâu và trạng thái request',
-      objective: 'Nhận ra vì sao singleton giữ dữ liệu người dùng có thể gây nhiễm chéo request.',
-      durationMinutes: 12,
+      id: 'long-running-state', title: 'Theo hai request để tìm lỗi lẫn dữ liệu', durationMinutes: 13,
+      objective: 'Tự truy vết lỗi tenant trên singleton, sửa bằng tham số và kiểm chứng bằng thứ tự thực thi có kiểm soát.',
       slides: [
-        {
-          id: 'server-lifetime',
-          title: 'Server không khởi động lại sau mỗi request',
-          subtitle: 'Một process phục vụ nhiều người dùng qua thời gian',
-          narration:
-            'Tab trình duyệt thường có vòng đời gắn với phiên của người dùng. Một Node.js server thì khác: process khởi động một lần và có thể tiếp nhận hàng triệu request trước lần deploy kế tiếp. NestJS mặc định giữ các provider singleton trong suốt vòng đời ứng dụng. Cách này tiết kiệm chi phí khởi tạo, nhưng thuộc tính mutable trên service tồn tại qua nhiều request. Mỗi request phải truyền ngữ cảnh của nó qua tham số, không gắn tạm clinicId, userId hay tenantId lên singleton rồi hy vọng request khác không chạy xen vào.',
-          takeaway: 'Vòng đời singleton dài hơn request; trạng thái nghiệp vụ không được để trong thuộc tính mutable của singleton.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'VÒNG ĐỜI · MỘT PROCESS PHỤC VỤ NHIỀU REQUEST',
-            lead: 'Server khởi động một lần, rồi nhiều request lần lượt hoặc đồng thời đi qua cùng một heap.',
-            points: [
-              { title: 'Dependency singleton', detail: 'Dùng chung được nếu trạng thái bên trong an toàn và có vòng đời phù hợp.' },
-              { title: 'Dữ liệu request', detail: 'tenantId, userId và kết quả tạm thuộc đúng lần gọi hiện tại.' },
-              { title: 'Rủi ro', detail: 'Thuộc tính mutable trên service có thể bị request khác ghi đè khi hàm đang await.' }
-            ]
-          }
-        },
-        {
-          id: 'data-bleed-trace',
-          title: 'Một lần await có thể mở cửa cho request khác',
-          subtitle: 'Truy vết lỗi dùng chung trạng thái',
-          narration:
-            'Request A ghi clinic-saigon vào thuộc tính currentClinicId rồi chờ audit service qua mạng. Khi hàm đang chờ, main thread có thể xử lý request B; B ghi clinic-hanoi vào cùng thuộc tính. Khi A chạy tiếp, nó đọc clinic-hanoi và truy vấn nhầm dữ liệu. await không khóa singleton và cũng không tạo bản sao thuộc tính. Bản sửa là dùng clinicId như biến cục bộ, truyền nó xuyên suốt lời gọi. Với ngữ cảnh cần truy cập sâu, dùng cơ chế request context được thiết kế rõ ràng thay vì biến toàn cục mutable.',
-          takeaway: 'await tạo điểm nhường lịch; trạng thái dùng chung có thể bị request khác ghi trước khi hàm tiếp tục.',
-          visual: {
-            kind: 'timeline',
-            events: [
-              { time: '0 ms', actor: 'Request A', action: 'Ghi clinic-saigon lên singleton' },
-              { time: '2 ms', actor: 'Request A', action: 'await audit I/O; nhường main thread' },
-              { time: '3 ms', actor: 'Request B', action: 'Ghi clinic-hanoi lên cùng thuộc tính' },
-              { time: '8 ms', actor: 'Request A', action: 'Tiếp tục và đọc nhầm clinic-hanoi' }
-            ]
-          },
-          focusPlan: ['highlight', 'highlight', 'circle', 'highlight']
-        },
-        {
-          id: 'stateless-repair',
-          title: 'Giữ ngữ cảnh trong phạm vi request',
-          subtitle: 'Sửa nguyên nhân thay vì tăng số lượng instance',
-          narration:
-            'Có thể giảm rủi ro bằng request-scoped provider nhưng việc đó làm tăng chi phí tạo và phân giải dependency. Với dữ liệu như clinicId trong ví dụ, cách đơn giản và dễ kiểm chứng nhất là truyền tham số. Service singleton vẫn dùng tốt để giữ client kết nối database, cấu hình bất biến và dependency dùng chung an toàn. Quy tắc thiết kế không phải “cấm singleton”; đó là chỉ giữ trạng thái có vòng đời dài hơn hoặc bằng service, còn dữ liệu của một request phải nằm trong context của request.',
-          takeaway: 'Giữ provider singleton; truyền dữ liệu thay đổi theo request qua tham số hoặc request context.',
-          visual: {
-            kind: 'comparison',
-            columns: [
-              { title: 'Sai: mutable singleton', points: ['this.currentTenant = tenantId', 'Request A và B ghi cùng vùng nhớ', 'Có thể trả dữ liệu sai tenant'] },
-              { title: 'Đúng: dữ liệu cục bộ', points: ['generateReport(tenantId)', 'Mỗi lần gọi có tham số riêng', 'Dependency hạ tầng vẫn được chia sẻ'] }
-            ]
-          }
-        },
-        {
-          id: 'singleton-lifetime',
-          title: 'Singleton phù hợp cho dependency, không phù hợp cho trạng thái request',
-          subtitle: 'Quyết định dựa trên vòng đời dữ liệu, không dựa trên tên provider',
-          narration:
-            'Trong NestJS, provider mặc định có scope singleton trong vòng đời của application context. Một database pool hay client HTTP có thể được chia sẻ vì bản chất của nó là dependency dài hạn có quản lý trạng thái nội bộ theo thiết kế. Ngược lại, currentUser, tenantId, giỏ hàng của người dùng hay dữ liệu request tạm thời thuộc một lần gọi. Đặt chúng vào thuộc tính singleton làm nhiều request cùng truy cập một vị trí trên heap. Chuyển provider sang request scope có thể giải quyết một số kiểu truy cập ngầm, nhưng cũng làm lan truyền phạm vi request qua dependency graph và tăng chi phí khởi tạo/resolution. Trước khi chọn scope, mình hãy hỏi ba điều: dữ liệu sống bao lâu, ai sở hữu nó, và cần chia sẻ cho những lời gọi nào? Nếu chỉ cần một service dùng tenantId để truy vấn, truyền tenantId vào tham số là ranh giới rõ và dễ kiểm thử nhất.',
-          takeaway: 'Chọn scope theo ownership và lifetime; dữ liệu request nên được truyền qua call context rõ ràng.',
-          visual: {
-            kind: 'comparison',
-            columns: [
-              { title: 'Chia sẻ an toàn', points: ['Database pool có giới hạn', 'Cấu hình bất biến', 'Client hạ tầng có lifecycle rõ'] },
-              { title: 'Giữ trong request', points: ['tenantId / userId', 'Kết quả tạm của một request', 'Mutable state không được gắn lên singleton'] }
-            ]
-          }
-        },
-        {
-          id: 'async-request-context',
-          title: 'Truyền request context tới nơi cần dùng',
-          subtitle: 'Tham số tường minh là mặc định; AsyncLocalStorage là công cụ có chủ đích',
-          narration:
-            'Với luồng nghiệp vụ thông thường, hãy nhận tenantId ở controller hoặc guard, xác thực nó, rồi truyền qua các hàm service tới repository. Call signature khi đó cho thấy rõ dependency của hàm và việc kiểm thử có thể cấp context giả một cách trực tiếp. Một số hệ thống logging hoặc tracing cần correlationId ở nhiều tầng mà không muốn thêm tham số vào hàng chục API. Node.js AsyncLocalStorage có thể duy trì context theo chuỗi async đã được hỗ trợ, nhưng vẫn cần khởi tạo context ở ranh giới request, tránh lưu dữ liệu mutable không liên quan và kiểm tra thư viện native/callback có bảo toàn context hay không. Đây không phải một bộ nhớ toàn cục an toàn tuyệt đối. Dù dùng cách nào, mục tiêu là mỗi request đọc đúng dữ liệu của chính nó và có test tái hiện được hai request xen kẽ.',
-          takeaway: 'Dùng tham số cho dependency nghiệp vụ; dùng async context có giới hạn cho metadata xuyên suốt như trace ID.',
-          visual: {
-            kind: 'flow',
-            nodes: [
-              { id: 'request-boundary', title: 'Request boundary', detail: 'Xác thực userId, tenantId, traceId' },
-              { id: 'explicit-context', title: 'Tham số rõ ràng', detail: 'Truyền context theo lời gọi service' },
-              { id: 'request-logging', title: 'Logging / tracing', detail: 'AsyncLocalStorage cho metadata xuyên tầng' },
-              { id: 'tenant-query', title: 'Repository', detail: 'Truy vấn đúng tenant của request hiện tại' }
-            ]
-          }
-        }
+        teach({
+          id: 'server-lifetime', title: 'Sau request đầu tiên, service vẫn còn đó', subtitle: 'Một app khởi động một lần và phục vụ nhiều lần gọi',
+          lead: 'Trong NestJS, provider mặc định là singleton của application context.',
+          intro: 'Một lần đặt lịch kết thúc không có nghĩa ứng dụng bị xoá rồi khởi động lại từ đầu. Server thường tiếp tục lắng nghe request kế tiếp. Trong NestJS, provider mặc định được tạo và tái sử dụng trong vòng đời application context. Đây là điều ta muốn với những dependency tốn công khởi tạo.',
+          exhibit: { label: 'So sánh vòng đời', rows: [{ label: 'Application context', value: 'khởi tạo → phục vụ → shutdown' }, { label: 'AppointmentService mặc định', value: 'tái sử dụng qua nhiều request' }, { label: 'Request A', value: 'bắt đầu → trả lời → kết thúc' }, { label: 'Request B', value: 'bắt đầu → trả lời → kết thúc' }] },
+          steps: [
+            { title: 'Chia sẻ dependency là hữu ích', detail: 'Ví dụ database pool và cấu hình bất biến.', speech: 'Nếu mỗi request tự mở một pool database mới, chi phí kết nối và số kết nối có thể tăng rất nhanh. Một pool có thiết kế quản lý truy cập rõ ràng có thể được dùng chung. Cấu hình chỉ đọc cũng có thể dùng chung. Vì thế, singleton tự nó không phải một lỗi thiết kế.' },
+            { title: 'Dữ liệu người dùng có vòng đời khác', detail: 'tenantId thuộc request đang được xác thực.', speech: 'Nhưng phòng khám của người đang gọi là ngữ cảnh của request đó. Ghi nó lên một thuộc tính currentTenant của singleton có nghĩa mình đang dùng một ô nhớ chung để biểu diễn nhiều người. Tên biến có chữ current không tạo ra sự cô lập nào.' },
+            { title: 'Đặt câu hỏi ownership', detail: 'Ai sở hữu dữ liệu, và nó phải sống tới khi nào?', speech: 'Mỗi khi thêm thuộc tính vào service, hãy hỏi dữ liệu này thuộc về hạ tầng dùng chung hay một lần gọi cụ thể. Nếu câu trả lời là một người dùng, một lượt tính tiền hoặc một request, cần có ranh giới phù hợp. Phần tiếp theo sẽ cho thấy hậu quả bằng bốn mốc rất cụ thể.' }
+          ], takeaway: 'Chia sẻ dependency dài hạn; giữ ngữ cảnh từng request riêng.',
+          conclusion: 'Đừng sửa bằng cách cấm mọi singleton. Ta chỉ cần bỏ phần trạng thái có ownership không phù hợp ra khỏi object dùng chung.'
+        }),
+        teach({
+          id: 'data-bleed-trace', title: 'Dự đoán: request Sài Gòn sẽ đọc tenant nào?', subtitle: 'Dừng suy đoán ở từng dòng code và ghi lại trạng thái',
+          lead: 'A đang chờ audit; B có thể chạy và ghi đè cùng thuộc tính.',
+          intro: 'Nhìn đoạn code ngắn trên bảng. Mình có một service singleton và một hàm list. Trước khi nghe lời giải, hãy thử đoán điều gì xảy ra nếu request Sài Gòn chờ audit lâu hơn request Hà Nội. Audit ở đây chỉ là một lời gọi I/O bất đồng bộ để tạo điểm chờ trong ví dụ.',
+          exhibit: { label: 'appointments.service.ts · thiết kế sai', language: 'typescript', code: "private currentTenant = '';\n\nasync list(tenantId: string) {\n  this.currentTenant = tenantId;\n  await this.audit.record(tenantId);\n  return this.repo.find(this.currentTenant);\n}" },
+          steps: [
+            { title: 'A ghi saigon rồi chờ', detail: 'Thuộc tính chung hiện mang giá trị saigon.', lines: [4, 5], speech: 'Request A nhận saigon ở tham số. Dòng bốn ghi nó lên thuộc tính currentTenant. Dòng năm chờ audit trả kết quả. Với Promise chưa hoàn tất, hàm tạm dừng phần tiếp theo và trả quyền điều khiển về runtime. Điều đó không khoá service và cũng không tạo bản sao của thuộc tính.' },
+            { title: 'B ghi hanoi trong lúc A chờ', detail: 'Cùng object, cùng thuộc tính, giá trị mới.', lines: [1, 4], speech: 'Trong lúc A chờ, runtime có thể xử lý request B. B nhận hanoi rồi cũng chạy dòng bốn trên đúng object service ấy. Giá trị currentTenant bây giờ là hanoi. A vẫn giữ tham số riêng là saigon, nhưng code của mình lại không dùng tham số đó ở dòng truy vấn.' },
+            { title: 'A tiếp tục và đọc hanoi', detail: 'Bug nằm ở lần đọc trạng thái chung sau await.', lines: [6], speech: 'Khi audit của A xong, A chạy tiếp dòng sáu. Nó đọc thuộc tính tại thời điểm hiện tại, nên có thể lấy hanoi và truy vấn nhầm phòng khám. Không cần hai dòng JavaScript chạy song song mới có lỗi. Chỉ cần hai luồng công việc xen kẽ ở điểm chờ là đủ.' }
+          ], takeaway: 'await không cô lập trạng thái; luôn kiểm tra thứ được đọc lại sau điểm chờ.',
+          conclusion: 'Bây giờ mình giải thích được chính xác ai ghi gì và lúc nào. Câu “Node.js chỉ có một main thread nên không có race” đã bỏ qua sự xen kẽ của các tác vụ bất đồng bộ.'
+        }),
+        teach({
+          id: 'stateless-repair', title: 'Sửa bằng cách giữ đúng dữ liệu của lần gọi', subtitle: 'Thay một dependency ngầm bằng tham số tường minh',
+          lead: 'A cần dùng tenantId của A, không đọc một thuộc tính “hiện tại” của service.',
+          intro: 'Ta không cần đổi cả kiến trúc ứng dụng để sửa ví dụ vừa rồi. Trước hết, bỏ thuộc tính currentTenant và dùng tham số tenantId xuyên suốt lời gọi. Mình giữ audit và repository là dependency dùng chung, còn dữ liệu của request được truyền tường minh.',
+          exhibit: { label: 'appointments.service.ts · sửa ownership', language: 'typescript', code: "async list(tenantId: string) {\n  await this.audit.record(tenantId);\n  return this.repo.find(tenantId);\n}\n\n// tenantId phải lấy từ context đã xác thực.\n// Truy vấn vẫn phải lọc tenant ở repository." },
+          steps: [
+            { title: 'Tham số tồn tại qua await', detail: 'Ngữ cảnh async giữ giá trị của lần gọi đang tiếp tục.', lines: [1, 2, 3], speech: 'A nhận saigon và giữ ngữ cảnh của lần gọi đó qua điểm await. B nhận hanoi trong một lần gọi khác. Khi A tiếp tục, nó truyền saigon xuống repository. Việc B chạy xen không tự thay giá trị tham số của A. Đây là điều ta có thể nhìn rõ ngay từ code.' },
+            { title: 'Truyền đúng chưa đủ để phân quyền', detail: 'Nguồn tenant phải được xác thực và câu truy vấn phải dùng nó.', lines: [6, 7], speech: 'Tuy nhiên, không được lấy một tenant bất kỳ từ body rồi tin rằng đã an toàn. Controller hoặc guard phải xác định quyền truy cập phù hợp. Repository cũng phải đưa tenant vào điều kiện truy vấn. Bản sửa trên giải quyết lỗi giữ trạng thái chung, không thay thế toàn bộ kiểm tra phân quyền.' },
+            { title: 'Vẫn giữ dependency dùng chung', detail: 'Không cần tạo lại pool chỉ để tách dữ liệu người dùng.', speech: 'Audit client và repository có thể tiếp tục là dependency singleton nếu thiết kế của chúng phù hợp. Mình không phải tạo một database pool cho mỗi request. Ta đã tách hai vòng đời, thay vì dùng một cấu hình scope để che mờ vấn đề ownership.' }
+          ], takeaway: 'Một hàm nhận rõ context sẽ dễ kiểm tra hơn một hàm đọc trạng thái dùng chung ngầm.',
+          conclusion: 'Bước tiếp theo là chứng minh bản sửa bằng kiểm thử có thứ tự xen kẽ rõ ràng. Chạy hai request ngẫu nhiên rồi thấy chưa lỗi chưa phải bằng chứng chắc chắn.'
+        }),
+        teach({
+          id: 'data-bleed-test', title: 'Một test phải buộc lỗi có cơ hội xảy ra', subtitle: 'Điều khiển điểm chờ thay vì trông vào may rủi thời gian',
+          lead: 'Cho A dừng đúng trước lần đọc, cho B ghi đè, rồi mới cho A tiếp tục.',
+          intro: 'Nếu chỉ gửi hai request đồng thời, tốc độ máy và database có thể khiến bug lúc xuất hiện lúc không. Một phép thử tốt cần điều khiển được điểm chờ. Trên bảng là lịch thực thi của test, không phải mốc thời gian đo được từ production.',
+          exhibit: { label: 'Lịch kiểm thử có kiểm soát', rows: [{ label: 'Bước 1', value: 'A vào audit → giữ Promise chưa resolve' }, { label: 'Bước 2', value: 'B vào service với tenant hanoi' }, { label: 'Bước 3', value: 'Resolve audit của A' }, { label: 'Kỳ vọng', value: 'A truy vấn saigon; B truy vấn hanoi' }] },
+          steps: [
+            { title: 'Giữ một Promise làm cổng', detail: 'Fake audit cho test quyền cho A tiếp tục.', speech: 'Trong test, fake audit trả một Promise chưa được resolve cho request A. Test giữ hàm resolve. Như vậy mình biết chắc A đã ghi trạng thái và đang chờ, thay vì đoán bằng cách sleep vài mili giây.' },
+            { title: 'Cho B chạy trong khoảng trống', detail: 'Tái hiện đúng điều kiện ghi đè thuộc tính.', speech: 'Sau khi xác nhận A tới điểm chờ, test cho B gọi service với hanoi. Với code sai, B đã thay giá trị thuộc tính chung. Với code đúng, B chỉ có ngữ cảnh riêng. Hai phiên bản khác nhau ở ownership, không khác ở số thread.' },
+            { title: 'Mở cổng và kiểm tra đầu vào repository', detail: 'Quan sát dữ liệu được truyền, không chỉ HTTP status.', speech: 'Cuối cùng, resolve Promise của A và kiểm tra repository đã nhận tenant nào. Nếu chỉ kiểm tra status hai trăm, test vẫn có thể pass dù dữ liệu trả sai phòng khám. Kỳ vọng phải gắn với invariant nghiệp vụ, tức mỗi request chỉ truy vấn tenant đã được xác thực của chính nó.' }
+          ], takeaway: 'Test concurrency nên kiểm soát thứ tự xen kẽ và kiểm tra dữ liệu tại ranh giới gây lỗi.',
+          conclusion: 'Đó là cách biến một mô tả “thỉnh thoảng bị lẫn” thành một test có thể lặp lại. Mình không cần tải lớn để bắt đầu chứng minh nguyên nhân.'
+        }),
+        teach({
+          id: 'async-request-context', title: 'Khi nào cần request scope hoặc async context?', subtitle: 'Chọn công cụ sau khi đã hiểu dữ liệu thuộc về ai',
+          lead: 'Tham số là mặc định rõ ràng; scope và async context giải những nhu cầu khác.',
+          intro: 'Sau ví dụ vừa rồi, có thể nảy ra câu hỏi liệu cứ đổi toàn bộ service sang request scope có nhanh hơn không. Cách đó có chỗ dùng, nhưng trước hết mình phân biệt ba lựa chọn và mục đích của từng lựa chọn.',
+          exhibit: { label: 'Chọn theo nhu cầu', rows: [{ label: 'Dữ liệu nghiệp vụ của một lời gọi', value: 'truyền tham số' }, { label: 'Instance cần vòng đời theo request', value: 'request-scoped provider' }, { label: 'traceId xuyên chuỗi async', value: 'AsyncLocalStorage có kiểm chứng' }] },
+          steps: [
+            { title: 'Ưu tiên chữ ký hàm dễ đọc', detail: 'list(tenantId) bộc lộ dependency nghiệp vụ.', speech: 'Nếu service chỉ cần tenant để truy vấn, truyền tham số thường đơn giản nhất. Test cấp tenant giả mà không phải dựng cả request context. Người đọc biết hàm cần gì ngay từ chữ ký, thay vì phải tìm một biến môi trường ngầm.' },
+            { title: 'Request scope có chi phí và sự lan truyền', detail: 'Dependency graph có thể phải tạo instance theo từng request.', speech: 'Request scope phù hợp khi bản thân instance cần gắn với một request. Nhưng nó làm thay đổi vòng đời và có thể kéo các consumer sang vòng đời đó. Việc tạo và phân giải dependency theo request có chi phí. Không nên chọn nó chỉ để giữ một chuỗi tenantId mà tham số đã giải quyết tốt.' },
+            { title: 'Async context dùng có chủ đích', detail: 'Khởi tạo tại boundary, kiểm tra thư viện có giữ context.', speech: 'AsyncLocalStorage của Node.js hữu ích cho metadata như traceId xuyên nhiều tầng. Mình cần khởi tạo context ở ranh giới request và kiểm tra các tích hợp callback có bảo toàn context. Đây không phải lý do để nhét mọi trạng thái mutable vào một chỗ “global nhưng có vẻ an toàn”.' }
+          ], takeaway: 'Chọn công cụ theo ownership, lifetime và khả năng kiểm thử; không chọn theo tên nghe tiện.',
+          conclusion: 'Ta đã hiểu vì sao hai request có thể xen vào nhau. Giờ mình hỏi điều kiện nào giúp request khác có cơ hội được chạy, và điều gì xảy ra khi main thread không trả quyền.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q2',
-        question: 'Trong ví dụ hai request xen kẽ qua await, vì sao Request A có thể truy vấn tenant của Request B?',
-        options: [
-          'Vì await làm process tạo heap mới cho Request B.',
-          'Vì cả hai lần gọi cùng ghi vào thuộc tính singleton.',
-          'Vì biến tham số của A tự đổi theo biến môi trường.',
-          'Vì database tự gộp hai transaction khác tenant.'
-        ],
-        correctIndex: 1,
-        explanation: 'Thuộc tính service singleton nằm trên object dùng chung. Khi A đang chờ I/O, B có thể ghi đè thuộc tính; A tiếp tục và đọc giá trị mới từ B.'
-      },
-      explanation: 'Câu hỏi chỉ được đưa ra sau khi học viên đã xem trace xen kẽ và phương án sửa.'
+      check: { id: 'c1-l1-live-process-q2', question: 'A chờ audit, B ghi hanoi, rồi A đọc this.currentTenant. Bản sửa trực tiếp nhất là gì?', options: ['Thêm async vào mọi phương thức của service.', 'Truyền tenant đã xác thực qua tham số tới repository.', 'Tăng số process nhưng giữ nguyên thuộc tính chung.', 'Tăng heap để A giữ thuộc tính lâu hơn B.'], correctIndex: 1, explanation: 'Bỏ dependency vào thuộc tính mutable giúp mỗi lần gọi tiếp tục dùng đúng context của nó sau await. Tăng tài nguyên hoặc thêm async không thay đổi ownership của thuộc tính dùng chung.' },
+      explanation: 'Muốn sửa race qua await, hãy theo lần ghi và lần đọc trạng thái; dùng test điều khiển Promise để chứng minh.'
     },
     {
-      id: 'event-loop',
-      title: 'Main thread, event loop và I/O bất đồng bộ',
-      objective: 'Giải thích được vì sao Node.js đơn luồng vẫn phục vụ nhiều request đồng thời và điều gì làm nó bị block.',
-      durationMinutes: 15,
+      id: 'event-loop', title: 'Vì sao chờ database khác với tính toán nặng?', durationMinutes: 14,
+      objective: 'Phân biệt I/O wait với CPU work, dự đoán callback bị trì hoãn và chọn cách tách việc phù hợp.',
       slides: [
-        {
-          id: 'cooperative-runtime',
-          title: 'Một main thread có thể luân phiên nhiều request',
-          subtitle: 'Chồng lấp thời gian chờ không đồng nghĩa chạy JavaScript song song',
-          narration:
-            'Node.js thường thực thi JavaScript ứng dụng trên một main thread. Khi handler gặp thao tác I/O bất đồng bộ, runtime đăng ký việc chờ với hệ điều hành hoặc libuv rồi trả quyền cho event loop. Trong thời gian socket chờ, main thread chạy callback khác đã sẵn sàng. Khi dữ liệu về, callback của request đầu được xếp để chạy tiếp. Vì vậy nhiều request có thể đang chờ đồng thời mà không cần một JavaScript thread riêng cho từng request. Nhưng hai đoạn JavaScript đồng bộ trên cùng isolate không chạy song song trên hai lõi.',
-          takeaway: 'Node.js tăng concurrency bằng cách không giữ main thread trong lúc chờ I/O.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'REQUEST I/O · MAIN THREAD · CALLBACK',
-            lead: 'Trong lúc libuv chờ I/O, main thread tiếp tục chạy việc khác. Khi I/O hoàn tất, callback được đưa về để chạy khi thread sẵn sàng.',
-            illustration: {
-              src: 'https://dev-to-uploads.s3.amazonaws.com/uploads/articles/5dnrdqoql3sp9rw0gt1x.gif',
-              alt: 'GIF minh họa JavaScript tiếp tục chạy trong khi libuv xử lý I/O, sau đó callback được đưa về event loop.',
-              caption: 'Andrew Hu & Fabrizio Lallo · Node Doctors · mô hình minh họa giản lược'
-            }
-          }
-        },
-        {
-          id: 'blocking-main-thread',
-          title: 'Đồng bộ dài sẽ chặn tất cả callback',
-          subtitle: 'Concurrency không cứu được một event loop đang bận tính toán',
-          narration:
-            'Nếu một callback chạy vòng lặp đồng bộ 500 mili giây, event loop không thể xử lý callback khác trong khoảng thời gian đó. Request mới vẫn có thể đến kernel và dữ liệu I/O vẫn có thể vào buffer, nhưng ứng dụng chưa có cơ hội chạy handler hoặc gửi phản hồi. Cùng nguyên tắc ấy áp dụng cho JSON parse khổng lồ, biểu thức chính quy gây backtracking hoặc tính toán CPU nặng. Tách CPU-bound work sang worker thread hay tiến trình worker; không kỳ vọng chuyển một vòng lặp nặng thành async chỉ bằng cách thêm từ khóa async.',
-          takeaway: 'async không làm phép tính đồng bộ chạy nền; main thread bị chiếm thì callback của mọi request phải chờ.',
-          visual: {
-            kind: 'timeline',
-            events: [
-              { time: '0 ms', actor: 'Request A', action: 'Bắt đầu vòng lặp đồng bộ' },
-              { time: '1–500 ms', actor: 'Main thread', action: 'Không trả quyền cho event loop' },
-              { time: 'Trong lúc đó', actor: 'Request B', action: 'Callback sẵn sàng nhưng chưa được chạy' },
-              { time: '500 ms', actor: 'Main thread', action: 'Vòng lặp xong; hàng đợi mới được xử lý' }
-            ]
-          }
-        },
-        {
-          id: 'async-versus-parallel',
-          title: 'Phân biệt đồng thời và song song',
-          subtitle: 'Concurrency là quản lý nhiều việc; parallelism là chạy cùng thời điểm',
-          narration:
-            'Với I/O bất đồng bộ, runtime giữ nhiều công việc đang chờ và luân phiên xử lý phần JavaScript khi chúng sẵn sàng. Đó là concurrency. Parallelism xảy ra khi nhiều luồng hoặc process thực sự chạy trên nhiều lõi CPU cùng lúc. Libuv thread pool có thể chạy một số loại tác vụ nền, còn Worker Threads phù hợp cho JavaScript CPU-bound. Phân biệt hai khái niệm giúp chọn đúng công cụ: tăng số connection pool không làm CPU-bound code nhanh hơn; còn thêm worker cho I/O chờ mạng thường chỉ tăng phức tạp mà không tăng throughput tương ứng.',
-          takeaway: 'I/O concurrency tận dụng thời gian chờ; CPU parallelism cần worker hoặc process thực thi riêng.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'PHÂN BIỆT HAI CÁCH TĂNG NĂNG LỰC',
-            lead: 'Concurrency quản lý nhiều việc đang diễn ra. Parallelism thực sự chạy nhiều phép tính cùng một thời điểm.',
-            points: [
-              { title: 'I/O-bound', detail: 'Nhường main thread trong lúc chờ; event loop có thể chạy callback khác.' },
-              { title: 'CPU-bound', detail: 'JavaScript tính liên tục thì vẫn chiếm thread; cần worker hoặc process riêng để chạy song song.' }
-            ],
-            question: 'Thêm Worker Threads có giúp một request chỉ đang chờ database nhanh hơn không?'
-          }
-        },
-        {
-          id: 'event-loop-turn',
-          title: 'Một lượt event loop nối callback I/O với microtask',
-          subtitle: 'Các phase là cách tổ chức công việc; promise callback không phải một phase ngang hàng',
-          narration:
-            'Trong Node.js, libuv điều phối các nhóm callback như timers, pending callbacks, poll, check và close callbacks. Khi poll nhận socket readiness, JavaScript callback được đưa vào lượt xử lý phù hợp; setImmediate thường gắn với check, còn timer chỉ đủ điều kiện chạy khi ngưỡng thời gian đạt và event loop tới điểm xử lý timer. Sau callback hiện tại, Node.js xử lý hàng đợi microtask của Promise và process.nextTick theo quy tắc runtime trước khi tiếp tục công việc khác. Không nên dạy sơ đồ phase như một lịch đồng hồ luôn giống hệt nhau: thứ tự một số callback phụ thuộc thời điểm đăng ký và phiên bản Node/libuv. Mô hình cần nhớ cho backend là callback JavaScript chạy đồng bộ tới hết; thao tác chờ I/O nhường event loop; callback đã sẵn sàng vẫn phải chờ main thread rảnh.',
-          takeaway: 'I/O readiness chỉ làm callback sẵn sàng; main thread mới thực thi callback và microtask.',
-          visual: {
-            kind: 'cycle',
-            centerLabel: 'MAIN THREAD',
-            nodes: [
-              { id: 'loop-poll', title: 'Poll I/O', detail: 'Kernel báo socket hoặc handle sẵn sàng' },
-              { id: 'js-callback', title: 'JavaScript callback', detail: 'Chạy tới khi kết thúc hoặc nhường I/O' },
-              { id: 'microtasks', title: 'Microtasks', detail: 'Promise reactions và nextTick theo quy tắc runtime' },
-              { id: 'next-work', title: 'Công việc kế tiếp', detail: 'Event loop tiếp tục khi main thread được trả quyền' }
-            ]
-          },
-        },
-        {
-          id: 'microtask-starvation',
-          title: 'Một hàng microtask tự nối dài cũng có thể làm đói I/O',
-          subtitle: 'Không chỉ vòng lặp for mới làm event loop trễ',
-          narration:
-            'Một callback đồng bộ rất dài là nguyên nhân rõ ràng của event-loop lag, nhưng callback ngắn lặp liên tục qua Promise hoặc process.nextTick cũng có thể giữ runtime quá lâu ở hàng ưu tiên cao. Ví dụ một tác vụ đệ quy cứ schedule microtask mới mà không nhường sang lượt I/O có thể khiến socket đã ready phải đợi. Vì vậy “mã này dùng async” không chứng minh nó thân thiện với event loop. Hãy quan sát độ trễ event loop dưới tải, tách CPU work theo lô có giới hạn, và chủ động nhường quyền khi xử lý batch lớn. Với công việc tính toán nặng, Worker Threads hoặc một worker service riêng thường phù hợp hơn; với I/O, giữ concurrency hữu hạn để downstream không bị quá tải.',
-          takeaway: 'Đo thời gian chiếm main thread và nhường quyền có chủ đích; async không tự bảo đảm fairness.',
-          visual: {
-            kind: 'comparison',
-            columns: [
-              { title: 'Event loop được nhường', points: ['Callback có giới hạn thời gian', 'Batch có điểm yield', 'Socket ready được xử lý kịp'] },
-              { title: 'Event loop bị đói', points: ['CPU callback quá dài', 'Microtask tự schedule liên tục', 'I/O sẵn sàng nhưng phản hồi vẫn trễ'] }
-            ]
-          }
-        }
+        teach({
+          id: 'cooperative-runtime', title: 'Trong lúc A chờ, CPU của Node làm gì?', subtitle: 'Một quầy xử lý có thể nhận việc khác khi đang đợi kết quả',
+          lead: 'I/O có thể còn đang diễn ra dù JavaScript của request đó chưa chạy tiếp.',
+          intro: 'Mình trở lại lời gọi audit ở ví dụ cũ. Giả sử một dịch vụ mạng mất hai trăm mili giây mới trả lời. Main thread có phải dành đủ hai trăm mili giây chỉ để đứng nhìn request A không? Với I/O bất đồng bộ thông thường, câu trả lời là không.',
+          exhibit: { label: 'Dòng thời gian giản lược · số liệu minh hoạ', rows: [{ label: '0–2 ms', value: 'A chuẩn bị và gửi I/O' }, { label: '2–200 ms', value: 'A chờ; main thread có thể xử lý B' }, { label: '200 ms', value: 'I/O của A đã sẵn sàng' }, { label: 'Lượt được thực thi', value: 'A tiếp tục đoạn sau await' }] },
+          steps: [
+            { title: 'Đăng ký việc rồi nhường quyền', detail: 'Chờ Promise chưa hoàn tất cho phép call stack hiện tại rút đi.', speech: 'A gửi yêu cầu qua API bất đồng bộ rồi gặp await với Promise chưa hoàn tất. Phần tiếp theo của hàm được giữ để chạy sau. Khi callback hiện tại kết thúc, runtime có thể xử lý công việc khác. Ví dụ người phục vụ nhận order rồi chuyển xuống bếp là cách hình dung sự chờ, nhưng kernel và runtime mới là cơ chế thực tế.' },
+            { title: 'I/O không cần JS liên tục canh', detail: 'Network readiness thường do kernel theo dõi.', speech: 'Trong trường hợp socket mạng, kernel theo dõi trạng thái I/O và runtime nhận thông báo phù hợp. Không có một vòng JavaScript liên tục hỏi database đã xong chưa. Với một số API khác như thao tác filesystem hoặc crypto, Node còn dùng worker pool. Không được gộp tất cả bất đồng bộ thành “đều chạy trong thread pool”.' },
+            { title: 'Sẵn sàng chưa chắc chạy ngay', detail: 'Callback vẫn đợi main thread có thể thực thi.', speech: 'Khi dữ liệu đã về, phần JavaScript tiếp tục của A vẫn phải được chạy trên main thread phù hợp. Nếu lúc đó main thread đang bận một vòng lặp dài, A chưa thể tiếp tục ngay. Vì vậy, thời gian request không chỉ là thời gian database trả lời.' }
+          ], takeaway: 'I/O đang chờ và JavaScript đang chạy là hai trạng thái khác nhau.',
+          conclusion: 'Điểm mạnh này cho phép một main thread phối hợp nhiều request chờ I/O. Nó không làm main thread chạy nhiều đoạn JavaScript đồng bộ cùng lúc.'
+        }),
+        teach({
+          id: 'blocking-main-thread', title: 'Một vòng lặp làm chậm cả /health', subtitle: 'Thí nghiệm hai request để quan sát sự chặn',
+          lead: 'Một handler giữ main thread lâu sẽ trì hoãn cả những handler rất nhẹ.',
+          intro: 'Hãy thêm một nhánh slow vào HTTP server. Để minh hoạ sự chặn, mình cố ý dùng vòng lặp chờ bận nửa giây. Đây là code thí nghiệm, không phải cách tạo delay trong ứng dụng. Trong một terminal gọi slow, rồi terminal khác gọi health ngay sau đó.',
+          exhibit: { label: 'Ví dụ chặn · chỉ chạy trong môi trường thử nghiệm', language: 'javascript', code: "if (req.url === '/slow') {\n  const until = performance.now() + 500;\n  while (performance.now() < until) {}\n}\nres.end('ok');\n\n// Terminal A: curl localhost:3000/slow\n// Terminal B: curl localhost:3000/health" },
+          steps: [
+            { title: 'Dòng while không trả quyền', detail: 'Main thread bận kiểm tra điều kiện tới khi hết thời gian.', lines: [2, 3], speech: 'Trong nửa giây này, main thread liên tục chạy vòng lặp. Nó không gặp một điểm chờ I/O để trả quyền cho runtime. Dù hệ điều hành vẫn có thể lập lịch những thread khác, main thread của ứng dụng chưa sẵn sàng chạy callback health.' },
+            { title: 'Health nhẹ nhưng vẫn phải đợi', detail: 'Request đã đến không có nghĩa handler đã bắt đầu chạy.', lines: [5, 8], speech: 'Health chỉ cần trả một chuỗi ngắn, nhưng nó vẫn chia sẻ nơi thực thi JavaScript với slow. Độ trễ nhìn từ client gồm cả thời gian đợi tới lượt. Nếu health đến khi slow còn khoảng bốn trăm mili giây, nó có thể phải đợi xấp xỉ phần thời gian còn lại, cộng các chi phí khác.' },
+            { title: 'Đo rồi thay một điều kiện', detail: 'Bỏ vòng lặp và so sánh lại trong cùng điều kiện tải.', speech: 'Mình đo latency trước, bỏ vòng lặp rồi đo lại. Đừng chạy thí nghiệm trên production hoặc kết luận chỉ từ một lần đo. Trong hệ thống thật, JSON lớn, regex xấu hoặc xử lý đồng bộ dài có thể đóng vai vòng lặp này mà nhìn qua code không rõ ràng bằng.' }
+          ], takeaway: 'Handler nhẹ vẫn chậm nếu phải đợi một main thread bị chiếm lâu.',
+          conclusion: 'Bây giờ ta thử một cách sửa rất thường gặp nhưng không có tác dụng, chỉ thêm từ async vào hàm tính toán.'
+        }),
+        teach({
+          id: 'async-versus-parallel', title: 'Thêm async không chuyển vòng lặp sang lõi khác', subtitle: 'Thay hình thức trả kết quả không thay nơi thực thi',
+          lead: 'async làm hàm trả Promise; phần tính toán đồng bộ vẫn chạy tại nơi được gọi.',
+          intro: 'Nếu mình bọc hàm tính checksum bằng async rồi await nó, liệu health có hết chậm không? Hãy nhìn kỹ phần nào của code thực sự nhường quyền và phần nào vẫn đang dùng CPU.',
+          exhibit: { label: 'Sai lầm thường gặp', language: 'typescript', code: "async function checksum(values: number[]) {\n  let sum = 0;\n  for (const value of values) sum += value;\n  return sum;\n}\nconst result = await checksum(largeArray);" },
+          steps: [
+            { title: 'Vòng lặp vẫn chạy đồng bộ', detail: 'Không có bước offload trong thân hàm.', lines: [1, 2, 3], speech: 'Khi gọi checksum, thân hàm bắt đầu chạy trên main thread của mình. Từ async không tạo thread mới. Vòng lặp vẫn phải chạy xong trước khi hàm trả kết quả. Một Promise bọc kết quả không chứng minh công việc đã được đưa sang worker.' },
+            { title: 'Concurrency khác parallelism', detail: 'Xen kẽ công việc khác với thực thi thật trên nhiều lõi.', lines: [6], speech: 'Đồng thời, hay concurrency, là nhiều công việc có khoảng đời chồng lấp và được phối hợp. Song song, hay parallelism, là thực thi tại cùng thời điểm trên tài nguyên phù hợp. Chờ I/O giúp xen kẽ nhiều request, nhưng muốn tính toán nặng song song cần cơ chế thực thi khác.' },
+            { title: 'Chọn theo workload', detail: 'Giảm việc, chia lô có yield, hoặc dùng worker pool có giới hạn.', speech: 'Nếu việc nhỏ, trước hết giảm lượng dữ liệu và thuật toán thừa. Nếu chia được thành lô, có thể trả quyền giữa các lô để cải thiện khả năng đáp ứng, nhưng tổng CPU vẫn phải được trả. Nếu thực sự cần tách tính toán, dùng một pool Worker Threads hoặc hệ thống job phù hợp. Tạo worker mới cho từng request có thể đưa thêm chi phí khởi tạo và truyền dữ liệu.' }
+          ], takeaway: 'Muốn biết code có chặn hay không, đọc công việc thực tế chứ không chỉ đọc từ async.',
+          conclusion: 'Ta đã tách được chạy code, chờ I/O và chạy song song. Còn một bẫy nhỏ là tưởng cứ await Promise đã resolve thì I/O khác sẽ được phục vụ ngay.'
+        }),
+        teach({
+          id: 'microtask-starvation', title: 'Nhường cho microtask chưa chắc đã nhường cho I/O', subtitle: 'Hiểu đủ để tránh một cách chia lô sai',
+          lead: 'Một chuỗi microtask liên tục có thể trì hoãn cơ hội xử lý I/O.',
+          intro: 'Giả sử mình đã quyết định chia việc thành các lô. Sau mỗi lô, mình viết await Promise.resolve và nghĩ rằng event loop đã được nghỉ. Điểm cần kiểm tra là phần tiếp theo được đưa vào loại hàng đợi nào.',
+          exhibit: { label: 'Ví dụ chia lô CPU · so sánh điểm yield', language: 'typescript', code: "// Chưa bảo đảm I/O có cơ hội được xử lý:\nawait Promise.resolve();\n\n// Yield qua một lượt lập lịch phù hợp trong Node:\nawait new Promise<void>((resolve) => {\n  setImmediate(resolve);\n});" },
+          steps: [
+            { title: 'Promise continuation dùng microtask', detail: 'Promise đã resolve vẫn không có nghĩa là poll I/O ngay.', lines: [1, 2], speech: 'Phần tiếp theo sau await được lập lịch theo cơ chế Promise. Nếu công việc liên tục tự nối dài microtask, runtime có thể mất rất lâu mới tới cơ hội xử lý các sự kiện I/O khác. Thêm nhiều await không tự tạo ra tính công bằng.' },
+            { title: 'Yield phải có mục đích', detail: 'setImmediate có thể trả cơ hội cho các lượt xử lý khác.', lines: [4, 5, 6, 7], speech: 'Với tác vụ CPU chia được thành những lô nhỏ, setImmediate có thể giúp mình trả quyền qua lượt lập lịch khác. Nhưng không có một kích thước lô thần kỳ cho mọi máy. Phải đo độ trễ và tổng thời gian hoàn tất, rồi điều chỉnh theo yêu cầu của workload.' },
+            { title: 'Không cần thuộc thứ tự mọi queue hôm nay', detail: 'Giữ invariant: mỗi lượt JS phải đủ ngắn.', speech: 'Các pha event loop và thứ tự nextTick với Promise sẽ được học sâu riêng. Ở đây, nguyên tắc cần giữ là không để một luồng công việc liên tục chiếm cơ hội của request khác. Việc chia lô cải thiện fairness, không biến công việc CPU thành miễn phí.' }
+          ], takeaway: 'Đánh giá điểm yield bằng hành vi quan sát được của I/O, không bằng số lượng await.',
+          conclusion: 'Trong vận hành, mình sẽ nối điều này với event-loop delay và CPU profile, thay vì cứ nhìn thấy async là loại trừ khả năng block.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q3',
-        question: 'Một tác vụ đồng bộ chiếm main thread 500 ms ảnh hưởng thế nào đến request khác đang chờ callback?',
-        options: [
-          'Callback vẫn chạy trên lõi CPU thứ hai của cùng isolate.',
-          'Callback phải chờ main thread trả quyền cho event loop.',
-          'Kernel hủy callback vì socket đã mở quá lâu.',
-          'async tự chuyển toàn bộ JavaScript sang thread pool.'
-        ],
-        correctIndex: 1,
-        explanation: 'JavaScript đồng bộ trên cùng isolate chiếm main thread cho đến khi hoàn tất. Callback có thể đã sẵn sàng nhưng event loop chưa thể chạy nó.'
-      },
-      explanation: 'Đã giảng I/O yield, block đồng bộ và concurrency/parallelism trước khi hỏi.'
+      check: { id: 'c1-l1-live-process-q3', question: 'Hàm async có vòng lặp CPU 500 ms và không offload. /health trên cùng isolate bị ảnh hưởng thế nào?', options: ['Tự chạy song song vì hàm đã trả kiểu Promise.', 'Có thể chờ vì vòng lặp vẫn chiếm main thread.', 'Không bị ảnh hưởng vì /health không đọc database.', 'Tự được chuyển sang libuv worker pool.'], correctIndex: 1, explanation: 'async không di chuyển công việc đồng bộ sang thread khác. Một callback nhẹ vẫn bị trì hoãn nếu main thread đang chạy vòng lặp chưa kết thúc.' },
+      explanation: 'Tách CPU time khỏi I/O wait; xác minh điểm nhường quyền và nơi công việc thực sự được thực thi.'
     },
     {
-      id: 'hardware-latency',
-      title: 'Phân cấp bộ nhớ và khoảng cách độ trễ',
-      objective: 'So sánh thứ tự độ trễ giữa cache, RAM, SSD và network; liên hệ với kiến trúc xử lý I/O.',
-      durationMinutes: 10,
+      id: 'hardware-latency', title: 'Tự tính số request đang chờ', durationMinutes: 10,
+      objective: 'Đổi đúng đơn vị để dùng định luật Little, phân biệt số trung bình với percentile và kiểm tra queueing.',
       slides: [
-        {
-          id: 'latency-scale',
-          title: 'Dữ liệu càng xa CPU, chi phí chờ càng lớn',
-          subtitle: 'Thang logarit: mỗi tầng cách nhau nhiều bậc độ lớn',
-          narration:
-            'Thanh ghi và cache nằm sát lõi CPU nên có độ trễ rất thấp. RAM chậm hơn cache; SSD và network lại tăng thêm các tầng điều khiển, bus, kernel và truyền dẫn. Các giá trị trong hình là xấp xỉ để so sánh bậc độ lớn, không phải cam kết cho mọi máy. Khi backend gọi database qua mạng, CPU không cần tính liên tục trong toàn bộ round trip. Thiết kế tốt tổ chức việc chờ sao cho thread có thể phục vụ công việc khác, đồng thời giữ giới hạn concurrency để không làm cạn socket, pool hoặc bộ nhớ.',
-          takeaway: 'Độ trễ I/O lớn hơn nhiều so với thời gian tính toán; tối ưu hệ thống phải tính cả thời gian chờ.',
-          visual: {
-            kind: 'latency-scale',
-            items: [
-              { title: 'CPU register', latencyNs: 0.5, label: '≈ 0.5 ns' },
-              { title: 'L1/L2 cache', latencyNs: 4, label: '≈ 1–4 ns' },
-              { title: 'L3 cache', latencyNs: 20, label: '≈ 10–20 ns' },
-              { title: 'RAM', latencyNs: 100, label: '≈ 80–100 ns' },
-              { title: 'NVMe I/O', latencyNs: 100000, label: '≈ 100 μs' },
-              { title: 'Network round trip', latencyNs: 40000000, label: '≈ 40 ms' }
-            ]
-          }
-        },
-        {
-          id: 'latency-to-throughput',
-          title: 'Vì sao thời gian chờ quyết định sức chứa?',
-          subtitle: 'Dùng định luật Little để nối concurrency, throughput và latency',
-          narration:
-            'Định luật Little cho biết số request trung bình đang ở trong hệ thống bằng throughput nhân với thời gian lưu lại. Nếu API xử lý 2,000 request mỗi giây và mỗi request mất 50 mili giây, trung bình khoảng 100 request đang tồn tại đồng thời. Đây không phải tốc độ CPU; đó là số công việc đang chiếm tài nguyên khi chờ và chạy. Tăng thời gian truy vấn từ 50 lên 500 mili giây, trong khi throughput giữ nguyên, làm số request in-flight tăng gấp mười. Khi tính capacity, phải cộng bộ nhớ request, socket, buffer, pool và giới hạn downstream.',
-          takeaway: 'Số request in-flight tăng theo throughput × latency; latency cao làm phình tài nguyên đồng thời.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'CÔNG THỨC SỨC CHỨA · ĐỊNH LUẬT LITTLE',
-            lead: 'L = λ × W',
-            points: [
-              { title: 'L', detail: 'Số request trung bình đang nằm trong hệ thống.' },
-              { title: 'λ', detail: 'Throughput, tính bằng request mỗi giây.' },
-              { title: 'W', detail: 'Thời gian một request ở trong hệ thống, đổi về giây.' }
-            ],
-            question: 'Nếu λ không đổi nhưng W tăng gấp mười, số request in-flight thay đổi thế nào?'
-          }
-        },
-        {
-          id: 'little-law-worked-example',
-          title: 'Tính nhanh số request đang nằm trong hệ thống',
-          subtitle: 'Throughput × thời gian lưu lại = concurrency trung bình',
-          narration:
-            'Mình làm phép tính có đơn vị để tránh dùng công thức như một khẩu hiệu. Nếu hệ thống hoàn tất trung bình hai nghìn request mỗi giây và thời gian một request ở trong hệ thống là năm mươi mili giây, đổi thời gian thành 0,05 giây rồi tính 2.000 request/giây nhân 0,05 giây được khoảng 100 request. Nếu thời gian tăng thành 500 mili giây trong khi throughput và tải ổn định, con số trung bình thành khoảng 1.000 request. Đây là số trung bình trong một cửa sổ ổn định, không phải giới hạn peak hay số thread cần tạo. Khi service chờ database, request in-flight còn giữ tham chiếu object, socket, timeout và đôi khi slot connection pool. Vì vậy latency downstream có thể biến thành memory pressure và queueing trước khi CPU utilization cao.',
-          takeaway: 'Dùng L = λW cùng đơn vị nhất quán để ước lượng concurrency; sau đó tính tài nguyên được giữ bởi mỗi request.',
-          visual: {
-            kind: 'flow',
-            nodes: [
-              { id: 'rate', title: '2.000 req/s', detail: 'Arrival/completion rate ổn định' },
-              { id: 'wait-50', title: '× 0,05 s', detail: '50 ms latency → khoảng 100 request in-flight' },
-              { id: 'wait-500', title: '× 0,5 s', detail: '500 ms latency → khoảng 1.000 request in-flight' },
-              { id: 'capacity-cost', title: 'Tài nguyên', detail: 'Socket, object, timeout, pool và queue' }
-            ]
-          },
-        },
-        {
-          id: 'latency-waterfall',
-          title: 'P95 là tổng thời gian ở nhiều chặng, không chỉ thời gian CPU',
-          subtitle: 'Tách queue, ứng dụng, database và network bằng trace',
-          narration:
-            'Một request có thể mất tổng cộng 480 mili giây nhưng chỉ dùng CPU trong vài mili giây. Ví dụ 120 mili giây chờ được nhận vào worker, 4 mili giây chạy middleware và business logic, 330 mili giây chờ database, phần còn lại nằm ở network và serialization. Đây là một trace minh họa, không phải con số chuẩn cho mọi hệ thống. Nếu chỉ nhìn CPU, mình sẽ thấy máy còn rảnh và không hiểu vì sao người dùng chờ. Phân rã latency theo span giúp xác định request chờ ở hàng đợi, pool hay downstream. P95 còn nhạy với phân phối và tail latency; trung bình thấp không loại trừ một nhóm request bị chậm kéo đuôi. Khi nhận sự cố, cần so sánh p50/p95/p99, request rate, queue depth và thời gian của từng dependency.',
-          takeaway: 'Đo latency theo từng span và percentile; tổng thời gian request không đồng nghĩa thời gian CPU.',
-          visual: {
-            kind: 'timeline',
-            events: [
-              { time: '120 ms', actor: 'Ingress queue', action: 'Request chờ slot xử lý' },
-              { time: '4 ms', actor: 'Node.js', action: 'Middleware và business logic dùng CPU' },
-              { time: '330 ms', actor: 'Database', action: 'Query và chờ phản hồi downstream' },
-              { time: '26 ms', actor: 'Network / encode', action: 'Truyền và serialize phản hồi' }
-            ]
-          }
-        }
+        teach({
+          id: 'latency-scale', title: 'Một request 200 ms có thể chỉ dùng vài ms CPU', subtitle: 'Nhìn timeline trước khi đọc phần trăm CPU',
+          lead: 'Thời gian phản hồi là thời gian trôi qua, không chỉ thời gian CPU thực thi.',
+          intro: 'Ta đo từ lúc API nhận request đến lúc trả xong mất hai trăm mili giây. Nếu kết luận CPU đã bận hai trăm mili giây thì mình có thể sửa sai tầng. Hãy tách một timeline giả định thành các phần dễ nhìn.',
+          exhibit: { label: 'Một request minh hoạ · các chặng tuần tự', rows: [{ label: 'Validate và chuẩn bị', value: '2 ms CPU' }, { label: 'Chờ pool và database', value: '195 ms elapsed' }, { label: 'Xử lý kết quả và trả lời', value: '3 ms CPU' }, { label: 'Tổng', value: '200 ms elapsed' }] },
+          steps: [
+            { title: 'CPU time chỉ là một phần', detail: 'Trong ví dụ, phần JS cần khoảng 5 ms.', speech: 'Hai mili giây đầu và ba mili giây cuối là phần minh hoạ main thread thực thi. Phần giữa chủ yếu là chờ. Số liệu thật sẽ phức tạp hơn và có thể có xử lý song song, nhưng việc tách elapsed time với CPU time vẫn giữ nguyên giá trị.' },
+            { title: 'Khoảng cách phần cứng giải thích vì sao chờ đáng kể', detail: 'Cache, RAM, storage và network có thang độ trễ khác nhau.', speech: 'CPU lấy dữ liệu từ cache nhanh hơn nhiều so với đi ra mạng. Dữ liệu càng xa nơi tính toán, giao thức và thiết bị trung gian càng có thể thêm thời gian. Không nên học một bảng nano giây như hằng số mọi máy, nhưng phải hiểu vì sao chờ database không thể được suy ra từ một phép cộng trên RAM.' },
+            { title: 'CPU rảnh không có nghĩa request rảnh', detail: 'Request vẫn giữ context, buffer và vị trí trong hàng đợi.', speech: 'Dù CPU không bận trong lúc chờ, request vẫn tồn tại. Nó có thể giữ object, buffer, socket và timeout. Khi thời gian chờ tăng, rất nhiều request có thể cùng bị giữ lại, khiến bộ nhớ tăng ngay khi phần trăm CPU còn thấp.' }
+          ], takeaway: 'CPU thấp vẫn có thể đi cùng latency và số request đang chờ rất cao.',
+          conclusion: 'Ta sẽ định lượng phần “rất nhiều” bằng một phép tính đơn giản, nhưng phải đổi đơn vị đúng trước.'
+        }),
+        teach({
+          id: 'little-law-worked-example', title: '1.000 request/giây × 0,2 giây bằng bao nhiêu?', subtitle: 'Một phép tính từng bước, dùng số trung bình cùng ranh giới',
+          lead: 'Trong hệ thống ổn định, L = λ × W với cùng ranh giới đo.',
+          intro: 'Mình đang đo ở ranh giới API, hệ thống nhận và hoàn tất trung bình một nghìn request mỗi giây. Thời gian từ nhận đến hoàn tất trung bình là hai trăm mili giây. Ta muốn biết trung bình có bao nhiêu request còn nằm trong API.',
+          exhibit: { label: 'Định luật Little · ví dụ ổn định', rows: [{ label: 'λ · tốc độ trung bình', value: '1.000 request/s' }, { label: 'W · thời gian trung bình', value: '200 ms = 0,2 s' }, { label: 'L = λ × W', value: '1.000 × 0,2 = 200 request' }, { label: 'Nếu W tăng thành 2 s', value: 'L = 2.000 request' }] },
+          steps: [
+            { title: 'Đổi ms thành giây', detail: '200 / 1.000 = 0,2 giây.', speech: 'Trước hết đổi hai trăm mili giây thành không phẩy hai giây. Tốc độ đang tính theo request trên giây, nên thời gian cũng phải tính bằng giây. Nhân một nghìn với hai trăm mà quên đơn vị sẽ cho kết quả sai một nghìn lần.' },
+            { title: 'Nhân và kiểm tra đơn vị', detail: 'request/s × s = request.', speech: 'Tiếp theo, một nghìn request mỗi giây nhân không phẩy hai giây bằng hai trăm request. Đơn vị giây triệt tiêu, còn đơn vị request. Đây là số đang nằm trong ranh giới hệ thống trung bình, không phải số thread, cũng không phải số socket TCP luôn bằng nó.' },
+            { title: 'Thay một biến để dự đoán', detail: 'Giữ λ, tăng W mười lần thì L tăng mười lần.', speech: 'Giả sử dependency chậm khiến thời gian trung bình thành hai giây, còn tốc độ vẫn được duy trì trong trạng thái ổn định phù hợp. Kết quả thành hai nghìn request. Nếu mỗi request giữ thêm dữ liệu, memory pressure có thể tăng mạnh mà CPU chưa tăng tương ứng.' }
+          ], takeaway: 'Little liên hệ tốc độ, thời gian lưu lại và số lượng trung bình; không dự đoán tất cả giới hạn sức chứa.',
+          conclusion: 'Trong quá tải liên tục, đầu vào có thể vượt tốc độ hoàn tất và hàng đợi cứ tăng. Khi đó không được lấy một snapshot ngắn rồi giả vờ hệ thống đang ổn định. Cần đo thêm backlog và sự thay đổi theo thời gian.'
+        }),
+        teach({
+          id: 'latency-waterfall', title: 'Đừng thay W trung bình bằng p95', subtitle: 'Hai câu hỏi thống kê khác nhau',
+          lead: 'Little dùng trung bình; p95 nói về phần đuôi phân bố latency.',
+          intro: 'Dashboard thường đặt p95 thật nổi bật, nên ta dễ lấy nó đưa thẳng vào phép tính vừa học. Nhưng p95 và trung bình không trả lời cùng một câu hỏi. Hãy giữ hai đại lượng tách biệt.',
+          exhibit: { label: 'Cùng một tập request minh hoạ', rows: [{ label: 'Latency trung bình', value: '200 ms' }, { label: 'p95 latency', value: '900 ms' }, { label: 'L theo Little với λ = 1.000/s', value: '200 request trung bình' }, { label: 'Không được suy ra', value: 'L = 900 chỉ từ p95' }] },
+          steps: [
+            { title: 'Mean phục vụ phép tính trung bình', detail: 'W và λ phải đo cùng khoảng và cùng boundary.', speech: 'Định luật Little liên hệ các đại lượng trung bình. Mình phải chọn cùng khoảng đo và cùng phạm vi, chẳng hạn từ lúc API nhận đến lúc API hoàn tất. Đo throughput của toàn API rồi dùng thời gian riêng một query sẽ trộn hai ranh giới.' },
+            { title: 'p95 phục vụ đọc trải nghiệm đuôi', detail: 'Khoảng 95% mẫu có latency không vượt mốc đó.', speech: 'p95 cho một ngưỡng percentile của tập mẫu, giúp thấy các request chậm ở phần đuôi. Nó không phải thời gian trung bình của mọi request. Khi p95 tăng mà mean ít thay đổi, có thể chỉ một nhóm request bị ảnh hưởng; cần phân nhóm theo endpoint, tenant hoặc dependency.' },
+            { title: 'Không cộng percentile các chặng', detail: 'Tổng p95 từng span không tự bằng p95 toàn request.', speech: 'Tương tự, không cộng p95 của pool, database và serialize rồi gọi đó là p95 end-to-end. Các mẫu ở đuôi mỗi chặng có thể thuộc những request khác nhau. Muốn biết request nào chậm ở đâu, hãy xem trace và thời lượng các span của chính request đó.' }
+          ], takeaway: 'Dùng mean để tính lượng công việc trung bình; dùng percentile và trace để điều tra phần đuôi.',
+          conclusion: 'Một công thức chỉ hữu ích khi mình biết đại lượng đầu vào thực sự đo gì. Tiếp theo, ta quay lại nhiều kết nối để phân biệt thêm connection với request đang thực thi.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q4',
-        question: 'Nếu throughput giữ nguyên nhưng latency tăng gấp 10, số request in-flight trung bình thay đổi ra sao?',
-        options: [
-          'Giảm 10 lần vì request xử lý ít CPU hơn.',
-          'Không đổi vì throughput không thay đổi.',
-          'Tăng xấp xỉ 10 lần theo định luật Little.',
-          'Tăng theo bình phương của latency.'
-        ],
-        correctIndex: 2,
-        explanation: 'Định luật Little là L = λW: số request trung bình trong hệ thống bằng arrival/throughput rate nhân thời gian lưu lại. Giữ λ không đổi và tăng W 10 lần thì L cũng tăng 10 lần.'
-      },
-      explanation: 'Học viên đã thấy thang độ trễ và áp dụng L = λW trước câu kiểm tra.'
+      check: { id: 'c1-l1-live-process-q4', question: 'API ổn định hoàn tất 500 request/s; mean latency là 400 ms. L trung bình bằng bao nhiêu?', options: ['1.250 request, vì phải chia tốc độ cho thời gian.', '200.000 request, vì thời gian đo bằng mili giây.', '200 request, vì 500 × 0,4 giây = 200.', 'Không thể tính nếu chưa biết số thread.'], correctIndex: 2, explanation: 'Đổi 400 ms thành 0,4 s rồi dùng L = λW với cùng ranh giới và khoảng đo. Kết quả là request trung bình trong hệ thống, không phải số connection hay thread.' },
+      explanation: 'Kiểm tra đơn vị, dùng mean đúng ranh giới và không thay percentile vào một công thức dành cho trung bình.'
     },
     {
-      id: 'c10k',
-      title: 'C10K và I/O multiplexing',
-      objective: 'Giải thích được giới hạn của thread-per-connection và cách kernel báo socket sẵn sàng.',
-      durationMinutes: 17,
+      id: 'c10k', title: 'Nhiều kết nối chờ không cần một thread cho từng kết nối', durationMinutes: 15,
+      objective: 'Phân biệt connection với công việc sẵn sàng, giải thích interest/ready list và chỉ ra giới hạn epoll không giải quyết.',
       slides: [
-        {
-          id: 'thread-per-connection-cost',
-          title: '10.000 connection không đồng nghĩa cần 10.000 thread',
-          subtitle: 'Chi phí stack và context switching tăng theo số thread',
-          narration:
-            'Mô hình thread-per-connection cấp một thread cho mỗi kết nối. Nếu mỗi thread dành xấp xỉ 1.5 MB cho user stack, 10,000 thread tương ứng khoảng 15 GB không gian stack được reserve/commit tùy cấu hình và hệ điều hành. Con số này là phép ước lượng minh họa, không phải mức cố định của Linux. Ngoài stack, kernel còn giữ cấu trúc thread và scheduler phải quản lý runnable threads. Khi nhiều thread tranh một số lõi nhỏ, chuyển đổi ngữ cảnh và cache disruption tăng. Nút thắt là chi phí quản lý các connection chủ yếu đang chờ, không phải mỗi connection cần một lõi CPU.',
-          takeaway: 'Thread-per-connection gắn chi phí thực thi và quản lý với cả connection đang chờ.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'ƯỚC LƯỢNG TÀI NGUYÊN · THREAD-PER-CONNECTION',
-            lead: 'Nhiều connection chỉ đang chờ I/O, nhưng mô hình cũ vẫn gắn với chúng nhiều thread và stack.',
-            points: [
-              { title: 'Phép tính minh họa', detail: 'Nếu mỗi stack reserve 1 MiB, 10.000 thread cần khoảng 10 GiB không gian địa chỉ cho stack.' },
-              { title: 'Không đồng nghĩa với RSS', detail: 'Stack được reserve không có nghĩa toàn bộ số byte đã nằm trong RAM; cấu hình và hệ điều hành làm con số thực tế thay đổi.' },
-              { title: 'Chi phí khác', detail: 'Scheduler quản lý nhiều thread; runnable thread tranh CPU và làm tăng context switching.' }
-            ],
-            note: 'Ước lượng 1 MiB chỉ để minh họa cách nhân; hãy đo cấu hình stack thật của môi trường.'
-          }
-        },
-        {
-          id: 'multiplexing',
-          title: 'I/O multiplexing: theo dõi nhiều socket, nhận danh sách sẵn sàng',
-          subtitle: 'epoll, kqueue và IOCP là cơ chế theo dõi sự kiện của hệ điều hành',
-          narration:
-            'I/O multiplexing cho phép một event loop đăng ký nhiều socket rồi đợi kernel báo những socket đã sẵn sàng. Trên Linux, epoll giữ tập interest và ready list trong kernel; epoll_wait trả về các sự kiện sẵn sàng thay vì ứng dụng phải quét toàn bộ danh sách ở mỗi vòng. kqueue là cơ chế tương ứng phổ biến trên BSD và macOS; Windows có IOCP với mô hình completion khác. Cần nói chính xác: không phải mọi thao tác I/O đều O(1), cũng không phải epoll làm request hoàn tất nhanh hơn. Nó giảm cách ứng dụng phải quản lý hàng loạt connection đang chờ bằng thread riêng.',
-          takeaway: 'Kernel theo dõi readiness; event loop chỉ xử lý socket có sự kiện cần phục vụ.',
-          visual: {
-            kind: 'flow',
-            nodes: [
-              { id: 'register', title: 'Register FD', detail: 'Ứng dụng đăng ký socket' },
-              { id: 'kernel', title: 'Kernel watches', detail: 'Theo dõi readiness của nhiều FD' },
-              { id: 'ready', title: 'Ready list', detail: 'Chỉ các socket có sự kiện' },
-              { id: 'callback', title: 'Callback', detail: 'Event loop tiếp tục xử lý' }
-            ]
-          },
-        },
-        {
-          id: 'poll-vs-epoll-architecture',
-          title: '50.000 socket nhưng chỉ 10 socket có dữ liệu mới',
-          subtitle: 'So sánh chi phí quét readiness với vòng chờ sự kiện của kernel',
-          narration:
-            'Ta quay lại sơ đồ mở đầu và đi sâu vào luồng hệ điều hành. Với poll, ứng dụng gửi một danh sách descriptor cần theo dõi; kernel kiểm tra danh sách trong lần gọi và trả trạng thái. Lặp lại việc quét danh sách lớn có thể tạo chi phí tăng theo số descriptor được xét, dù phần lớn chưa sẵn sàng. epoll cho phép đăng ký tập interest vào kernel rồi chờ epoll_wait; kernel duy trì trạng thái theo dõi và trả một tập event sẵn sàng để ứng dụng xử lý. Nếu năm mươi nghìn socket mở mà chỉ mười socket có dữ liệu, event loop có thể tập trung vào số event vừa nhận thay vì giao một JavaScript thread cho từng kết nối. Đây là cách mô tả hướng xử lý, không phải lời hứa rằng mọi hoạt động epoll luôn O(1): chi phí thực tế phụ thuộc số event, cách cập nhật interest, kernel và workload. kqueue và IOCP có mô hình API riêng, không nên coi chúng là cùng một triển khai chỉ khác tên.',
-          takeaway: 'poll gửi danh sách cần kiểm tra mỗi lượt; epoll theo dõi interest trong kernel và trả event readiness.',
-          visual: {
-            kind: 'architecture-comparison',
-            left: {
-              title: 'MÔ HÌNH CŨ · POLL DANH SÁCH',
-              subtitle: 'Kiểm tra tập FD lặp lại khi chờ',
-              steps: [
-                { id: 'poll-submit', title: 'Gửi danh sách', detail: 'Ứng dụng chuyển tập FD cần theo dõi' },
-                { id: 'poll-scan', title: 'Kernel kiểm tra N', detail: 'Quét các descriptor trong danh sách' },
-                { id: 'poll-idle', title: '49.990 đang chờ', detail: 'Phần lớn không có event mới ở lượt này' },
-                { id: 'poll-repeat', title: 'Gửi lại', detail: 'Lặp lại khi event loop chờ lượt tiếp' }
-              ]
-            },
-            right: {
-              title: 'MÔ HÌNH HIỆN ĐẠI · EPOLL',
-              subtitle: 'Kernel trả nhóm descriptor đã sẵn sàng',
-              steps: [
-                { id: 'epoll-register', title: 'Đăng ký interest', detail: 'Thêm FD và loại event cần nhận' },
-                { id: 'epoll-watch', title: 'Kernel theo dõi', detail: 'Readiness được cập nhật khi socket đổi trạng thái' },
-                { id: 'epoll-ready', title: '10 FD ready', detail: 'epoll_wait trả tập event cần xử lý' },
-                { id: 'epoll-dispatch', title: 'Dispatch event', detail: 'Callback xử lý rồi quay lại chờ' }
-              ]
-            },
-            bridge: '50.000 kết nối đang mở, 10 sự kiện mới: event loop làm việc với tập readiness vừa được kernel báo.'
-          },
-        },
-        {
-          id: 'socket-event-trace',
-          title: 'Một socket đi từ chờ đến callback',
-          subtitle: 'Truy vết luồng sự kiện thay cho một thread ngủ trên mỗi connection',
-          narration:
-            'Khi socket chưa có dữ liệu, event loop không cần chạy vòng lặp JavaScript liên tục để hỏi nó. Runtime đăng ký quan tâm với backend I/O. NIC nhận packet, kernel cập nhật buffer và đánh dấu socket sẵn sàng. Khi event loop chờ trong epoll_wait được đánh thức, runtime lấy sự kiện rồi gọi callback tương ứng. Callback chạy JavaScript trên main thread; nếu nó xử lý CPU quá lâu thì lại block các callback khác. Multiplexing giải quyết hiệu quả quản lý I/O chờ, không loại bỏ nhu cầu viết callback ngắn và có backpressure.',
-          takeaway: 'Readiness đánh thức event loop; callback vẫn chạy trên main thread và cần giữ ngắn.',
-          visual: {
-            kind: 'timeline',
-            events: [
-              { time: '1', actor: 'Node/libuv', action: 'Đăng ký FD với kernel' },
-              { time: '2', actor: 'Socket', action: 'Chờ dữ liệu; không cần JS thread riêng' },
-              { time: '3', actor: 'Kernel/NIC', action: 'Packet đến; FD chuyển sang ready' },
-              { time: '4', actor: 'Event loop', action: 'Callback được gọi để xử lý dữ liệu' }
-            ]
-          },
-        },
-        {
-          id: 'connection-capacity-limits',
-          title: 'epoll không gỡ hết mọi giới hạn của một server',
-          subtitle: 'Một kết nối vẫn chiếm FD, kernel memory và năng lực downstream',
-          narration:
-            'I/O multiplexing giảm cách ứng dụng phải chờ từng socket, nhưng mỗi kết nối vẫn cần một file descriptor, trạng thái TCP, buffer kernel và một phần bộ nhớ trong ứng dụng. Server còn chịu giới hạn file descriptor của process, giới hạn memory của container, backlog lúc accept, giới hạn connection pool và năng lực database. Nếu tăng số connection tối đa mà không giới hạn request đang chạy, một đợt tải có thể chuyển từ thiếu thread sang cạn memory hoặc làm database quá tải. Backpressure là tín hiệu để tạm ngừng đọc hoặc giảm nhận thêm công việc khi consumer phía sau chưa theo kịp. Capacity planning cần đo cả kết nối mở, request in-flight và queue downstream; “epoll hỗ trợ nhiều FD” không có nghĩa máy vô hạn tài nguyên.',
-          takeaway: 'Multiplexing tối ưu cách chờ; FD, memory, pool, backlog và downstream vẫn phải có ngân sách.',
-          visual: {
-            kind: 'flow',
-            nodes: [
-              { id: 'fd-limit', title: 'Process limit', detail: 'ulimit / descriptor table' },
-              { id: 'kernel-cost', title: 'Kernel TCP state', detail: 'Socket buffer và trạng thái kết nối' },
-              { id: 'app-inflight', title: 'Application in-flight', detail: 'Object request, timeout và queue' },
-              { id: 'downstream-pool', title: 'Downstream', detail: 'DB pool, rate limit và backpressure' }
-            ]
-          },
-        }
+        teach({
+          id: 'thread-per-connection-cost', title: 'Một khách giữ kết nối không có nghĩa đang đặt lịch', subtitle: 'Phân biệt socket đang mở và request đang cần CPU',
+          lead: '50.000 socket mở, chỉ 10 socket sẵn sàng đọc: hai con số mô tả hai việc khác nhau.',
+          intro: 'Hãy mở rộng ứng dụng thành màn hình cập nhật lịch theo thời gian thực. Nhiều trình duyệt giữ kết nối lâu nhưng chỉ thỉnh thoảng có dữ liệu mới. Lúc này tổng kết nối đang mở khác xa số công việc JavaScript cần chạy ngay.',
+          exhibit: { label: 'Snapshot minh hoạ · không phải benchmark', rows: [{ label: 'Socket đang mở', value: '50.000' }, { label: 'Socket vừa sẵn sàng đọc', value: '10' }, { label: 'Socket khác trong snapshot', value: '49.990' }, { label: 'Câu hỏi thiết kế', value: 'làm sao chờ mà không canh từng socket?' }] },
+          steps: [
+            { title: 'Connection là quan hệ còn tồn tại', detail: 'Nó có thể sống qua nhiều request hoặc thông điệp.', speech: 'Một connection TCP có thể tồn tại dù tại thời điểm này không có request mới cần chạy. Trong HTTP keep-alive, kết nối còn có thể được tái sử dụng. Vì thế, lấy số connection làm số request in-flight mà không hiểu giao thức sẽ dẫn tới phép tính sai.' },
+            { title: 'Thread riêng có chi phí quản lý', detail: 'Stack ảo, trang thực dùng và ngữ cảnh lập lịch.', speech: 'Nếu mỗi connection có một OS thread chờ riêng, ta phải trả chi phí thread và tài nguyên liên quan. Ví dụ giả sử reserve một MiB stack cho mỗi thread, mười nghìn thread tương ứng khoảng chín phẩy tám GiB không gian stack ảo. Đó chưa phải kết luận rằng ngần ấy RAM đã resident. Kích thước và cách cấp stack phụ thuộc nền tảng.' },
+            { title: 'Chỉ xử lý thứ đang cần xử lý', detail: 'Giữ đăng ký quan tâm, nhận những sự kiện sẵn sàng.', speech: 'Mình cần một cơ chế chờ chung và biết socket nào có thể thực hiện I/O. Đó là bài toán điều phối, không phải yêu cầu tạo ra một lõi CPU cho từng khách. Từ đây ta mới đưa vào khái niệm I/O multiplexing, hay ghép kênh theo dõi nhiều nguồn I/O.' }
+          ], takeaway: 'Đếm connection, request in-flight và công việc ready riêng; chúng không thay thế nhau.',
+          conclusion: 'Trên Linux, epoll là một cơ chế quan trọng hỗ trợ kiểu điều phối này. Mình sẽ giải thích nó bằng hai danh sách và ba thao tác.'
+        }),
+        teach({
+          id: 'multiplexing', title: 'epoll: danh sách quan tâm và danh sách sẵn sàng', subtitle: 'Hai danh sách giúp hiểu việc kernel đang làm',
+          lead: 'Đăng ký socket cần theo dõi khác với nhận các socket đã sẵn sàng.',
+          intro: 'Nếu phải tự đi hỏi từng socket trong một tập lớn sau mỗi lượt chờ, ứng dụng dễ làm nhiều việc chỉ để phát hiện rằng đa số chưa có gì. epoll cho phép duy trì tập quan tâm trong kernel và nhận các sự kiện sẵn sàng. Mô hình trên bảng cố ý giản lược để nhìn rõ vai trò.',
+          exhibit: { label: 'Linux epoll · mô hình khái niệm', code: 'epoll_create1(...)       // tạo instance\nepoll_ctl(..., ADD, fd)  // đăng ký quan tâm\nepoll_wait(...)         // đợi sự kiện ready\n\ninterest: [fd7, fd8, fd9, ...]\nready:    [fd8, fd42, ...]' },
+          steps: [
+            { title: 'Đăng ký quan tâm', detail: 'interest list chứa các FD cần theo dõi.', lines: [1, 2, 5], speech: 'Ứng dụng tạo một epoll instance rồi dùng epoll_ctl để thêm, sửa hoặc xoá đăng ký quan tâm. Kernel duy trì tập này. Không phải sau mỗi lượt đợi ứng dụng đều phải gửi lại toàn bộ danh sách theo cách poll nhận mảng FD.' },
+            { title: 'Đợi các sự kiện ready', detail: 'epoll_wait có thể chặn thread gọi khi chưa có sự kiện.', lines: [3, 6], speech: 'Khi chưa có sự kiện phù hợp, lời gọi đợi có thể để thread gọi ngủ thay vì chạy vòng lặp bận. Khi có socket ready, kernel trả các sự kiện để runtime tiếp tục. Đây không phải JavaScript tự chạy một vòng for qua năm mươi nghìn socket liên tục.' },
+            { title: 'Ready là khả năng thực hiện I/O', detail: 'Không đồng nghĩa đã có đủ một thông điệp ứng dụng.', speech: 'Một socket ready để đọc có thể chỉ có một phần dữ liệu, có thể báo EOF hoặc tình trạng lỗi phù hợp. Runtime vẫn phải đọc và parser vẫn phải ráp dữ liệu theo giao thức. epoll không tự biến một gói byte thành request HTTP hoàn chỉnh hay kết quả query.' }
+          ], takeaway: 'epoll thông báo readiness; runtime vẫn chịu trách nhiệm đọc, parse và lập lịch xử lý.',
+          conclusion: 'Ta dùng epoll để giải thích Linux. Trên macOS có cơ chế như kqueue, trên Windows có mô hình I/O khác. libuv cung cấp lớp trừu tượng, nên không được khẳng định Node.js trên mọi hệ điều hành đều gọi epoll.'
+        }),
+        teach({
+          id: 'socket-event-trace', title: 'Theo một phản hồi database từ mạng tới await', subtitle: 'Mỗi tầng làm một việc khác nhau',
+          lead: 'Kernel nhận byte không có nghĩa câu lệnh sau await đã chạy.',
+          intro: 'Mình quay về request đặt lịch A đang đợi database. Giả sử không có lỗi mạng và truy vấn đã hoàn thành. Ta theo dữ liệu quay lại process qua ba mốc, để tránh gộp mọi thứ thành một câu “event loop chạy request”.',
+          exhibit: { label: 'Đường trở về của một query · mô hình giản lược', rows: [{ label: 'Kernel', value: 'nhận dữ liệu → socket ready' }, { label: 'Runtime và driver', value: 'đọc byte → parse phản hồi' }, { label: 'Promise của lời gọi DB', value: 'được hoàn tất theo driver' }, { label: 'JavaScript tiếp tục', value: 'chạy khi có cơ hội được thực thi' }] },
+          steps: [
+            { title: 'Socket có dữ liệu', detail: 'Kernel theo dõi trạng thái tài nguyên mạng.', speech: 'Dữ liệu đến socket tạo điều kiện để I/O có thể tiến triển. Kernel và cơ chế thông báo hỗ trợ runtime biết việc đó. Tầng này không biết điều kiện phân quyền phòng khám của ứng dụng mình.' },
+            { title: 'Driver hiểu giao thức', detail: 'Đọc và ráp dữ liệu thành kết quả có nghĩa.', speech: 'Runtime và thư viện database đọc dữ liệu rồi xử lý theo giao thức. Một phản hồi lớn có thể cần nhiều lần đọc. Chỉ khi đủ điều kiện hoàn thành mà API quy định, Promise hoặc callback của query mới được hoàn tất.' },
+            { title: 'Continuation vẫn cần CPU', detail: 'Mapping dữ liệu và serialize có thể làm main thread bận.', speech: 'Sau await, ứng dụng còn có thể map hàng chục nghìn dòng rồi serialize JSON. Dù query đã xong, phần CPU này vẫn có thể trì hoãn request khác. Vì thế, tối ưu đường đọc socket không thay được việc giới hạn lượng kết quả và công việc sau query.' }
+          ], takeaway: 'Tách readiness, hoàn tất giao thức và thực thi JavaScript khi đọc trace.',
+          conclusion: 'Đến đây ta hiểu Node.js có thể giữ nhiều I/O chờ mà không cần một thread chạy JS cho từng socket. Nhưng số lượng kết nối vẫn có những giới hạn vật lý và cấu hình.'
+        }),
+        teach({
+          id: 'connection-capacity-limits', title: 'epoll không làm server có sức chứa vô hạn', subtitle: 'Mỗi tầng vẫn có giới hạn cần đo',
+          lead: 'Theo dõi readiness hiệu quả không xoá chi phí socket, buffer, CPU và downstream.',
+          intro: 'Giả sử mình đã dùng cơ chế I/O phù hợp nhưng server vẫn quá tải. Kết luận epoll hỏng sẽ là quá sớm. Nó giải bài toán chờ và nhận sự kiện, không giải mọi giới hạn khác của hệ thống.',
+          exhibit: { label: 'Các giới hạn cần đối chiếu', rows: [{ label: 'FD limit và socket', value: 'có thể hết khả năng mở thêm' }, { label: 'Buffer và bộ nhớ', value: 'tăng theo dữ liệu bị giữ' }, { label: 'Main thread', value: 'callback và serialize vẫn dùng CPU' }, { label: 'Database pool', value: 'số query thực thi đồng thời hữu hạn' }] },
+          steps: [
+            { title: 'Đo đúng tài nguyên đã đầy', detail: 'CPU thấp không loại trừ hết FD hoặc pool.', speech: 'Một process có thể gặp giới hạn FD ngay khi CPU rảnh. Một ứng dụng cũng có thể giữ nhiều request chỉ để chờ pool database. Mỗi tín hiệu dẫn tới một phép đo khác nhau, nên mình không dùng một con số CPU để đại diện sức khoẻ toàn server.' },
+            { title: 'Giới hạn lượng công việc đang giữ', detail: 'Bound concurrency, timeout và backpressure.', speech: 'Khi downstream chậm, nhận thêm vô hạn chỉ làm nhiều người cùng chờ và giữ thêm dữ liệu. Cần giới hạn concurrency hoặc hàng đợi, đặt timeout theo ngân sách request và xử lý backpressure. Khi hết sức chứa, trả lỗi có kiểm soát có thể tốt hơn giữ mọi request tới khi process hết bộ nhớ.' },
+            { title: 'Không gắn nhãn O(1) cho mọi chi phí', detail: 'Chi phí vẫn phụ thuộc sự kiện, đăng ký và workload.', speech: 'Ta không nên diễn đạt epoll là luôn xử lý mọi thứ trong thời gian hằng số. Số sự kiện trả về vẫn cần được duyệt, việc đăng ký có chi phí và callback vẫn phải chạy. Điều hữu ích là cơ chế duy trì tập quan tâm và trả sự kiện ready phù hợp với nhiều socket đang chờ.' }
+          ], takeaway: 'Multiplexing giúp quản lý chờ; capacity planning vẫn cần đo và giới hạn các tài nguyên còn lại.',
+          conclusion: 'Nếu đã thấy request chờ tích lại, chỉ số bộ nhớ thường là manh mối tiếp theo. Mình sẽ đọc nó cẩn thận để không nhầm mọi phần tăng với leak JavaScript.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q5',
-        question: 'epoll giúp giảm loại chi phí nào trong máy chủ nhiều kết nối đang chờ?',
-        options: [
-          'Xóa hoàn toàn độ trễ truyền dẫn của mạng.',
-          'Bắt buộc cấp một thread cho từng socket.',
-          'Theo dõi socket readiness mà không quét toàn bộ bằng một thread mỗi socket.',
-          'Chạy callback JavaScript song song trên mọi lõi CPU.'
-        ],
-        correctIndex: 2,
-        explanation: 'epoll cho phép kernel quản lý tập file descriptor quan tâm và trả các sự kiện sẵn sàng cho event loop. Nó không xóa latency mạng, không cấp thread cho mỗi socket và không tự chạy JavaScript song song.'
-      },
-      explanation: 'Câu hỏi đặt sau khi đã giải thích stack/thread cost, readiness và callback trace.'
+      check: { id: 'c1-l1-live-process-q5', question: 'epoll trả socket ready nhưng API vẫn chậm. Kết luận nào đúng?', options: ['Ready bảo đảm request HTTP đã được xử lý xong.', 'epoll tự phân phối callback JS lên mọi lõi CPU.', 'Cần đo tiếp main thread, driver, pool và lượng dữ liệu.', 'Không còn khả năng tắc nghẽn ở tầng ứng dụng.'], correctIndex: 2, explanation: 'Readiness chỉ cho biết I/O có thể tiến triển, không phải toàn bộ request đã hoàn tất. Parsing, continuation, database pool và xử lý kết quả vẫn có thể gây chậm.' },
+      explanation: 'Connection mở, I/O ready và callback được thực thi là các trạng thái riêng; mỗi trạng thái có chi phí riêng.'
     },
     {
-      id: 'process-memory',
-      title: 'RSS, V8 heap và bộ nhớ ngoài',
-      objective: 'Phân biệt các vùng bộ nhớ để chọn đúng chỉ số và dấu hiệu khi chẩn đoán process tăng RAM.',
-      durationMinutes: 11,
+      id: 'process-memory', title: 'Đọc bộ nhớ mà không kết luận vội là leak', durationMinutes: 10,
+      objective: 'Phân biệt RSS, V8 heap, external và arrayBuffers; nối số liệu process với giới hạn container đúng ranh giới.',
       slides: [
-        {
-          id: 'memory-regions',
-          title: 'RSS là phần trang nhớ đang nằm trong RAM',
-          subtitle: 'HeapUsed chỉ là một phần của footprint process',
-          narration:
-            'RSS, resident set size, ước lượng số trang của process hiện đang cư trú trong RAM. process.memoryUsage().heapUsed đo phần V8 heap đang được object sử dụng; heapTotal là vùng heap V8 đã cấp; external ghi nhận bộ nhớ native gắn với object JavaScript, ví dụ một số Buffer; arrayBuffers là phần backing store của ArrayBuffer và Buffer. RSS còn có thể gồm code, stack, native allocations và các vùng khác. Vì vậy RSS tăng mà heapUsed ổn định không tự động chứng minh có JavaScript object leak. Cần đọc nhiều chỉ số theo thời gian và đối chiếu workload.',
-          takeaway: 'RSS phản ánh footprint process; heapUsed không bao gồm toàn bộ RAM mà process chiếm.',
-          visual: {
-            kind: 'memory-map',
-            regions: [
-              { id: 'heap', title: 'V8 heap', detail: 'heapUsed / heapTotal' },
-              { id: 'external', title: 'External', detail: 'Native memory gắn với object JS' },
-              { id: 'stack', title: 'Stack & code', detail: 'Call stack, runtime và mã thực thi' },
-              { id: 'rss', title: 'RSS', detail: 'Tập hợp trang process đang ở RAM' }
-            ]
-          }
-        },
-        {
-          id: 'memory-trend',
-          title: 'Đọc xu hướng sau garbage collection',
-          subtitle: 'Một snapshot không đủ để kết luận memory leak',
-          narration:
-            'HeapUsed dao động trong lúc ứng dụng cấp phát object rồi GC thu hồi object không còn reachable. Nếu baseline sau các chu kỳ GC tăng liên tục dưới workload lặp lại, có thể còn reference giữ dữ liệu sống. Nếu heap ổn định nhưng RSS tăng, điều tra native memory, buffer, allocator fragmentation, thread stack hoặc cache của thư viện. So sánh cùng tải, cùng thời gian và cùng loại traffic; ghi nhận cả heapUsed, external, arrayBuffers và RSS. Đừng đặt ngưỡng OOM chỉ theo heap limit vì container bị giới hạn theo tổng memory của process.',
-          takeaway: 'Leak được nhận diện qua xu hướng baseline và reference còn sống; không chỉ qua một đỉnh RSS.',
-          visual: {
-            kind: 'comparison',
-            columns: [
-              { title: 'Heap tăng sau GC', points: ['Object còn reachable', 'Kiểm tra cache, listener, closure', 'Heap snapshot giúp tìm retainers'] },
-              { title: 'RSS tăng, heap ổn định', points: ['External/native memory', 'Buffer, stack hoặc fragmentation', 'Đối chiếu external và arrayBuffers'] }
-            ]
-          }
-        },
-        {
-          id: 'memory-metric-triage',
-          title: 'Đọc các chỉ số bộ nhớ cùng một thời điểm',
-          subtitle: 'Tách object còn sống khỏi buffer và vùng native',
-          narration:
-            'Node.js process.memoryUsage trả về một số góc nhìn có liên quan nhưng không cộng chúng lại để thành RSS. heapUsed là phần V8 heap đang dùng bởi object; heapTotal là vùng heap đã cấp cho V8. external là bộ nhớ native được gắn với object JavaScript, còn arrayBuffers cho biết backing store của ArrayBuffer và Buffer; phần này có mối quan hệ với external nên không được cộng máy móc hai lần. RSS là footprint trang cư trú của process và có thể tăng do code, stack, thư viện native, allocator hoặc memory mapping. Hãy lấy mẫu đồng thời theo thời gian rồi ghép với tải, số connection và GC. Nếu heapUsed sau GC ổn định nhưng external tăng cùng số Buffer còn giữ, điều tra vòng đời buffer. Nếu chỉ RSS dao động sau một peak nhưng baseline ổn định, fragmentation hoặc allocator behavior có thể là giả thuyết cần kiểm chứng, chưa phải kết luận leak.',
-          takeaway: 'So sánh các chuỗi chỉ số theo cùng timestamp và tải; tránh cộng các metric có phạm vi chồng lấp.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'ĐỌC METRIC · KHÔNG CỘNG MÁY MÓC',
-            lead: 'Mỗi chỉ số trả lời một câu hỏi khác nhau về footprint của process.',
-            points: [
-              { title: 'heapUsed', detail: 'Object đang được V8 sử dụng; so baseline sau các chu kỳ GC.' },
-              { title: 'external / arrayBuffers', detail: 'Bộ nhớ native và backing store của Buffer; phạm vi có thể chồng lấp.' },
-              { title: 'RSS', detail: 'Các trang của process đang cư trú trong RAM, gồm cả nhiều vùng ngoài V8 heap.' }
-            ],
-            question: 'Nếu RSS tăng còn heapUsed sau GC ổn định, mình sẽ đo tiếp vùng nào?'
-          }
-        },
-        {
-          id: 'container-memory-budget',
-          title: 'Giới hạn container áp dụng lên process, không chỉ V8 heap',
-          subtitle: 'Heap limit thấp hơn cgroup limit để chừa ngân sách cho native memory',
-          narration:
-            'Trong container, cgroup memory limit thường giới hạn tổng memory mà workload được phép dùng theo cấu hình runtime. V8 heap chỉ là một phần; thread stack, Buffer backing store, TLS, native dependency, code và page cache liên quan cũng góp vào footprint. Nếu đặt max-old-space-size gần bằng memory limit, process có thể bị kernel hoặc nền tảng container kết thúc trước khi V8 phát ra lỗi heap out of memory. Ngược lại, hạ heap limit quá thấp gây GC thường xuyên và giảm throughput. Nên dùng ngân sách có biên an toàn, theo dõi RSS cùng heap và external, kiểm tra trạng thái OOMKilled của container, rồi load test gần với giới hạn vận hành. Giới hạn thực tế còn phụ thuộc cách triển khai và phiên bản Node, nên phải kiểm chứng trên image production.',
-          takeaway: 'Đặt heap budget bên trong tổng ngân sách container và dành phần còn lại cho native, stack, buffer và runtime.',
-          visual: {
-            kind: 'comparison',
-            columns: [
-              { title: 'V8 heap budget', points: ['Object JavaScript', 'Garbage collection', 'Heap snapshot và retainers'] },
-              { title: 'Container memory budget', points: ['RSS toàn process', 'External, Buffer, native và stack', 'OOM kill ở ranh giới cgroup'] }
-            ]
-          }
-        }
+        teach({
+          id: 'memory-regions', title: 'RSS và heapUsed không đo cùng một thứ', subtitle: 'Đọc tên chỉ số trước khi cộng các con số',
+          lead: 'process.memoryUsage() trả nhiều góc nhìn; chúng không phải các ngăn độc lập để cộng hết lại.',
+          intro: 'Khi API giữ nhiều request chờ, dashboard báo bộ nhớ tăng. Trước khi chụp heap snapshot, mình đọc từng chỉ số đang có. Ví dụ trên bảng dùng MiB và số giả định, không phải phép đo được lấy từ một server cụ thể.',
+          exhibit: { label: 'Snapshot minh hoạ · MiB', rows: [{ label: 'rss', value: '240' }, { label: 'heapTotal / heapUsed', value: '96 / 60' }, { label: 'external', value: '80' }, { label: 'arrayBuffers', value: '64 · nằm trong external' }] },
+          steps: [
+            { title: 'heapUsed là phần V8 heap đang dùng', detail: 'heapTotal là phần heap V8 đã cấp, không phải toàn bộ process.', speech: 'V8 quản lý nhiều object JavaScript trên heap. heapUsed phản ánh phần đang dùng; heapTotal phản ánh dung lượng heap đã được cấp theo cách runtime báo cáo. Chúng không bao gồm mọi vùng nhớ của process. Đọc heapUsed ổn định rồi kết luận tổng bộ nhớ ổn định là bước nhảy quá xa.' },
+            { title: 'Buffer có phần dữ liệu ngoài heap JS', detail: 'external và arrayBuffers có quan hệ bao hàm.', speech: 'Buffer và ArrayBuffer có thể giữ backing memory được báo trong các chỉ số tương ứng. Trong API này, arrayBuffers được tính trong external, nên không cộng hai số như hai ngăn rời. Wrapper JavaScript nhỏ có thể giữ một khối dữ liệu lớn mà chỉ nhìn số object sẽ khó nhận ra.' },
+            { title: 'RSS nhìn các trang resident của process', detail: 'Còn có code, stack và cấp phát native.', speech: 'RSS nhìn rộng hơn phần heap JavaScript, gồm các trang resident thuộc nhiều vùng của process. Code, stack và cấp phát native cũng có thể góp vào đó. Nhưng cũng không được coi RSS là tổng đơn giản của những dòng trên bảng, vì các phạm vi đo và quan hệ bao hàm không cho phép cộng tùy ý.' }
+          ], takeaway: 'Đọc định nghĩa từng metric và quan hệ bao hàm trước khi suy nguyên nhân hoặc tính tổng.',
+          conclusion: 'Giờ mình so sánh hai thời điểm và hỏi phần tăng có thể đến từ dữ liệu nào trong ví dụ request đang chờ.'
+        }),
+        teach({
+          id: 'memory-metric-triage', title: 'Heap ổn định nhưng Buffer đang tích lại', subtitle: 'Nối thay đổi metric với một giả thuyết có thể kiểm tra',
+          lead: 'RSS tăng, arrayBuffers tăng, in-flight tăng: kiểm tra dữ liệu đang bị giữ trong request chờ.',
+          intro: 'Giả sử heapUsed gần như đi ngang, nhưng RSS và arrayBuffers cùng tăng trong lúc database chậm. Đây là gợi ý điều tra, chưa phải bằng chứng kết luận. Mình cần tìm nơi đang giữ tham chiếu tới các dữ liệu đó.',
+          exhibit: { label: 'Hai thời điểm minh hoạ · MiB trừ dòng in-flight', rows: [{ label: 'heapUsed', value: '60 → 64' }, { label: 'arrayBuffers', value: '64 → 180' }, { label: 'RSS', value: '240 → 370' }, { label: 'Request in-flight', value: '200 → 2.000' }] },
+          steps: [
+            { title: 'Đưa ra giả thuyết cụ thể', detail: 'Body, kết quả query hoặc buffer có thể đang được giữ.', speech: 'Trong API của mình, request đang chờ có thể vẫn giữ body, context hoặc kết quả từ một chặng trước. Nếu số request tăng mười lần, dữ liệu bị giữ cũng có thể tăng. Mình sẽ kiểm tra kích thước body, cách buffer response và vị trí hàng đợi, thay vì chỉ tăng giới hạn V8 heap.' },
+            { title: 'Thay điều kiện rồi quan sát', detail: 'Khi downstream hồi phục và backlog giảm, memory có giảm theo không?', speech: 'Cho downstream hồi phục trong môi trường thử nghiệm, theo dõi in-flight và lượng dữ liệu được giải phóng. Nếu lượng giữ giảm theo backlog, đó là bằng chứng khác với trường hợp object cứ bị giữ sau khi request xong. RSS có thể không giảm ngay do allocator và các yếu tố native, nên phải đọc xu hướng nhiều chỉ số.' },
+            { title: 'Chưa được loại trừ native memory', detail: 'Không phải mọi native allocation đều được external phản ánh đầy đủ.', speech: 'Nếu RSS tiếp tục tăng còn các chỉ số khác không giải thích được, cần điều tra sâu hơn về allocator, fragmentation và thư viện native. Một snapshot không đủ để phân biệt tất cả trường hợp. Quan trọng là mình nêu rõ bằng chứng nào đang có và giả thuyết nào chưa được kiểm tra.' }
+          ], takeaway: 'Memory tăng có thể là công việc đang tích lại; leak là một giả thuyết cần thêm bằng chứng.',
+          conclusion: 'Tiếp theo, mình đặt những số liệu này vào giới hạn container để hiểu vì sao tăng heap không phải cách cứu mọi lần OOM.'
+        }),
+        teach({
+          id: 'container-memory-budget', title: 'Container 512 MiB không dành trọn 512 MiB cho heap', subtitle: 'Giới hạn áp dụng ở cgroup, không chỉ ở một biến V8',
+          lead: 'Heap chỉ là một phần của lượng bộ nhớ được tính vào giới hạn container.',
+          intro: 'Giả sử container có giới hạn bộ nhớ năm trăm mười hai MiB. Mình không thể đặt heap tối đa đúng con số đó rồi cho rằng đã dùng tài nguyên tối ưu. Trong container còn có các vùng và kiểu bộ nhớ khác cần được tính tới.',
+          exhibit: { label: 'Ngân sách minh hoạ · phải đo workload thật', rows: [{ label: 'Giới hạn cgroup', value: '512 MiB' }, { label: 'Heap budget giả định', value: '256 MiB' }, { label: 'Phần còn lại', value: 'Buffer, native, stack, code, headroom' }, { label: 'Bằng chứng OOM', value: 'container status + cgroup events' }] },
+          steps: [
+            { title: 'Heap flag không giới hạn tổng process', detail: '--max-old-space-size không phải trần RSS.', speech: 'Flag giới hạn old space của V8 không phải trần cho mọi cấp phát bộ nhớ. Buffer, thread stack và thư viện native vẫn cần chỗ. Một process có thể còn xa heap limit nhưng container đã chịu áp lực bộ nhớ.' },
+            { title: 'Cgroup accounting khác process RSS', detail: 'Có thể tính nhiều process và các loại memory khác.', speech: 'Giới hạn container được thực thi theo cgroup, không đơn giản là lấy một lần đọc RSS của Node rồi so với ngưỡng. Cgroup có thể bao gồm nhiều process và các khoản memory được tính theo cơ chế của hệ điều hành. Vì thế, cần xem metric container cùng với metric của process.' },
+            { title: 'Xác minh lý do bị kill', detail: 'Exit 137 một mình không chứng minh OOM.', speech: 'Nếu container kết thúc với mã một trăm ba mươi bảy, đừng tự động kết luận OOM. Nó có thể phản ánh bị SIGKILL vì nguyên nhân khác. Hãy đối chiếu trạng thái OOMKilled hoặc sự kiện cgroup và log của môi trường chạy. Giữ headroom theo số đo workload thay vì dùng phần trăm cố định như một định luật.' }
+          ], takeaway: 'Đặt budget cho toàn workload và kiểm chứng OOM bằng bằng chứng của môi trường chạy.',
+          conclusion: 'Mình đã có đủ mô hình để xử lý một sự cố hoàn chỉnh. Ta sẽ dùng thứ tự chẩn đoán để tránh tăng sai tài nguyên.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q6',
-        question: 'RSS tăng còn heapUsed ổn định thì kết luận kỹ thuật hợp lý nhất là gì?',
-        options: [
-          'Chắc chắn không có vấn đề bộ nhớ vì heap không đổi.',
-          'Chắc chắn là leak object JavaScript trong V8 heap.',
-          'Cần kiểm tra external/native memory và các vùng ngoài heap.',
-          'Garbage collector đã dừng hoạt động vĩnh viễn.'
-        ],
-        correctIndex: 2,
-        explanation: 'RSS bao gồm nhiều vùng ngoài V8 heap. Khi RSS và heapUsed lệch xu hướng, cần kiểm tra external, arrayBuffers, stack, native allocation và fragmentation trước khi quy kết nguyên nhân.'
-      },
-      explanation: 'Học viên đã được dạy cách map memoryUsage metrics và đọc xu hướng sau GC.'
+      check: { id: 'c1-l1-live-process-q6', question: 'RSS và arrayBuffers tăng, heapUsed ít đổi, request in-flight tăng. Bước tiếp theo hợp lý nhất?', options: ['Kết luận không có vấn đề vì heapUsed ổn định.', 'Cộng arrayBuffers vào external để tính tổng.', 'Kiểm tra buffer và dữ liệu đang bị giữ theo backlog.', 'Tăng old-space limit tới đúng memory limit container.'], correctIndex: 2, explanation: 'Các xu hướng gợi ý kiểm tra memory ngoài heap và công việc đang chờ, chưa chứng minh một loại leak cụ thể. arrayBuffers đã thuộc external; giới hạn container cũng không chỉ tính V8 heap.' },
+      explanation: 'Nối các metric theo cùng thời điểm và cùng workload; kiểm chứng giả thuyết giữ dữ liệu trước khi tăng giới hạn.'
     },
     {
-      id: 'production-application',
-      title: 'Áp dụng mô hình vào sự cố production',
-      objective: 'Kết nối concurrency, event loop, upstream latency và memory thành một quy trình chẩn đoán.',
-      durationMinutes: 13,
+      id: 'production-application', title: 'Ghép các manh mối để xử lý một ca thật', durationMinutes: 13,
+      objective: 'Đề xuất phép đo, thay đổi có giới hạn và tiêu chí kiểm chứng cho tình huống API chậm do downstream.',
       slides: [
-        {
-          id: 'incident-diagnostic',
-          title: 'Khi p95 tăng, lần theo hàng đợi trước khi tăng máy',
-          subtitle: 'Tách CPU-bound, I/O-bound và cạn tài nguyên',
-          narration:
-            'Giả sử p95 tăng từ 80 lên 900 mili giây. Trước tiên xem CPU và event-loop lag: CPU cao cùng lag cao gợi ý callback đồng bộ nặng hoặc GC pressure. Nếu CPU thấp nhưng request in-flight và latency database tăng, hệ thống có thể đang chờ downstream; kiểm tra pool, timeout, queueing và backpressure. Nếu RSS tăng dần, so sánh heapUsed với external sau GC. Những chỉ số này giúp phân loại cơ chế trước khi chọn hành động: tối ưu code CPU, giới hạn concurrency, sửa query, hoặc tìm reference giữ object. Một dashboard chỉ có CPU percentage chưa đủ giải thích tình trạng API.',
-          takeaway: 'Chọn hướng xử lý theo dấu hiệu của queue, event loop, downstream latency và từng vùng memory.',
-          visual: {
-            kind: 'flow',
-            nodes: [
-              { id: 'p95', title: 'p95 tăng', detail: 'Xác nhận phạm vi và thời điểm' },
-              { id: 'cpu', title: 'CPU / event loop', detail: 'Tìm callback hoặc GC pressure' },
-              { id: 'io', title: 'I/O / in-flight', detail: 'Kiểm tra downstream, pool, backpressure' },
-              { id: 'memory', title: 'RSS / heap / external', detail: 'Tách leak heap khỏi native memory' }
-            ]
-          }
-        },
-        {
-          id: 'lesson-recap',
-          title: 'Bản đồ nguyên nhân và công cụ',
-          subtitle: 'Từ process đến triệu chứng vận hành',
-          narration:
-            'Mình nối lại toàn bộ mạch học. Hệ điều hành tạo process và lập lịch thread. Runtime JavaScript xử lý trên main thread; I/O bất đồng bộ cho phép event loop tiến hành công việc khác trong lúc chờ. Kernel multiplex socket readiness để phục vụ nhiều connection mà không gắn một JavaScript thread cho mỗi socket. Dữ liệu request không được đặt lên singleton mutable vì process sống lâu và heap được chia sẻ. Cuối cùng, RSS, heapUsed và external trả lời những câu hỏi khác nhau khi điều tra bộ nhớ. Bây giờ bạn đã có mô hình để đọc một sự cố, không chỉ thuộc tên epoll hay event loop.',
-          takeaway: 'Process → runtime → I/O → memory: mỗi tầng tạo một nhóm giới hạn và một nhóm tín hiệu chẩn đoán.',
-          visual: {
-            kind: 'text-slide',
-            eyebrow: 'TỔNG HỢP · MỘT MÔ HÌNH, BỐN TẦNG',
-            lead: 'Triệu chứng production có thể lần ngược qua các tầng thực thi để tìm nơi đang giữ thời gian hoặc tài nguyên.',
-            points: [
-              { title: 'Process và thread', detail: 'Ai sở hữu tài nguyên? Thread nào đang thực thi?' },
-              { title: 'Runtime và event loop', detail: 'Main thread đang chạy CPU hay đang nhường lúc chờ I/O?' },
-              { title: 'Kernel và socket', detail: 'Socket nào ready, queue nào đang tích tụ?' },
-              { title: 'Memory', detail: 'Heap, external hay RSS đang tăng theo tải?' }
-            ]
-          }
-        },
-        {
-          id: 'guided-production-case',
-          title: 'Ca thực hành: p95 tăng, CPU thấp, RSS đi lên',
-          subtitle: 'Xây giả thuyết theo bằng chứng thay vì chọn một nút bấm tăng tài nguyên',
-          narration:
-            'Mình dùng một sự cố giả định để nối tất cả mô hình. API p95 tăng từ 90 lên 850 mili giây; CPU 35%; database span tăng từ 45 lên 420 mili giây; request in-flight tăng gấp tám; RSS tăng từ 900 MB lên 1,5 GB nhưng heapUsed sau GC gần như đi ngang. Trước hết, không kết luận CPU thiếu hay JavaScript heap leak. Bằng chứng hiện nghiêng về chờ downstream và tích tụ request; RSS cần tách external, buffer, stack và native memory. Mình kiểm tra pool wait time, queue depth, timeout, số socket và kích thước response, sau đó giới hạn concurrency hoặc trả lỗi sớm nếu database không thể nhận thêm. Đồng thời truy trace để xác nhận database span giải thích được p95. Khi tải giảm, so sánh baseline memory sau GC. Bạn hãy nói thành tiếng giả thuyết ưu tiên, metric cần lấy tiếp và thay đổi an toàn nhất; rồi mới xem đáp án ở câu kiểm tra cuối.',
-          takeaway: 'Tạo giả thuyết từ nhiều tín hiệu, chọn phép đo phân biệt chúng, rồi mới can thiệp có kiểm soát.',
-          visual: {
-            kind: 'timeline',
-            events: [
-              { time: 'p95 850 ms', actor: 'Triệu chứng', action: 'Định vị endpoint và thời điểm bắt đầu' },
-              { time: 'CPU 35%', actor: 'Runtime', action: 'Kiểm tra event-loop lag trước khi tăng CPU' },
-              { time: 'DB 420 ms', actor: 'Downstream', action: 'Đối chiếu pool wait, trace và queue' },
-              { time: 'RSS ↑ / heap ổn', actor: 'Memory', action: 'Tách external/buffer khỏi heap leak' }
-            ]
-          }
-        },
-        {
-          id: 'diagnostic-decision-order',
-          title: 'Thứ tự chẩn đoán giúp tránh sửa nhầm tầng',
-          subtitle: 'Triệu chứng → giả thuyết → phép đo phân biệt → thay đổi có kiểm soát',
-          narration:
-            'Một quy trình tốt không bắt đầu bằng “thêm instance” hay “tăng heap”. Nó bắt đầu bằng phạm vi ảnh hưởng, thời điểm và percentile. Nếu CPU cùng event-loop lag cao, lấy profile để tìm callback đồng bộ, GC pause và hot path. Nếu CPU thấp nhưng thời gian span database hoặc pool wait cao, kiểm tra downstream, concurrency và queue. Nếu RSS tăng, tách heapUsed, external, arrayBuffers, thread count và giới hạn container qua cùng mốc thời gian. Chọn một thay đổi giới hạn, ví dụ giảm concurrency hoặc khôi phục pool configuration, rồi theo dõi cùng tập metric để xác nhận tác động và rollback nếu xấu đi. Một thay đổi duy nhất giúp kết quả quan sát có ý nghĩa hơn một loạt tuning đồng thời.',
-          takeaway: 'Mỗi can thiệp production phải gắn với một giả thuyết có thể bị dữ liệu bác bỏ.',
-          visual: {
-            kind: 'decision-tree',
-            rootTitle: 'P95 tăng: tầng nào đang giữ request?',
-            rootSubtitle: 'Chọn giả thuyết theo metric đi cùng nhau',
-            tradeoff: 'Một thay đổi mỗi lần; đo lại rồi giữ hoặc rollback',
-            branches: [
-              {
-                condition: 'CPU và event-loop lag cùng cao',
-                outcome: { id: 'cpu-profile', title: 'Profile callback / GC', detail: 'Tách CPU-bound work khỏi main thread' },
-                tone: 'recommended'
-              },
-              {
-                condition: 'CPU thấp, DB span hoặc pool wait cao',
-                outcome: { id: 'downstream-check', title: 'Kiểm tra downstream', detail: 'Pool, queue, timeout và backpressure' },
-                tone: 'neutral'
-              },
-              {
-                condition: 'RSS tăng, heap sau GC ổn định',
-                outcome: { id: 'native-memory', title: 'Đo vùng ngoài heap', detail: 'External, Buffer, stack và native memory' },
-                tone: 'tradeoff'
-              }
-            ]
-          }
-        }
+        teach({
+          id: 'guided-production-case', title: 'API chậm nhưng CPU chỉ 20%: bắt đầu từ đâu?', subtitle: 'Không chọn cách sửa chỉ từ một chỉ số',
+          lead: 'Đọc cùng lúc latency, pool wait, in-flight, CPU và bộ nhớ.',
+          intro: 'Mình đưa ra một ca giả lập để tổng hợp bài. Trước sự cố, API hoàn tất một nghìn request mỗi giây với thời gian trung bình hai trăm mili giây. Sau đó database chậm hơn, request bắt đầu tích lại. Hãy thử nêu một giả thuyết trước khi nghe lời giải.',
+          exhibit: { label: 'Ca giả lập · so trước và trong sự cố', rows: [{ label: 'CPU process', value: 'quanh 20%' }, { label: 'DB latency và pool wait', value: 'đều tăng' }, { label: 'Request in-flight', value: '200 → 2.000' }, { label: 'RSS / heapUsed', value: 'RSS tăng / heap gần ổn định' }] },
+          steps: [
+            { title: 'Nêu giả thuyết, chưa kết luận', detail: 'Ứng dụng có vẻ đang chờ nhiều hơn là tính toán nhiều hơn.', speech: 'CPU thấp và thời gian chờ pool tăng phù hợp với khả năng ứng dụng bị chặn ở downstream. Nhưng đây chưa chứng minh database là nguyên nhân duy nhất. Một CPU tổng trung bình cũng có thể che khuất một thread bận, nên mình cần thêm metric của process và event-loop delay.' },
+            { title: 'Lấy một trace chậm', detail: 'Tách pool acquisition, query và xử lý sau query.', speech: 'Chọn request chậm và đọc từng span. Nó chờ lấy connection bao lâu, query chạy bao lâu, rồi serialize bao lâu? Nếu phần lớn thời gian nằm ở pool acquisition, mình kiểm tra pool đang được giữ bởi ai. Nếu query mới là phần tăng, xem query plan, lock wait và tải database tương ứng.' },
+            { title: 'Nối backlog với memory', detail: 'Đo kích thước dữ liệu mỗi request đang giữ.', speech: 'Tiếp theo, so in-flight với memory theo thời gian. Nếu nhiều request đang giữ buffer trong lúc chờ, RSS có thể tăng dù heap ít đổi. Mình không vội gọi đó là leak, cũng không coi tăng heap là cách làm database nhanh hơn.' }
+          ], takeaway: 'Một chẩn đoán tốt nói rõ hiện tượng, giả thuyết và phép đo phân biệt các nguyên nhân.',
+          conclusion: 'Bây giờ mình chọn một thay đổi nhỏ có thể kiểm chứng, thay vì cùng lúc đổi pool, heap, thread và số instance.'
+        }),
+        teach({
+          id: 'diagnostic-decision-order', title: 'Sửa một điều kiện, giữ một tiêu chí thành công', subtitle: 'Ngăn queue phình ra trước khi tối ưu mù quáng',
+          lead: 'Tăng lượng công việc vào một dependency đang quá tải có thể làm sự cố nặng hơn.',
+          intro: 'Giả sử trace và metric đã cho thấy hàng đợi pool tăng vì database thực thi chậm. Một phản xạ thường gặp là tăng pool thật lớn. Nhưng nếu database đã bão hoà, làm nhiều query chạy đồng thời hơn có thể tăng contention và latency.',
+          exhibit: { label: 'Kế hoạch thử có kiểm soát', rows: [{ label: 'Giả thuyết', value: 'downstream chậm → backlog tăng' }, { label: 'Can thiệp đầu', value: 'giới hạn concurrency / queue' }, { label: 'Ngân sách request', value: 'timeout phù hợp và hủy có hỗ trợ' }, { label: 'Đo lại', value: 'latency, throughput, errors, in-flight' }] },
+          steps: [
+            { title: 'Chặn tích lũy vô hạn', detail: 'Bound queue và số việc có thể thực thi đồng thời.', speech: 'Trước hết bảo vệ hệ thống bằng giới hạn rõ. Khi đã tới ngưỡng, xử lý từ chối hoặc chờ có giới hạn theo yêu cầu sản phẩm. Backpressure nghĩa là phía tạo việc phải phản ứng khi phía nhận không theo kịp, chứ không cứ đẩy thêm vào RAM.' },
+            { title: 'Timeout phải gắn với vòng đời công việc', detail: 'Client ngừng chờ chưa chắc query đã dừng.', speech: 'Đặt timeout giúp giới hạn thời gian chờ của một tầng, nhưng cần biết công việc bên dưới có bị huỷ thật không. Nếu API trả timeout mà query vẫn tiếp tục chạy hàng phút, tài nguyên vẫn bị giữ. Cơ chế huỷ phải được driver và database hỗ trợ, và cần được kiểm tra thay vì giả định.' },
+            { title: 'So cùng workload và đọc trade-off', detail: 'Không ăn mừng p95 giảm nếu lỗi tăng mất kiểm soát.', speech: 'Đo lại dưới tải tương đương, ghi cả throughput, tỷ lệ lỗi, backlog và bộ nhớ. Nếu mình chủ động từ chối sớm một phần request để giữ hệ thống sống, đó là một trade-off cần báo rõ. Giảm latency bằng cách bỏ phần lớn request không đồng nghĩa mọi người dùng đã được phục vụ tốt hơn.' }
+          ], takeaway: 'Mỗi thay đổi cần giả thuyết, phạm vi ảnh hưởng và metric xác minh.',
+          conclusion: 'Sau khi ổn định được sự cố, mới tiếp tục tối ưu query, dữ liệu trả về hoặc phân bổ tài nguyên dựa trên bottleneck đã xác minh.'
+        }),
+        teach({
+          id: 'lesson-recap', title: 'Tự giải thích lại đường đi của một request', subtitle: 'Dùng mô hình để dự đoán, không chỉ để nhớ tên',
+          lead: 'Một request đi qua nhiều vòng đời và nhiều loại thời gian.',
+          intro: 'Mình quay lại request đặt lịch đầu bài. Lần này, hãy tự mô tả nó bằng các ranh giới vừa học. Nếu có đoạn chưa giải thích được, đó chính là phần nên xem lại.',
+          exhibit: { label: 'Ba câu tự kiểm tra', rows: [{ label: 'Dữ liệu nằm ở đâu?', value: 'request context hay singleton?' }, { label: 'Thời gian mất ở đâu?', value: 'CPU, I/O hay queue?' }, { label: 'Tài nguyên bị giữ là gì?', value: 'socket, pool slot, object, buffer?' }] },
+          steps: [
+            { title: 'Theo ownership', detail: 'Xác thực tenant rồi truyền đúng context.', speech: 'Trước hết, process đang nhận request và service đang phục vụ nó có thể sống lâu hơn request. Tenant của người gọi phải được xác thực và giữ theo ngữ cảnh lần gọi. Một lần await không tự tạo vùng riêng cho thuộc tính mutable trên singleton.' },
+            { title: 'Theo công việc thực thi', detail: 'JS chạy ngắn; I/O chờ; kết quả ready vẫn phải được xử lý.', speech: 'Sau đó, main thread chuẩn bị I/O và có thể nhận việc khác trong lúc chờ. Socket readiness được theo dõi bằng cơ chế phù hợp của nền tảng. Dữ liệu quay về vẫn cần được đọc, parse và xử lý. Một vòng lặp CPU dài ở bất kỳ request nào có thể trì hoãn cơ hội đó.' },
+            { title: 'Theo lượng công việc còn giữ', detail: 'Dùng mean đúng đơn vị và đối chiếu memory.', speech: 'Cuối cùng, nếu thời gian lưu lại tăng ở cùng tốc độ xử lý ổn định, số request trung bình trong hệ thống sẽ tăng. Những request ấy có thể giữ thêm dữ liệu. Mình đọc RSS, heap và memory ngoài heap theo định nghĩa, rồi đo bottleneck trước khi chọn cách sửa.' }
+          ], takeaway: 'Muốn sửa đúng, hãy giải thích được dữ liệu của ai, đang chờ gì và giữ tài nguyên nào.',
+          conclusion: 'Đó là mô hình nền để học V8, event loop và NestJS sâu hơn. Ta không cần giải mọi bài toán vận hành hôm nay, nhưng cần đủ khả năng đặt đúng câu hỏi và làm một phép thử để kiểm chứng.'
+        })
       ],
-      check: {
-        id: 'c1-l1-live-process-q7',
-        question: 'CPU thấp, database latency và request in-flight cùng tăng. Hướng kiểm tra đầu tiên hợp lý nhất là gì?',
-        options: [
-          'Tăng heap limit để main thread chạy nhanh hơn.',
-          'Kiểm tra downstream, pool, timeout và backpressure.',
-          'Chuyển toàn bộ request sang Worker Threads.',
-          'Tăng số thread cho từng socket đang chờ.'
-        ],
-        correctIndex: 1,
-        explanation: 'CPU thấp trong khi database latency và in-flight cùng tăng phù hợp với nghẽn chờ downstream hoặc queueing. Cần kiểm tra giới hạn pool, timeout và backpressure trước khi tăng tài nguyên mù quáng.'
-      },
-      explanation: 'CPU thấp đi cùng database latency và số request in-flight tăng cho thấy nhiều công việc đang chờ downstream hoặc queue. Kiểm tra pool, timeout và backpressure sẽ giúp xác định điểm nghẽn.'
+      check: { id: 'c1-l1-live-process-q7', question: 'Pool wait tăng, DB chậm, in-flight và RSS cùng tăng. Hành động nào có căn cứ nhất?', options: ['Tăng heap trước vì request luôn chậm do thiếu heap.', 'Đọc trace, kiểm tra pool/DB và giới hạn backlog có đo lại.', 'Tạo một Worker Thread mới cho mỗi request đang chờ.', 'Tăng pool vô hạn để request nào cũng có connection.'], correctIndex: 1, explanation: 'Các tín hiệu cần được nối với trace để xác định chặng chờ và tài nguyên bị giữ. Giới hạn backlog bảo vệ sức chứa; việc tăng pool hoặc heap chỉ có ý nghĩa khi có giả thuyết và phép đo phù hợp.' },
+      explanation: 'Tách dữ liệu dùng chung, thời gian CPU và I/O wait; chọn một can thiệp có thể quan sát và kiểm chứng.'
     }
   ],
-  closing: {
-    id: 'closing-model',
-    title: 'Quay lại câu hỏi 50.000 kết nối',
-    subtitle: 'Từ câu hỏi vận hành đến cơ chế bên dưới',
-    narration:
-      'Giờ mình quay lại tình huống mở đầu. Năm mươi nghìn kết nối không tự động có nghĩa cần năm mươi nghìn thread JavaScript chạy liên tục. Mình cần biết kết nối nào có readiness, event loop có đang bị callback CPU dài chặn hay không, và khi request tăng thì latency downstream làm số công việc in-flight phình ra thế nào. Nếu máy chậm, mình phân biệt CPU với thời gian chờ; nếu memory tăng, mình so sánh heapUsed, external và RSS cùng một mốc tải. Đây là mô hình để đặt giả thuyết, không phải công thức thay cho benchmark. Trước khi kết thúc, thử trả lời câu hỏi ban đầu bằng cơ chế kernel readiness và nói thêm một metric bạn sẽ đo để kiểm chứng server của mình.',
-    takeaway: 'Đáp án phải nối được readiness, event loop, tài nguyên đang chờ và metric production.',
-    visual: {
-      kind: 'text-slide',
-      eyebrow: 'TỰ GIẢI THÍCH LẠI · CHƯA CẦN THUỘC TÊN API',
-      lead: 'Một kết nối đang mở có nhất thiết phải chiếm một thread đang chạy không?',
-      points: [
-        { title: 'Nói cơ chế', detail: 'Giải thích kernel readiness đưa socket có sự kiện tới runtime như thế nào.' },
-        { title: 'Nối vận hành', detail: 'Chỉ ra metric giúp phân biệt CPU-bound, chờ I/O và memory pressure.' }
-      ],
-      question: 'Với server của mình, tín hiệu đầu tiên nào sẽ giúp kiểm chứng giả thuyết?'
-    }
-  }
+  closing: overview({
+    id: 'closing-recap', title: 'Bài tập nhỏ: quan sát một API của chính mình',
+    subtitle: 'Biến mô hình vừa học thành một kết quả có thể giải thích',
+    lead: 'Chọn một endpoint đọc database và ghi lại điều mình quan sát được.',
+    intro: 'Để kết thúc, mình muốn người học mang theo một bài tập nhỏ có thể làm trên ứng dụng quen thuộc. Không cần tạo tải lớn và cũng không cần can thiệp production. Hãy làm trong môi trường thử nghiệm có quyền kiểm soát.',
+    exhibit: { label: 'Bài tập sau buổi học' },
+    steps: [
+      { title: 'Vẽ vòng đời', detail: 'Đánh dấu process, singleton, request và context.', speech: 'Vẽ request đi qua controller, service và repository. Với mỗi dữ liệu được giữ lại, ghi ai sở hữu và nó phải sống tới lúc nào. Nếu thấy currentUser hoặc currentTenant trên singleton, hãy theo lần ghi và đọc quanh các điểm await.' },
+      { title: 'Tạo hai tình huống chậm', detail: 'Một I/O chậm; một CPU task dài có kiểm soát.', speech: 'So một dependency giả chậm với một phép tính dài trong môi trường thử. Quan sát một endpoint nhẹ thứ hai và giải thích vì sao hành vi khác nhau. Không suy từ phần trăm CPU duy nhất; hãy ghi thêm latency và số request đang chờ.' },
+      { title: 'Viết giả thuyết và bằng chứng', detail: 'Nêu cách đo để bác bỏ hoặc củng cố kết luận.', speech: 'Cuối cùng, viết một đoạn ngắn nêu hiện tượng, nguyên nhân mình nghi ngờ và phép đo cần thêm. Một kết luận tốt có thể bị kiểm chứng là sai. Điều đó giúp mình tiến bộ hơn việc thuộc một khẩu hiệu như cứ async là nhanh.' }
+    ],
+    takeaway: 'Giải thích bằng một ví dụ chạy được và một phép đo có thể lặp lại.',
+    conclusion: 'Ở bài sau, mình đi sâu hơn vào cách V8 thực thi và tối ưu JavaScript. Mô hình process, main thread và ownership hôm nay sẽ là nền để hiểu những gì runtime làm bên trong.'
+  })
 };

@@ -1,0 +1,194 @@
+{
+  "document_id": "ARC-S03-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-010",
+      "title": "Biên soạn giáo án có cấu trúc",
+      "actor": "editor",
+      "i_want": "tạo mục tiêu/sections/script/checkpoints",
+      "so_that": "đạt mục tiêu BO-02 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S03",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-02"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-06",
+        "BR-08"
+      ],
+      "requirement_ids": [
+        "FR-10"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S03-teaching-plans/specs.md",
+      "depends_on": [
+        "US-007",
+        "US-009"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-010-01",
+          "given": "lesson/source ready",
+          "when": "soạn giáo án",
+          "then": "objective→script→visual intent→checkpoint trace được"
+        },
+        {
+          "id": "AC-010-02",
+          "given": "dangling source hoặc checkpoint schema sai",
+          "when": "lint",
+          "then": "error có ref/block/rule cụ thể"
+        },
+        {
+          "id": "AC-010-03",
+          "given": "editor khác đã lưu",
+          "when": "autosave ETag cũ",
+          "then": "412, không overwrite buffer người soạn"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-011",
+      "title": "AI dựng giáo án từ content và nguồn",
+      "actor": "editor",
+      "i_want": "nhận draft có provenance/citation để sửa",
+      "so_that": "đạt mục tiêu BO-02 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S03",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-02"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-05",
+        "BR-06",
+        "BR-10"
+      ],
+      "requirement_ids": [
+        "FR-11"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S03-teaching-plans/specs.md",
+      "depends_on": [
+        "US-010"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-011-01",
+          "given": "budget/source được phép",
+          "when": "chạy authoring job",
+          "then": "artifact schema-valid có prompt/model/input hash và citation"
+        },
+        {
+          "id": "AC-011-02",
+          "given": "source chứa instruction injection hoặc chưa cấp quyền",
+          "when": "build context",
+          "then": "không cấp tool/quyền mới, không dùng source ngoài scope"
+        },
+        {
+          "id": "AC-011-03",
+          "given": "provider timeout hoặc apply stale",
+          "when": "retry/reconcile",
+          "then": "usage unknown hoặc412 rõ, không auto publish/double apply"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-012",
+      "title": "Review giáo án và kiến thức",
+      "actor": "reviewer",
+      "i_want": "duyệt đúng revision với nguồn kiểm chứng",
+      "so_that": "đạt mục tiêu BO-02 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S03",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-02"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-05",
+        "BR-06"
+      ],
+      "requirement_ids": [
+        "FR-12"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S03-teaching-plans/specs.md",
+      "depends_on": [
+        "US-011"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-012-01",
+          "given": "draft có đủ objective/source/lint",
+          "when": "review/approve",
+          "then": "decision gắn hash và human findings disposition"
+        },
+        {
+          "id": "AC-012-02",
+          "given": "AI bịa nguồn hoặc author tự duyệt trái policy",
+          "when": "approve",
+          "then": "bị chặn hoặc cần xử lý findings theo quyền"
+        },
+        {
+          "id": "AC-012-03",
+          "given": "draft đổi sau approval",
+          "when": "đi publish",
+          "then": "approval cũ không còn đủ điều kiện"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

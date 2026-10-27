@@ -1,0 +1,196 @@
+{
+  "document_id": "ARC-S08-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-025",
+      "title": "Giải thích thích ứng theo objective",
+      "actor": "học viên",
+      "i_want": "nhận cách giải thích khác khi chưa hiểu",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S08",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-05",
+        "BR-06",
+        "BR-07",
+        "BR-08"
+      ],
+      "requirement_ids": [
+        "FR-25"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S08-adaptive-teaching/specs.md",
+      "depends_on": [
+        "US-019",
+        "US-020",
+        "US-022"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-025-01",
+          "given": "checkpoint đang học và source được phép",
+          "when": "yêu cầu giải thích khác",
+          "then": "AI dùng approved objective/visual schema và đưa check-understanding"
+        },
+        {
+          "id": "AC-025-02",
+          "given": "AI muốn tự thay plan/pass checkpoint",
+          "when": "trả adaptive response",
+          "then": "không sửa published package hoặc tự pass"
+        },
+        {
+          "id": "AC-025-03",
+          "given": "kết thúc trao đổi phụ",
+          "when": "resume lecture",
+          "then": "quay lại beat gốc đúng version"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-026",
+      "title": "Đánh giá grounding và prompt rollback",
+      "actor": "reviewer",
+      "i_want": "kiểm tra citation/chất lượng câu trả lời",
+      "so_that": "đạt mục tiêu BO-02 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S08",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-02"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-05",
+        "BR-06"
+      ],
+      "requirement_ids": [
+        "FR-26"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S08-adaptive-teaching/specs.md",
+      "depends_on": [
+        "US-019",
+        "US-024"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-026-01",
+          "given": "fixture objective/source/answer có kỳ vọng",
+          "when": "chạy review evaluation",
+          "then": "findings groundedness và severity có evidence refs"
+        },
+        {
+          "id": "AC-026-02",
+          "given": "citation sai revision hoặc không resolve",
+          "when": "validate answer",
+          "then": "flag/reject, không expose nguồn giả"
+        },
+        {
+          "id": "AC-026-03",
+          "given": "prompt mới chất lượng giảm",
+          "when": "rollback active pointer",
+          "then": "run cũ giữ version, run mới dùng version đã duyệt"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-027",
+      "title": "Insights học tập để cải thiện bài giảng",
+      "actor": "mentor",
+      "i_want": "xem điểm tắc theo mục tiêu/checkpoint",
+      "so_that": "đạt mục tiêu BO-05 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S08",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-05"
+      ],
+      "business_rule_ids": [
+        "BR-05",
+        "BR-11"
+      ],
+      "requirement_ids": [
+        "FR-27"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S08-adaptive-teaching/specs.md",
+      "depends_on": [
+        "US-021",
+        "US-026"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-027-01",
+          "given": "có sessions được cấp scope",
+          "when": "mở insights",
+          "then": "aggregate questions/dropoff/summary theo objective"
+        },
+        {
+          "id": "AC-027-02",
+          "given": "ít dữ liệu hoặc actor ngoài scope",
+          "when": "query analytics",
+          "then": "không khẳng định kết quả học chưa có bằng chứng, không leak transcript"
+        },
+        {
+          "id": "AC-027-03",
+          "given": "event dedup/reprocess",
+          "when": "rebuild projection",
+          "then": "insight không đếm trùng hoặc đổi nguồn lịch sử"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

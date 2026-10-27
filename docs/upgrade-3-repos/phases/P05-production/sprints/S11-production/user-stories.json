@@ -1,0 +1,196 @@
+{
+  "document_id": "ARC-S11-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-034",
+      "title": "Core UAT/performance/browser readiness",
+      "actor": "reviewer",
+      "i_want": "nghiệm thu toàn luồng trên browser thật",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P05",
+      "sprint_id": "S11",
+      "release": "R3",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-07",
+        "BR-09",
+        "BR-10",
+        "BR-11"
+      ],
+      "requirement_ids": [
+        "FR-34"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P05-production/sprints/S11-production/specs.md",
+      "depends_on": [
+        "US-025",
+        "US-027",
+        "US-032",
+        "US-033"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-034-01",
+          "given": "staging workload/fixture duyệt",
+          "when": "chạy authoring→graphics→AI1-1→resume UAT",
+          "then": "AC/perf/a11y/isolation có evidence và hardware context"
+        },
+        {
+          "id": "AC-034-02",
+          "given": "Safari/STT/ONNX/provider lỗi",
+          "when": "fallback smoke",
+          "then": "text/chat vẫn học được, trạng thái degraded rõ"
+        },
+        {
+          "id": "AC-034-03",
+          "given": "test có flaky provider/timing",
+          "when": "phân tích failure",
+          "then": "tách deterministic fixture và real smoke, không bỏ test để giả pass"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-035",
+      "title": "Backup/restore và vận hành core",
+      "actor": "operator",
+      "i_want": "khôi phục DB/media/source/session snapshots",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P05",
+      "sprint_id": "S11",
+      "release": "R3",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-10",
+        "BR-13"
+      ],
+      "requirement_ids": [
+        "FR-35"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P05-production/sprints/S11-production/specs.md",
+      "depends_on": [
+        "US-031",
+        "US-034"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-035-01",
+          "given": "off-host backup/keys available",
+          "when": "restore blank environment",
+          "then": "RPO/RTO đo thực, citations/assets/session refs kiểm đúng"
+        },
+        {
+          "id": "AC-035-02",
+          "given": "Redis hoặc AI provider outage",
+          "when": "reconcile/degrade",
+          "then": "outbox/jobs durable, theory/documents không mất"
+        },
+        {
+          "id": "AC-035-03",
+          "given": "daily dump chưa có PITR",
+          "when": "review RPO15m",
+          "then": "không claim15m, đổi strategy/target trước approve"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-036",
+      "title": "Cutover production có cửa sổ ghi rõ",
+      "actor": "ĐẠI CA",
+      "i_want": "chuyển hệ thống sau duyệt UAT/restore",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P05",
+      "sprint_id": "S11",
+      "release": "R3",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-13",
+        "BR-14"
+      ],
+      "requirement_ids": [
+        "FR-36"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P05-production/sprints/S11-production/specs.md",
+      "depends_on": [
+        "US-034",
+        "US-035"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-036-01",
+          "given": "UAT/exceptions/runbooks đã ký",
+          "when": "freeze/import/read-only smoke",
+          "then": "mở ghi mới chỉ sau approve, ghi watermark"
+        },
+        {
+          "id": "AC-036-02",
+          "given": "fail trước mở ghi mới",
+          "when": "rollback routing",
+          "then": "MVP cùng snapshot không mất write"
+        },
+        {
+          "id": "AC-036-03",
+          "given": "sự cố sau mở ghi mới",
+          "when": "incident response",
+          "then": "roll-forward hoặc read-only/reconcile, không quay JSON cũ mù"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

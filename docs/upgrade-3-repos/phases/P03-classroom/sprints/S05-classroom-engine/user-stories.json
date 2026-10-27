@@ -1,0 +1,192 @@
+{
+  "document_id": "ARC-S05-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-016",
+      "title": "Room AI có phiên bản",
+      "actor": "editor",
+      "i_want": "tạo template lớp1-1 từ lecture package",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P03",
+      "sprint_id": "S05",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-01",
+        "BR-03"
+      ],
+      "requirement_ids": [
+        "FR-16"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P03-classroom/sprints/S05-classroom-engine/specs.md",
+      "depends_on": [
+        "US-015"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-016-01",
+          "given": "package published và persona hợp lệ",
+          "when": "publish room version",
+          "then": "pin package/persona/policy và học viên được gán vào được"
+        },
+        {
+          "id": "AC-016-02",
+          "given": "plan/source draft chưa publish",
+          "when": "bind room",
+          "then": "bị chặn với reference cụ thể"
+        },
+        {
+          "id": "AC-016-03",
+          "given": "room publish phiên bản mới",
+          "when": "phiên cũ tiếp tục",
+          "then": "vẫn dùng snapshot ban đầu"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-017",
+      "title": "Engine giảng/vẽ/voice có fallback",
+      "actor": "học viên",
+      "i_want": "học cùng instructor/bảng và ngắt lời",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P03",
+      "sprint_id": "S05",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-07",
+        "BR-09",
+        "BR-10"
+      ],
+      "requirement_ids": [
+        "FR-17"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P03-classroom/sprints/S05-classroom-engine/specs.md",
+      "depends_on": [
+        "US-016"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-017-01",
+          "given": "browser đủ capability",
+          "when": "vào phòng và giơ tay",
+          "then": "narration/ink/focus pause và resume đúng beat"
+        },
+        {
+          "id": "AC-017-02",
+          "given": "ONNX/STT/TTS/3D lỗi hoặc unsupported",
+          "when": "học tiếp",
+          "then": "text/chat hoặc serverTTS policy fallback, không chặn tài liệu"
+        },
+        {
+          "id": "AC-017-03",
+          "given": "rời route/quay lại",
+          "when": "cleanup/remount",
+          "then": "không audio/worker/RAF/WebGL leak hoặc lecture chạy hai lần"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-018",
+      "title": "Session durable và single writer",
+      "actor": "học viên",
+      "i_want": "pause/resume đa thiết bị từ checkpoint ack",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P03",
+      "sprint_id": "S05",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-02",
+        "BR-08",
+        "BR-09"
+      ],
+      "requirement_ids": [
+        "FR-18"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P03-classroom/sprints/S05-classroom-engine/specs.md",
+      "depends_on": [
+        "US-005",
+        "US-016"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-018-01",
+          "given": "event checkpoint đã ack",
+          "when": "mở thiết bị khác",
+          "then": "resume đúng snapshot/checkpoint/lastAck"
+        },
+        {
+          "id": "AC-018-02",
+          "given": "writer lease bị takeover hoặc completed giả",
+          "when": "gửi event/finish",
+          "then": "stale lease409 và không xác minh mastery giả"
+        },
+        {
+          "id": "AC-018-03",
+          "given": "event trùng hoặc mạng ngắt trước ack",
+          "when": "retry/reconcile",
+          "then": "dedup eventId, pending không báo saved"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

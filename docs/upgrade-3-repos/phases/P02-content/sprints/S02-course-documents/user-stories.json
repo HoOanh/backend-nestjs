@@ -1,0 +1,190 @@
+{
+  "document_id": "ARC-S02-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-007",
+      "title": "Setup khoá/chương/bài/lộ trình",
+      "actor": "editor",
+      "i_want": "quản lý cấu trúc học từ CMS",
+      "so_that": "đạt mục tiêu BO-01 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S02",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-01"
+      ],
+      "business_rule_ids": [
+        "BR-02",
+        "BR-03"
+      ],
+      "requirement_ids": [
+        "FR-07"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S02-course-documents/specs.md",
+      "depends_on": [
+        "US-005",
+        "US-006"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-007-01",
+          "given": "editor có quyền",
+          "when": "tạo/reorder course/chapter/lesson/roadmap",
+          "then": "ID/slug/order/ref đúng và Web đọc published metadata"
+        },
+        {
+          "id": "AC-007-02",
+          "given": "slug trùng hoặc reorder thiếu ID",
+          "when": "lưu thay đổi",
+          "then": "validation chặn và không mất cây nội dung"
+        },
+        {
+          "id": "AC-007-03",
+          "given": "hai editor reorder cùng version",
+          "when": "gửi If-Match cũ",
+          "then": "412, giữ draft để reconcile"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-008",
+      "title": "Đính kèm tài liệu theo scope",
+      "actor": "editor",
+      "i_want": "gắn nguồn tài liệu vào khoá/bài",
+      "so_that": "đạt mục tiêu BO-01 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S02",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-01"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-06"
+      ],
+      "requirement_ids": [
+        "FR-08"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S02-course-documents/specs.md",
+      "depends_on": [
+        "US-007"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-008-01",
+          "given": "tài liệu allowlist và quyền hợp lệ",
+          "when": "upload/finalize/attach",
+          "then": "original hash/version/visibility và usage refs được lưu"
+        },
+        {
+          "id": "AC-008-02",
+          "given": "file MIME/size sai hoặc source ngoài scope",
+          "when": "finalize/attach",
+          "then": "reject/quarantine, không cho student đọc"
+        },
+        {
+          "id": "AC-008-03",
+          "given": "document có published ref",
+          "when": "yêu cầu xóa/replace",
+          "then": "không phá snapshot, tạo revision hoặc impact report"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-009",
+      "title": "Trích xuất và truy nguồn tài liệu",
+      "actor": "editor",
+      "i_want": "xem nội dung nguồn có page/section thật",
+      "so_that": "đạt mục tiêu BO-01 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S02",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-01"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-06"
+      ],
+      "requirement_ids": [
+        "FR-09"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S02-course-documents/specs.md",
+      "depends_on": [
+        "US-008"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-009-01",
+          "given": "PDFtext/DOCX/MD/TXT hỗ trợ",
+          "when": "extract",
+          "then": "spans/parserVersion/warnings resolve về original revision"
+        },
+        {
+          "id": "AC-009-02",
+          "given": "PDFscan/zipbomb/parser timeout",
+          "when": "extract",
+          "then": "needs_ocr/failed/quarantined rõ, không fake ready/text"
+        },
+        {
+          "id": "AC-009-03",
+          "given": "job extract retry",
+          "when": "xử lý cùng input/hash/version",
+          "then": "không tạo spans/revisions trùng hoặc bịa page DOCX"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "document_id": "ARC-S09-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-028",
+      "title": "Cohort/roster/lịch AI1-1",
+      "actor": "admin",
+      "i_want": "tổ chức nhiều học viên với phiên riêng",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S09",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-01",
+        "BR-09",
+        "BR-11"
+      ],
+      "requirement_ids": [
+        "FR-28"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S09-cohorts-mentor/specs.md",
+      "depends_on": [
+        "US-018",
+        "US-021"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-028-01",
+          "given": "class/roster/timezone hợp lệ",
+          "when": "publish lịch và student join",
+          "then": "occurrenceUTC và một primary session/student"
+        },
+        {
+          "id": "AC-028-02",
+          "given": "roster CSV trùng hoặc ngoài join window",
+          "when": "import/join",
+          "then": "report/chặn rõ, không shared AV"
+        },
+        {
+          "id": "AC-028-03",
+          "given": "reschedule/cancel/join retry",
+          "when": "xử lý lịch",
+          "then": "không rewrite session cũ, notification dedup"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-029",
+      "title": "Mentor dashboard đúng assignment",
+      "actor": "mentor",
+      "i_want": "theo dõi progress/summary từng học viên được giao",
+      "so_that": "đạt mục tiêu BO-05 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S09",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-05"
+      ],
+      "business_rule_ids": [
+        "BR-11"
+      ],
+      "requirement_ids": [
+        "FR-29"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S09-cohorts-mentor/specs.md",
+      "depends_on": [
+        "US-021",
+        "US-028"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-029-01",
+          "given": "mentor được gán lớp",
+          "when": "xem dashboard",
+          "then": "progress/summary trong scope, transcript có quyền riêng+audit"
+        },
+        {
+          "id": "AC-029-02",
+          "given": "assignment vừa thu hồi",
+          "when": "request tiếp",
+          "then": "backend chặn, UI không cấp dữ liệu mới từ cache cũ"
+        },
+        {
+          "id": "AC-029-03",
+          "given": "đổi học viên/lớp trong dashboard",
+          "when": "query data",
+          "then": "query key đúng scope không lẫn account"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-030",
+      "title": "Module settings phục vụ content/classroom",
+      "actor": "admin",
+      "i_want": "cấu hình module và disable có kiểm soát",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S09",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-10",
+        "BR-12"
+      ],
+      "requirement_ids": [
+        "FR-30"
+      ],
+      "spec_ids": [
+        "SPEC-04"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S09-cohorts-mentor/specs.md",
+      "depends_on": [
+        "US-006",
+        "US-028"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-030-01",
+          "given": "module compiled/dependency/config hợp lệ",
+          "when": "enable/settings",
+          "then": "validate version và capability/menu nhất quán"
+        },
+        {
+          "id": "AC-030-02",
+          "given": "dependency thiếu hoặc core auth bị disable",
+          "when": "thao tác",
+          "then": "bị chặn có impact report, không DDL/xoá data"
+        },
+        {
+          "id": "AC-030-03",
+          "given": "classroom đang active",
+          "when": "disable drain",
+          "then": "chặn new session, giữ/stop in-flight theo policy deadline có audit"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

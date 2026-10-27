@@ -1,0 +1,246 @@
+{
+  "version": "0.2",
+  "status": "draft",
+  "sprints": [
+    {
+      "sprint_id": "S00",
+      "phase_id": "P00",
+      "release": null,
+      "title": "Chốt sản phẩm, specs và bộ chuẩn",
+      "effort_pd": {
+        "min": 4,
+        "max": 7
+      },
+      "depends_on": [],
+      "path": "phases/P00-definition/sprints/S00-definition",
+      "status": "draft",
+      "story_ids": [
+        "US-001",
+        "US-002",
+        "US-003"
+      ]
+    },
+    {
+      "sprint_id": "S01",
+      "phase_id": "P01",
+      "release": "R1",
+      "title": "Nền tảng ba repo phục vụ core",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S00"
+      ],
+      "path": "phases/P01-foundation/sprints/S01-foundation",
+      "status": "draft",
+      "story_ids": [
+        "US-004",
+        "US-005",
+        "US-006"
+      ]
+    },
+    {
+      "sprint_id": "S02",
+      "phase_id": "P02",
+      "release": "R1",
+      "title": "Dữ liệu khoá học, bài và tài liệu nguồn",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S01"
+      ],
+      "path": "phases/P02-content/sprints/S02-course-documents",
+      "status": "draft",
+      "story_ids": [
+        "US-007",
+        "US-008",
+        "US-009"
+      ]
+    },
+    {
+      "sprint_id": "S03",
+      "phase_id": "P02",
+      "release": "R1",
+      "title": "Giáo án và AI soạn bài từ content",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S02"
+      ],
+      "path": "phases/P02-content/sprints/S03-teaching-plans",
+      "status": "draft",
+      "story_ids": [
+        "US-010",
+        "US-011",
+        "US-012"
+      ]
+    },
+    {
+      "sprint_id": "S04",
+      "phase_id": "P02",
+      "release": "R1",
+      "title": "Bài giảng đồ hoạ, preview và xuất bản",
+      "effort_pd": {
+        "min": 14,
+        "max": 22
+      },
+      "depends_on": [
+        "S03"
+      ],
+      "path": "phases/P02-content/sprints/S04-graphics-publish",
+      "status": "draft",
+      "story_ids": [
+        "US-013",
+        "US-014",
+        "US-015"
+      ]
+    },
+    {
+      "sprint_id": "S05",
+      "phase_id": "P03",
+      "release": "R1",
+      "title": "Room và engine AI1-1 có state bền vững",
+      "effort_pd": {
+        "min": 16,
+        "max": 24
+      },
+      "depends_on": [
+        "S04"
+      ],
+      "path": "phases/P03-classroom/sprints/S05-classroom-engine",
+      "status": "draft",
+      "story_ids": [
+        "US-016",
+        "US-017",
+        "US-018"
+      ]
+    },
+    {
+      "sprint_id": "S06",
+      "phase_id": "P03",
+      "release": "R1",
+      "title": "Trao đổi AI, checkpoint và resume đa thiết bị",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S05"
+      ],
+      "path": "phases/P03-classroom/sprints/S06-conversation-progress",
+      "status": "draft",
+      "story_ids": [
+        "US-019",
+        "US-020",
+        "US-021"
+      ]
+    },
+    {
+      "sprint_id": "S07",
+      "phase_id": "P04",
+      "release": "R2",
+      "title": "Visual studio và giáo án có vòng đời nguồn",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S06"
+      ],
+      "path": "phases/P04-core-depth/sprints/S07-visual-studio",
+      "status": "draft",
+      "story_ids": [
+        "US-022",
+        "US-023",
+        "US-024"
+      ]
+    },
+    {
+      "sprint_id": "S08",
+      "phase_id": "P04",
+      "release": "R2",
+      "title": "Giải thích thích ứng và phân tích phiên học",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S07"
+      ],
+      "path": "phases/P04-core-depth/sprints/S08-adaptive-teaching",
+      "status": "draft",
+      "story_ids": [
+        "US-025",
+        "US-026",
+        "US-027"
+      ]
+    },
+    {
+      "sprint_id": "S09",
+      "phase_id": "P04",
+      "release": "R2",
+      "title": "Lớp, lịch và mentor theo dõi1-1",
+      "effort_pd": {
+        "min": 10,
+        "max": 16
+      },
+      "depends_on": [
+        "S06"
+      ],
+      "path": "phases/P04-core-depth/sprints/S09-cohorts-mentor",
+      "status": "draft",
+      "story_ids": [
+        "US-028",
+        "US-029",
+        "US-030"
+      ]
+    },
+    {
+      "sprint_id": "S10",
+      "phase_id": "P05",
+      "release": "R3",
+      "title": "Migration content, nguồn và dữ liệu học tập",
+      "effort_pd": {
+        "min": 10,
+        "max": 16
+      },
+      "depends_on": [
+        "S07",
+        "S09"
+      ],
+      "path": "phases/P05-production/sprints/S10-migration",
+      "status": "draft",
+      "story_ids": [
+        "US-031",
+        "US-032",
+        "US-033"
+      ]
+    },
+    {
+      "sprint_id": "S11",
+      "phase_id": "P05",
+      "release": "R3",
+      "title": "Nghiệm thu core và chuyển production",
+      "effort_pd": {
+        "min": 12,
+        "max": 18
+      },
+      "depends_on": [
+        "S08",
+        "S10"
+      ],
+      "path": "phases/P05-production/sprints/S11-production",
+      "status": "draft",
+      "story_ids": [
+        "US-034",
+        "US-035",
+        "US-036"
+      ]
+    }
+  ]
+}

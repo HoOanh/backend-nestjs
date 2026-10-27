@@ -1,0 +1,191 @@
+{
+  "document_id": "ARC-S04-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-013",
+      "title": "Đồ hoạ giảng dạy có semantic schema",
+      "actor": "editor",
+      "i_want": "tạo diagram/slide/image/storyboard đúng nội dung",
+      "so_that": "đạt mục tiêu BO-03 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S04",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-03"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-07"
+      ],
+      "requirement_ids": [
+        "FR-13"
+      ],
+      "spec_ids": [
+        "SPEC-02"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S04-graphics-publish/specs.md",
+      "depends_on": [
+        "US-010"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-013-01",
+          "given": "objective và typed visual kind hợp lệ",
+          "when": "soạn visual",
+          "then": "labels/relations/source/alt/rendererVersion được validate"
+        },
+        {
+          "id": "AC-013-02",
+          "given": "arbitrary JS/SVG/script hoặc kind không hỗ trợ",
+          "when": "lưu/preview",
+          "then": "không execute và báo lỗi schema"
+        },
+        {
+          "id": "AC-013-03",
+          "given": "schema/visual revision mới",
+          "when": "render package cũ",
+          "then": "không đổi layout/content pinned cũ âm thầm"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-014",
+      "title": "Đồng bộ narration với bảng/focus",
+      "actor": "editor",
+      "i_want": "gắn narration beat vào visual actions",
+      "so_that": "đạt mục tiêu BO-03 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S04",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-03"
+      ],
+      "business_rule_ids": [
+        "BR-07",
+        "BR-09"
+      ],
+      "requirement_ids": [
+        "FR-14"
+      ],
+      "spec_ids": [
+        "SPEC-02"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S04-graphics-publish/specs.md",
+      "depends_on": [
+        "US-013"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-014-01",
+          "given": "script và visual targets có ID",
+          "when": "preview beats",
+          "then": "reveal/draw/highlight theo narration clock"
+        },
+        {
+          "id": "AC-014-02",
+          "given": "missing target/beat hoặc narration mapping",
+          "when": "validate",
+          "then": "lint chặn, không mất nội dung âm thầm"
+        },
+        {
+          "id": "AC-014-03",
+          "given": "pause/raise-hand/replay beat",
+          "when": "resume narration",
+          "then": "focus/ink không chạy lệch bằng wall time"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-015",
+      "title": "Preview/review/publish lecture package",
+      "actor": "publisher",
+      "i_want": "xuất bản gói bài giảng nhất quán",
+      "so_that": "đạt mục tiêu BO-03 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P02",
+      "sprint_id": "S04",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-03"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-05",
+        "BR-07"
+      ],
+      "requirement_ids": [
+        "FR-15"
+      ],
+      "spec_ids": [
+        "SPEC-02"
+      ],
+      "sprint_spec_path": "phases/P02-content/sprints/S04-graphics-publish/specs.md",
+      "depends_on": [
+        "US-012",
+        "US-014"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-015-01",
+          "given": "lesson/plan/visual/source đã approved",
+          "when": "publish",
+          "then": "immutable package pins refs, audit/outbox và Web renderer đúng"
+        },
+        {
+          "id": "AC-015-02",
+          "given": "preview code hết hạn hoặc source private",
+          "when": "truy cập public",
+          "then": "không xem được draft/private source"
+        },
+        {
+          "id": "AC-015-03",
+          "given": "cache invalidation lỗi hoặc publish retry",
+          "when": "worker xử lý",
+          "then": "event retry an toàn, không publish duplicate"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

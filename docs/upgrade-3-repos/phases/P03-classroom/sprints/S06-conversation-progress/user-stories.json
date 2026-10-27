@@ -1,0 +1,196 @@
+{
+  "document_id": "ARC-S06-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-019",
+      "title": "Hội thoại AI theo checkpoint và nguồn",
+      "actor": "học viên",
+      "i_want": "hỏi/giơ tay và nhận giải thích grounded",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P03",
+      "sprint_id": "S06",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-06",
+        "BR-09",
+        "BR-10"
+      ],
+      "requirement_ids": [
+        "FR-19"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P03-classroom/sprints/S06-conversation-progress/specs.md",
+      "depends_on": [
+        "US-011",
+        "US-018"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-019-01",
+          "given": "session hợp lệ có permitted sources",
+          "when": "gửi câu hỏi",
+          "then": "SSE answer/citations bám pinned objective/checkpoint"
+        },
+        {
+          "id": "AC-019-02",
+          "given": "cố đọc tài liệu author-only/người khác",
+          "when": "ask/source retrieval",
+          "then": "không leak private text hoặc source metadata"
+        },
+        {
+          "id": "AC-019-03",
+          "given": "stream ngắt/cancel/provider timeout",
+          "when": "query run status",
+          "then": "không tạo message/run duplicate và không xoá usage unknown"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-020",
+      "title": "Checkpoint và tiến trình có evidence",
+      "actor": "học viên",
+      "i_want": "kiểm tra hiểu bài bằng kết quả server",
+      "so_that": "đạt mục tiêu BO-05 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P03",
+      "sprint_id": "S06",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-05"
+      ],
+      "business_rule_ids": [
+        "BR-02",
+        "BR-08",
+        "BR-09"
+      ],
+      "requirement_ids": [
+        "FR-20"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P03-classroom/sprints/S06-conversation-progress/specs.md",
+      "depends_on": [
+        "US-010",
+        "US-018"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-020-01",
+          "given": "answer hợp lệ của checkpoint pinned",
+          "when": "submit",
+          "then": "server chấm và lưu progress provenance"
+        },
+        {
+          "id": "AC-020-02",
+          "given": "client gửi pass/score hoặc foreign checkpoint",
+          "when": "submit",
+          "then": "không được coi trusted và không lộ answer keys"
+        },
+        {
+          "id": "AC-020-03",
+          "given": "duplicate submit hoặc offline pending",
+          "when": "sync lại",
+          "then": "cùng attempt ack, không tăng pass/lượt trùng"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-021",
+      "title": "Transcript và summary phiên học",
+      "actor": "học viên",
+      "i_want": "xem lại điểm chưa hiểu và bước tiếp theo",
+      "so_that": "đạt mục tiêu BO-05 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P03",
+      "sprint_id": "S06",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-05"
+      ],
+      "business_rule_ids": [
+        "BR-09",
+        "BR-10",
+        "BR-11"
+      ],
+      "requirement_ids": [
+        "FR-21"
+      ],
+      "spec_ids": [
+        "SPEC-03"
+      ],
+      "sprint_spec_path": "phases/P03-classroom/sprints/S06-conversation-progress/specs.md",
+      "depends_on": [
+        "US-019",
+        "US-020"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-021-01",
+          "given": "session finish đủ evidence",
+          "when": "summary job chạy",
+          "then": "transcript/summary có input hash/source, đọc đúng account"
+        },
+        {
+          "id": "AC-021-02",
+          "given": "summary provider fail hoặc actor ngoài scope",
+          "when": "xem summary",
+          "then": "completion vẫn giữ, lỗi/forbidden rõ"
+        },
+        {
+          "id": "AC-021-03",
+          "given": "worker retry hoặc prompt version đổi",
+          "when": "xử lý lại",
+          "then": "không duplicate transcript, run pin prompt/source version"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

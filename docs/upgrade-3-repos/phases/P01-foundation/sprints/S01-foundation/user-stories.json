@@ -1,0 +1,189 @@
+{
+  "document_id": "ARC-S01-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-004",
+      "title": "Setup3repo sau G0",
+      "actor": "developer",
+      "i_want": "có backend/CMS/Web build độc lập theo baseline",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P01",
+      "sprint_id": "S01",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-14"
+      ],
+      "requirement_ids": [
+        "FR-04"
+      ],
+      "spec_ids": [
+        "SPEC-04"
+      ],
+      "sprint_spec_path": "phases/P01-foundation/sprints/S01-foundation/specs.md",
+      "depends_on": [
+        "US-003"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-004-01",
+          "given": "G0 đã được duyệt rõ",
+          "when": "audit scaffold rồi setup phần được phép",
+          "then": "repo tên backend đúng và3build/test skeleton có evidence"
+        },
+        {
+          "id": "AC-004-02",
+          "given": "scaffold tồn tại có thay đổi khác",
+          "when": "chuẩn bị setup",
+          "then": "không overwrite/reset, có report giữ/sửa/thay"
+        },
+        {
+          "id": "AC-004-03",
+          "given": "compatibility spike lệch ADR",
+          "when": "báo kết quả",
+          "then": "review thay đổi trước phần implementation phụ thuộc"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-005",
+      "title": "Danh tính và quyền học theo phân công",
+      "actor": "admin",
+      "i_want": "xác thực và gán quyền course/action/scope",
+      "so_that": "đạt mục tiêu BO-04 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P01",
+      "sprint_id": "S01",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-04"
+      ],
+      "business_rule_ids": [
+        "BR-02",
+        "BR-04",
+        "BR-11"
+      ],
+      "requirement_ids": [
+        "FR-05"
+      ],
+      "spec_ids": [
+        "SPEC-04"
+      ],
+      "sprint_spec_path": "phases/P01-foundation/sprints/S01-foundation/specs.md",
+      "depends_on": [
+        "US-004"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-005-01",
+          "given": "staff/student có credential hợp lệ",
+          "when": "login và gán course",
+          "then": "session audience đúng, access/enrollment có audit"
+        },
+        {
+          "id": "AC-005-02",
+          "given": "student hoặc mentor ngoài assignment",
+          "when": "đọc internal/foreign session",
+          "then": "server từ chối, không chỉ ẩn menu"
+        },
+        {
+          "id": "AC-005-03",
+          "given": "quyền vừa revoke hoặc token rotate đồng thời",
+          "when": "gọi request kế tiếp",
+          "then": "không giữ quyền cũ và không revoke sai do refresh race"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-006",
+      "title": "Contracts và module shell",
+      "actor": "developer",
+      "i_want": "sinh clients từ hợp đồng backend dùng chung",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P01",
+      "sprint_id": "S01",
+      "release": "R1",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-02",
+        "BR-12"
+      ],
+      "requirement_ids": [
+        "FR-06"
+      ],
+      "spec_ids": [
+        "SPEC-04"
+      ],
+      "sprint_spec_path": "phases/P01-foundation/sprints/S01-foundation/specs.md",
+      "depends_on": [
+        "US-004"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-006-01",
+          "given": "spec audience/version cố định",
+          "when": "codegen2lần",
+          "then": "diff sạch, CMS/Web type/build pass và route shell theo capability"
+        },
+        {
+          "id": "AC-006-02",
+          "given": "public spec lộ private schema/answer",
+          "when": "chạy contract check",
+          "then": "gate fail trước publish"
+        },
+        {
+          "id": "AC-006-03",
+          "given": "breaking contract hoặc module dependency đổi",
+          "when": "review release",
+          "then": "có compatibility/impact plan, không runtime install code"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

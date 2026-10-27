@@ -1,0 +1,195 @@
+{
+  "document_id": "ARC-S07-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-022",
+      "title": "Visual studio nâng cao",
+      "actor": "editor",
+      "i_want": "chỉnh timeline/preset3D và layout giảng dạy",
+      "so_that": "đạt mục tiêu BO-03 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S07",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-03"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-07"
+      ],
+      "requirement_ids": [
+        "FR-22"
+      ],
+      "spec_ids": [
+        "SPEC-02"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S07-visual-studio/specs.md",
+      "depends_on": [
+        "US-015",
+        "US-017"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-022-01",
+          "given": "preset/schema được duyệt",
+          "when": "scrub/edit và preview",
+          "then": "CMS/Web cùng rendererVersion và semantic content"
+        },
+        {
+          "id": "AC-022-02",
+          "given": "preset không hỗ trợ hoặc reduced motion",
+          "when": "render",
+          "then": "báo lỗi/fallback giữ kiến thức, không mất nội dung"
+        },
+        {
+          "id": "AC-022-03",
+          "given": "visual được chỉnh khi phiên active",
+          "when": "publish mới",
+          "then": "phiên cũ không bị thay đổi"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-023",
+      "title": "AI tạo ảnh minh hoạ có review",
+      "actor": "editor",
+      "i_want": "tạo ảnh draft gắn bài và provenance",
+      "so_that": "đạt mục tiêu BO-03 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S07",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-03"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-05",
+        "BR-07",
+        "BR-10"
+      ],
+      "requirement_ids": [
+        "FR-23"
+      ],
+      "spec_ids": [
+        "SPEC-02"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S07-visual-studio/specs.md",
+      "depends_on": [
+        "US-011",
+        "US-013"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-023-01",
+          "given": "task/image capability và budget hợp lệ",
+          "when": "generate image",
+          "then": "artifact có prompt/model/source/rights và alt draft"
+        },
+        {
+          "id": "AC-023-02",
+          "given": "ảnh có chữ kỹ thuật sai hoặc asset chưa ready",
+          "when": "review/publish",
+          "then": "không tự publish, yêu cầu sửa/reject"
+        },
+        {
+          "id": "AC-023-03",
+          "given": "job cancel/retry sau provider charge",
+          "when": "settle usage",
+          "then": "không giả phí0 hoặc tạo bản apply trùng"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-024",
+      "title": "Cập nhật nguồn có impact review",
+      "actor": "editor",
+      "i_want": "biết giáo án/visual nào cần cập nhật",
+      "so_that": "đạt mục tiêu BO-02 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P04",
+      "sprint_id": "S07",
+      "release": "R2",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-02"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-06"
+      ],
+      "requirement_ids": [
+        "FR-24"
+      ],
+      "spec_ids": [
+        "SPEC-01"
+      ],
+      "sprint_spec_path": "phases/P04-core-depth/sprints/S07-visual-studio/specs.md",
+      "depends_on": [
+        "US-009",
+        "US-012",
+        "US-015"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-024-01",
+          "given": "document có revision mới",
+          "when": "xem impact",
+          "then": "liệt kê package/plan/visual refs và tạo draft fork"
+        },
+        {
+          "id": "AC-024-02",
+          "given": "revision mới chưa extract ready",
+          "when": "regenerate plan",
+          "then": "bị chặn hoặc dùng nguồn cũ rõ ràng theo lựa chọn"
+        },
+        {
+          "id": "AC-024-03",
+          "given": "session đang pin nguồn cũ",
+          "when": "source mới publish",
+          "then": "còn resolve citation cũ, không rewrite history"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

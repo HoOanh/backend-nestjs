@@ -1,0 +1,192 @@
+{
+  "document_id": "ARC-S10-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-031",
+      "title": "Migration content/source/progress đầy đủ",
+      "actor": "operator",
+      "i_want": "chuyển dữ liệu core theo manifest",
+      "so_that": "đạt mục tiêu BO-01 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P05",
+      "sprint_id": "S10",
+      "release": "R3",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-01"
+      ],
+      "business_rule_ids": [
+        "BR-03",
+        "BR-13"
+      ],
+      "requirement_ids": [
+        "FR-31"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P05-production/sprints/S10-migration/specs.md",
+      "depends_on": [
+        "US-024",
+        "US-029",
+        "US-030"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-031-01",
+          "given": "snapshot freeze và scope duyệt",
+          "when": "dry-run/import2lần",
+          "then": "5courses/40lesson baseline kiểm lại và không record trùng"
+        },
+        {
+          "id": "AC-031-02",
+          "given": "ID/FK/email/source refs xung đột",
+          "when": "ETL chạy",
+          "then": "exception report/quarantine rõ, không silently drop"
+        },
+        {
+          "id": "AC-031-03",
+          "given": "localStorage-only progress/legacy result",
+          "when": "đối soát",
+          "then": "giữ provenance/giới hạn bảo toàn, không tự verified"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-032",
+      "title": "URL legacy và read-only archive",
+      "actor": "học viên",
+      "i_want": "mở lại liên kết và dữ liệu cũ trong scope",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P05",
+      "sprint_id": "S10",
+      "release": "R3",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-13"
+      ],
+      "requirement_ids": [
+        "FR-32"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P05-production/sprints/S10-migration/specs.md",
+      "depends_on": [
+        "US-031"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-032-01",
+          "given": "legacy route được map",
+          "when": "mở deep link",
+          "then": "đến bài/package hợp lệ hoặc thông báo archive rõ"
+        },
+        {
+          "id": "AC-032-02",
+          "given": "hash fragment server không thấy",
+          "when": "resolve old URL",
+          "then": "client bridge đúng, không giả301 mọi link"
+        },
+        {
+          "id": "AC-032-03",
+          "given": "legacy feature ngoài core chưa có replacement",
+          "when": "cutover scope review",
+          "then": "archive/read-only policy được duyệt, không mất âm thầm"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-033",
+      "title": "Data ops và retention tài liệu/phiên",
+      "actor": "operator",
+      "i_want": "export và purge theo quyền/reference policy",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P05",
+      "sprint_id": "S10",
+      "release": "R3",
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "implementation_after_approval",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-04",
+        "BR-11",
+        "BR-12",
+        "BR-13"
+      ],
+      "requirement_ids": [
+        "FR-33"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P05-production/sprints/S10-migration/specs.md",
+      "depends_on": [
+        "US-031"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-033-01",
+          "given": "export/retention quyền hợp lệ",
+          "when": "preview scope",
+          "then": "count/refs/cutoff/policy fingerprint có report"
+        },
+        {
+          "id": "AC-033-02",
+          "given": "asset/source đang published dùng hoặc fingerprint cũ",
+          "when": "execute purge",
+          "then": "bị chặn cần review/repreview"
+        },
+        {
+          "id": "AC-033-03",
+          "given": "retry export/purge batch",
+          "when": "reconcile",
+          "then": "idempotent, signed download expires, audit redact"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "document_id": "ARC-S00-STORIES",
+  "version": "0.2",
+  "status": "draft",
+  "implementation_authorized": false,
+  "source": "../../../../user-stories.json",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Duyệt baseline và sprint scope",
+      "actor": "ĐẠI CA",
+      "i_want": "chốt BRD/kiến trúc/SRS/specs/stories trước setup",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P00",
+      "sprint_id": "S00",
+      "release": null,
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "documentation",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-14"
+      ],
+      "requirement_ids": [
+        "FR-01"
+      ],
+      "spec_ids": [
+        "SPEC-05"
+      ],
+      "sprint_spec_path": "phases/P00-definition/sprints/S00-definition/specs.md",
+      "depends_on": [],
+      "acceptance_criteria": [
+        {
+          "id": "AC-001-01",
+          "given": "hồ sơ0.2 đầy đủ",
+          "when": "review từng artifact",
+          "then": "ghi decision/version/scope; không tự mở G0 khi còn Pending"
+        },
+        {
+          "id": "AC-001-02",
+          "given": "chưa có duyệt đủ",
+          "when": "yêu cầu setup từ tài liệu",
+          "then": "không chạy setup/code và nêu artifact còn thiếu"
+        },
+        {
+          "id": "AC-001-03",
+          "given": "scope thay đổi",
+          "when": "cập nhật hồ sơ",
+          "then": "trace stories/specs/sprints và xin duyệt phần thay đổi"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "document review + structural validation"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-002",
+      "title": "Chuẩn hoá rule trước setup",
+      "actor": "tech lead",
+      "i_want": "có shared/backend/CMS/Web rules đúng scope",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P00",
+      "sprint_id": "S00",
+      "release": null,
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "documentation",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-14"
+      ],
+      "requirement_ids": [
+        "FR-02"
+      ],
+      "spec_ids": [
+        "SPEC-04"
+      ],
+      "sprint_spec_path": "phases/P00-definition/sprints/S00-definition/specs.md",
+      "depends_on": [
+        "US-001"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-002-01",
+          "given": "rule templates đã soạn",
+          "when": "review TS/format/boundaries/workflow",
+          "then": "có owner và enforcement plan, chưa có config executable"
+        },
+        {
+          "id": "AC-002-02",
+          "given": "rule khác chỉ đạo ĐẠI CA",
+          "when": "áp dụng precedence",
+          "then": "giữ chỉ đạo ĐẠI CA và sửa template"
+        },
+        {
+          "id": "AC-002-03",
+          "given": "rule chung thay đổi",
+          "when": "đồng bộ manifest3repo",
+          "then": "version/hash được cập nhật, không âm thầm lệch"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "document review + structural validation"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    },
+    {
+      "id": "US-003",
+      "title": "Chọn và soạn skills cho core",
+      "actor": "tech lead",
+      "i_want": "có skill chuyên tác vụ đã review trước cài",
+      "so_that": "đạt mục tiêu BO-06 của luồng content→giáo án→đồ hoạ→AI1-1",
+      "phase_id": "P00",
+      "sprint_id": "S00",
+      "release": null,
+      "priority": "must",
+      "status": "draft",
+      "implementation_status": "not_started",
+      "work_kind": "documentation",
+      "business_objective_ids": [
+        "BO-06"
+      ],
+      "business_rule_ids": [
+        "BR-14"
+      ],
+      "requirement_ids": [
+        "FR-03"
+      ],
+      "spec_ids": [
+        "SPEC-04"
+      ],
+      "sprint_spec_path": "phases/P00-definition/sprints/S00-definition/specs.md",
+      "depends_on": [
+        "US-002"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "AC-003-01",
+          "given": "local/official sources đã đọc",
+          "when": "soạn5skill draft",
+          "then": "frontmatter/reference/scope hợp lệ và không auto install"
+        },
+        {
+          "id": "AC-003-02",
+          "given": "external skill chưa pin hoặc có quyền ngoài scope",
+          "when": "review nguồn",
+          "then": "không cài chỉ vì phổ biến"
+        },
+        {
+          "id": "AC-003-03",
+          "given": "skill sửa activation/reference",
+          "when": "validate lại",
+          "then": "không broken link hoặc mở quyền code khi chưa duyệt"
+        }
+      ],
+      "verification": {
+        "evidence_status": "not_executed",
+        "method": "document review + structural validation"
+      },
+      "approval": {
+        "status": "pending",
+        "approved_by": null,
+        "approved_at": null
+      }
+    }
+  ]
+}

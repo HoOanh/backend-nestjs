@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import {
   fetchZeroTtsPcmFrames,
   preloadVietnameseSpeechSequence,
-  stopVietnameseSpeech
+  stopVietnameseSpeech,
+  speakVietnamese
 } from '../src/services/vietnameseVoiceService.ts';
 
 const originalFetch = globalThis.fetch;
@@ -13,6 +14,16 @@ afterEach(() => {
 });
 
 describe('batched ZeroTTS stream', () => {
+  test('an empty audio stream does not announce readiness or advance the lesson', async () => {
+    globalThis.fetch = async () => new Response(new Uint8Array(), { headers: { 'X-Audio-Sample-Rate': '24000' } });
+    let ready = 0;
+    let ended = 0;
+    const errors: string[] = [];
+    await speakVietnamese({ text: 'Kiểm tra âm thanh.', onAudioReady: () => ready += 1, onEnd: () => ended += 1, onError: (message) => errors.push(message) });
+    expect(ready).toBe(0);
+    expect(ended).toBe(0);
+    expect(errors).toEqual(['Chưa nhận được âm thanh để bắt đầu bài giảng.']);
+  });
   test('replaces obsolete lookahead without restarting the next beat', () => {
     const requests = new Map<string, AbortSignal>();
     globalThis.fetch = async (_input, init) => {

@@ -2,6 +2,7 @@
 
 import { streamZeroTtsInBrowser, stopBrowserZeroTts, type SpeechController } from './zeroTtsBrowser';
 import { normalizeTextForVietnameseSpeech, splitIntoVietnameseSentences } from '../utils/speechText';
+import { NarrationPlaybackClock, type NarrationPlaybackProgress } from './narrationPlaybackClock';
 
 export { normalizeTextForVietnameseSpeech, splitIntoVietnameseSentences } from '../utils/speechText';
 
@@ -12,6 +13,7 @@ export interface SpeakVietnameseOptions {
   onSentenceChange?: (sentence: string, index: number, total: number) => void;
   onSentenceEnd?: (sentence: string, index: number, total: number) => void;
   onAudioReady?: () => void;
+  onPlaybackProgress?: (progress: NarrationPlaybackProgress) => void;
   onAmplitude?: (amplitude: number) => void;
   onEnd?: () => void;
   onError?: (errMessage: string) => void;
@@ -531,6 +533,36 @@ function createPreparedSpeechTask(text: string): PreparedSpeechTask {
   return task;
 }
 
+function narrationNotifier(
+  clock: NarrationPlaybackClock,
+  session: StreamAudioSession,
+  sentences: string[],
+  options: Omit<SpeakVietnameseOptions, 'text'>,
+): () => void {
+  let ready = false;
+  let previousIndex = -1;
+  const ended = new Set<number>();
+  return () => {
+    if (session.context.state !== 'running') return;
+    const progress = clock.read(session.context.currentTime);
+    if (!progress) return;
+    if (!ready) { ready = true; options.onAudioReady?.(); }
+    if (previousIndex !== progress.sentenceIndex) {
+      if (previousIndex >= 0 && !ended.has(previousIndex)) {
+        ended.add(previousIndex);
+        options.onSentenceEnd?.(sentences[previousIndex], previousIndex, sentences.length);
+      }
+      previousIndex = progress.sentenceIndex;
+      options.onSentenceChange?.(sentences[previousIndex], previousIndex, sentences.length);
+    }
+    options.onPlaybackProgress?.(progress);
+    if (progress.progress >= 1 && !ended.has(previousIndex)) {
+      ended.add(previousIndex);
+      options.onSentenceEnd?.(sentences[previousIndex], previousIndex, sentences.length);
+    }
+  };
+}
+
 async function playPreparedTtsTask(
   task: PreparedSpeechTask,
   options: Omit<SpeakVietnameseOptions, 'text'>,
@@ -556,10 +588,13 @@ async function playPreparedTtsTask(
   }
   if (session.context.state === 'suspended') await session.context.resume();
 
+  const clock = new NarrationPlaybackClock(task.sentences.map((sentence) => sentence.length / (16 * Math.min(1.5, Math.max(0.8, rate)))));
+  const notifyPlayback = narrationNotifier(clock, session, task.sentences, options);
   const dataArray = new Uint8Array(new ArrayBuffer(session.analyser.frequencyBinCount));
   let animationFrame = 0;
   const pumpAmplitude = () => {
     if (controller.cancelled) return;
+    notifyPlayback();
     session.analyser.getByteFrequencyData(dataArray);
     let sum = 0;
     for (let index = 1; index < Math.min(28, dataArray.length); index += 1) sum += dataArray[index];
@@ -568,7 +603,6 @@ async function playPreparedTtsTask(
   };
   animationFrame = requestAnimationFrame(pumpAmplitude);
 
-  let activeSentenceIndex = -1;
   let scheduledFrames = 0;
   let streamFailure: Error | null = null;
   try {
@@ -576,7 +610,7 @@ async function playPreparedTtsTask(
       for await (const event of task.queue.read()) {
         if (controller.cancelled) break;
         if (event.type === 'frame') {
-          const { startAt } = schedulePcmFrame(
+          const { startAt, endAt } = schedulePcmFrame(
             event.samples,
             event.sampleRate,
             rate,
@@ -584,23 +618,9 @@ async function playPreparedTtsTask(
             controller
           );
           scheduledFrames += 1;
-          if (event.sentenceIndex !== activeSentenceIndex) {
-            activeSentenceIndex = event.sentenceIndex;
-            scheduleFocusCallback(
-              () => options.onSentenceChange?.(event.sentence, event.sentenceIndex, task.sentences.length),
-              session.context,
-              startAt,
-              controller
-            );
-          }
+          clock.record(event.sentenceIndex, startAt, endAt);
         } else {
-          const endAt = session.scheduleCursor;
-          scheduleFocusCallback(
-            () => options.onSentenceEnd?.(event.sentence, event.sentenceIndex, task.sentences.length),
-            session.context,
-            endAt,
-            controller
-          );
+          clock.complete(event.sentenceIndex);
         }
       }
     } catch (error) {
@@ -612,8 +632,9 @@ async function playPreparedTtsTask(
       await playStreamedSentences(iterateSentences(task.sentences), options, controller, rate);
       return;
     }
-    options.onAudioReady?.();
+    if (!controller.cancelled && scheduledFrames === 0) throw new Error('Chưa nhận được âm thanh để bắt đầu bài giảng.');
     await waitForStreamPlayback(session, controller);
+    if (!controller.cancelled) notifyPlayback();
     if (streamFailure && !controller.cancelled) options.onError?.(streamFailure.message);
   } finally {
     if (animationFrame) cancelAnimationFrame(animationFrame);
@@ -630,10 +651,13 @@ async function playPreparedBrowserTtsTask(
 ): Promise<void> {
   if (session.context.state === 'suspended') await session.context.resume();
 
+  const clock = new NarrationPlaybackClock(task.sentences.map((sentence) => sentence.length / (16 * Math.min(1.5, Math.max(0.8, rate)))));
+  const notifyPlayback = narrationNotifier(clock, session, task.sentences, options);
   const dataArray = new Uint8Array(new ArrayBuffer(session.analyser.frequencyBinCount));
   let animationFrame = 0;
   const pumpAmplitude = () => {
     if (controller.cancelled) return;
+    notifyPlayback();
     session.analyser.getByteFrequencyData(dataArray);
     let sum = 0;
     for (let index = 1; index < Math.min(28, dataArray.length); index += 1) sum += dataArray[index];
@@ -644,7 +668,6 @@ async function playPreparedBrowserTtsTask(
 
   let streamFailure: Error | null = null;
   let activeSentenceIndex = -1;
-  let activeSentence = '';
   let activeSampleRate = 0;
   let activeFrames: Float32Array<ArrayBuffer>[] = [];
   let activeSampleCount = 0;
@@ -663,7 +686,6 @@ async function playPreparedBrowserTtsTask(
       underrunWarnings += 1;
       console.warn(`[ZeroTTS] playback buffer underrun: ${underrunSeconds.toFixed(2)}s`);
     }
-    const sentenceText = activeSentence;
     const sentenceIndex = activeSentenceIndex;
     const samples = new Float32Array(activeSampleCount);
     let offset = 0;
@@ -678,19 +700,11 @@ async function playPreparedBrowserTtsTask(
       session,
       controller
     );
-    if (!sentenceStartScheduled) {
-      sentenceStartScheduled = true;
-      scheduleFocusCallback(
-        () => options.onSentenceChange?.(sentenceText, sentenceIndex, task.sentences.length),
-        session.context,
-        startAt,
-        controller
-      );
-    }
+    clock.record(sentenceIndex, startAt, endAt);
+    sentenceStartScheduled = true;
     hasScheduledAudio = true;
     if (!audioReadySent) {
       audioReadySent = true;
-      options.onAudioReady?.();
     }
     pendingSeconds = Math.max(0, pendingSeconds - activeSampleCount / activeSampleRate);
     activeFrames = [];
@@ -700,19 +714,10 @@ async function playPreparedBrowserTtsTask(
 
   const finishActiveSentence = () => {
     if (activeSentenceIndex < 0) return;
-    const sentenceText = activeSentence;
     const sentenceIndex = activeSentenceIndex;
-    const endAt = flushActiveFrames() ?? session.scheduleCursor;
-    if (sentenceStartScheduled) {
-      scheduleFocusCallback(
-        () => options.onSentenceEnd?.(sentenceText, sentenceIndex, task.sentences.length),
-        session.context,
-        endAt,
-        controller
-      );
-    }
+    flushActiveFrames();
+    if (sentenceStartScheduled) clock.complete(sentenceIndex);
     activeSentenceIndex = -1;
-    activeSentence = '';
     activeSampleRate = 0;
     activeFrames = [];
     activeSampleCount = 0;
@@ -729,7 +734,6 @@ async function playPreparedBrowserTtsTask(
           }
           if (activeSentenceIndex < 0) {
             activeSentenceIndex = event.sentenceIndex;
-            activeSentence = event.sentence;
             activeSampleRate = event.sampleRate;
           }
           activeFrames.push(event.samples);
@@ -752,10 +756,12 @@ async function playPreparedBrowserTtsTask(
     finishActiveSentence();
     if (controller.cancelled || !hasScheduledAudio) {
       if (streamFailure && !controller.cancelled) throw streamFailure;
+      if (!controller.cancelled) throw new Error('Chưa nhận được âm thanh để bắt đầu bài giảng.');
       return;
     }
 
     await waitForStreamPlayback(session, controller);
+    if (!controller.cancelled) notifyPlayback();
     if (streamFailure && !controller.cancelled) options.onError?.(streamFailure.message);
   } finally {
     if (animationFrame) cancelAnimationFrame(animationFrame);
@@ -778,7 +784,8 @@ async function playPreparedPcmWithoutWebAudio(
     sentenceFrames[event.sentenceIndex].push(event.samples);
     sentenceSamples[event.sentenceIndex] += event.samples.length;
   }
-  if (controller.cancelled || sampleRate === 0) return;
+  if (controller.cancelled) return;
+  if (sampleRate === 0) throw new Error('Chưa nhận được âm thanh để bắt đầu bài giảng.');
 
   const sampleCount = sentenceSamples.reduce((total, count) => total + count, 0);
   const wav = new ArrayBuffer(44 + sampleCount * 2);
@@ -820,19 +827,20 @@ async function playPreparedPcmWithoutWebAudio(
   activeAudioObjectUrls.add(audioUrl);
   let activeSentenceIndex = -1;
   const updateSentenceFocus = () => {
-    const elapsed = audio.currentTime * audio.playbackRate;
+    const elapsed = audio.currentTime;
     const sentenceIndex = sentenceEndTimes.findIndex((endTime) => elapsed < endTime);
     const nextIndex = sentenceIndex < 0 ? task.sentences.length - 1 : sentenceIndex;
+    const startTime = nextIndex > 0 ? sentenceEndTimes[nextIndex - 1] : 0;
+    const duration = sentenceEndTimes[nextIndex] - startTime;
+    options.onPlaybackProgress?.({ sentenceIndex: nextIndex, progress: Math.min(1, Math.max(0, (elapsed - startTime) / Math.max(0.001, duration))) });
     if (nextIndex === activeSentenceIndex) return;
     activeSentenceIndex = nextIndex;
     options.onSentenceChange?.(task.sentences[nextIndex], nextIndex, task.sentences.length);
   };
-  updateSentenceFocus();
-  options.onAudioReady?.();
-
   await new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       audio.ontimeupdate = null;
+      audio.onplaying = null;
       audio.onended = null;
       audio.onpause = null;
       audio.onerror = null;
@@ -841,6 +849,7 @@ async function playPreparedPcmWithoutWebAudio(
       activeAudioObjectUrls.delete(audioUrl);
       options.onAmplitude?.(0);
     };
+    audio.onplaying = () => { options.onAudioReady?.(); updateSentenceFocus(); };
     audio.ontimeupdate = updateSentenceFocus;
     audio.onended = () => {
       cleanup();

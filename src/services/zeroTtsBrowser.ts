@@ -6,7 +6,7 @@ const MODEL_REPO = 'zeroweight-ai/ZeroTTS';
 const VOICE = 'quangminh';
 export interface ZeroTtsInstallState {
   status: 'idle' | 'loading' | 'ready' | 'error';
-  phase?: 'checking' | 'downloading' | 'preparing';
+  phase?: 'checking' | 'downloading' | 'preparing' | 'buffering';
   loadedBytes: number;
   totalBytes: number;
   errorMessage?: string;
@@ -75,7 +75,7 @@ async function ensureModelLoaded(): Promise<void> {
         return modelWorker.load(MODEL_REPO, (progress) => {
           publishInstallState({
             status: 'loading',
-            phase: downloadInfo.cached ? 'preparing' : 'downloading',
+            phase: downloadInfo.cached || (progress.overallTotal > 0 && progress.overallLoaded >= progress.overallTotal) ? 'preparing' : 'downloading',
             loadedBytes: progress.overallLoaded,
             totalBytes: progress.overallTotal,
           });

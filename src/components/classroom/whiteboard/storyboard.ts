@@ -18,22 +18,41 @@ export interface BoardLabel {
   color?: string;
   size?: number;
 }
-export interface BoardDrawing { strokes: BoardStroke[]; labels: BoardLabel[]; }
+export interface BoardFocus { x: number; y: number; width: number; height: number; }
+export interface BoardDrawing { strokes: BoardStroke[]; labels: BoardLabel[]; focus: BoardFocus; }
+
+/** Authored focus regions keep the red annotation on the concept being explained. */
+function focusRegion(scene: InstructorStoryboard, phase: number): BoardFocus {
+  const regions: Record<InstructorStoryboard['kind'], BoardFocus[]> = {
+    process: [{ x: 65, y: 110, width: 215, height: 280 }, { x: 502, y: 65, width: 278, height: 185 }, { x: 502, y: 272, width: 278, height: 185 }, { x: 867, y: 190, width: 270, height: 100 }],
+    'request-race': [{ x: 53, y: 65, width: 150, height: 215 }, { x: 431, y: 205, width: 330, height: 65 }, { x: 431, y: scene.variant === 'local' ? 260 : 205, width: 330, height: 66 }, { x: 790, y: 122, width: 195, height: 75 }],
+    'event-loop': [{ x: 65, y: 115, width: 160, height: 235 }, { x: 445, y: 165, width: 250, height: 175 }, { x: 946, y: 136, width: 210, height: 240 }, { x: 785, y: 380, width: 360, height: 65 }],
+    queue: [{ x: 55, y: 95, width: 160, height: 210 }, { x: 420, y: 274, width: 260, height: 70 }, { x: 345, y: 345, width: 570, height: 78 }, { x: 335, y: 425, width: 700, height: 68 }],
+    multiplexing: [{ x: 60, y: 75, width: 305, height: 270 }, { x: 489, y: 179, width: 225, height: 65 }, { x: 489, y: 248, width: 225, height: 67 }, { x: 938, y: 240, width: 220, height: 70 }],
+    memory: [{ x: 234, y: 48, width: 714, height: 395 }, { x: 265, y: 140, width: 300, height: 190 }, { x: 575, y: 140, width: 330, height: 190 }, { x: 76, y: 209, width: 110, height: 75 }],
+    diagnosis: [{ x: 60, y: 200, width: 220, height: 85 }, { x: 461, y: 207, width: 222, height: 70 }, { x: 898, y: 65, width: 280, height: 110 }, { x: 895, y: 348, width: 290, height: 112 }]
+  };
+  if (scene.kind === 'process' && scene.variant === 'threads') {
+    return [{ x: 210, y: 30, width: 805, height: 435 }, { x: 417, y: 108, width: 375, height: 130 }, { x: 258, y: 290, width: 693, height: 130 }, { x: 275, y: 356, width: 655, height: 57 }][phase];
+  }
+  if (scene.kind === 'multiplexing' && scene.variant === 'fd') return [{ x: 65, y: 105, width: 160, height: 235 }, { x: 355, y: 85, width: 320, height: 320 }, { x: 935, y: 138, width: 205, height: 260 }, { x: 342, y: 428, width: 530, height: 66 }][phase];
+  return regions[scene.kind][phase];
+}
 
 export function createStoryboard(scene: InstructorStoryboard, phase: number): BoardDrawing {
   const strokes: BoardStroke[] = [];
   const labels: BoardLabel[] = [];
   const line = (id: string, d: string, at = 0, color: string = palette.ink, fill?: string) => strokes.push({ id, d, at, color, fill });
   const label = (id: string, text: string, x: number, y: number, at = 0, color: string = palette.ink, size = 25) => labels.push({ id, text, x, y, at, color, size });
-  const box = (id: string, x: number, y: number, w: number, h: number, at = 0, color: string = palette.ink) => line(id, `M${x+12} ${y} Q${x-3} ${y-2} ${x} ${y+14} L${x-1} ${y+h-12} Q${x} ${y+h+3} ${x+15} ${y+h} L${x+w-12} ${y+h+1} Q${x+w+3} ${y+h} ${x+w} ${y+h-15} L${x+w+1} ${y+12} Q${x+w} ${y-3} ${x+w-14} ${y} Z`, at, color);
+  const box = (id: string, x: number, y: number, w: number, h: number, at = 0, color: string = palette.ink) => line(id, `M${x+12} ${y} Q${x-3} ${y-2} ${x} ${y+14} L${x-1} ${y+h-12} Q${x} ${y+h+3} ${x+15} ${y+h} L${x+w-12} ${y+h+1} Q${x+w+3} ${y+h} ${x+w} ${y+h-15} L${x+w+1} ${y+12} Q${x+w} ${y-3} ${x+w-14} ${y} Z`, at, color, `${color}09`);
   const arrow = (id: string, x: number, y: number, tx: number, ty: number, at: number, color: string = palette.blue) => {
     line(id, `M${x} ${y} C${x+(tx-x)*0.4} ${y-12} ${x+(tx-x)*0.6} ${ty+12} ${tx} ${ty}`, at, color);
     const angle = Math.atan2(ty-y, tx-x);
     line(`${id}-tip`, `M${tx-15*Math.cos(angle-0.5)} ${ty-15*Math.sin(angle-0.5)} L${tx} ${ty} L${tx-15*Math.cos(angle+0.5)} ${ty-15*Math.sin(angle+0.5)}`, at, color);
   };
   const person = (id: string, x: number, y: number, at: number, color: string) => {
-    line(`${id}-head`, `M${x+22} ${y} C${x+22} ${y+30} ${x-22} ${y+30} ${x-22} ${y} C${x-22} ${y-30} ${x+22} ${y-30} ${x+22} ${y}`, at, color);
-    line(`${id}-body`, `M${x-45} ${y+90} L${x-42} ${y+60} Q${x} ${y+20} ${x+42} ${y+60} L${x+45} ${y+90} M${x-24} ${y+90} L${x-24} ${y+122} M${x+24} ${y+90} L${x+24} ${y+122}`, at, color);
+    line(`${id}-head`, `M${x+22} ${y} C${x+22} ${y+30} ${x-22} ${y+30} ${x-22} ${y} C${x-22} ${y-30} ${x+22} ${y-30} ${x+22} ${y}`, at, color, '#f5e4d4');
+    line(`${id}-body`, `M${x-44} ${y+121} L${x-42} ${y+71} Q${x-40} ${y+50} ${x-16} ${y+43} Q${x} ${y+52} ${x+16} ${y+43} Q${x+40} ${y+50} ${x+42} ${y+71} L${x+44} ${y+121} Q${x} ${y+128} ${x-44} ${y+121} Z`, at, color, `${color}0c`);
   };
   const database = (id: string, x: number, y: number, at: number) => {
     line(id, `M${x} ${y} C${x} ${y-30} ${x+150} ${y-30} ${x+150} ${y} C${x+150} ${y+30} ${x} ${y+30} ${x} ${y} L${x} ${y+105} C${x} ${y+135} ${x+150} ${y+135} ${x+150} ${y+105} L${x+150} ${y} M${x} ${y+52} C${x} ${y+82} ${x+150} ${y+82} ${x+150} ${y+52}`, at);
@@ -89,7 +108,6 @@ export function createStoryboard(scene: InstructorStoryboard, phase: number): Bo
     arrow('read-tenant', 785, 245, 943, 245, 3, local ? palette.green : palette.red);
     label('db-name', 'Repository', 970, 385, 3);
     label('read-label', local ? 'A đọc saigon' : 'A đọc hanoi!', 805, 175, 3, local ? palette.green : palette.red, 23);
-    if (!local) line('wrong-circle', 'M793 147 C811 113 950 114 969 150 C986 202 797 211 793 147', 3, palette.red);
   } else if (scene.kind === 'event-loop') {
     const blocked = scene.variant === 'blocked';
     box('main-thread', 390, 95, 350, 290);
@@ -178,5 +196,5 @@ export function createStoryboard(scene: InstructorStoryboard, phase: number): Bo
     label('io', 'Pool / downstream', 912, 390, 3, palette.green);
     label('io-measure', 'Trace · queue · timeout', 912, 435, 3, palette.muted, 22);
   }
-  return { strokes, labels };
+  return { strokes, labels, focus: focusRegion(scene, Math.max(0, Math.min(3, phase))) };
 }

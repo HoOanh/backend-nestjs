@@ -1,13 +1,16 @@
+import type { MotionValue } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import type { InstructorVisual } from '../../data/instructor-curriculum/types';
 import { IllustratedLessonSlide } from './IllustratedLessonSlide';
 
-export function WorkedExampleSlide({ visual, title, subtitle, visibleCount, focusIndex }: {
+export function WorkedExampleSlide({ visual, title, subtitle, visibleCount, focusIndex, progress, playing }: {
   visual: Extract<InstructorVisual, { kind: 'worked-example' }>;
   title?: string;
   subtitle?: string;
   visibleCount: number;
   focusIndex: number;
+  progress?: MotionValue<number>;
+  playing?: boolean;
 }) {
   const containerRef = useRef<HTMLElement>(null);
   const activeLines = visual.steps[focusIndex - 1]?.lines ?? [];
@@ -25,7 +28,7 @@ export function WorkedExampleSlide({ visual, title, subtitle, visibleCount, focu
     }
   }, [focusIndex]);
   if (visual.storyboard) {
-    return <IllustratedLessonSlide key={visual.storyboard.caption} visual={visual} title={title} subtitle={subtitle} focusIndex={focusIndex} />;
+    return <IllustratedLessonSlide key={visual.storyboard.caption} visual={visual} title={title} subtitle={subtitle} focusIndex={focusIndex} progress={progress} playing={playing} />;
   }
   return (
     <section ref={containerRef} className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-3 py-3 sm:px-6 lg:px-8" aria-label="Ví dụ giải thích từng bước">

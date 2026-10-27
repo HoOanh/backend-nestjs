@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Toaster, toast } from 'sonner';
 import {
@@ -53,6 +53,8 @@ import {
   type ZeroTtsInstallState
 } from '../../services/zeroTtsBrowser.ts';
 import { ZeroTtsInstallPage } from './ZeroTtsInstallPage.tsx';
+import { classroomPreparationState } from './preparationState';
+import { narrationStageProgress } from '../../services/narrationPlaybackClock';
 import {
   InteractiveSmartboardClassroom,
   type BoardDisplayMode,
@@ -812,6 +814,10 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const [activeBeatIndex, setActiveBeatIndex] = useState(0);
   const [visualRevealCount, setVisualRevealCount] = useState(0);
   const [visualFocusIndex, setVisualFocusIndex] = useState(-1);
+  const visualProgress = useMotionValue(0);
+  const [firstAudioReady, setFirstAudioReady] = useState(false);
+  const firstAudioReadyRef = useRef(false);
+  const [preparationError, setPreparationError] = useState<string | null>(null);
 
   // Classroom Stage & Camera State
   const [overrideBoardMode, setOverrideBoardMode] =
@@ -855,6 +861,8 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const pendingTutorAssistantIdRef = useRef<string | null>(null);
   const installPauseRef = useRef(false);
   const usesBrowserZeroTts = import.meta.env.PROD && import.meta.env.VITE_ZEROTTS_ENABLED !== 'true';
+  const preparationState = classroomPreparationState(zeroTtsInstallState, firstAudioReady, preparationError);
+  const resourcesPending = voiceEnabled && preparationState !== null;
 
   useEffect(
     () => subscribeZeroTtsInstallState(setZeroTtsInstallState),
@@ -862,13 +870,13 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   );
 
   useEffect(() => {
-    if (!usesBrowserZeroTts || !hasStartedClass || classStartedAt === null) return;
+    if (!hasStartedClass || classStartedAt === null) return;
 
-    if (zeroTtsInstallState.status === 'loading' && classPausedAt === null) {
+    if (resourcesPending && classPausedAt === null) {
       installPauseRef.current = true;
       setClassPausedAt(Date.now());
     } else if (
-      zeroTtsInstallState.status === 'ready' &&
+      !resourcesPending &&
       installPauseRef.current &&
       classPausedAt !== null
     ) {
@@ -876,7 +884,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       setClassPausedAt(null);
       installPauseRef.current = false;
     }
-  }, [usesBrowserZeroTts, hasStartedClass, classStartedAt, classPausedAt, zeroTtsInstallState.status]);
+  }, [resourcesPending, hasStartedClass, classStartedAt, classPausedAt]);
 
   const setLectureAutoPlay = useCallback((enabled: boolean) => {
     if (!enabled) cancelLectureAdvanceRef.current?.();
@@ -917,6 +925,9 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     lectureBeats[Math.min(activeBeatIndex, lectureBeats.length - 1)] ||
     lectureBeats[0];
 
+  const currentBeatRef = useRef(currentBeat);
+  currentBeatRef.current = currentBeat;
+
   const currentQuizAttempt = quizSelectionByStep[currentCheckpoint.id];
 
   // Reset the classroom only when changing lessons. Progress writes during this
@@ -929,6 +940,10 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     raisingHandRef.current = false;
     resumeAfterQuestionRef.current = null;
     setHasStartedClass(false);
+    firstAudioReadyRef.current = false;
+    setFirstAudioReady(false);
+    setPreparationError(null);
+    visualProgress.set(0);
     setClassStartedAt(null);
     setClassPausedAt(null);
     setClassPausedDurationMs(0);
@@ -973,6 +988,8 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       onAudioReady?: () => void
     ) => {
       cancelLectureAdvanceRef.current?.();
+      visualProgress.set(0);
+      if (!firstAudioReadyRef.current) setPreparationError(null);
       setLiveSubtitle(scriptText);
       if (!voiceEnabled) {
         stopVietnameseSpeech();
@@ -1003,7 +1020,14 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           setLiveSubtitle(sentence);
           onSentenceStarted?.(index, total);
         },
+        onPlaybackProgress: ({ sentenceIndex, progress }) => {
+          const sequence = currentBeatRef.current?.focusSequence ?? [];
+          visualProgress.set(narrationStageProgress(sequence, sentenceOffset + sentenceIndex, progress));
+        },
         onAudioReady: () => {
+          firstAudioReadyRef.current = true;
+          setFirstAudioReady(true);
+          setPreparationError(null);
           setIsPreparingSpeech(false);
           setIsSpeaking(true);
           onAudioReady?.();
@@ -1012,6 +1036,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           finishPlayback(true);
         },
         onError: (message) => {
+          if (!firstAudioReadyRef.current) setPreparationError(message);
           console.error('[Classroom] Speech playback failed:', message);
           toast.error(usesBrowserZeroTts
             ? 'Không thể chuẩn bị tài nguyên. Thử lại để tiếp tục buổi học.'
@@ -1020,7 +1045,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
         }
       });
     },
-    [usesBrowserZeroTts, voiceEnabled, speechRate]
+    [usesBrowserZeroTts, voiceEnabled, speechRate, visualProgress]
   );
 
   const playProfessorVietnameseStream = useCallback(
@@ -1370,6 +1395,9 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   // Start the live lecture session
   const handleStartLectureSession = () => {
+    firstAudioReadyRef.current = false;
+    setFirstAudioReady(false);
+    setPreparationError(null);
     setClassStartedAt(Date.now());
     setClassPausedAt(null);
     setClassPausedDurationMs(0);
@@ -1855,14 +1883,20 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#F5F0E6] text-stone-800">
       <Toaster position="top-center" richColors theme="light" />
 
-      {usesBrowserZeroTts && hasStartedClass &&
-        (zeroTtsInstallState.status === 'error' ||
-          (zeroTtsInstallState.status === 'loading' && zeroTtsInstallState.phase !== 'preparing')) && (
-          <ZeroTtsInstallPage
-            state={zeroTtsInstallState}
-            onRetry={() => playCurrentBeatFromCurrentSentence(lectureAutoPlayRef.current)}
-          />
-        )}
+      {hasStartedClass && voiceEnabled && preparationState && (
+        <ZeroTtsInstallPage
+          state={preparationState}
+          onRetry={() => { setPreparationError(null); playCurrentBeatFromCurrentSentence(lectureAutoPlayRef.current); }}
+          onCancel={() => {
+            stopVietnameseSpeech();
+            setIsPreparingSpeech(false);
+            setIsSpeaking(false);
+            setLectureAutoPlay(false);
+            setHasStartedClass(false);
+            setClassStartedAt(null);
+          }}
+        />
+      )}
 
       {/* =====================================================================
           1. TOP BRIGHT CLASSROOM HEADER BAR
@@ -1982,6 +2016,8 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
           instructorVisual={currentBeat?.instructorVisual}
           visualRevealCount={visualRevealCount}
           visualFocusIndex={visualFocusIndex}
+          visualProgress={visualProgress}
+          visualPlaying={isSpeaking}
           visualFocusPlan={currentBeat?.focusPlan}
           presentationRole={currentBeat?.presentationRole}
           slideIndex={lectureBeats.slice(0, activeBeatIndex).filter((beat) => beat.boardMode === 'keypoints').length}

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion, type MotionValue } from 'framer-motion';
 import { Code2, PenLine } from 'lucide-react';
 import type { InstructorVisual } from '../../data/instructor-curriculum/types';
 import { WhiteboardIllustration } from './whiteboard/WhiteboardIllustration';
 
-export function IllustratedLessonSlide({ visual, title, subtitle, focusIndex }: {
+export function IllustratedLessonSlide({ visual, title, subtitle, focusIndex, progress, playing }: {
   visual: Extract<InstructorVisual, { kind: 'worked-example' }>;
   title?: string;
   subtitle?: string;
   focusIndex: number;
+  progress?: MotionValue<number>;
+  playing?: boolean;
 }) {
   const [showEvidence, setShowEvidence] = useState(false);
   const reducedMotion = useReducedMotion();
@@ -30,7 +32,7 @@ export function IllustratedLessonSlide({ visual, title, subtitle, focusIndex }: 
               <pre className="overflow-x-auto font-mono text-xs leading-7 text-stone-800 sm:text-sm"><code>{visual.exhibit.code.split('\n').map((line, index) => <span key={index} data-active-line={step?.lines?.includes(index + 1) || undefined} className={`block px-3 ${step?.lines?.includes(index + 1) ? 'bg-sky-50 font-semibold text-sky-900' : ''}`}>{line || ' '}</span>)}</code></pre>
             ) : <dl className="space-y-4">{visual.exhibit.rows?.map((row) => <div key={row.label} className="flex flex-wrap justify-between gap-3 border-b border-stone-100 pb-3"><dt className="text-sm text-stone-600">{row.label}</dt><dd className="font-mono text-sm font-semibold text-stone-900">{row.value}</dd></div>)}</dl>}
           </figure>
-        ) : <WhiteboardIllustration key={storyboard.caption} scene={storyboard} focusIndex={focusIndex} />}
+        ) : <WhiteboardIllustration key={storyboard.caption} scene={storyboard} focusIndex={focusIndex} progress={progress} playing={playing} />}
       </div>
       <div className="flex shrink-0 flex-col gap-2 border-t border-stone-200 pt-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-h-[58px] min-w-0 flex-1" aria-live="polite" aria-atomic="true">

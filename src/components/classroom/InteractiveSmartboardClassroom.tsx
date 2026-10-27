@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type MotionValue } from 'framer-motion';
 import { resolveFocusCue } from './focusSequence.ts';
 import { WorkedExampleSlide } from './WorkedExampleSlide.tsx';
 import {
@@ -52,6 +52,8 @@ export interface InteractiveSmartboardClassroomProps {
   instructorVisual?: InstructorVisual;
   visualRevealCount?: number;
   visualFocusIndex?: number;
+  visualProgress?: MotionValue<number>;
+  visualPlaying?: boolean;
   visualFocusPlan?: InstructorFocusCue[];
   presentationRole?: InstructorPresentationRole;
   slideIndex?: number;
@@ -743,6 +745,8 @@ function InstructorVisualPanel({
   visibleCount,
   focusIndex = -1,
   focusPlan = [],
+  progress,
+  playing,
   title,
   subtitle
 }: {
@@ -750,6 +754,8 @@ function InstructorVisualPanel({
   visibleCount: number;
   focusIndex?: number;
   focusPlan?: InstructorFocusCue[];
+  progress?: MotionValue<number>;
+  playing?: boolean;
   title?: string;
   subtitle?: string;
 }) {
@@ -766,7 +772,7 @@ function InstructorVisualPanel({
     />
   );
   if (visual.kind === 'worked-example') {
-    return <WorkedExampleSlide visual={visual} title={title} subtitle={subtitle} visibleCount={visibleCount} focusIndex={focusIndex} />;
+    return <WorkedExampleSlide visual={visual} title={title} subtitle={subtitle} visibleCount={visibleCount} focusIndex={focusIndex} progress={progress} playing={playing} />;
   }
   if (visual.kind === 'text-slide') {
     return renderSketch(textSlideSketch(visual, visibleCount), 'Slide nội dung viết tay');
@@ -947,6 +953,8 @@ function SmartboardPanel(props: InteractiveSmartboardClassroomProps) {
                         visual={props.instructorVisual}
                         visibleCount={props.visualRevealCount ?? 0}
                         focusIndex={props.visualFocusIndex}
+                        progress={props.visualProgress}
+                        playing={props.visualPlaying}
                         focusPlan={props.visualFocusPlan}
                         title={props.slideTitle}
                         subtitle={props.slideSubtitle}
@@ -980,6 +988,8 @@ function SmartboardPanel(props: InteractiveSmartboardClassroomProps) {
                         }}
                         visibleCount={1 + (props.slidePoints?.slice(0, 4).length ?? 0)}
                         focusIndex={props.visualFocusIndex}
+                        progress={props.visualProgress}
+                        playing={props.visualPlaying}
                         title={props.slideTitle}
                         subtitle={props.slideSubtitle}
                       />
@@ -1016,6 +1026,8 @@ function SmartboardPanel(props: InteractiveSmartboardClassroomProps) {
                       visual={props.instructorVisual || markdownAsVisual(props.visualDiagramText, props.slideTitle || 'Sơ đồ bài học')}
                       visibleCount={props.instructorVisual ? visualEntryCount(props.instructorVisual) : 7}
                       focusIndex={props.visualFocusIndex}
+                        progress={props.visualProgress}
+                        playing={props.visualPlaying}
                     />
                   </div>
                 )}

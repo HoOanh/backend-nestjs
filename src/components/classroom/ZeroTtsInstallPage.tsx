@@ -5,19 +5,21 @@ import { Button } from '../ui/button';
 interface ZeroTtsInstallPageProps {
   state: ZeroTtsInstallState;
   onRetry: () => void;
+  onCancel?: () => void;
 }
 
 function toMegabytes(bytes: number): string {
   return (bytes / 1_000_000).toFixed(0);
 }
 
-export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPageProps>) {
+export function ZeroTtsInstallPage({ state, onRetry, onCancel }: Readonly<ZeroTtsInstallPageProps>) {
   const totalBytes = state.totalBytes || 903_000_000;
   const loadedBytes = Math.min(state.loadedBytes, totalBytes);
   const percent = Math.min(100, Math.floor((loadedBytes / totalBytes) * 100));
   const isLoading = state.status === 'loading';
   const isDownloading = state.phase === 'downloading';
   const isChecking = state.phase === 'checking';
+  const isBuffering = state.phase === 'buffering';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#f5f0e6] px-4 py-8">
@@ -38,7 +40,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
               ? 'Đang thực hiện tải tài nguyên lần đầu'
               : isChecking
                 ? 'Đang kiểm tra tài nguyên'
-                : 'Đang chuẩn bị tài nguyên'
+                : isBuffering ? 'Đang chuẩn bị lời giảng đầu tiên' : 'Đang khởi tạo tài nguyên'
             : 'Chưa thể chuẩn bị tài nguyên'}
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-stone-600">
@@ -47,7 +49,9 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
               ? 'Đang tải tài nguyên cần thiết. Buổi học sẽ bắt đầu sau khi hoàn tất.'
               : isChecking
                 ? 'Đang kiểm tra tài nguyên đã lưu để tiếp tục buổi học.'
-                : 'Tài nguyên đã có trên thiết bị. Đang chuẩn bị để tiếp tục buổi học.'
+                : isBuffering
+                  ? 'Đang tạo và nạp âm thanh. Lớp học sẽ bắt đầu ngay khi sẵn sàng phát.'
+                  : 'Đang khởi tạo tài nguyên đã tải. Buổi học sẽ bắt đầu khi âm thanh sẵn sàng.'
             : 'Tài nguyên chưa sẵn sàng. Thử lại để tiếp tục buổi học.'}
         </p>
 
@@ -84,7 +88,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
         ) : isLoading ? (
           <div className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-sky-700">
             <LoaderCircle size={18} className="animate-spin" />
-            {isChecking ? 'Đang kiểm tra tài nguyên' : 'Đang chuẩn bị tài nguyên'}
+            {isChecking ? 'Đang kiểm tra tài nguyên' : isBuffering ? 'Đang chuẩn bị âm thanh' : 'Đang khởi tạo tài nguyên'}
           </div>
         ) : (
           <Button
@@ -98,6 +102,7 @@ export function ZeroTtsInstallPage({ state, onRetry }: Readonly<ZeroTtsInstallPa
             Thử lại
           </Button>
         )}
+        {onCancel && <button type="button" onClick={onCancel} className="mx-auto mt-5 block rounded-lg px-4 py-2 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800 focus-visible:outline-2 focus-visible:outline-sky-600">Quay lại</button>}
       </section>
     </div>
   );

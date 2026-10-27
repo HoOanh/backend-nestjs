@@ -1,4 +1,4 @@
-import writingHand from '../../../assets/classroom/writing-hand.png';
+import { writingHand } from './writingHandAsset';
 import { whiteboardDesign as design } from './designSystem';
 
 /** Photographic cutout. The exposed nib at image pixel (117, 123) anchors the pen. */

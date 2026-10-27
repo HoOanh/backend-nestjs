@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { penTimeline, splitPenStrokes } from '../src/components/classroom/whiteboard/penTimeline';
+import { drawingDuration, penTimeline, splitPenStrokes } from '../src/components/classroom/whiteboard/penTimeline';
 
 const strokes = [
   { length: 100, start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
@@ -24,4 +24,10 @@ test('disjoint subpaths lift the pen and ink never rewinds as the audio advances
     current.forEach((value, index) => expect(value).toBeGreaterThanOrEqual(previous[index]));
     previous = current;
   }
+});
+
+test('ink duration depends on diagram complexity, with practical minimum and maximum', () => {
+  expect(drawingDuration([{ length: 30, start: { x: 0, y: 0 }, end: { x: 30, y: 0 } }])).toBe(1.25);
+  expect(drawingDuration([{ length: 900, start: { x: 0, y: 0 }, end: { x: 900, y: 0 } }])).toBe(3);
+  expect(drawingDuration([{ length: 3000, start: { x: 0, y: 0 }, end: { x: 3000, y: 0 } }])).toBe(6);
 });

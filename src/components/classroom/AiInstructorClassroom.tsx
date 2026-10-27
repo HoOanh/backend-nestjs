@@ -54,7 +54,8 @@ import {
 } from '../../services/zeroTtsBrowser.ts';
 import { ZeroTtsInstallPage } from './ZeroTtsInstallPage.tsx';
 import { classroomPreparationState } from './preparationState';
-import { narrationStageProgress } from '../../services/narrationPlaybackClock';
+import { preloadWritingHand } from './whiteboard/writingHandAsset';
+import { NarrationFocusClock } from '../../services/narrationPlaybackClock';
 import {
   InteractiveSmartboardClassroom,
   type BoardDisplayMode,
@@ -818,6 +819,8 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const [firstAudioReady, setFirstAudioReady] = useState(false);
   const firstAudioReadyRef = useRef(false);
   const [preparationError, setPreparationError] = useState<string | null>(null);
+  const [handState, setHandState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [handLoadAttempt, setHandLoadAttempt] = useState(0);
 
   // Classroom Stage & Camera State
   const [overrideBoardMode, setOverrideBoardMode] =
@@ -861,8 +864,17 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
   const pendingTutorAssistantIdRef = useRef<string | null>(null);
   const installPauseRef = useRef(false);
   const usesBrowserZeroTts = import.meta.env.PROD && import.meta.env.VITE_ZEROTTS_ENABLED !== 'true';
-  const preparationState = classroomPreparationState(zeroTtsInstallState, firstAudioReady, preparationError);
-  const resourcesPending = voiceEnabled && preparationState !== null;
+  const preparationState = classroomPreparationState(zeroTtsInstallState, firstAudioReady, preparationError, handState, voiceEnabled);
+  const resourcesPending = preparationState !== null;
+
+  useEffect(() => {
+    let active = true;
+    preloadWritingHand().then(
+      () => { if (active) setHandState('ready'); },
+      () => { if (active) setHandState('error'); }
+    );
+    return () => { active = false; };
+  }, [handLoadAttempt]);
 
   useEffect(
     () => subscribeZeroTtsInstallState(setZeroTtsInstallState),
@@ -1000,6 +1012,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
       }
 
       let didFinish = false;
+      const drawingClock = new NarrationFocusClock();
       const finishPlayback = (completed: boolean) => {
         if (didFinish) return;
         didFinish = true;
@@ -1020,9 +1033,10 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
           setLiveSubtitle(sentence);
           onSentenceStarted?.(index, total);
         },
-        onPlaybackProgress: ({ sentenceIndex, progress }) => {
+        onPlaybackProgress: ({ sentenceIndex, elapsedSeconds }) => {
           const sequence = currentBeatRef.current?.focusSequence ?? [];
-          visualProgress.set(narrationStageProgress(sequence, sentenceOffset + sentenceIndex, progress));
+          const focus = sequence[sentenceOffset + sentenceIndex];
+          visualProgress.set(drawingClock.read(focus, elapsedSeconds));
         },
         onAudioReady: () => {
           firstAudioReadyRef.current = true;
@@ -1105,7 +1119,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
 
   // Automatically run the current Lecture Beat when class is active and not interrupted
   useEffect(() => {
-    if (!hasStartedClass || isRaisingHand || showLaptopSandbox) return;
+    if (!hasStartedClass || handState !== 'ready' || isRaisingHand || showLaptopSandbox) return;
 
     const beat = lectureBeats[activeBeatIndex];
     if (!beat) return;
@@ -1209,6 +1223,7 @@ export const AiInstructorClassroom: React.FC<AiInstructorClassroomProps> = ({
     );
   }, [
     hasStartedClass,
+    handState,
     activeStepIndex,
     activeBeatIndex,
     lectureBeats,
@@ -1883,10 +1898,14 @@ QUY TẮC PHẢN HỒI (TỐI ĐA 130–180 TỪ, ĐỂ ĐỌC BẰNG GIỌNG NA
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#F5F0E6] text-stone-800">
       <Toaster position="top-center" richColors theme="light" />
 
-      {hasStartedClass && voiceEnabled && preparationState && (
+      {hasStartedClass && preparationState && (
         <ZeroTtsInstallPage
           state={preparationState}
-          onRetry={() => { setPreparationError(null); playCurrentBeatFromCurrentSentence(lectureAutoPlayRef.current); }}
+          onRetry={() => {
+            setPreparationError(null);
+            if (handState === 'error') { setHandState('loading'); setHandLoadAttempt((attempt) => attempt + 1); }
+            else playCurrentBeatFromCurrentSentence(lectureAutoPlayRef.current);
+          }}
           onCancel={() => {
             stopVietnameseSpeech();
             setIsPreparingSpeech(false);

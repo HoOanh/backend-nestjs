@@ -4,7 +4,7 @@ import type { InstructorStoryboard } from '../../../data/instructor-curriculum/t
 import { createStoryboard, type BoardLabel } from './storyboard';
 import { whiteboardDesign as design } from './designSystem';
 import { DrawingHand } from './DrawingHand';
-import { penTimeline, splitPenStrokes } from './penTimeline';
+import { drawingDuration, penTimeline, splitPenStrokes } from './penTimeline';
 
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -12,7 +12,7 @@ function BoardText({ label, phase, clock, order, count, reduced }: {
   label: BoardLabel; phase: number; clock: MotionValue<number>; order: number; count: number; reduced: boolean | null;
 }) {
   const start = 0.22 + (order / Math.max(1, count)) * 0.4;
-  const opacity = useTransform(clock, (value) => label.at > phase ? 0 : label.at < phase || reduced ? 1 : clamp((value / design.motion.handExitEnd - start) / 0.12));
+  const opacity = useTransform(clock, (value) => label.at > phase ? 0 : label.at < phase || reduced ? 1 : clamp((value - start) / 0.12));
   const y = useTransform(opacity, (value) => label.y + (1 - value) * 4);
   return <motion.text aria-hidden={label.at > phase} x={label.x} style={{ y, opacity }} fill={label.color || design.ink} fontFamily={design.handwriting} fontSize={label.size || 25}>{label.text}</motion.text>;
 }
@@ -28,6 +28,7 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
   const drawing = useMemo(() => createStoryboard(scene, phase), [scene, phase]);
   const strokes = useMemo(() => drawing.strokes.flatMap((stroke) => splitPenStrokes(stroke.d).map((d, index) => ({ ...stroke, d, id: `${stroke.id}-${index}` }))), [drawing]);
   const preview = useMotionValue(0);
+  const animationProgress = useMotionValue(0);
   const clock = progress && !concluded ? progress : preview;
   const handX = useMotionValue(0);
   const handY = useMotionValue(0);
@@ -52,6 +53,10 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
     const annotation = root.current?.querySelector<SVGPathElement>('[data-focus-outline]');
     const geometry = active.map((path) => ({ length: path.getTotalLength(), start: path.getPointAtLength(0), end: path.getPointAtLength(path.getTotalLength()) }));
     const outlineLength = annotation?.getTotalLength() ?? 0;
+    const inkSeconds = drawingDuration(geometry);
+    const travelEndSeconds = inkSeconds + (annotation ? design.motion.highlightTravelSeconds : 0);
+    const highlightEndSeconds = travelEndSeconds + (annotation ? design.motion.highlightSeconds : 0);
+    const totalSeconds = highlightEndSeconds + design.motion.handExitSeconds;
     for (const path of paths) {
       const at = Number(path.dataset.drawAt);
       const length = path.getTotalLength();
@@ -62,14 +67,18 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
     }
     if (annotation) annotation.style.strokeDasharray = `${outlineLength} ${outlineLength}`;
     const update = (value: number) => {
-      const fraction = reduced || concluded ? 1 : clamp(value);
-      const inkEnd = annotation ? design.motion.drawingEnd : design.motion.drawingEndWithoutHighlight;
+      const elapsed = reduced || concluded ? totalSeconds : progress ? Math.max(0, value) : Math.max(0, value) * design.motion.previewStageSeconds;
+      const fraction = clamp(elapsed / totalSeconds);
+      animationProgress.set(fraction);
+      const inkEnd = inkSeconds / totalSeconds;
+      const travelEnd = travelEndSeconds / totalSeconds;
+      const highlightEnd = highlightEndSeconds / totalSeconds;
       const timeline = penTimeline(geometry, fraction / inkEnd);
       timeline.drawn.forEach((part, index) => {
         active[index].style.strokeDashoffset = String(geometry[index].length * (1 - part));
         active[index].style.fillOpacity = String(clamp((part - 0.85) / 0.15));
       });
-      const emphasis = clamp((fraction - design.motion.highlightTravelEnd) / (design.motion.highlightEnd - design.motion.highlightTravelEnd));
+      const emphasis = annotation ? clamp((fraction - travelEnd) / (highlightEnd - travelEnd)) : 0;
       if (annotation) annotation.style.strokeDashoffset = String(outlineLength * (1 - emphasis));
       let point: { x: number; y: number } | undefined;
       let lift = timeline.tip.lift;
@@ -77,7 +86,7 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
       if (fraction > inkEnd && annotation) {
         const from = geometry.at(-1)?.end ?? annotation.getPointAtLength(0);
         const to = annotation.getPointAtLength(0);
-        const travel = clamp((fraction - inkEnd) / (design.motion.highlightTravelEnd - inkEnd));
+        const travel = clamp((fraction - inkEnd) / (travelEnd - inkEnd));
         lift = Math.sin(Math.PI * travel);
         point = emphasis > 0 ? annotation.getPointAtLength(outlineLength * emphasis) : { x: from.x + (to.x - from.x) * travel, y: from.y + (to.y - from.y) * travel - lift * 24 };
       } else if (active[tip.index]) {
@@ -85,8 +94,8 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
         const to = geometry[tip.index].start;
         point = tip.travel < 1 ? { x: from.x + (to.x - from.x) * tip.travel, y: from.y + (to.y - from.y) * tip.travel - lift * 24 } : active[tip.index].getPointAtLength(geometry[tip.index].length * tip.progress);
       }
-      const exitStart = annotation ? design.motion.highlightEnd : inkEnd;
-      const withdraw = clamp((fraction - exitStart) / (design.motion.handExitEnd - exitStart));
+      const exitStart = annotation ? highlightEnd : inkEnd;
+      const withdraw = clamp((fraction - exitStart) / (1 - exitStart));
       if (point) { handX.set(point.x + withdraw * 110); handY.set(point.y + withdraw * 190); }
       handScale.set(1 + lift * 0.025);
       handRotation.set(-lift * 3);
@@ -96,13 +105,13 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
     };
     update(clock.get());
     return clock.on('change', update);
-  }, [drawing, phase, concluded, reduced, playing, clock, handX, handY, handOpacity, handRotation, handScale]);
+  }, [drawing, phase, concluded, reduced, playing, progress, clock, animationProgress, handX, handY, handOpacity, handRotation, handScale]);
 
   const currentLabels = drawing.labels.filter((label) => label.at === phase);
   return <svg ref={root} viewBox="0 0 1200 520" role="img" aria-label={scene.caption} className="h-full min-h-[210px] w-full" data-storyboard={scene.kind} data-media-clock={Boolean(progress)}>
     <title>{scene.caption}</title>
     {strokes.map((stroke) => <path key={stroke.id} d={stroke.d} data-draw-at={stroke.at} fill={stroke.fill || 'none'} stroke={stroke.color || design.ink} strokeWidth={stroke.width || 2.8} strokeLinecap="round" strokeLinejoin="round" />)}
-    {drawing.labels.map((label) => <BoardText key={label.id} label={label} phase={phase} clock={clock} order={currentLabels.indexOf(label)} count={currentLabels.length} reduced={reduced} />)}
+    {drawing.labels.map((label) => <BoardText key={label.id} label={label} phase={phase} clock={animationProgress} order={currentLabels.indexOf(label)} count={currentLabels.length} reduced={reduced} />)}
     {focusIndex > 0 && <path key={`focus-${phase}`} d={outline} fill="none" stroke={design.red} strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" data-focus-outline="true" />}
     <motion.g style={{ x: handX, y: handY, opacity: handOpacity }} data-drawing-hand="true" className="pointer-events-none">
       <motion.g style={{ rotate: handRotation, scale: handScale }}><DrawingHand /></motion.g>

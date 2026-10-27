@@ -20,6 +20,7 @@ export function ZeroTtsInstallPage({ state, onRetry, onCancel }: Readonly<ZeroTt
   const isDownloading = state.phase === 'downloading';
   const isChecking = state.phase === 'checking';
   const isBuffering = state.phase === 'buffering';
+  const isVisuals = state.phase === 'visuals';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#f5f0e6] px-4 py-8">
@@ -40,7 +41,7 @@ export function ZeroTtsInstallPage({ state, onRetry, onCancel }: Readonly<ZeroTt
               ? 'Đang thực hiện tải tài nguyên lần đầu'
               : isChecking
                 ? 'Đang kiểm tra tài nguyên'
-                : isBuffering ? 'Đang chuẩn bị lời giảng đầu tiên' : 'Đang khởi tạo tài nguyên'
+                : isBuffering ? 'Đang chuẩn bị lời giảng đầu tiên' : isVisuals ? 'Đang chuẩn bị hình minh hoạ' : 'Đang khởi tạo tài nguyên'
             : 'Chưa thể chuẩn bị tài nguyên'}
         </h1>
         <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-stone-600">
@@ -49,7 +50,9 @@ export function ZeroTtsInstallPage({ state, onRetry, onCancel }: Readonly<ZeroTt
               ? 'Đang tải tài nguyên cần thiết. Buổi học sẽ bắt đầu sau khi hoàn tất.'
               : isChecking
                 ? 'Đang kiểm tra tài nguyên đã lưu để tiếp tục buổi học.'
-                : isBuffering
+                : isVisuals
+                  ? 'Đang tải hình bàn tay để hoạt ảnh sẵn sàng trước khi bắt đầu.'
+                  : isBuffering
                   ? 'Đang tạo và nạp âm thanh. Lớp học sẽ bắt đầu ngay khi sẵn sàng phát.'
                   : 'Đang khởi tạo tài nguyên đã tải. Buổi học sẽ bắt đầu khi âm thanh sẵn sàng.'
             : 'Tài nguyên chưa sẵn sàng. Thử lại để tiếp tục buổi học.'}
@@ -88,7 +91,7 @@ export function ZeroTtsInstallPage({ state, onRetry, onCancel }: Readonly<ZeroTt
         ) : isLoading ? (
           <div className="mt-8 flex items-center justify-center gap-2 text-sm font-semibold text-sky-700">
             <LoaderCircle size={18} className="animate-spin" />
-            {isChecking ? 'Đang kiểm tra tài nguyên' : isBuffering ? 'Đang chuẩn bị âm thanh' : 'Đang khởi tạo tài nguyên'}
+            {isChecking ? 'Đang kiểm tra tài nguyên' : isBuffering ? 'Đang chuẩn bị âm thanh' : isVisuals ? 'Đang tải hình minh hoạ' : 'Đang khởi tạo tài nguyên'}
           </div>
         ) : (
           <Button

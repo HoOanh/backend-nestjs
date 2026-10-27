@@ -18,9 +18,9 @@ không khẳng định các hoạt ảnh này đã được quan sát trong đo�
 - Mỗi lượt focus chỉ vẽ phần mới; các nét cũ được giữ để người học theo mạch.
   Nhãn xuất hiện theo cụm; lớp màu chỉ hiện sau khi đường bao đã vẽ gần xong.
 - `penTimeline` tách lệnh SVG `M` thành từng nét. Bút nhấc và di chuyển theo cung
-  giữa các nét, có tăng/giảm tốc nhẹ. Khoảng 35% tiến độ lời giảng dành cho hình,
-  tiếp đó bút di chuyển, khoanh đỏ và rút tay ở khoảng 54%, để lại thời gian
-  quan sát hình trong khi nghe. Không chạy hạt sáng cùng lúc.
+  giữa các nét, có tăng/giảm tốc nhẹ. Thời gian vẽ dựa trên tổng độ dài nét
+  và khoảng di chuyển, xấp xỉ 300 đơn vị/giây, giới hạn từ 1,25 đến 6 giây.
+  Khoanh đỏ và rút tay có thời lượng cố định; không chạy hạt sáng cùng lúc.
 
 ## Scene và tín hiệu phát
 
@@ -31,15 +31,16 @@ Scene thread và FD có biến thể riêng để tránh minh hoạ sai bằng h
 `focusSequence` của lời giảng đưa focus index vào scene. Các stroke có `at` xác định
 giai đoạn xuất hiện. Trong lớp học, `NarrationPlaybackClock` đo các đoạn PCM đã lên lịch bằng
 `AudioContext.currentTime`, tính cả tốc độ phát và loại thời gian chờ buffer.
-`narrationStageProgress` chia mỗi bước theo các câu đang nói; nét bút, nhãn,
-đường khoanh đỏ dùng chung MotionValue này. Không còn giới hạn 2.8 giây
-cho một lượt vẽ. Tạm dừng giữ nguyên nét đã vẽ. Đây là đồng bộ theo tiến độ câu;
-khi câu còn đang sinh audio, thời lượng tạm ước lượng rồi cập nhật bằng PCM,
-chưa phải căn từng âm tiết. Trang xem độc lập không có audio dùng preview 16 giây.
+Mỗi focus bắt đầu theo câu giảng, rồi nét bút chạy theo số giây PCM đã phát
+thực tế, thay vì tỷ lệ của độ dài lời thoại. Thời gian chờ buffer không làm bút
+chạy; tạm dừng giữ nguyên nét. Khi câu mới chuyển focus trước khi vẽ xong,
+phần cũ được hoàn tất để hình mới xuất hiện đúng ý giảng. Trang xem độc lập
+không có audio dùng đồng hồ mô phỏng 9 giây.
 
 ## Chuẩn bị tài nguyên
 
-Màn chuẩn bị giữ qua tải model, khởi tạo ONNX và sinh/buffer lời giảng đầu tiên.
+Màn chuẩn bị giữ qua tải và giải mã ảnh tay, tải model, khởi tạo ONNX và
+sinh/buffer lời giảng đầu tiên. Ảnh có tên chứa hash và cache một năm trên Vercel.
 Chỉ `onAudioReady` tại thời điểm audio thực sự bắt đầu phát mới mở lớp và chạy
 đồng hồ buổi học. Stream rỗng báo lỗi để thử lại; có nút quay lại màn bắt đầu.
 

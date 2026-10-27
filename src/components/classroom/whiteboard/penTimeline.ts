@@ -7,6 +7,15 @@ export interface PenStroke {
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const smooth = (value: number) => value * value * (3 - 2 * value);
 
+export function drawingDuration(strokes: PenStroke[]): number {
+  const weight = strokes.reduce((sum, stroke, index) => {
+    const previous = strokes[index - 1];
+    const distance = previous ? Math.hypot(stroke.start.x - previous.end.x, stroke.start.y - previous.end.y) : 0;
+    return sum + Math.max(42, stroke.length) + (previous ? Math.min(140, 28 + distance * 0.3) : 0);
+  }, 0);
+  return Math.max(1.25, Math.min(6, weight / 300));
+}
+
 /** Reserve real time for lifting and moving the pen between disconnected strokes. */
 export function penTimeline(strokes: PenStroke[], progress: number) {
   const weights = strokes.map((stroke, index) => {

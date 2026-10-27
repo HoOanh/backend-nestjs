@@ -6,7 +6,7 @@ const MODEL_REPO = 'zeroweight-ai/ZeroTTS';
 const VOICE = 'quangminh';
 export interface ZeroTtsInstallState {
   status: 'idle' | 'loading' | 'ready' | 'error';
-  phase?: 'checking' | 'downloading' | 'preparing' | 'buffering';
+  phase?: 'checking' | 'downloading' | 'preparing' | 'buffering' | 'visuals';
   loadedBytes: number;
   totalBytes: number;
   errorMessage?: string;

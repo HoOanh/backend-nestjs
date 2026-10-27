@@ -10,11 +10,9 @@ export const whiteboardDesign = {
   handwriting: "'Patrick Hand', 'Playpen Sans', cursive",
   handWidth: 520,
   motion: {
-    previewStageSeconds: 16,
-    drawingEnd: 0.35,
-    drawingEndWithoutHighlight: 0.35,
-    highlightTravelEnd: 0.4,
-    highlightEnd: 0.5,
-    handExitEnd: 0.54
+    previewStageSeconds: 9,
+    highlightTravelSeconds: 0.18,
+    highlightSeconds: 0.65,
+    handExitSeconds: 0.25
   }
 } as const;

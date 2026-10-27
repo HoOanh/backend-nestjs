@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { NarrationPlaybackClock, narrationStageProgress } from '../src/services/narrationPlaybackClock';
+import { NarrationFocusClock, NarrationPlaybackClock, narrationStageProgress } from '../src/services/narrationPlaybackClock';
 import { classroomPreparationState } from '../src/components/classroom/preparationState';
 
 describe('media-driven narration and drawing', () => {
@@ -10,10 +10,20 @@ describe('media-driven narration and drawing', () => {
     expect(clock.read(10.5)?.progress).toBeCloseTo(0.125);
     const atGap = clock.read(11)?.progress;
     expect(clock.read(14)?.progress).toBe(atGap);
+    expect(clock.read(14)?.elapsedSeconds).toBe(1);
     clock.record(0, 15, 18);
     clock.complete(0);
     expect(clock.read(16)?.progress).toBeCloseTo(0.5);
     expect(clock.read(18)?.progress).toBe(1);
+  });
+
+  test('focus time accumulates across sentences and starts afresh at the next focus', () => {
+    const clock = new NarrationFocusClock();
+    expect(clock.read(1, 3)).toBe(0);
+    expect(clock.read(1, 5)).toBe(2);
+    expect(clock.read(1, 8)).toBe(5);
+    expect(clock.read(2, 8)).toBe(0);
+    expect(clock.read(2, 9)).toBe(1);
   });
 
   test('follows scheduled playback-rate-adjusted audio and keeps sentences separate', () => {
@@ -22,8 +32,8 @@ describe('media-driven narration and drawing', () => {
     clock.complete(0);
     clock.record(1, 2, 6);
     clock.complete(1);
-    expect(clock.read(1)).toEqual({ sentenceIndex: 0, progress: 0.5 });
-    expect(clock.read(4)).toEqual({ sentenceIndex: 1, progress: 0.5 });
+    expect(clock.read(1)).toEqual({ sentenceIndex: 0, progress: 0.5, elapsedSeconds: 1 });
+    expect(clock.read(4)).toEqual({ sentenceIndex: 1, progress: 0.5, elapsedSeconds: 4 });
   });
 
   test('new streamed chunks cannot rewind a sentence or falsely finish it', () => {
@@ -55,5 +65,12 @@ describe('classroom preparation gate', () => {
   test('shows errors instead of pretending a loaded model is playable audio', () => {
     expect(classroomPreparationState({ ...base, status: 'ready' }, false, 'empty stream')?.status).toBe('error');
     expect(classroomPreparationState({ ...base, status: 'error' }, false, null)?.status).toBe('error');
+  });
+  test('keeps the screen open until the hand image is decoded, even with voice muted', () => {
+    const ready = { ...base, status: 'ready' as const };
+    expect(classroomPreparationState(ready, true, null, 'loading')?.status).toBe('loading');
+    expect(classroomPreparationState(ready, true, null, 'error')?.status).toBe('error');
+    expect(classroomPreparationState(ready, false, null, 'loading', false)?.status).toBe('loading');
+    expect(classroomPreparationState(ready, false, null, 'ready', false)).toBeNull();
   });
 });

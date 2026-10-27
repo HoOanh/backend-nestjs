@@ -832,7 +832,7 @@ async function playPreparedPcmWithoutWebAudio(
     const nextIndex = sentenceIndex < 0 ? task.sentences.length - 1 : sentenceIndex;
     const startTime = nextIndex > 0 ? sentenceEndTimes[nextIndex - 1] : 0;
     const duration = sentenceEndTimes[nextIndex] - startTime;
-    options.onPlaybackProgress?.({ sentenceIndex: nextIndex, progress: Math.min(1, Math.max(0, (elapsed - startTime) / Math.max(0.001, duration))) });
+    options.onPlaybackProgress?.({ sentenceIndex: nextIndex, progress: Math.min(1, Math.max(0, (elapsed - startTime) / Math.max(0.001, duration))), elapsedSeconds: elapsed / audio.playbackRate });
     if (nextIndex === activeSentenceIndex) return;
     activeSentenceIndex = nextIndex;
     options.onSentenceChange?.(task.sentences[nextIndex], nextIndex, task.sentences.length);

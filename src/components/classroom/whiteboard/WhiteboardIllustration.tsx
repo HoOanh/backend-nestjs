@@ -12,7 +12,7 @@ function BoardText({ label, phase, clock, order, count, reduced }: {
   label: BoardLabel; phase: number; clock: MotionValue<number>; order: number; count: number; reduced: boolean | null;
 }) {
   const start = 0.22 + (order / Math.max(1, count)) * 0.4;
-  const opacity = useTransform(clock, (value) => label.at > phase ? 0 : label.at < phase || reduced ? 1 : clamp((value - start) / 0.12));
+  const opacity = useTransform(clock, (value) => label.at > phase ? 0 : label.at < phase || reduced ? 1 : clamp((value / design.motion.handExitEnd - start) / 0.12));
   const y = useTransform(opacity, (value) => label.y + (1 - value) * 4);
   return <motion.text aria-hidden={label.at > phase} x={label.x} style={{ y, opacity }} fill={label.color || design.ink} fontFamily={design.handwriting} fontSize={label.size || 25}>{label.text}</motion.text>;
 }
@@ -63,13 +63,13 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
     if (annotation) annotation.style.strokeDasharray = `${outlineLength} ${outlineLength}`;
     const update = (value: number) => {
       const fraction = reduced || concluded ? 1 : clamp(value);
-      const inkEnd = annotation ? 0.73 : 0.93;
+      const inkEnd = annotation ? design.motion.drawingEnd : design.motion.drawingEndWithoutHighlight;
       const timeline = penTimeline(geometry, fraction / inkEnd);
       timeline.drawn.forEach((part, index) => {
         active[index].style.strokeDashoffset = String(geometry[index].length * (1 - part));
         active[index].style.fillOpacity = String(clamp((part - 0.85) / 0.15));
       });
-      const emphasis = clamp((fraction - 0.79) / 0.18);
+      const emphasis = clamp((fraction - design.motion.highlightTravelEnd) / (design.motion.highlightEnd - design.motion.highlightTravelEnd));
       if (annotation) annotation.style.strokeDashoffset = String(outlineLength * (1 - emphasis));
       let point: { x: number; y: number } | undefined;
       let lift = timeline.tip.lift;
@@ -77,7 +77,7 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
       if (fraction > inkEnd && annotation) {
         const from = geometry.at(-1)?.end ?? annotation.getPointAtLength(0);
         const to = annotation.getPointAtLength(0);
-        const travel = clamp((fraction - inkEnd) / 0.06);
+        const travel = clamp((fraction - inkEnd) / (design.motion.highlightTravelEnd - inkEnd));
         lift = Math.sin(Math.PI * travel);
         point = emphasis > 0 ? annotation.getPointAtLength(outlineLength * emphasis) : { x: from.x + (to.x - from.x) * travel, y: from.y + (to.y - from.y) * travel - lift * 24 };
       } else if (active[tip.index]) {
@@ -85,12 +85,13 @@ export function WhiteboardIllustration({ scene, focusIndex, progress, playing = 
         const to = geometry[tip.index].start;
         point = tip.travel < 1 ? { x: from.x + (to.x - from.x) * tip.travel, y: from.y + (to.y - from.y) * tip.travel - lift * 24 } : active[tip.index].getPointAtLength(geometry[tip.index].length * tip.progress);
       }
-      const withdraw = clamp((fraction - 0.97) / 0.03);
+      const exitStart = annotation ? design.motion.highlightEnd : inkEnd;
+      const withdraw = clamp((fraction - exitStart) / (design.motion.handExitEnd - exitStart));
       if (point) { handX.set(point.x + withdraw * 110); handY.set(point.y + withdraw * 190); }
       handScale.set(1 + lift * 0.025);
       handRotation.set(-lift * 3);
       // A lifted pen travels visibly; the hand withdraws once the emphasis is complete.
-      const visibility = Math.min(clamp(fraction / 0.018), clamp((0.995 - fraction) / 0.025));
+      const visibility = Math.min(clamp(fraction / 0.018), 1 - withdraw);
       handOpacity.set(!reduced && !concluded && playing && active.length ? visibility : 0);
     };
     update(clock.get());

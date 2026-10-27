@@ -18,8 +18,8 @@ không khẳng định các hoạt ảnh này đã được quan sát trong đo�
 - Mỗi lượt focus chỉ vẽ phần mới; các nét cũ được giữ để người học theo mạch.
   Nhãn xuất hiện theo cụm; lớp màu chỉ hiện sau khi đường bao đã vẽ gần xong.
 - `penTimeline` tách lệnh SVG `M` thành từng nét. Bút nhấc và di chuyển theo cung
-  giữa các nét, có tăng/giảm tốc nhẹ. Khoảng 55% tiến độ lời giảng dành cho hình,
-  tiếp đó bút di chuyển, khoanh đỏ và rút tay ở khoảng 80%, để lại thời gian
+  giữa các nét, có tăng/giảm tốc nhẹ. Khoảng 35% tiến độ lời giảng dành cho hình,
+  tiếp đó bút di chuyển, khoanh đỏ và rút tay ở khoảng 54%, để lại thời gian
   quan sát hình trong khi nghe. Không chạy hạt sáng cùng lúc.
 
 ## Scene và tín hiệu phát

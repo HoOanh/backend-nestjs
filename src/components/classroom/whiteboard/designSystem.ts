@@ -11,10 +11,10 @@ export const whiteboardDesign = {
   handWidth: 520,
   motion: {
     previewStageSeconds: 16,
-    drawingEnd: 0.55,
-    drawingEndWithoutHighlight: 0.72,
-    highlightTravelEnd: 0.6,
-    highlightEnd: 0.76,
-    handExitEnd: 0.8
+    drawingEnd: 0.35,
+    drawingEndWithoutHighlight: 0.35,
+    highlightTravelEnd: 0.4,
+    highlightEnd: 0.5,
+    handExitEnd: 0.54
   }
 } as const;

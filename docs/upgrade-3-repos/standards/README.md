@@ -1,6 +1,8 @@
+> Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](../implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
+
 # Bộ chuẩn trước setup
 
-DRAFT 0.2 · Deliverable S00 · Chưa cài/activate vào repo thật.
+Baseline0.2 · S00 đã cài rules và các skill được chọn vào3repo; [execution evidence](../implementation/S01-REPORT.md). Các bản ở thư mục standards vẫn là nguồn tham chiếu, bản active nằm trong AGENTS.md và .agents/skills của từng repo.
 
 1. [Coding rules](CODING-RULES.md): quy tắc source, data/API, FE, AI/graphics và testing.
 2. [Workflow và gates](WORKFLOW.md): authority, DoR/DoD, sync3 repo và quality gate ownership.
@@ -17,3 +19,6 @@ Rule templates hiện chỉ là Markdown, không tên AGENTS.md active trong sou
 Tech lead giữ shared rules/skill version trong hồ sơ, mỗi repo có bản sao kèm source version/hash; PR chạm rule chung cần kiểm3 repo, không phụ thuộc fourth repo. Backend nhận content/contracts/classroom specs; CMS nhận content/graphics/frontend; Web nhận graphics/classroom/frontend. Skill nào có reference tới hồ sơ phải được copy cùng supporting reference hoặc sửa thành repo-local link và validate lại, không để link sang máy cá nhân.
 
 Precedence: chỉ đạo ĐẠI CA trong phiên → applicable repo rules → skill task-specific; skill không tự mở quyền setup/code/commit/deploy. Required rule có rationale và gate; guideline thẩm mỹ không biến thành linter giả. Root AGENTS ngắn, chi tiết trong docs/rules và skill đúng phạm vi.
+
+
+Review bổ sung của ĐẠI CA: [Foundation rework — kiến trúc/i18n/brand/UI](../implementation/FOUNDATION-REWORK.md).

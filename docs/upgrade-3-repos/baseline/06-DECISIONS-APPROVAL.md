@@ -1,6 +1,6 @@
 # Quyết định và phê duyệt
 
-DRAFT 0.2 · **G0=CLOSED**. Bản0.1 được thay bởi0.2; không chuyển trạng thái duyệt cũ tự động.
+Baseline 0.2 · **G0 mở cho S00/S01 theo chỉ đạo “ok thực hiện đi nhé”, tiếp tục28/10/2026**. Bản0.1 được thay bởi0.2; không chuyển trạng thái duyệt cũ tự động.
 
 ## Đã xác nhận qua chỉ đạo scope
 
@@ -8,7 +8,7 @@ DRAFT 0.2 · **G0=CLOSED**. Bản0.1 được thay bởi0.2; không chuyển tr�
 - Core là setup content/course/lesson/tài liệu, giáo án/đồ hoạ, lớp AI 1-1 và trao đổi AI.
 - Hồ sơ triển khai chia phase/sprint; skill và coding rules phải chuẩn bị trước setup.
 - Thanh toán ngoài cả ba release, chưa có kế hoạch thực hiện.
-- Hiện chỉ được chỉnh tài liệu và draft skill/rule; chưa setup/code.
+- Đã cấp quyền setup/implementation S00/S01 sau khi đồng ý hồ sơ0.2; xem [báo cáo](../implementation/S01-REPORT.md).
 
 Xác nhận các ý scope trên không phải duyệt toàn bộ thiết kế hoặc mở G0.
 
@@ -29,10 +29,15 @@ Xác nhận các ý scope trên không phải duyệt toàn bộ thiết kế ho
 
 ## Gate theo artifact
 
-BRD / Architecture+ADR / SRS / global+per-sprint stories JSON / shared+sprint specs / standards+skills / roadmap: **tất cả Pending**, reviewer ĐẠI CA, version0.2. Approval record phải ghi version/hash, phạm vi release/sprint, ngày và người duyệt. Duyệt một phần không mở setup cho phần còn thiếu.
+Baseline/rules/specs0.2 được đồng ý về hướng và đã có quyền thực hiện S00/S01. Các quyết định chưa cần cho S01 hoặc cần dữ liệu/credentials thực tế vẫn Pending, không đánh dấu được xác nhận thay ĐẠI CA. Reviewer ĐẠI CA, version0.2. Approval record phải ghi version/hash, phạm vi release/sprint, ngày và người duyệt. Duyệt một phần không mở setup cho phần còn thiếu.
 
 G0 mở chỉ khi toàn bộ baseline+S00 và blocking decisions cho sprint đầu đã được duyệt. Trước mỗi sprint: spec chi tiết và dependency được duyệt, story AC rõ, không còn blocking technical/business decision. Chỉ làm phần được duyệt; không tự thêm source type/renderer/AI capability khác scope. Chưa có phản hồi rõ thì không ghi Approved.
 
 ## Giới hạn khảo sát
 
 Chưa đo production traffic, chưa chạy compatibility/performance spike, chưa có báo giá AI/hạ tầng, chưa nghiệm thu scaffold sibling. Phần thiết kế API/schema trong hồ sơ là semantic draft, không phải generated OpenAPI đã test. Trong giai đoạn tài liệu có thể refine specs và bảng DTO; mọi phần bổ sung vẫn phải duyệt trước implementation tương ứng.
+
+
+## Chỉ đạo bổ sung được thực hiện — 28/10/2026
+
+ĐẠI CA yêu cầu trực tiếp sửa nền tảng 3 source: CMS TanStack file-based; đa ngôn ngữ; logo/màu MVP; copyright ARC Irobot; bỏ nhãn nội bộ khỏi UI; áp dụng frontend-design. Đây là authorization cho scope rework này, không suy ra authorization các sprint sau. Quyết định và bằng chứng ở [FOUNDATION-REWORK](../implementation/FOUNDATION-REWORK.md).

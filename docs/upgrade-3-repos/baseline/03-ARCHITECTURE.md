@@ -73,7 +73,7 @@ SourceDocument owned/scope rõ; AttachmentLink gắn course/lesson với role re
 
 ## 4. Stack và topology
 
-Backend NestJS/TypeScript strict, PostgreSQL, Redis/BullMQ, MinIO/S3; CMS React/Vite/shadcn/TanStack Router+Query; Web Next/shadcn/Canvas/three/onnxruntime-web. Node24 candidate; major/patch và compatibility matrix là hồ sơ S00, chỉ chạy spike sau duyệt. Không tuyên bố latest hay compatibility khi chưa đo.
+Backend NestJS/TypeScript strict, PostgreSQL, Redis/BullMQ, MinIO/S3; CMS React/Vite/shadcn/TanStack file-based Router+Query; Web Next/shadcn/Canvas/three/onnxruntime-web. Node24 candidate; major/patch và compatibility matrix là hồ sơ S00, chỉ chạy spike sau duyệt. Không tuyên bố latest hay compatibility khi chưa đo.
 
 Một origin đề xuất: `/` Web, `/cms/` CMS, `/api/p/v1` student, `/api/i/v1` staff, `/api/w/v1` signed webhook. Cookie API do backend quản lý qua edge, Next server forwarding theo allowlist và private no-store. Student/staff audience tách; OAuth state/nonce/PKCE, staff invite/MFA, CSRF + HttpOnly/Secure host-only cookie. Token không localStorage, không query string.
 
@@ -121,3 +121,10 @@ Các module exam/certificate legacy nằm ngoài active schema đích của3 rel
 | ADR-10 |Baseline/rules/skills approved before setup; phase/sprint gates |
 
 Nguồn kỹ thuật: [Node releases](https://nodejs.org/en/about/previous-releases), [MinIO distribution](https://github.com/minio/minio#source-only-distribution), [BullMQ production](https://docs.bullmq.io/guide/going-to-production). Các ADR là đề xuất riêng của sản phẩm, chưa được duyệt hoặc kiểm chứng runtime.
+
+
+## 10. Bổ sung foundation theo review 28/10/2026
+
+CMS dùng `src/routes` file-based, pathless authenticated layout và generated typed tree, plugin tự code split; module registry chỉ metadata, không dựng route bằng vòng lặp. Web locale-prefix `/vi` và `/en` với next-intl, CMS react-i18next + cookie `ARC_LOCALE`; API/email cùng locale contract. Brand lấy nguyên logo và palette MVP; UI không chứa trạng thái phase/sprint. Design tokens thuộc frontend, không API contracts.
+
+Chi tiết cấu trúc, generated code, identity navigation, middleware và evidence: [Foundation rework](../implementation/FOUNDATION-REWORK.md). Quy tắc UI: [Frontend design](../standards/FRONTEND-DESIGN.md). Đây là chỉ đạo hiện hành, thay các chi tiết scaffold chưa phù hợp trong báo cáo S01 trước đó.

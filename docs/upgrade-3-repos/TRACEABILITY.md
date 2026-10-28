@@ -1,6 +1,6 @@
 # Ma trận truy vết0.2
 
-Nguồn chuẩn user-stories.json; bản0.1 đã thay. AC implementation chưa chạy.
+Nguồn chuẩn user-stories.json; bản0.1 đã thay. S00/S01 đã có evidence local; xem implementation/S01-REPORT.md và trạng thái trong canonical JSON.
 
 | BO | BR | FR | Story | Spec | Phase/Sprint | Release | Acceptance |
 |---|---|---|---|---|---|---|---|

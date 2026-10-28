@@ -1,3 +1,5 @@
+> Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](../implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
+
 # Workflow và quality gates
 
 DRAFT 0.2 · Chỉ áp sau phê duyệt tương ứng.
@@ -15,7 +17,7 @@ Entry dependencies đạt gate; user stories có actor/value/AC; API/schema/stat
 
 ## Thực hiện sau duyệt
 
-Không tự tạo commit. Khi cần nhánh mới dùng `feat/` hoặc `fix/` theo task; tuyệt đối không tạo/sử dụng branch chứa `code/`. Trước thay đổi kiểm trạng thái git để giữ work người khác; không auto reset/overwrite scaffold. Search scope hẹp, CodeGraph trước khi đọc/search code nếu repo có index khả dụng; không tự index, không quét dependencies/build output.
+Không tự tạo commit. Khi cần nhánh mới dùng `feat/` hoặc `fix/` theo task; tuyệt đối không tạo/sử dụng branch chứa `code/` hoặc `codex/`. Trước thay đổi kiểm trạng thái git để giữ work người khác; không auto reset/overwrite scaffold. Search scope hẹp, CodeGraph trước khi đọc/search code nếu repo có index khả dụng; không tự index, không quét dependencies/build output.
 
 Feature slice: backend contract/schema → producer tests → client generation → CMS/Web integration → core flow demo → AC evidence → reviewer sign-off. Generated mocks không dùng để kết luận auth/network/cookie đúng; có API smoke qua deployed-like edge. File/source/visual schema change phải update cả consumer liên quan trước close sprint.
 

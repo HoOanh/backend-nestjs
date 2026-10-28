@@ -1,3 +1,5 @@
+> Execution28/10/2026: S00/S01 authorized và locally qualified; [evidence](../../../../implementation/S01-REPORT.md). Baseline scope bên dưới giữ để truy vết.
+
 # S01 — Nền tảng ba repo phục vụ core
 
 DRAFT 0.2 · Phase P01 · Release R1 · Gate chưa mở.
@@ -29,3 +31,6 @@ Effort đề xuất **12–18 person-days**, không phải số ngày lịch ho�
 - Contracts và module shell: diff sạch, CMS/Web type/build pass và route shell theo capability.
 
 Bắt buộc kiểm negative/retry/version scenarios trong JSON; có evidence AC ID, cập nhật contract/schema/reference và release compatibility nếu liên quan. Reviewer kiểm nguồn/semantic graphics, không chỉ build xanh. Ghi not_executed cho checks chưa chạy. Exit sprint không tự cho phép setup/code sprint sau khi specs sprint sau chưa được duyệt.
+
+
+Review foundation theo yêu cầu mới: [Acceptance checklist](review-amendment.json) và [báo cáo rework](../../../../implementation/FOUNDATION-REWORK.md).

@@ -1,0 +1,15 @@
+{
+  "authorization": "User review instruction 2026-10-28",
+  "scope": "Foundation rework only",
+  "preserves_original_approval_snapshot": true,
+  "hashes": {
+    "baseline/03-ARCHITECTURE.md": "5acaa948d49c63fc83abda5eb28aea7dc30a6fe8fe5dc2760898c4375fc26a13",
+    "baseline/04-SRS.md": "8fa051ce39e0d23f7dbbefff09f22d0890208b7bc0092b964ffe97afbfcba711",
+    "baseline/06-DECISIONS-APPROVAL.md": "dc37f5bed7755912043b222896a7cbc430a41aaf149baf6d805eefccb7143db8",
+    "standards/FRONTEND-DESIGN.md": "6ccfbdb9d4e57a43b6a01f1194b897c58cbec45963ca89e1949fdbc209c47cb6",
+    "standards/CODING-RULES.md": "02ef4478a4a77b076c0dcc5e6f9b7f07c602e4f58413ac47a0ddaa838299646c",
+    "implementation/FOUNDATION-REWORK.md": "5482b0b1269a1c05cef1e6bbeb28c83ede49e71decf4920870c8b32f154d11d0",
+    "implementation/compatibility-matrix.json": "72600d8b61967d45269d9b4b0bcdbd801df60095b13d666b51d112c20fcccedb",
+    "phases/P01-foundation/sprints/S01-foundation/review-amendment.json": "75c5efe060fae86a1c2f73fbe63e1dbc8ee19800765bf199632b83ed859976b6"
+  }
+}

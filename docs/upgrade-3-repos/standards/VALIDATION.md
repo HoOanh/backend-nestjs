@@ -1,3 +1,7 @@
+> Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](../implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
+
+> Update28/10/2026: validator gốc đã pass9installed copies sau khi chuẩn bị venv local. [Execution evidence](../implementation/S01-REPORT.md). Phần bên dưới là lịch sử kiểm tra tài liệu trước setup.
+
 # Kiểm tra bộ tài liệu 0.2
 
 Ngày 27/10/2026 · Chỉ document/static checks, không implementation hoặc behavioral agent trial.

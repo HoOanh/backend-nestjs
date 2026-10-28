@@ -1,0 +1,17 @@
+{
+  "authorization": "User foundation quality instruction 2026-10-28",
+  "scope": "Foundation only; no S02 feature expansion",
+  "historical_manifest": "foundation-rework-hashes.json represents the earlier rework snapshot, not current quality amendments",
+  "hashes": {
+    "README.md": "ad74054fc53daaf2e1a76ac4f1ebbd1996f47d1f27ecbf1e1d150e18185dbc9a",
+    "standards/README.md": "9c6f238f86a7125be8d80e922df8a9446718087d1cf4eb79d6d2340415620777",
+    "standards/WORKFLOW.md": "baf37a195bad1c001f25094d4a68f3d8237da8128115c25656e0250d2a6c58c3",
+    "standards/VALIDATION.md": "7d85aec1699792f83a3fe46d82536ef523d12dd943c21e2c7d1eac3c762a343d",
+    "standards/CODING-RULES.md": "476f3b783875c42bfe37adbe2e92c4e52fd10567011d605ec2f5609eaeb8d185",
+    "standards/FRONTEND-DESIGN.md": "66e69f6ade6af9f12bba337cb68a02adb460b6f7713cff6668b5f556de337201",
+    "standards/rule-templates/AGENTS.shared.md": "bb8ab6f496ccbc52c2c3dc4a31c5e05f7bc4aad5b743f665a105e063d76b696a",
+    "standards/skills/arc-foundation-quality/SKILL.md": "5fd8f40106d65e2e7a97940933f032a3a3bfde6734101d119707986d9897d8c1",
+    "implementation/FOUNDATION-QUALITY.md": "681e954e741c0661b6a78fa6ebd61561c34539a089736547ade6fd8f47150d78",
+    "implementation/S02-HANDOFF.md": "5d6f3fcb05f9b9d70224017cef4efd120d7474dc63038cc2f08f4ff4d3c810a1"
+  }
+}

@@ -2,7 +2,7 @@
   "document_id": "ARC-S00-STORIES",
   "version": "0.2",
   "status": "draft",
-  "implementation_authorized": false,
+  "implementation_authorized": true,
   "source": "../../../../user-stories.json",
   "stories": [
     {
@@ -15,8 +15,8 @@
       "sprint_id": "S00",
       "release": null,
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "documentation",
       "business_objective_ids": [
         "BO-06"
@@ -53,13 +53,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "document review + structural validation"
+        "evidence_status": "passed_local",
+        "method": "document review + structural validation",
+        "evidence_report": "implementation/S01-REPORT.md"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "authorized_for_execution",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "evidence": "ok thực hiện đi nhé; continue"
       }
     },
     {
@@ -72,8 +74,8 @@
       "sprint_id": "S00",
       "release": null,
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "documentation",
       "business_objective_ids": [
         "BO-06"
@@ -112,13 +114,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "document review + structural validation"
+        "evidence_status": "passed_local",
+        "method": "document review + structural validation",
+        "evidence_report": "implementation/S01-REPORT.md"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "authorized_for_execution",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "evidence": "ok thực hiện đi nhé; continue"
       }
     },
     {
@@ -131,8 +135,8 @@
       "sprint_id": "S00",
       "release": null,
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "documentation",
       "business_objective_ids": [
         "BO-06"
@@ -171,13 +175,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "document review + structural validation"
+        "evidence_status": "passed_local",
+        "method": "document review + structural validation",
+        "evidence_report": "implementation/S01-REPORT.md"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "authorized_for_execution",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "evidence": "ok thực hiện đi nhé; continue"
       }
     }
   ]

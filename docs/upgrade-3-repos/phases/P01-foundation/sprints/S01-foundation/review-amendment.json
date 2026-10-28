@@ -1,0 +1,85 @@
+{
+  "document_id": "ARC-S01-FOUNDATION-REVIEW",
+  "date": "2026-10-28",
+  "authorization": "Chỉ đạo bổ sung trực tiếp của ĐẠI CA: làm lại router, nền tảng, đa ngôn ngữ, brand và UI",
+  "parent_story_id": "US-004",
+  "status": "locally_qualified",
+  "checks": [
+    {
+      "id": "FW-01",
+      "request": "TanStack file-based routing trong CMS",
+      "status": "passed",
+      "evidence": [
+        "src/routes/",
+        "src/routeTree.gen.ts",
+        "e2e/smoke.spec.ts: denied private/module routes"
+      ],
+      "repositories": [
+        "arc-academy-cms"
+      ]
+    },
+    {
+      "id": "FW-02",
+      "request": "Chuẩn hoá ranh giới codebase cả 3 repo",
+      "status": "passed",
+      "evidence": [
+        "Backend Auth controllers/SessionService/AccessModule",
+        "CMS routes/app/core/modules",
+        "Web route adapters/features/core",
+        "ESLint core/controller import boundaries"
+      ],
+      "repositories": [
+        "arc-academy-backend",
+        "arc-academy-cms",
+        "arc-academy-web"
+      ]
+    },
+    {
+      "id": "FW-03",
+      "request": "Đa ngôn ngữ Việt/Anh",
+      "status": "passed",
+      "evidence": [
+        "123 translation keys/locale",
+        "API language negotiation",
+        "localized durable transactional emails",
+        "English real full-stack signup/session",
+        "shared preference and reload tests"
+      ],
+      "repositories": [
+        "arc-academy-backend",
+        "arc-academy-cms",
+        "arc-academy-web"
+      ]
+    },
+    {
+      "id": "FW-04",
+      "request": "Logo/màu MVP, copyright ARC Irobot, không nhãn nội bộ",
+      "status": "passed",
+      "evidence": [
+        "brand.manifest.json",
+        "scripts/check-product.mjs",
+        "browser footer/logo checks",
+        "visual review screenshots"
+      ],
+      "repositories": [
+        "arc-academy-cms",
+        "arc-academy-web"
+      ]
+    },
+    {
+      "id": "FW-05",
+      "request": "Áp dụng frontend-design để làm lại UI",
+      "status": "implemented_and_visually_reviewed",
+      "evidence": [
+        "standards/FRONTEND-DESIGN.md",
+        "Web learning atlas",
+        "CMS content studio",
+        "desktop/mobile screenshots"
+      ],
+      "repositories": [
+        "arc-academy-cms",
+        "arc-academy-web"
+      ]
+    }
+  ]
+}

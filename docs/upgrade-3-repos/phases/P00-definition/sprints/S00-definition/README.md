@@ -1,3 +1,5 @@
+> Execution28/10/2026: S00/S01 authorized và locally qualified; [evidence](../../../../implementation/S01-REPORT.md). Baseline scope bên dưới giữ để truy vết.
+
 # S00 — Chốt sản phẩm, specs và bộ chuẩn
 
 DRAFT 0.2 · Phase P00 · Release trước implementation · Gate chưa mở.

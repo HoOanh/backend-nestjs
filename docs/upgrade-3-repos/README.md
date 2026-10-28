@@ -1,8 +1,12 @@
+> Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
+
 # Arc Irobot Academy — kế hoạch theo phase và sprint
 
-**DRAFT 0.2 · 27/10/2026 · G0 đóng, chưa được setup hoặc code.**
+**Baseline 0.2 · S00/S01 đã được ĐẠI CA cho phép thực hiện; cập nhật28/10/2026.**
 
-Ba repo đích: **arc-academy-backend · arc-academy-cms · arc-academy-web**. Đây là tên thiết kế; chưa rename/tạo/chỉnh repo thật.
+[Đọc báo cáo S00/S01 và evidence](implementation/S01-REPORT.md). Phần mô tả chưa setup dưới đây thuộc baseline trước triển khai; trạng thái hiện hành theo báo cáo execution, không suy ra đã hoàn thành các sprint tiếp theo.
+
+Ba repo đích: **arc-academy-backend · arc-academy-cms · arc-academy-web**. Ba repo local đã được khởi tạo trên feat/foundation; chưa commit/push/remote.
 
 Trục sản phẩm: **content/tài liệu → khoá học → giáo án → bài giảng có đồ hoạ → lớp AI 1-1 → trao đổi với AI → tiến trình và cải thiện bài giảng**.
 
@@ -38,6 +42,9 @@ Bản 0.2 thay baseline 0.1; release assignment, story IDs và effort của 0.1 
 
 ## Ràng buộc trước khi làm
 
-ĐẠI CA duyệt BRD, kiến trúc, SRS, stories, specs và bộ chuẩn trước G0. Thiết kế chi tiết bổ sung cho sprint nào cũng phải được duyệt trước code sprint đó. Không tự install skill/dependency, scaffold, codegen, đổi cấu hình repo, migrate hay deploy từ yêu cầu chỉnh tài liệu này. Không commit/push tự động.
+ĐẠI CA duyệt BRD, kiến trúc, SRS, stories, specs và bộ chuẩn trước G0. Thiết kế chi tiết bổ sung cho sprint nào cũng phải được duyệt trước code sprint đó. Quyền thực hiện S00/S01 đã được cấp bằng chỉ đạo tiếp theo trong chat; không tự mở rộng thành production deployment hoặc thay scope đã chốt. Không commit/push tự động.
 
 Nguồn nội bộ: MVP `/Users/hominhoanh/Documents/source/backend-nestjs`, khảo sát HEAD `25eae35`; kế hoạch đính kèm và phản hồi scope của ĐẠI CA. Nguồn kỹ thuật/skill chính thức được ghi ở [research](standards/SKILLS-RESEARCH.md).
+
+
+Review bổ sung của ĐẠI CA: [Foundation rework — kiến trúc/i18n/brand/UI](implementation/FOUNDATION-REWORK.md).

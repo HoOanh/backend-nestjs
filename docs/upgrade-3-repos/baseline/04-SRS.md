@@ -1,6 +1,6 @@
 # SRS — yêu cầu theo phase/sprint
 
-DRAFT 0.2 · Baseline0.1 đã thay thế. Mỗi FR có story và3AC; implementation đều not_started.
+DRAFT 0.2 · Baseline0.1 đã thay thế. Mỗi FR có story và3AC; trạng thái thực thi hiện hành ở canonical stories JSON và báo cáo S01.
 
 | Requirement | Yêu cầu MUST | BO | Phase/Sprint | Release | Spec |
 |---|---|---|---|---|---|
@@ -62,4 +62,12 @@ Chưa benchmark hoặc xác nhận các ngưỡng. Sizing/hardware/active users 
 
 ## Traceability và gate
 
-Nguồn chuẩn `../user-stories.json`; mỗi sprint có bản stories đầy đủ đồng bộ. Ma trận `../TRACEABILITY.md` nối BO/BR/FR/US/SPEC/phase/sprint/AC. Chưa AC implementation nào được chạy. S00 syntax/doc checks không chứng minh sản phẩm đã implement. Spec chi tiết/DTO bổ sung vẫn cần duyệt trước source tương ứng.
+Nguồn chuẩn `../user-stories.json`; mỗi sprint có bản stories đầy đủ đồng bộ. Ma trận `../TRACEABILITY.md` nối BO/BR/FR/US/SPEC/phase/sprint/AC. S00/S01 đã có local evidence theo báo cáo; AC của các sprint sau chưa chạy. S00 syntax/doc checks không chứng minh sản phẩm đã implement. Spec chi tiết/DTO bổ sung vẫn cần duyệt trước source tương ứng.
+
+
+### Bổ sung foundation từ review 28/10/2026
+
+- UI CMS/Web VI+EN đầy đủ cho các màn hình foundation; HTML lang, metadata, nav, form, lỗi, email và copyright đồng bộ. Chuyển locale giữ pathname/query/hash; lựa chọn tồn tại sau reload và shared-origin CMS/Web.
+- API message theo Accept-Language có fallback VI, code không đổi. Email action ghi locale vào outbox; auth links và private redirects giữ locale.
+- CMS routing sinh từ files; manifest chỉ metadata; private/permission guard vẫn cần backend enforce.
+- Giữ logo MVP, palette có provenance và kiểm tra hash; copyright ARC Irobot; cấm internal delivery status/fake courses/KPI lên UI.

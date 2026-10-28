@@ -1,3 +1,5 @@
+> Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](../implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
+
 # Coding rules — dự thảo chung
 
 DRAFT 0.2 · Review trước setup, enforce trong S01 sau duyệt.
@@ -40,3 +42,11 @@ DRAFT 0.2 · Review trước setup, enforce trong S01 sau duyệt.
 - Không thêm domain ngoài core; legacy ngoài scope giữ manifest/archive decision. Không commit/push/deploy hoặc setup khi approval chưa mở.
 
 Nguồn hướng dẫn: xem SKILLS-RESEARCH.md. Các rule domain ở đây do mục tiêu sản phẩm quyết định, không gắn uy tín nguồn như bằng chứng chúng đã phù hợp runtime.
+
+
+## Foundation rework rules
+
+- Theo [FRONTEND-DESIGN](FRONTEND-DESIGN.md): logo/hash/palette từ MVP, copyright ARC Irobot, không nội bộ sprint/phase hoặc dữ liệu dựng sẵn trong UI.
+- CMS `routes` file-based, plugin code split; manifest metadata không chứa view/route factory. Web route adapters vào feature; core không import feature/route/app.
+- UI strings chỉ từ resources VI/EN có key/placeholder parity; format số/ngày qua locale. API/email action locale phải được truyền, không hardcode VI.
+- `product:check`, lint boundaries, typecheck, unit/integration/browser theo phạm vi sửa. Output generated không sửa tay; ngoại lệ tool-generated casts của TanStack không cho phép application dùng any.

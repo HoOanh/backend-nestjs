@@ -2,7 +2,7 @@
   "document_id": "ARC-S01-STORIES",
   "version": "0.2",
   "status": "draft",
-  "implementation_authorized": false,
+  "implementation_authorized": true,
   "source": "../../../../user-stories.json",
   "stories": [
     {
@@ -15,8 +15,8 @@
       "sprint_id": "S01",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"
@@ -55,13 +55,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "passed_local",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC",
+        "evidence_report": "implementation/S01-REPORT.md"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "authorized_for_execution",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "evidence": "ok thực hiện đi nhé; continue"
       }
     },
     {
@@ -74,8 +76,8 @@
       "sprint_id": "S01",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-04"
@@ -116,13 +118,18 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "passed_local",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC",
+        "evidence_report": "implementation/S01-REPORT.md",
+        "limitations": [
+          "Google credentials/live-provider qualification pending; disabled when unconfigured."
+        ]
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "authorized_for_execution",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "evidence": "ok thực hiện đi nhé; continue"
       }
     },
     {
@@ -135,8 +142,8 @@
       "sprint_id": "S01",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"
@@ -176,13 +183,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "passed_local",
+        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC",
+        "evidence_report": "implementation/S01-REPORT.md"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "authorized_for_execution",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "evidence": "ok thực hiện đi nhé; continue"
       }
     }
   ]

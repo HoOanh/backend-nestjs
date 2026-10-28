@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-28",
+  "contract_version": "0.2.0",
+  "authorized_scope": "P02/S02",
+  "authorization_quotes": [
+    "Mở P02, bắt đầu S02",
+    "Chốt giới hạn và quyền mặc định đề xuất"
+  ],
+  "human_acceptance": "pending",
+  "artifacts": {
+    "baseline/06-DECISIONS-APPROVAL.md": "75bc37c829231a7d4ab758c42e40f985430d4169da204ed23235998cd285e4e1",
+    "phases/P02-content/sprints/S02-course-documents/specs.md": "d112b55e26ecdb26c3319362dc179ec8e277a45c3b657b792bb3e808914bf064",
+    "user-stories.json": "af289bed7615c4bd996db3c477dd2b567c8908ffcda77f568f427db61f110291",
+    "sprint-index.json": "f2190d99a1867e1d459fbc50f378f6260ca6f1f05521871c972693a7859bf39e",
+    "implementation/S02-REPORT.md": "349cac8b7a3fc352f8ecb1bcc28d391b943f613d0d9f351ff26d48feacd65c1c"
+  }
+}

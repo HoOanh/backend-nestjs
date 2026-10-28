@@ -1,3 +1,5 @@
+> 28/10/2026: ĐẠI CA đã xác nhận mở P02/bắt đầu S02 và chốt default tài liệu. Xem [S02 report](S02-REPORT.md); giới hạn foundation-only phía dưới đã được thay bởi chỉ đạo mới.
+
 > Chỉ đạo mới 28/10/2026: tiếp tục hardening nền tảng; chưa mở S02. Xem [Foundation quality](FOUNDATION-QUALITY.md). Nội dung handoff bên dưới là lịch sử chuẩn bị.
 
 # Đầu vào S02

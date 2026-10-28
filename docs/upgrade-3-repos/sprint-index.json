@@ -55,12 +55,14 @@
         "S01"
       ],
       "path": "phases/P02-content/sprints/S02-course-documents",
-      "status": "draft",
+      "status": "locally_qualified",
       "story_ids": [
         "US-007",
         "US-008",
         "US-009"
-      ]
+      ],
+      "execution_report": "implementation/S02-REPORT.md",
+      "human_acceptance": "pending"
     },
     {
       "sprint_id": "S03",

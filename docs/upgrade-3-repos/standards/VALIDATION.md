@@ -1,3 +1,5 @@
+> Chỉ đạo mới28/10/2026: đã mở S02 theo xác nhận ĐẠI CA; xem [S02 report](../implementation/S02-REPORT.md). Giữ nguyên các quality gates nền tảng.
+
 > Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](../implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
 
 > Update28/10/2026: validator gốc đã pass9installed copies sau khi chuẩn bị venv local. [Execution evidence](../implementation/S01-REPORT.md). Phần bên dưới là lịch sử kiểm tra tài liệu trước setup.

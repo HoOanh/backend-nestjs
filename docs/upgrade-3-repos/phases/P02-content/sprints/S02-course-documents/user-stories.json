@@ -1,8 +1,8 @@
 {
   "document_id": "ARC-S02-STORIES",
   "version": "0.2",
-  "status": "draft",
-  "implementation_authorized": false,
+  "status": "locally_qualified",
+  "implementation_authorized": true,
   "source": "../../../../user-stories.json",
   "stories": [
     {
@@ -15,8 +15,8 @@
       "sprint_id": "S02",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -57,13 +57,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "locally_qualified",
+        "method": "real HTTP/Postgres/MinIO, isolated parser, generated-contract and full-stack Playwright",
+        "execution_report": "implementation/S02-REPORT.md",
+        "human_acceptance": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "implementation_authorized",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "scope": "Open P02/start S02; document20MiB/PDF100pages/author-only defaults; acceptance pending"
       }
     },
     {
@@ -76,8 +79,8 @@
       "sprint_id": "S02",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -117,13 +120,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "locally_qualified",
+        "method": "real HTTP/Postgres/MinIO, isolated parser, generated-contract and full-stack Playwright",
+        "execution_report": "implementation/S02-REPORT.md",
+        "human_acceptance": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "implementation_authorized",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "scope": "Open P02/start S02; document20MiB/PDF100pages/author-only defaults; acceptance pending"
       }
     },
     {
@@ -136,8 +142,8 @@
       "sprint_id": "S02",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -177,13 +183,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "locally_qualified",
+        "method": "real HTTP/Postgres/MinIO, isolated parser, generated-contract and full-stack Playwright",
+        "execution_report": "implementation/S02-REPORT.md",
+        "human_acceptance": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "implementation_authorized",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "scope": "Open P02/start S02; document20MiB/PDF100pages/author-only defaults; acceptance pending"
       }
     }
   ]

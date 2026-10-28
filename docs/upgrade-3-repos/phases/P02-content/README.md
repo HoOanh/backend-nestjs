@@ -1,3 +1,5 @@
+> 28/10/2026: ĐẠI CA đã mở P02/bắt đầu S02. Trạng thái thực thi và giới hạn tại [S02 report](../../implementation/S02-REPORT.md). Các ghi chú draft/gate cũ phía dưới là lịch sử baseline.
+
 # P02 — Content, giáo án và bài giảng đồ hoạ
 
 DRAFT 0.2 · Chưa mở gate.

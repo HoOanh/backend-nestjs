@@ -5,9 +5,9 @@
   "date": "2026-10-27",
   "status": "draft",
   "implementation_authorized": true,
-  "approval_gate": "G0_OPEN_FOR_S00_S01",
+  "approval_gate": "G0_OPEN_FOR_S00_S01_S02",
   "canonical_source": true,
-  "scope_note": "S00/S01 authorized and locally qualified; later sprint scope remains in the baseline. See implementation/S01-REPORT.md for evidence and limitations.",
+  "scope_note": "S00/S01 locally qualified; S02 explicitly authorized 2026-10-28, implemented and locally qualified, human acceptance pending. S03 onward not implemented. See implementation/S02-REPORT.md.",
   "stories": [
     {
       "id": "US-001",
@@ -389,8 +389,8 @@
       "sprint_id": "S02",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -431,13 +431,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "locally_qualified",
+        "method": "real HTTP/Postgres/MinIO, isolated parser, generated-contract and full-stack Playwright",
+        "execution_report": "implementation/S02-REPORT.md",
+        "human_acceptance": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "implementation_authorized",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "scope": "Open P02/start S02; document20MiB/PDF100pages/author-only defaults; acceptance pending"
       }
     },
     {
@@ -450,8 +453,8 @@
       "sprint_id": "S02",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -491,13 +494,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "locally_qualified",
+        "method": "real HTTP/Postgres/MinIO, isolated parser, generated-contract and full-stack Playwright",
+        "execution_report": "implementation/S02-REPORT.md",
+        "human_acceptance": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "implementation_authorized",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "scope": "Open P02/start S02; document20MiB/PDF100pages/author-only defaults; acceptance pending"
       }
     },
     {
@@ -510,8 +516,8 @@
       "sprint_id": "S02",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "locally_qualified",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -551,13 +557,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "locally_qualified",
+        "method": "real HTTP/Postgres/MinIO, isolated parser, generated-contract and full-stack Playwright",
+        "execution_report": "implementation/S02-REPORT.md",
+        "human_acceptance": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "implementation_authorized",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-28",
+        "scope": "Open P02/start S02; document20MiB/PDF100pages/author-only defaults; acceptance pending"
       }
     },
     {

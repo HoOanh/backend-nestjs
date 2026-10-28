@@ -81,4 +81,4 @@ Thanh toán không nằm trong bất cứ phase/sprint/release nào. Thi/chứng
 |Migration mất dữ liệu local/ngoài scope |Exception/provenance/archive và user communication decision |Operator/ĐẠI CA |
 |Post-write rollback mất ghi mới |Watermark/delta/reconcile hoặc roll-forward runbook |Operator |
 
-Mọi sprint còn Pending. Báo cáo cuối sprint phải dẫn AC evidence thay vì chỉ đánh dấu done. Source-of-truth [user-stories.json](user-stories.json) và [sprint-index.json](sprint-index.json) phải đồng bộ với per-sprint copies.
+S00/S01 đã qualified local; S02 được ĐẠI CA mở28/10/2026 và đã triển khai/qualified local, human acceptance pending; S03 trở đi chưa implementation. Xem [S02 report](implementation/S02-REPORT.md). Báo cáo cuối sprint phải dẫn AC evidence thay vì chỉ đánh dấu done. Source-of-truth [user-stories.json](user-stories.json) và [sprint-index.json](sprint-index.json) phải đồng bộ với per-sprint copies.

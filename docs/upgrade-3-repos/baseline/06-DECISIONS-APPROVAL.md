@@ -18,7 +18,7 @@ Xác nhận các ý scope trên không phải duyệt toàn bộ thiết kế ho
 |---|---|---|---|
 | D-01 |Definition và release scope |R1 core flow pilot/S01–06, R2 depth/S07–09, R3 production/S10–11;1-1 là AI |Pending |
 | D-02 |Data/infra/versions |Postgres/Prisma candidate, MinIO/S3, Redis; Node24 candidate và compatibility matrix |Pending |
-| D-03 |Nguồn tài liệu |PDF text/DOCX/MD/TXT R1; scanned PDF báo needs_ocr, OCR tự động chưa xếp sprint; limit và confidentiality policy |Pending |
+| D-03 |Nguồn tài liệu |PDF text/DOCX/MD/TXT R1; scanned PDF báo needs_ocr, OCR tự động chưa xếp sprint; limit và confidentiality policy |Limits/default visibility approved28/10; retention/confidentiality pending |
 | D-04 |Đồ hoạ |Typed diagram/image/whiteboard storyboard R1, advanced3D preset studio R2; không arbitrary code |Pending |
 | D-05 |AI/voice và ngân sách vận hành |Provider text/image capabilities, model/voice rights, quota numbers, fallback server TTS; text always available |Pending |
 | D-06 |Review/governance |Reviewer khác author; citation/hash/version rules; emergency waiver có audit, không waive structural errors |Pending |
@@ -41,3 +41,7 @@ Chưa đo production traffic, chưa chạy compatibility/performance spike, chư
 ## Chỉ đạo bổ sung được thực hiện — 28/10/2026
 
 ĐẠI CA yêu cầu trực tiếp sửa nền tảng 3 source: CMS TanStack file-based; đa ngôn ngữ; logo/màu MVP; copyright ARC Irobot; bỏ nhãn nội bộ khỏi UI; áp dụng frontend-design. Đây là authorization cho scope rework này, không suy ra authorization các sprint sau. Quyết định và bằng chứng ở [FOUNDATION-REWORK](../implementation/FOUNDATION-REWORK.md).
+
+## Mở P02 / S02 — 28/10/2026
+
+ĐẠI CA xác nhận trực tiếp **“Mở P02, bắt đầu S02”**, sau đó **“Chốt giới hạn và quyền mặc định đề xuất”**: tài liệu tối đa20 MiB, PDF100trang, mặc định author-only; student-readable phải được gắn rõ và qua review. Không gửi nguồn tới AI, không tự OCR. Đây là quyền implementation S02, thay giới hạn “chưa mở S02” của các ghi chú foundation trước đó. S03/S04 chưa được triển khai trong đợt này; không có quyền commit/push/deploy. Retention/confidentiality/source-rights ngoài default quyền trên vẫn cần quyết định khi có dữ liệu thật. Xem [S02 report](../implementation/S02-REPORT.md) và [execution contract](../phases/P02-content/sprints/S02-course-documents/specs.md).

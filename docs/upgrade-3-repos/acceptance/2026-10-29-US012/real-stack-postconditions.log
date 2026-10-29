@@ -1,0 +1,14 @@
+## full-stack run 2026-10-29T16:20:39Z
+plan=99552141-8441-468d-880a-ba90036d4ec5
+-[ RECORD 1 ]+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+state        | approved
+planVersion  | 2
+contentHash  | 8c2564be252e11d8e70dabeaed6c352f472c1e03e2b7612f0fa5a50a6f3bb13a
+decided_by   | reviewer.us012@arc.local
+decisionNote | 
+dispositions | [{"ref": "167154fe-7e40-452b-ab0a-dfd79d266f7c", "note": "Nguồn và mục tiêu đã đối chiếu; bổ sung phần giảng ở bản sau.", "path": "objectives.1", "rule": "objective_trace_incomplete"}]
+
+teaching.plan.create|1
+teaching.plan.review.approve|1
+teaching.plan.review.submit|1
+teaching.plan.save|1

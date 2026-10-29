@@ -58,9 +58,22 @@ Chi tiết log: [backend-quality.log](backend-quality.log), [cms-quality.log](cm
 - `src/modules/teaching-plans/views/PlanReviewPanel.test.tsx` (4 test): submit, waive bắt buộc, reject note, stale badge.
 - `e2e/plan-review.spec.ts` (5 test): author submit, reviewer approve sau disposition, queue mở plan, stale + chặn editor vào queue, mobile 390px không tràn.
 
+
+## Full-stack thật (local, bổ sung sau khi commit)
+
+Chạy thêm một lượt UI → API → Postgres thật trên máy local, không dùng fixture:
+
+- Seed local: editor `editor.us012@arc.local`, reviewer `reviewer.us012@arc.local`, course/bài/tài liệu ready + span gắn bài, plan version 2 có 1 cảnh báo `objective_trace_incomplete`.
+- Editor đăng nhập bằng mật khẩu thật, mở plan, bấm **Gửi duyệt** → panel “Đang chờ duyệt”.
+- Reviewer đăng nhập tài khoản riêng, mở **Duyệt giáo án**, vào plan từ queue, bấm duyệt khi chưa ghi lý do → UI chặn; ghi lý do → duyệt thành công, panel “Đã duyệt”.
+- DB read-only sau chạy: `state=approved`, `planVersion=2`, `contentHash=8c2564be…b13a`, `decided_by=reviewer.us012@arc.local`, disposition lưu đúng rule/path/ref/note; audit có `teaching.plan.review.submit|approve`, `teaching.plan.create|save`.
+- Ảnh: [real-author-pending.png](real-author-pending.png), [real-reviewer-approved.png](real-reviewer-approved.png). Log DB: [real-stack-postconditions.log](real-stack-postconditions.log).
+
+Giới hạn: script chạy full-stack là script tạm trong `.local` (không commit), dùng tài khoản seed local; không phải production và không thay thế human sign-off.
+
 ## Giới hạn / chưa chứng minh
 
-- Browser test dùng HTTP fixture có state, không chạy với backend/Postgres thật trong flow UI; backend e2e mới là bằng chứng HTTP/Postgres thật.
+- Bộ Playwright đã commit dùng HTTP fixture; flow UI full-stack thật chỉ chạy thêm một lượt local (script tạm, không commit) như mục trên. Backend e2e vẫn là bằng chứng HTTP/Postgres tái lập được.
 - Chưa có con người thật đóng vai reviewer ký nghiệm thu nội dung/kiến thức (human sign-off vẫn pending). Đây là workflow review, không phải biên bản review nội dung.
 - CMS application coverage còn thấp; không đánh dấu toàn bộ UI đã được coverage.
 - Chưa commit/push/deploy; chưa chạy production migration. Không có publish giáo án; approval chưa được dùng bởi một publish endpoint vì S03 không mở publish.

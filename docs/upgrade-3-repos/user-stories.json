@@ -764,7 +764,7 @@
       ],
       "verification": {
         "evidence_status": "local_verified",
-        "method": "116 backend tests incl. real HTTP/Postgres review e2e; 68 CMS unit tests; 31/31 browser fixture incl. 5 US-012 scenarios; OpenAPI/Bruno/CMS codegen drift",
+        "method": "116 backend tests incl. real HTTP/Postgres review e2e; 68 CMS unit tests; 31/31 browser fixture; one real local UI→API→Postgres run (editor submit, independent reviewer approve, DB postconditions); OpenAPI/Bruno/CMS codegen drift",
         "evidence_path": "acceptance/2026-10-29-US012/REPORT.md",
         "human_signoff": "pending"
       },

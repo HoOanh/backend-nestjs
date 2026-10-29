@@ -1,4 +1,4 @@
-> Cập nhật30/10/2026 (lượt4): US-013 xong; US-014 xong backend + CMS beat editor + Web narration clock (DOM test pause/resume). US-015 chưa bắt đầu; S04 chưa đóng.
+> Cập nhật30/10/2026 (lượt5): US-013 xong; US-014 xong backend/CMS/Web clock. US-015 mới xong **backend package/approve/publish/preview exchange/public projection**; CMS publish UI và Web learner package render chưa có. S04 chưa đóng.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
@@ -60,3 +60,12 @@ Không tuyên bố S04 exit.
 | AC-014-03 | PASS local | Pause/resume dùng elapsed, DOM test không lệch sau pause |
 
 Giới hạn: narration clock là clock mô phỏng (chưa nối TTS/audio thật); chưa có browser E2E real; reduced-motion chỉ kiểm bằng code path, chưa screenshot.
+
+## US-015 — backend package/publish slice (partial)
+
+- Bảng `lecture_package`, `lecture_publication`, `preview_exchange`; package pins plan/visual/document revision + hashes, chỉ tạo khi plan approval valid.
+- Endpoint staff: create/list/read/approve/publish/preview-exchanges; public: published lesson package, redeem exchange one-time.
+- Publish transaction: pointer publication + state package + audit + outbox `lecture.published`; idempotent cùng package (không tạo publication/outbox trùng); creator không tự publish, approve cần reviewer độc lập.
+- Public snapshot không chứa answer key/private source text; exchange hết hạn/đã dùng/draft trả404.
+- Test `test/lectures.e2e-spec.ts` 3; backend128 tests.
+- **Chưa làm**: CMS publish/review UI, Web learner render package đã publish, worker cache invalidation retry (AC-015-03 mới partial), preview external frame.

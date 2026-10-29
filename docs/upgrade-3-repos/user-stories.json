@@ -911,8 +911,8 @@
       "sprint_id": "S04",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "in_progress",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-03"
@@ -954,8 +954,10 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "partial_backend_verified",
+        "method": "Backend package/approve/publish/preview exchange/public projection + 128 tests; CMS publish UI and Web learner package render not implemented; worker retry not executed",
+        "evidence_path": "acceptance/2026-10-29-S04-US015/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
         "status": "pending",

@@ -1,0 +1,300 @@
+{
+  "date": "2026-10-29",
+  "startTime": "2026-10-29T02:16:25.048Z",
+  "durationMs": 46590.033,
+  "revisions": {
+    "arc-academy-backend": "329f175",
+    "arc-academy-cms": "3ea928f",
+    "arc-academy-web": "2a4d378"
+  },
+  "results": [
+    {
+      "id": "TC01",
+      "title": "Đăng nhập thật và thư viện trống",
+      "actor": "Editor, reviewer, admin, support, học viên",
+      "ac": [
+        "Foundation auth",
+        "AC-007-01"
+      ],
+      "precondition": "Tài khoản local ACTIVE, password đã hash, staff chưa enroll MFA; không inject session.",
+      "steps": [
+        "Nhập mật khẩu sai và xác nhận HTTP 401.",
+        "Nhập mật khẩu đúng; trước MFA gọi /auth/me phải 401.",
+        "Nhập TOTP sai rồi TOTP đúng; lưu recovery codes mà không đưa vào bằng chứng.",
+        "Đăng nhập qua UI cho các vai trò và mở thư viện trống."
+      ],
+      "expected": "Password/TOTP sai bị từ chối; staff chỉ có session sau MFA; access cookie HttpOnly; empty state đúng, UI sáng ở OS dark.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 5182,
+      "screenshots": [
+        "images/TC01-login-invalid-password.png",
+        "images/TC01-mfa-rejected-secret-masked.png",
+        "images/TC01-cms-empty-desktop.png",
+        "images/TC01-cms-empty-mobile.png",
+        "images/TC01-learner-empty-desktop.png"
+      ],
+      "actual": "7 actor đăng nhập qua UI; password sai401, TOTP sai401, me401 trước MFA; session staff chỉ được cấp sau MFA và cookie HttpOnly."
+    },
+    {
+      "id": "TC02",
+      "title": "Cây khoá học, autosave và reorder",
+      "actor": "Editor",
+      "ac": [
+        "AC-007-01",
+        "AC-007-02"
+      ],
+      "precondition": "Editor đã đăng nhập và chưa có khoá học.",
+      "steps": [
+        "Nhập slug không hợp lệ và kiểm nút tạo bị vô hiệu.",
+        "Tạo khoá; sửa chủ đề, mô tả, chương, bài và mục tiêu.",
+        "Chờ trạng thái Đã lưu rồi đọc lại dữ liệu API.",
+        "Đưa chương thứ hai lên đầu; thêm rồi xoá một chương đã autosave.",
+        "Kiểm ảnh 1440px và 390px."
+      ],
+      "expected": "Metadata/thứ tự/ID đúng trên DB; xoá node có ACK; không mất cây; mobile không tràn ngang.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 7272,
+      "screenshots": [
+        "images/TC02-course-tree-desktop.png",
+        "images/TC02-course-tree-mobile.png"
+      ],
+      "actual": "2 chương được lưu; chương thứ hai lên đầu giữ đúng ID; node mới đã autosave được xoá có ACK; 390px không tràn."
+    },
+    {
+      "id": "TC03",
+      "title": "Upload MD/TXT/PDF/DOCX và truy nguồn",
+      "actor": "Editor",
+      "ac": [
+        "AC-008-01",
+        "AC-009-01",
+        "AC-009-03"
+      ],
+      "precondition": "Khoá có ít nhất một bài; MinIO private và dispatcher hoạt động.",
+      "steps": [
+        "Chọn từng file Markdown, TXT, PDF text hai trang và DOCX hai đoạn qua input thật.",
+        "Chờ pipeline ready và so SHA-256 với bytes file gốc.",
+        "Kiểm PDF có page 1/2; DOCX có page=null.",
+        "Kiểm chuỗi script trong Markdown hiển thị như văn bản, không chạy.",
+        "Chụp source viewer từng định dạng và thư viện desktop/mobile."
+      ],
+      "expected": "Bốn định dạng ready; hash/citation đúng; không bịa số trang DOCX; nội dung không thực thi HTML/script.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 6843,
+      "screenshots": [
+        "images/TC03-md-source.png",
+        "images/TC03-txt-source.png",
+        "images/TC03-pdf-source.png",
+        "images/TC03-docx-source.png",
+        "images/TC03-library-desktop.png",
+        "images/TC03-library-mobile.png"
+      ],
+      "actual": "MD/TXT/PDF/DOCX đều ready; SHA-256 trùng file gốc; PDF page1/2, DOCX page=null; script hiển thị như text, không chạy."
+    },
+    {
+      "id": "TC04",
+      "title": "Tệp không hợp lệ và trạng thái extraction lỗi",
+      "actor": "Editor",
+      "ac": [
+        "AC-008-02",
+        "AC-009-02"
+      ],
+      "precondition": "Các fixture định dạng sai, >20MiB, scan, PDF101trang và DOCX expansion được chuẩn bị local.",
+      "steps": [
+        "Chọn .exe và file 20MiB+1, kiểm upload bị chặn trên UI.",
+        "Upload binary giả TXT và kiểm finalize 400.",
+        "Upload PDF không có text; đợi needs_ocr và spans rỗng.",
+        "Upload PDF101trang và DOCX expansion; đợi failed."
+      ],
+      "expected": "Không có ready giả; file quá giới hạn/ngoài allowlist bị chặn; MIME giả bị cách ly; scan yêu cầu OCR; parser từ chối dữ liệu nguy hiểm.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 7326,
+      "screenshots": [
+        "images/TC04-unsupported-file.png",
+        "images/TC04-oversized-file.png",
+        "images/TC04-quarantined-forged-mime.png",
+        "images/TC04-upload-rejected-english-mobile.png",
+        "images/TC04-needs-ocr.png",
+        "images/TC04-pdf-page-limit.png",
+        "images/TC04-docx-expansion-rejected.png"
+      ],
+      "actual": "EXE và20MiB+1 bị chặn trên UI; binary giả TXT finalize400; scan needs_ocr/spans0; PDF101trang và DOCX expansion failed. UX-01 đã sửa và regression VI/EN mobile PASS."
+    },
+    {
+      "id": "TC05",
+      "title": "Scope và reviewer độc lập",
+      "actor": "Editor khác, support, reviewer, admin, học viên chưa được cấp quyền, anonymous",
+      "ac": [
+        "AC-007-01",
+        "AC-008-01",
+        "AC-008-02"
+      ],
+      "precondition": "Có revision MD công khai cho học viên và TXT author-only; chưa publish/assign.",
+      "steps": [
+        "Gắn MD student-readable, TXT author-only.",
+        "Editor publish bị 403; admin tự publish khoá do mình tạo cũng bị 403.",
+        "Editor khác mở URL cùng khoá bị từ chối; support bị route guard chặn.",
+        "Reviewer mở form read-only và publish thành công.",
+        "Admin cấp assignment; anonymous đọc catalog nhưng không đọc tài liệu; học viên ngoài assignment bị 404."
+      ],
+      "expected": "Backend enforce role/ownership; reviewer khác tác giả; nguồn riêng không lọt vào learner projection.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 3307,
+      "screenshots": [
+        "images/TC05-foreign-editor-denied.png",
+        "images/TC05-role-guard.png",
+        "images/TC05-reviewer-readonly-desktop.png",
+        "images/TC05-published-by-reviewer.png",
+        "images/TC05-published-catalog-desktop.png"
+      ],
+      "actual": "Editor publish403, admin self-review403; editor ngoài scope bị chặn, support đi forbidden; reviewer publish200; anonymous401 và học viên ngoài assignment404 khi đọc nguồn."
+    },
+    {
+      "id": "TC06",
+      "title": "Học viên đọc và tải đúng nguồn đã duyệt",
+      "actor": "Học viên được cấp assignment",
+      "ac": [
+        "AC-008-01",
+        "AC-008-02",
+        "AC-009-01"
+      ],
+      "precondition": "Khoá đã được reviewer publish và assignment active.",
+      "steps": [
+        "Đi từ dashboard tới khoá và bài học.",
+        "Kiểm nguồn MD hiển thị, nguồn TXT riêng không xuất hiện.",
+        "Dùng bàn phím chuẩn bị download; tải thực file signed URL và đối chiếu SHA-256.",
+        "Gọi URL download revision riêng phải 404.",
+        "Kiểm desktop, mobile390, tablet820, EN và reload."
+      ],
+      "expected": "Bytes bản gốc đúng hash; Content-Disposition attachment; citation giữ nguyên; script không thực thi; VI/EN và layout đúng.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 2181,
+      "screenshots": [
+        "images/TC06-learner-course-desktop.png",
+        "images/TC06-learner-source-desktop.png",
+        "images/TC06-learner-source-mobile.png",
+        "images/TC06-learner-source-tablet.png",
+        "images/TC06-learner-source-english.png"
+      ],
+      "actual": "Signed original trả200 và Content-Disposition attachment, SHA-256 trùng revision1; nguồn TXT author-only không hiển thị và download404; VI/EN, keyboard,390/820px đạt."
+    },
+    {
+      "id": "TC07",
+      "title": "Revision mới không phá snapshot đã xuất bản",
+      "actor": "Editor và học viên",
+      "ac": [
+        "AC-008-03",
+        "AC-009-03"
+      ],
+      "precondition": "Học viên đã đọc revision1 đã publish.",
+      "steps": [
+        "Qua UI thêm revision2 cho cùng document và đợi ready.",
+        "Gỡ working attachment qua API thật với If-Match.",
+        "Yêu cầu xoá document phải 409.",
+        "Reload learner: vẫn đọc revision1, không đọc revision2.",
+        "Replay finalize revision1 và kiểm version/số span không đổi."
+      ],
+      "expected": "Bản gốc và publication pins bất biến; source update không tự thay nội dung đã duyệt; replay không duplicate span/revision.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 2652,
+      "screenshots": [
+        "images/TC07-source-revision-two-draft.png",
+        "images/TC07-published-source-still-revision-one.png"
+      ],
+      "actual": "Revision2 ready nhưng học viên vẫn đọc revision1 sau detach draft; xoá document409; replay finalize200 giữ version1/số spans."
+    },
+    {
+      "id": "TC08",
+      "title": "Lộ trình CRUD và thứ tự milestone",
+      "actor": "Editor",
+      "ac": [
+        "AC-007-01",
+        "AC-007-02"
+      ],
+      "precondition": "Khoá và lesson tồn tại, thuộc editor.",
+      "steps": [
+        "Tạo lộ trình, thêm milestone toàn khoá và milestone lesson.",
+        "Chuyển milestone lesson lên trước rồi lưu.",
+        "Mở chỉnh sửa, xem desktop/mobile, cập nhật tiêu đề.",
+        "Đọc API kiểm thứ tự rồi xoá lộ trình qua UI."
+      ],
+      "expected": "ID/ref/order đúng; save/update/delete có ACK; không tràn ngang mobile.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 657,
+      "screenshots": [
+        "images/TC08-roadmap-desktop.png",
+        "images/TC08-roadmap-mobile.png"
+      ],
+      "actual": "2 milestone được reorder, tạo/cập nhật/xoá qua UI có ACK200; API xác nhận lesson milestone ở đầu; mobile390px không tràn."
+    },
+    {
+      "id": "TC09",
+      "title": "Offline, reconnect, conflict và export draft",
+      "actor": "Hai trang cùng tài khoản editor",
+      "ac": [
+        "AC-007-03"
+      ],
+      "precondition": "Hai editor đang đọc cùng version; có quyền lưu.",
+      "steps": [
+        "Chuyển context browser offline và đổi tiêu đề.",
+        "Kiểm thông báo chưa lưu và DB không đổi; reconnect và chờ ACK.",
+        "Mở hai trang cùng version; trang1 lưu trước, trang2 lưu sau.",
+        "Kiểm 412; tải export JSON và đối chiếu tiêu đề local.",
+        "Bấm chuyển route; kiểm blocker rồi chọn tiếp tục chỉnh sửa."
+      ],
+      "expected": "Offline không báo saved giả; reconnect lưu; stale không overwrite DB; draft/export được giữ; navigation cần lựa chọn rõ.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 5076,
+      "screenshots": [
+        "images/TC09-offline-draft.png",
+        "images/TC09-conflict-preserves-draft.png",
+        "images/TC09-unsaved-navigation-blocker.png"
+      ],
+      "actual": "Offline giữ local title và DB không đổi; reconnect có ACK; phiên stale412 giữ draft; export JSON đúng local title và navigation blocker hoạt động."
+    },
+    {
+      "id": "TC10",
+      "title": "Thu hồi quyền có hiệu lực",
+      "actor": "Admin và học viên",
+      "ac": [
+        "AC-008-02"
+      ],
+      "precondition": "Assignment từng active và học viên đang có session.",
+      "steps": [
+        "Admin revoke assignment qua API thật.",
+        "Học viên dùng session cũ gọi documents và mở URL lesson.",
+        "Gọi internal audience bằng student cookie.",
+        "Kiểm ledger không có API 5xx hoặc JavaScript pageerror ngoài dự kiến."
+      ],
+      "expected": "API documents404 và internal401. UI not-found, không còn nội dung nguồn, có robots noindex; HTML stream có thể200 theo Next.js. Không có JS exception/API5xx ngoài dự kiến. Signed URL đã cấp trước đó vẫn có TTL tối đa60giây.",
+      "priority": "P1",
+      "status": "PASS",
+      "durationMs": 5195,
+      "screenshots": [
+        "images/TC10-assignment-revoked.png"
+      ],
+      "actual": "Revoke200; documents404, internal401; UI not-found/noindex và source text vắng mặt. HTML streaming200; browser pageerror0."
+    }
+  ],
+  "browserErrors": [],
+  "auth": "Real UI login; password + TOTP MFA; no session-cookie injection; no HTTP response mocks",
+  "revocationObservation": {
+    "htmlStatus": 200,
+    "noindex": true,
+    "sourceAbsent": true
+  },
+  "openUxFindings": 0,
+  "summary": {
+    "pass": 10,
+    "fail": 0,
+    "notExecuted": 0
+  }
+}

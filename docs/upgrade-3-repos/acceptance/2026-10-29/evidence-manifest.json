@@ -1,0 +1,240 @@
+{
+  "date": "2026-10-29",
+  "revisions": {
+    "arc-academy-backend": "329f175",
+    "arc-academy-cms": "3ea928f",
+    "arc-academy-web": "2a4d378"
+  },
+  "summary": {
+    "pass": 10,
+    "fail": 0,
+    "notExecuted": 0
+  },
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 6014,
+      "sha256": "6d428a957b2dbf478e32d66a2c49970eebf5e1ce822aafe55666b3b12522fba4"
+    },
+    {
+      "path": "index.html",
+      "bytes": 23733,
+      "sha256": "742197308c44c0960cd73b8cd5cd6f4218be79b61494fafa957edea07208a92b"
+    },
+    {
+      "path": "test-cases.csv",
+      "bytes": 9631,
+      "sha256": "631517348a7a166a3f99ce69a1b50b68bde8f69aefc4eb9e5aaacb0c6e97ddc0"
+    },
+    {
+      "path": "test-results.json",
+      "bytes": 13527,
+      "sha256": "ea8ca8c7296f1cac08939528b25780ff708f826f3e2d3eca2867e297d22438d3"
+    },
+    {
+      "path": "run-metadata.json",
+      "bytes": 16985,
+      "sha256": "938227e54eb01b825989af6c906496f06755158341d910709f5c88a1fb91b0da"
+    },
+    {
+      "path": "FINDINGS.md",
+      "bytes": 3370,
+      "sha256": "25958da660704a214e4c72d16233fdbdf70def8487922f7ff1cd99c5e4d3fa7c"
+    },
+    {
+      "path": "supplementary-checks.json",
+      "bytes": 754,
+      "sha256": "9fabad2db825ebcf190a13f6e458582f601df13ea99f5e0ed5dd73dc7f75a7de"
+    },
+    {
+      "path": "images/TC01-login-invalid-password.png",
+      "bytes": 62288,
+      "sha256": "41f990fa21ca9685fd0e952649298bc3af2a769d0794a71f15247ae5f18284a2"
+    },
+    {
+      "path": "images/TC01-mfa-rejected-secret-masked.png",
+      "bytes": 63395,
+      "sha256": "f3d03970f430600886c0369b9738c323ac40b90061cb8c74b91b553d4e1b55ba"
+    },
+    {
+      "path": "images/TC01-cms-empty-desktop.png",
+      "bytes": 83591,
+      "sha256": "be67ec1b81aae87627ef278f9566b79bff0f638cfdebfa45558de02311315d98"
+    },
+    {
+      "path": "images/TC01-cms-empty-mobile.png",
+      "bytes": 59348,
+      "sha256": "971343ca7aaac72eb766ab2beff8f1b4b5a856377ee3d79f4d7d4f1ab83de18f"
+    },
+    {
+      "path": "images/TC01-learner-empty-desktop.png",
+      "bytes": 8060,
+      "sha256": "140b7b35578c650bd8a3827bbcf637bd081da873dfb90c5fad1e6549f532a542"
+    },
+    {
+      "path": "images/TC02-course-tree-desktop.png",
+      "bytes": 203030,
+      "sha256": "17eaf237b3b631db26b285c9a2ccfbcb59626d0dc51de4ac569388ff23a4e468"
+    },
+    {
+      "path": "images/TC02-course-tree-mobile.png",
+      "bytes": 175592,
+      "sha256": "2587909a5124b042fc7a14a06bb3cefef704a1f05f991eb82d2eb5ff02c66760"
+    },
+    {
+      "path": "images/TC03-md-source.png",
+      "bytes": 257643,
+      "sha256": "8ce0fb7a68596ce832250e57d73d27144de935c3f94635d8a2e5a3224da81ca4"
+    },
+    {
+      "path": "images/TC03-txt-source.png",
+      "bytes": 256377,
+      "sha256": "155860938b10f8ea1674e5ca86a49e240d598239571c5f4ec3f187a5599ce203"
+    },
+    {
+      "path": "images/TC03-pdf-source.png",
+      "bytes": 254322,
+      "sha256": "0cd44b741d0775010669a84ffe4774d6599ca845655ce7a30f136d85220f0a18"
+    },
+    {
+      "path": "images/TC03-docx-source.png",
+      "bytes": 273239,
+      "sha256": "bb126b7c28c2ec42fcb62301c02bd62b71a23ce9af240a82045507e8d31e47ad"
+    },
+    {
+      "path": "images/TC03-library-desktop.png",
+      "bytes": 270842,
+      "sha256": "252aa190e56d0edeb2055a5045b93385e293abd87bb1719eed95639c3c42ef28"
+    },
+    {
+      "path": "images/TC03-library-mobile.png",
+      "bytes": 244004,
+      "sha256": "0b79102635b210afdfc50683864be502a051dbbe3791e0ab00ae4cf5d6d9772f"
+    },
+    {
+      "path": "images/TC04-unsupported-file.png",
+      "bytes": 276023,
+      "sha256": "bcdc56d762abf6d76e7a238e6a64c29214c05b77c06f49524ffb4b4e63e30687"
+    },
+    {
+      "path": "images/TC04-oversized-file.png",
+      "bytes": 275905,
+      "sha256": "7295083ed6aa7e9915c4fe0522aebf3ebc285ca90bf6e434eee78c9f6d43870d"
+    },
+    {
+      "path": "images/TC04-quarantined-forged-mime.png",
+      "bytes": 195124,
+      "sha256": "327d548e767150bb1b39a50bddaffe7717737bb1f9971579601231147421c26a"
+    },
+    {
+      "path": "images/TC04-upload-rejected-english-mobile.png",
+      "bytes": 188036,
+      "sha256": "156eaafc16f005b2c566d4f962b46104919653ad4eb06a9dd7e7d5944652bca6"
+    },
+    {
+      "path": "images/TC04-needs-ocr.png",
+      "bytes": 258564,
+      "sha256": "d0611ac00663d782e5f2c709a4890c17ee077ad9188f6c10ca1d9aebc13a2645"
+    },
+    {
+      "path": "images/TC04-pdf-page-limit.png",
+      "bytes": 263211,
+      "sha256": "052068bab52be52a8c54115b965e6600d28ba1ad243c9c3eaaae27926a6626b4"
+    },
+    {
+      "path": "images/TC04-docx-expansion-rejected.png",
+      "bytes": 267424,
+      "sha256": "9425faba7caf98c8fba902dcbbd397332b1ac5f06babed2f15fdf7cb15545d2a"
+    },
+    {
+      "path": "images/TC05-foreign-editor-denied.png",
+      "bytes": 53135,
+      "sha256": "8a61cfa23ac023f46b0679a81ba1a1298a3760d842933de7d744b52d965bb6ec"
+    },
+    {
+      "path": "images/TC05-role-guard.png",
+      "bytes": 15366,
+      "sha256": "46123f8a078ac193b93250d53d67748c87ed0e757a4e8210854e7f2e1748532f"
+    },
+    {
+      "path": "images/TC05-reviewer-readonly-desktop.png",
+      "bytes": 229409,
+      "sha256": "3b677ec107c167d3aed93704b7622f531e88484261e3bef94ac657ec870865ed"
+    },
+    {
+      "path": "images/TC05-published-by-reviewer.png",
+      "bytes": 234235,
+      "sha256": "760fba409e2fda5981f9386afb43a3a713a0b35b1b77cf35a23bdae8b3851f91"
+    },
+    {
+      "path": "images/TC05-published-catalog-desktop.png",
+      "bytes": 380182,
+      "sha256": "18e698209cc2a82495554c95895dd6dad2a1512303e4096e875ab21d54f66f98"
+    },
+    {
+      "path": "images/TC06-learner-course-desktop.png",
+      "bytes": 88270,
+      "sha256": "12585fb0fd7e5abb22a241b4f005ba2805d83ebaa10530249411da46457ed9ea"
+    },
+    {
+      "path": "images/TC06-learner-source-desktop.png",
+      "bytes": 92945,
+      "sha256": "2dad9a74746faa8f6927f86b576e03afe77b1d2bd6714a609187195edc3135e5"
+    },
+    {
+      "path": "images/TC06-learner-source-mobile.png",
+      "bytes": 81669,
+      "sha256": "340b6e2e3ff986030639a087c727c827d7d1575cc7bda5ef4dd39758376920ad"
+    },
+    {
+      "path": "images/TC06-learner-source-tablet.png",
+      "bytes": 88916,
+      "sha256": "e55accb0f86b1df2e4af0ff5b306d54f01ef8042a5bfe770f4af6010848994fc"
+    },
+    {
+      "path": "images/TC06-learner-source-english.png",
+      "bytes": 85379,
+      "sha256": "54b52bd54718603ed83efde795bd649f4b7fba9e79e6cb5e24901822f2643209"
+    },
+    {
+      "path": "images/TC07-source-revision-two-draft.png",
+      "bytes": 306629,
+      "sha256": "f53e1fb5896b5b64b74a4b84107c5663f8a02c2ba8208619abbd93c77bff778f"
+    },
+    {
+      "path": "images/TC07-published-source-still-revision-one.png",
+      "bytes": 85325,
+      "sha256": "5a0e144d82e40eae392b7ab69163430eca09e5b86fbd3fdc348eec3a6431a901"
+    },
+    {
+      "path": "images/TC08-roadmap-desktop.png",
+      "bytes": 100630,
+      "sha256": "b2e1456a19e6f1705615aea79faaf0c55319ca2f0d24c5af7d4fabd01224521a"
+    },
+    {
+      "path": "images/TC08-roadmap-mobile.png",
+      "bytes": 78895,
+      "sha256": "07b862894e0a5f6bb3602c043703a43dc851e38f5970de5aa8fbc0dcfb09f856"
+    },
+    {
+      "path": "images/TC09-offline-draft.png",
+      "bytes": 247661,
+      "sha256": "c31c0a3632b4c8f7852ffb94588cc4a996c8755e100df539b524f73ea076e306"
+    },
+    {
+      "path": "images/TC09-conflict-preserves-draft.png",
+      "bytes": 262113,
+      "sha256": "61065cd57b6c6a3dc072a803a10d5c1daa16ee4302fcb85cee6573a4a0adf10a"
+    },
+    {
+      "path": "images/TC09-unsaved-navigation-blocker.png",
+      "bytes": 279699,
+      "sha256": "99e2ce8329c68faedafa30272a412b833802f96f02835f4177f54a3a24b2f375"
+    },
+    {
+      "path": "images/TC10-assignment-revoked.png",
+      "bytes": 12704,
+      "sha256": "02f6cf424bd0ca527cfdad50db900cabcc00e22b417f89e5d8737596cbb859a1"
+    }
+  ]
+}

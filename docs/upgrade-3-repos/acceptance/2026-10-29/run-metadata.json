@@ -1,0 +1,635 @@
+{
+  "date": "2026-10-29",
+  "runId": "e288e51b-ec5c-4117-8b7c-82fe3ca32706",
+  "courseId": "d38ab61e-19bf-42f5-a208-521abf478fcd",
+  "lessonId": "76a9e027-9cd1-493c-91df-a1c9586998ac",
+  "browserErrors": [],
+  "revocationObservation": {
+    "htmlStatus": 200,
+    "noindex": true,
+    "sourceAbsent": true
+  },
+  "receipts": [
+    {
+      "method": "GET",
+      "path": "/api/i/v1/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/courses",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/158037ff-44a8-4ac0-b845-c9dfec54e7aa/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/158037ff-44a8-4ac0-b845-c9dfec54e7aa/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/158037ff-44a8-4ac0-b845-c9dfec54e7aa/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/e03eb5ed-ea1d-4a19-b6dd-5c2106177d2d/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/e03eb5ed-ea1d-4a19-b6dd-5c2106177d2d/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/e03eb5ed-ea1d-4a19-b6dd-5c2106177d2d/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/eea6c841-857a-40c3-8431-6881674ee7d4/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/eea6c841-857a-40c3-8431-6881674ee7d4/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/eea6c841-857a-40c3-8431-6881674ee7d4/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/eea6c841-857a-40c3-8431-6881674ee7d4/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/c54edf48-04bf-4105-a325-68335bcb7ce8/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/c54edf48-04bf-4105-a325-68335bcb7ce8/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/c54edf48-04bf-4105-a325-68335bcb7ce8/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/e7d4b77d-ae4f-4836-ad91-0ede9824b744/finalize",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/c41f2334-75c5-430a-8274-9a08d45fb7f5/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/c41f2334-75c5-430a-8274-9a08d45fb7f5/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/c41f2334-75c5-430a-8274-9a08d45fb7f5/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/9c5cef1a-1cb3-4fc2-b0d9-41d2783cc0d1/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/9c5cef1a-1cb3-4fc2-b0d9-41d2783cc0d1/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/9c5cef1a-1cb3-4fc2-b0d9-41d2783cc0d1/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/9c5cef1a-1cb3-4fc2-b0d9-41d2783cc0d1/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/upload-tickets",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/c99ed47c-784f-4205-9b4c-fcc89116fcf9/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/c99ed47c-784f-4205-9b4c-fcc89116fcf9/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/c99ed47c-784f-4205-9b4c-fcc89116fcf9/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/lessons/76a9e027-9cd1-493c-91df-a1c9586998ac/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/lessons/76a9e027-9cd1-493c-91df-a1c9586998ac/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/attachments",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/publish-metadata",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/p/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/lessons/76a9e027-9cd1-493c-91df-a1c9586998ac/documents/158037ff-44a8-4ac0-b845-c9dfec54e7aa/download",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/documents/3302c774-7590-4406-883f-b8e1f46462b5/revisions",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/document-revisions/04f32712-4414-4dd8-97dd-476c8aaa3839/finalize",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/04f32712-4414-4dd8-97dd-476c8aaa3839/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/document-revisions/04f32712-4414-4dd8-97dd-476c8aaa3839/extraction",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/roadmaps",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/i/v1/roadmaps",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/roadmaps",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/roadmaps/a99e4851-1310-43e9-9614-97ede485ed11",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/roadmaps",
+      "status": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/i/v1/roadmaps/a99e4851-1310-43e9-9614-97ede485ed11",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/roadmaps",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/capabilities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/attachments",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/draft",
+      "status": 412
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/i/v1/courses/d38ab61e-19bf-42f5-a208-521abf478fcd/documents",
+      "status": 200
+    }
+  ],
+  "contexts": "Real UI login; password + TOTP MFA; no session-cookie injection; no HTTP response mocks",
+  "dependencies": {
+    "API": "http://localhost:3310",
+    "CMS": "http://localhost:5174",
+    "WEB": "http://localhost:3002"
+  },
+  "fixtureDocuments": [
+    {
+      "name": "nestjs-request-lifecycle.md",
+      "revisionId": "158037ff-44a8-4ac0-b845-c9dfec54e7aa",
+      "sha256": "e85f6dd282a8ff0d2158afa9f124a5ebea10a2fddf1712df4798ccc6e69b947b",
+      "status": "ready",
+      "pages": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "sql-indexes.txt",
+      "revisionId": "e03eb5ed-ea1d-4a19-b6dd-5c2106177d2d",
+      "sha256": "1f0f490ac061cffa5eae807127564bf5e66ec3f54a251ee01992835e834cec28",
+      "status": "ready",
+      "pages": [
+        null,
+        null
+      ]
+    },
+    {
+      "name": "nestjs-pipeline.pdf",
+      "revisionId": "eea6c841-857a-40c3-8431-6881674ee7d4",
+      "sha256": "ab8a3133b79c05d4d2a2d2be73d88c2c1fef27e1723d6d3064c98a77d06147e7",
+      "status": "ready",
+      "pages": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "transaction-notes.docx",
+      "revisionId": "c54edf48-04bf-4105-a325-68335bcb7ce8",
+      "sha256": "a08b3b640f4eb0ef91978f04aa0427cc571856dcad80757606ecd38c9fb54730",
+      "status": "ready",
+      "pages": [
+        null,
+        null
+      ]
+    },
+    {
+      "name": "scanned-handout.pdf",
+      "revisionId": "c41f2334-75c5-430a-8274-9a08d45fb7f5",
+      "sha256": "9b6a2ec184bf467bd00a5746ab96325763bbd9dba44e4fbe19525e794f8a049e",
+      "status": "needs_ocr",
+      "pages": []
+    }
+  ]
+}

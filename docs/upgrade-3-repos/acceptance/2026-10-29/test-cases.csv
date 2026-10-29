@@ -1,0 +1,75 @@
+﻿"ID","Tên test","Vai trò","AC","Tiền điều kiện","Các bước","Mong đợi","Kết quả","Thực tế","Thời gian (ms)","Ảnh"
+"TC01","Đăng nhập thật và thư viện trống","Editor, reviewer, admin, support, học viên","Foundation auth, AC-007-01","Tài khoản local ACTIVE, password đã hash, staff chưa enroll MFA; không inject session.","1. Nhập mật khẩu sai và xác nhận HTTP 401.
+2. Nhập mật khẩu đúng; trước MFA gọi /auth/me phải 401.
+3. Nhập TOTP sai rồi TOTP đúng; lưu recovery codes mà không đưa vào bằng chứng.
+4. Đăng nhập qua UI cho các vai trò và mở thư viện trống.","Password/TOTP sai bị từ chối; staff chỉ có session sau MFA; access cookie HttpOnly; empty state đúng, UI sáng ở OS dark.","PASS","7 actor đăng nhập qua UI; password sai401, TOTP sai401, me401 trước MFA; session staff chỉ được cấp sau MFA và cookie HttpOnly.","5182","images/TC01-login-invalid-password.png
+images/TC01-mfa-rejected-secret-masked.png
+images/TC01-cms-empty-desktop.png
+images/TC01-cms-empty-mobile.png
+images/TC01-learner-empty-desktop.png"
+"TC02","Cây khoá học, autosave và reorder","Editor","AC-007-01, AC-007-02","Editor đã đăng nhập và chưa có khoá học.","1. Nhập slug không hợp lệ và kiểm nút tạo bị vô hiệu.
+2. Tạo khoá; sửa chủ đề, mô tả, chương, bài và mục tiêu.
+3. Chờ trạng thái Đã lưu rồi đọc lại dữ liệu API.
+4. Đưa chương thứ hai lên đầu; thêm rồi xoá một chương đã autosave.
+5. Kiểm ảnh 1440px và 390px.","Metadata/thứ tự/ID đúng trên DB; xoá node có ACK; không mất cây; mobile không tràn ngang.","PASS","2 chương được lưu; chương thứ hai lên đầu giữ đúng ID; node mới đã autosave được xoá có ACK; 390px không tràn.","7272","images/TC02-course-tree-desktop.png
+images/TC02-course-tree-mobile.png"
+"TC03","Upload MD/TXT/PDF/DOCX và truy nguồn","Editor","AC-008-01, AC-009-01, AC-009-03","Khoá có ít nhất một bài; MinIO private và dispatcher hoạt động.","1. Chọn từng file Markdown, TXT, PDF text hai trang và DOCX hai đoạn qua input thật.
+2. Chờ pipeline ready và so SHA-256 với bytes file gốc.
+3. Kiểm PDF có page 1/2; DOCX có page=null.
+4. Kiểm chuỗi script trong Markdown hiển thị như văn bản, không chạy.
+5. Chụp source viewer từng định dạng và thư viện desktop/mobile.","Bốn định dạng ready; hash/citation đúng; không bịa số trang DOCX; nội dung không thực thi HTML/script.","PASS","MD/TXT/PDF/DOCX đều ready; SHA-256 trùng file gốc; PDF page1/2, DOCX page=null; script hiển thị như text, không chạy.","6843","images/TC03-md-source.png
+images/TC03-txt-source.png
+images/TC03-pdf-source.png
+images/TC03-docx-source.png
+images/TC03-library-desktop.png
+images/TC03-library-mobile.png"
+"TC04","Tệp không hợp lệ và trạng thái extraction lỗi","Editor","AC-008-02, AC-009-02","Các fixture định dạng sai, >20MiB, scan, PDF101trang và DOCX expansion được chuẩn bị local.","1. Chọn .exe và file 20MiB+1, kiểm upload bị chặn trên UI.
+2. Upload binary giả TXT và kiểm finalize 400.
+3. Upload PDF không có text; đợi needs_ocr và spans rỗng.
+4. Upload PDF101trang và DOCX expansion; đợi failed.","Không có ready giả; file quá giới hạn/ngoài allowlist bị chặn; MIME giả bị cách ly; scan yêu cầu OCR; parser từ chối dữ liệu nguy hiểm.","PASS","EXE và20MiB+1 bị chặn trên UI; binary giả TXT finalize400; scan needs_ocr/spans0; PDF101trang và DOCX expansion failed. UX-01 đã sửa và regression VI/EN mobile PASS.","7326","images/TC04-unsupported-file.png
+images/TC04-oversized-file.png
+images/TC04-quarantined-forged-mime.png
+images/TC04-upload-rejected-english-mobile.png
+images/TC04-needs-ocr.png
+images/TC04-pdf-page-limit.png
+images/TC04-docx-expansion-rejected.png"
+"TC05","Scope và reviewer độc lập","Editor khác, support, reviewer, admin, học viên chưa được cấp quyền, anonymous","AC-007-01, AC-008-01, AC-008-02","Có revision MD công khai cho học viên và TXT author-only; chưa publish/assign.","1. Gắn MD student-readable, TXT author-only.
+2. Editor publish bị 403; admin tự publish khoá do mình tạo cũng bị 403.
+3. Editor khác mở URL cùng khoá bị từ chối; support bị route guard chặn.
+4. Reviewer mở form read-only và publish thành công.
+5. Admin cấp assignment; anonymous đọc catalog nhưng không đọc tài liệu; học viên ngoài assignment bị 404.","Backend enforce role/ownership; reviewer khác tác giả; nguồn riêng không lọt vào learner projection.","PASS","Editor publish403, admin self-review403; editor ngoài scope bị chặn, support đi forbidden; reviewer publish200; anonymous401 và học viên ngoài assignment404 khi đọc nguồn.","3307","images/TC05-foreign-editor-denied.png
+images/TC05-role-guard.png
+images/TC05-reviewer-readonly-desktop.png
+images/TC05-published-by-reviewer.png
+images/TC05-published-catalog-desktop.png"
+"TC06","Học viên đọc và tải đúng nguồn đã duyệt","Học viên được cấp assignment","AC-008-01, AC-008-02, AC-009-01","Khoá đã được reviewer publish và assignment active.","1. Đi từ dashboard tới khoá và bài học.
+2. Kiểm nguồn MD hiển thị, nguồn TXT riêng không xuất hiện.
+3. Dùng bàn phím chuẩn bị download; tải thực file signed URL và đối chiếu SHA-256.
+4. Gọi URL download revision riêng phải 404.
+5. Kiểm desktop, mobile390, tablet820, EN và reload.","Bytes bản gốc đúng hash; Content-Disposition attachment; citation giữ nguyên; script không thực thi; VI/EN và layout đúng.","PASS","Signed original trả200 và Content-Disposition attachment, SHA-256 trùng revision1; nguồn TXT author-only không hiển thị và download404; VI/EN, keyboard,390/820px đạt.","2181","images/TC06-learner-course-desktop.png
+images/TC06-learner-source-desktop.png
+images/TC06-learner-source-mobile.png
+images/TC06-learner-source-tablet.png
+images/TC06-learner-source-english.png"
+"TC07","Revision mới không phá snapshot đã xuất bản","Editor và học viên","AC-008-03, AC-009-03","Học viên đã đọc revision1 đã publish.","1. Qua UI thêm revision2 cho cùng document và đợi ready.
+2. Gỡ working attachment qua API thật với If-Match.
+3. Yêu cầu xoá document phải 409.
+4. Reload learner: vẫn đọc revision1, không đọc revision2.
+5. Replay finalize revision1 và kiểm version/số span không đổi.","Bản gốc và publication pins bất biến; source update không tự thay nội dung đã duyệt; replay không duplicate span/revision.","PASS","Revision2 ready nhưng học viên vẫn đọc revision1 sau detach draft; xoá document409; replay finalize200 giữ version1/số spans.","2652","images/TC07-source-revision-two-draft.png
+images/TC07-published-source-still-revision-one.png"
+"TC08","Lộ trình CRUD và thứ tự milestone","Editor","AC-007-01, AC-007-02","Khoá và lesson tồn tại, thuộc editor.","1. Tạo lộ trình, thêm milestone toàn khoá và milestone lesson.
+2. Chuyển milestone lesson lên trước rồi lưu.
+3. Mở chỉnh sửa, xem desktop/mobile, cập nhật tiêu đề.
+4. Đọc API kiểm thứ tự rồi xoá lộ trình qua UI.","ID/ref/order đúng; save/update/delete có ACK; không tràn ngang mobile.","PASS","2 milestone được reorder, tạo/cập nhật/xoá qua UI có ACK200; API xác nhận lesson milestone ở đầu; mobile390px không tràn.","657","images/TC08-roadmap-desktop.png
+images/TC08-roadmap-mobile.png"
+"TC09","Offline, reconnect, conflict và export draft","Hai trang cùng tài khoản editor","AC-007-03","Hai editor đang đọc cùng version; có quyền lưu.","1. Chuyển context browser offline và đổi tiêu đề.
+2. Kiểm thông báo chưa lưu và DB không đổi; reconnect và chờ ACK.
+3. Mở hai trang cùng version; trang1 lưu trước, trang2 lưu sau.
+4. Kiểm 412; tải export JSON và đối chiếu tiêu đề local.
+5. Bấm chuyển route; kiểm blocker rồi chọn tiếp tục chỉnh sửa.","Offline không báo saved giả; reconnect lưu; stale không overwrite DB; draft/export được giữ; navigation cần lựa chọn rõ.","PASS","Offline giữ local title và DB không đổi; reconnect có ACK; phiên stale412 giữ draft; export JSON đúng local title và navigation blocker hoạt động.","5076","images/TC09-offline-draft.png
+images/TC09-conflict-preserves-draft.png
+images/TC09-unsaved-navigation-blocker.png"
+"TC10","Thu hồi quyền có hiệu lực","Admin và học viên","AC-008-02","Assignment từng active và học viên đang có session.","1. Admin revoke assignment qua API thật.
+2. Học viên dùng session cũ gọi documents và mở URL lesson.
+3. Gọi internal audience bằng student cookie.
+4. Kiểm ledger không có API 5xx hoặc JavaScript pageerror ngoài dự kiến.","API documents404 và internal401. UI not-found, không còn nội dung nguồn, có robots noindex; HTML stream có thể200 theo Next.js. Không có JS exception/API5xx ngoài dự kiến. Signed URL đã cấp trước đó vẫn có TTL tối đa60giây.","PASS","Revoke200; documents404, internal401; UI not-found/noindex và source text vắng mặt. HTML streaming200; browser pageerror0.","5195","images/TC10-assignment-revoked.png"

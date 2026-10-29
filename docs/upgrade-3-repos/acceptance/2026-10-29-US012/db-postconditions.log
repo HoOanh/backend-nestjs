@@ -1,0 +1,18 @@
+## migration status 2026-10-29T16:10:02Z
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.
+Datasource "db": PostgreSQL database "arc_academy", schema "public" at "localhost:55433"
+
+10 migrations found in prisma/migrations
+
+Database schema is up to date!
+
+## read-only postconditions (localhost only)
+teaching_plan_review
+teaching_plan_review_pkey
+teaching_plan_review_planId_fkey
+teaching_plan_review_revisionId_fkey
+valid_teaching_plan_review_state
+guard_teaching_plan_review
+36

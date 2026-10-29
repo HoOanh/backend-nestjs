@@ -721,8 +721,8 @@
       "sprint_id": "S03",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented_local_verified",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-02"
@@ -763,13 +763,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "local_verified",
+        "method": "116 backend tests incl. real HTTP/Postgres review e2e; 68 CMS unit tests; 31/31 browser fixture incl. 5 US-012 scenarios; OpenAPI/Bruno/CMS codegen drift",
+        "evidence_path": "acceptance/2026-10-29-US012/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved_for_implementation",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-29",
+        "scope": "Check progress and execute the next remaining S03 item (US-012 human review)"
       }
     },
     {

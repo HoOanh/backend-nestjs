@@ -1,4 +1,4 @@
-> Cập nhật29/10/2026: US-010 đã commit; US-011 đã kiểm chứng local với Gemini thật. Report/spec/evidence chỉ ghi tại nguồn canonical này. US-012 human review chưa triển khai; chưa đóng toàn S03.
+> Cập nhật29/10/2026 (US-012): review decision gắn hash, disposition finding, reviewer độc lập và invalidation khi draft đổi đã kiểm chứng local (backend HTTP/Postgres, CMS browser fixture). Chưa human sign-off, chưa commit/push; S03 chưa đóng. Report/spec/evidence chỉ ghi tại nguồn canonical này.
 
 # S03 — Giáo án có cấu trúc
 
@@ -82,3 +82,11 @@ Prompt `arc-plan-authoring-2`: Gemini chỉ trả sections/narration/visual inte
 ĐẠI CA phản hồi khoá học khó dùng, không thấy cách xem/sửa bài đã soạn, giáo án rườm rà; chốt Outline + Sheet, AI-first, cho thêm API, rồi kéo-thả/mobile/danh sách/docs. Backend thêm `GET courses/:id/teaching-plans` và `GET teaching-plans/coverage` (không migration); CMS làm lại danh sách khoá, editor khoá học (tab, outline, Sheet, dnd-kit), editor giáo án (dàn ý, panel AI chọn tài liệu và tự lưu sourceRefs, lỗi nhảy vị trí, thanh mobile). Không đổi AC; ràng buộc UX ghi tại specs UX-S03-01..06.
 
 Backend e2e teaching-plans 6/6, api/bruno(87)/typecheck/lint PASS; CMS quality/build PASS, 64 unit, 26/26 browser (fixture). Lượt đầu khi máy tải nặng 24/26 do timeout, được giữ log riêng, không tính PASS. Chưa chạy lại với backend/Gemini thật, chưa commit. [Chi tiết](AUTHORING-UX-2026-10-29.md) · [Evidence](../acceptance/AUTHORING-UX-2026-10-29/REPORT.md).
+
+## US-012 — Review giáo án và kiến thức
+
+ĐẠI CA chỉ đạo “check tiến độ và thực hiện công việc tiếp theo”; hạng mục còn lại của S03 là US-012. Đã triển khai local, không commit/push/deploy, không publish giáo án. Contract: `teaching_plan_review` bất biến theo revision/hash/findings, submit idempotent theo revision, decision If-Match + contentHash, reviewer độc lập (không phải chủ khoá/tác giả/người gửi), approve phải disposition đủ mọi finding với note, rule nguồn/lesson không waive, approval invalid ngay khi plan/lesson/source đổi. Audit trong transaction; trigger DB chỉ cho `pending → approved|rejected` một lần. Queue duyệt chỉ trả bản đúng revision hiện hành và không trả bản của chính reviewer.
+
+- Backend: migration `20261029110000_plan_reviews` (local `localhost:55433`), 4 endpoint review, OpenAPI internal 60 paths, 91 Bruno templates. Quality PASS: 116 tests/18 suites, gồm HTTP/Postgres e2e thật, statements 85.17%, branches 67.26%, functions 83.18%, lines 87.42%.
+- CMS: panel duyệt trong plan editor (trạng thái, submit, approve/reject, disposition từng finding), route + queue `/reviews` cho `content:lesson:review`, VI/EN. Quality/build PASS, 68 unit tests, 31/31 browser (thêm 5 scenario US-012). Application statements 33.05%, không dùng số test để tuyên bố coverage UI.
+- Evidence: [acceptance/2026-10-29-US012](../acceptance/2026-10-29-US012/REPORT.md). Browser dùng HTTP fixture, chưa chạy UI với backend thật; chưa có reviewer người thật ký nghiệm thu nội dung. AC-012-03 được enforce bằng approval validity + chặn decision revision mới, không tuyên bố publish vì S03 chưa mở publish.

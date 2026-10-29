@@ -1,4 +1,4 @@
-> Cập nhật29/10/2026: US-010 đã commit, US-011 được ĐẠI CA mở và đã chạy Gemini thật; US-012 còn lại. Nâng cấp UX biên soạn (outline/sheet, AI-first, kéo-thả, mobile, danh sách) theo [AUTHORING-UX-2026-10-29](../../../../implementation/AUTHORING-UX-2026-10-29.md), chưa commit. Execution contract/evidence xem S03-REPORT; các gate lịch sử phía dưới không thay chỉ đạo mới.
+> Cập nhật29/10/2026 (US-012): review decision gắn hash, disposition finding, reviewer độc lập và invalidation khi draft đổi đã kiểm chứng local; chưa human sign-off/commit. Các mục US-010/011 giữ nguyên. Nâng cấp UX biên soạn (outline/sheet, AI-first, kéo-thả, mobile, danh sách) theo [AUTHORING-UX-2026-10-29](../../../../implementation/AUTHORING-UX-2026-10-29.md), chưa commit. Execution contract/evidence xem S03-REPORT; các gate lịch sử phía dưới không thay chỉ đạo mới.
 
 > Chỉ đạo29/10/2026: đã merge/push S02; bắt đầu US-010/S03 theo [execution contract](../../../../implementation/S03-REPORT.md). US-011/012 chưa triển khai trong lát cắt này; các gate lịch sử bên dưới được giữ để đối chiếu.
 

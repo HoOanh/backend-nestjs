@@ -1,3 +1,5 @@
+> Cập nhật trạng thái: nâng cấp UX này đã được commit (CMS 1e8b97f, backend 50b3ffe, docs f7245b5); các câu “chưa commit” bên dưới giữ làm mốc lịch sử.
+
 # Nâng cấp UX biên soạn khoá học & giáo án — 29/10/2026
 
 ĐẠI CA phản hồi: module khoá học khó dùng/khó hiểu, bài đã soạn không thấy cách xem lại hay sửa (chỉ thấy nút thêm), soạn giáo án rườm rà. ĐẠI CA chốt hướng **Outline + Sheet** cho khoá học, **AI-first, dàn ý 3 cột** cho giáo án, cho phép thêm API backend; sau đó yêu cầu làm tiếp kéo-thả, mobile, danh sách khoá học và tài liệu. Đây là nâng cấp UX trên US-007/US-010/US-011 đã có, không đổi AC, không mở US-012. Chưa commit.

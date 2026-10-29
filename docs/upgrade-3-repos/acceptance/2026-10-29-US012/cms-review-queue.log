@@ -1,0 +1,13 @@
+[WebServer] (node:30946) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 2 tests using 1 worker
+
+(node:30995) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/2] e2e/plan-review.spec.ts:330:1 › review queue lists current submissions and opens the plan
+[2/2] e2e/plan-review.spec.ts:342:1 › changed draft makes the old approval stale and blocks the review queue for editors
+  2 passed (1.7s)

@@ -912,7 +912,7 @@
       "release": "R1",
       "priority": "must",
       "status": "approved",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_local_verified",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-03"
@@ -954,10 +954,11 @@
         }
       ],
       "verification": {
-        "evidence_status": "partial_backend_verified",
-        "method": "Backend package/approve/publish/preview exchange/public projection + 128 tests; CMS publish UI and Web learner package render not implemented; worker retry not executed",
+        "evidence_status": "local_verified",
+        "method": "Backend package/publish/exchange/worker backoff + 130 tests; CMS publish panel + 70 unit/33 browser; Web learner published render + 45 unit/build",
         "evidence_path": "acceptance/2026-10-29-S04-US015/REPORT.md",
-        "human_signoff": "pending"
+        "human_signoff": "pending",
+        "limitations": "no browser E2E for CMS publish panel/learner page; worker not run end-to-end with Web"
       },
       "approval": {
         "status": "pending",

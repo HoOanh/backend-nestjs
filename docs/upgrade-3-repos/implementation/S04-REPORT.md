@@ -1,4 +1,4 @@
-> Cập nhật30/10/2026 (lượt5): US-013 xong; US-014 xong backend/CMS/Web clock. US-015 mới xong **backend package/approve/publish/preview exchange/public projection**; CMS publish UI và Web learner package render chưa có. S04 chưa đóng.
+> Cập nhật30/10/2026 (lượt6): US-013/US-014 xong; US-015 xong backend package/publish/exchange, CMS publish panel, Web learner published render và worker revalidate retry. S04 chuyển locally_qualified; human sign-off/browser E2E learner vẫn pending.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
@@ -69,3 +69,12 @@ Giới hạn: narration clock là clock mô phỏng (chưa nối TTS/audio thậ
 - Public snapshot không chứa answer key/private source text; exchange hết hạn/đã dùng/draft trả404.
 - Test `test/lectures.e2e-spec.ts` 3; backend128 tests.
 - **Chưa làm**: CMS publish/review UI, Web learner render package đã publish, worker cache invalidation retry (AC-015-03 mới partial), preview external frame.
+
+## US-015 — hoàn tất local
+
+- Backend: package pin plan/visual/document revision + hash; approve độc lập; publish transaction pointer+audit+outbox; idempotent; public snapshot sanitized (không answer key/private text); preview exchange one-time10 phút.
+- CMS: panel Xuất bản bài giảng trong plan editor — tạo gói, duyệt, xuất bản, tạo mã preview; trạng thái/hash/thời gian; quyền write/review.
+- Web: learner lesson ưu tiên published lecture package; render lesson/plan sections/checkpoints/visual pinned; fallback documents khi chưa publish.
+- Worker: outbox `lecture.published` claim, HMAC gọi Web `/api/revalidate`, retry exponential bounded5 lần rồi failed; event chỉ tạo một lần/package.
+- Test: backend130 tests (thêm worker backoff2), CMS70/33 browser, Web45; build cả3 repo PASS.
+- Giới hạn: chưa browser E2E cho CMS publish panel/learner page; worker chưa chạy end-to-end với Web thật; preview external frame chưa có.

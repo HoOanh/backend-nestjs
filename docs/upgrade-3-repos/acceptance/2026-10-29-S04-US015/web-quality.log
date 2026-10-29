@@ -1,4 +1,4 @@
-## web lecture codegen 2026-10-29T17:07:16Z
+## web learner lecture 2026-10-29T17:24:06Z
 Foundation checks passed: arc-academy-web.
 Structure checks passed: arc-academy-web.
 Checking formatting...
@@ -9,28 +9,28 @@ Generating route types...
  RUN  v3.2.7 /Users/oanhho/orca/workspaces/arc-academy-web/triggerfish
       Coverage enabled with v8
 
- ✓ src/core/auth/form-schema.test.ts (5 tests) 10ms
- ✓ src/features/content/content.server.test.ts (4 tests) 14ms
- ✓ src/core/i18n/locale.test.ts (9 tests) 11ms
- ✓ src/core/api/http-client.test.ts (10 tests) 23ms
- ✓ src/core/query/client.test.ts (1 test) 9ms
- ✓ src/core/api/server-transport.test.ts (4 tests) 16ms
- ✓ src/core/api/preview-transport.test.ts (2 tests) 6ms
- ✓ src/core/form-controls.test.tsx (3 tests) 70ms
+ ✓ src/core/api/server-transport.test.ts (4 tests) 14ms
+ ✓ src/features/content/content.server.test.ts (4 tests) 13ms
+ ✓ src/core/i18n/locale.test.ts (9 tests) 18ms
+ ✓ src/core/query/client.test.ts (1 test) 8ms
+ ✓ src/core/auth/form-schema.test.ts (5 tests) 5ms
+ ✓ src/core/api/http-client.test.ts (10 tests) 33ms
+ ✓ src/core/api/preview-transport.test.ts (2 tests) 19ms
+ ✓ src/core/form-controls.test.tsx (3 tests) 57ms
+ ✓ src/features/visuals/NarrationClock.test.tsx (1 test) 119ms
  ✓ src/features/visuals/beats.test.ts (2 tests) 1ms
- ✓ src/features/visuals/NarrationClock.test.tsx (1 test) 128ms
  ✓ src/core/api/display-error.test.ts (4 tests) 2ms
 
  Test Files  11 passed (11)
       Tests  45 passed (45)
-   Start at  00:07:19
-   Duration  1.16s (transform 245ms, setup 615ms, collect 1.06s, tests 289ms, environment 1.72s, prepare 642ms)
+   Start at  00:24:09
+   Duration  1.13s (transform 224ms, setup 634ms, collect 993ms, tests 289ms, environment 1.71s, prepare 632ms)
 
  % Coverage report from v8
 -------------------|---------|----------|---------|---------|-------------------
 File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
 -------------------|---------|----------|---------|---------|-------------------
-All files          |   12.61 |    74.77 |   56.25 |   12.61 |                   
+All files          |   12.15 |    74.12 |    55.1 |   12.15 |                   
  src               |       0 |        0 |       0 |       0 |                   
   middleware.ts    |       0 |        0 |       0 |       0 | 1-38              
  src/app           |       0 |      100 |     100 |       0 |                   
@@ -51,7 +51,7 @@ All files          |   12.61 |    74.77 |   56.25 |   12.61 |
  ...ses/[courseId] |       0 |        0 |       0 |       0 |                   
   page.tsx         |       0 |        0 |       0 |       0 | 1-5               
  ...ons/[lessonId] |       0 |        0 |       0 |       0 |                   
-  page.tsx         |       0 |        0 |       0 |       0 | 1-9               
+  page.tsx         |       0 |        0 |       0 |       0 | 1-13              
  ...earn/dashboard |       0 |        0 |       0 |       0 |                   
   page.tsx         |       0 |        0 |       0 |       0 | 1                 
  ...[locale]/login |       0 |        0 |       0 |       0 |                   
@@ -128,6 +128,8 @@ All files          |   12.61 |    74.77 |   56.25 |   12.61 |
   ...onAnatomy.tsx |       0 |        0 |       0 |       0 | 1-109             
  ...tures/learning |       0 |        0 |       0 |       0 |                   
   ...boardPage.tsx |       0 |        0 |       0 |       0 | 1-117             
+  ...eRenderer.tsx |       0 |        0 |       0 |       0 | 1-92              
+  ...ure.server.ts |       0 |        0 |       0 |       0 | 1-77              
  ...teaching-plans |       0 |        0 |       0 |       0 |                   
   PlanRenderer.tsx |       0 |        0 |       0 |       0 | 1-128             
   ...iew.server.ts |       0 |        0 |       0 |       0 | 1-41              
@@ -142,7 +144,7 @@ All files          |   12.61 |    74.77 |   56.25 |   12.61 |
  src/lib           |     100 |      100 |     100 |     100 |                   
   utils.ts         |     100 |      100 |     100 |     100 |                   
 -------------------|---------|----------|---------|---------|-------------------
-Product checks passed: 266 bilingual messages, matching placeholders, original logo and palette, no internal product labels.
+Product checks passed: 275 bilingual messages, matching placeholders, original logo and palette, no internal product labels.
 Đã copy spec từ ./openapi/public.json
 🍻 orval v7.21.0 - A swagger client generator for typescript
 preview: Cleaning output folder
@@ -155,11 +157,11 @@ server: Cleaning output folder
 Running afterAllFilesWrite hook...
 🎉 server - Your OpenAPI spec has been converted into ready to use orval!
 Generated API client is reproducible
-✔ feature cannot bypass shadcn with native controls (190.290541ms)
-✔ semantic document layout and native file upload remain valid (2.419834ms)
-✔ core cannot import feature composition (1.813875ms)
-✔ explicit TypeScript any remains an error (1.01325ms)
-✔ feature confirmations use accessible shadcn dialogs (0.982958ms)
+✔ feature cannot bypass shadcn with native controls (182.495625ms)
+✔ semantic document layout and native file upload remain valid (2.354ms)
+✔ core cannot import feature composition (1.770458ms)
+✔ explicit TypeScript any remains an error (0.98225ms)
+✔ feature confirmations use accessible shadcn dialogs (0.96875ms)
 ℹ tests 5
 ℹ suites 0
 ℹ pass 5
@@ -167,4 +169,4 @@ Generated API client is reproducible
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 297.908542
+ℹ duration_ms 261.730375

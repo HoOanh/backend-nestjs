@@ -5,7 +5,9 @@ Ngày30/10/2026. Phạm vi: backend LecturePackage, approve/publish transaction,
 ## Evidence
 
 - [backend-quality.log](backend-quality.log): 128 tests/21 suites; statements85.14%, branches66.46%, functions83.48%, lines87.76%; OpenAPI public23/internal70 paths,105 Bruno templates, reproducible.
-- [cms-quality.log](cms-quality.log), [web-quality.log](web-quality.log): codegen sync + quality pass (CMS70 unit, Web45 unit); chưa có publish UI/learner page.
+- [cms-quality.log](cms-quality.log): CMS70 unit +33 browser, build PASS; publish panel trong plan editor.
+- [web-quality.log](web-quality.log): Web45 unit, build PASS; learner page render package đã publish.
+- Worker: `lecture-outbox.spec.ts` backoff bounded (2 test); chưa chạy worker với Web thật.
 - Test: `test/lectures.e2e-spec.ts` (3): approve độc lập, publish idempotent + outbox, stale sau khi plan/visual đổi, public snapshot không answer key/private, preview exchange one-time/expired, draft không exchange.
 
 ## Hành vi
@@ -18,6 +20,7 @@ Ngày30/10/2026. Phạm vi: backend LecturePackage, approve/publish transaction,
 
 ## Giới hạn
 
-- CMS chưa có màn publish/review package; Web chưa render package đã publish cho learner.
-- AC-015-01/02 mới verified ở backend HTTP/Postgres; AC-015-03 partial (idempotent, chưa có worker retry).
-- Chưa commit/push? (sẽ commit cùng lượt).
+- CMS: panel tạo/duyệt/xuất bản gói + tạo mã preview trong plan editor (theo quyền).
+- Web: learner lesson đọc public published package, render objectives/sections/checkpoints/visual; private source text không nằm trong snapshot.
+- Worker: claim outbox `lecture.published`, gọi Web revalidate có HMAC, retry backoff bounded5 lần rồi failed; publish lặp không tạo event trùng.
+- AC-015-01/02 PASS local (HTTP/Postgres + Web build); AC-015-03 PASS local unit/idempotent, **chưa chạy worker end-to-end với Web thật**. Chưa có browser E2E cho learner published page và CMS panel.

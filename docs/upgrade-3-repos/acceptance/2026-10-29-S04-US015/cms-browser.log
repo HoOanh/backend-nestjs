@@ -1,0 +1,50 @@
+[WebServer] (node:99305) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 33 tests using 1 worker
+
+(node:99307) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/auth-ux.spec.ts:2:1 › localized field errors, password visibility and keyboard language menu (982ms)
+  ✓   2 e2e/course-authoring.spec.ts:300:1 › course outline lists lessons compactly and edits a lesson in a side sheet (3.5s)
+  ✓   3 e2e/course-authoring.spec.ts:350:1 › lesson without a plan offers AI or manual start, then saves new sections (1.8s)
+  ✓   4 e2e/course-authoring.spec.ts:382:1 › plan editor shows outline, jumps to findings and sends chosen sources to AI (3.1s)
+  ✓   5 e2e/course-authoring.spec.ts:426:1 › course outline and plan editor fit a 390px viewport (322ms)
+  ✓   6 e2e/course-authoring.spec.ts:447:1 › course list shows plan coverage, filters by category and fits mobile (833ms)
+  ✓   7 e2e/course-authoring.spec.ts:469:1 › lessons drag across chapters with the mouse and chapters reorder by keyboard (4.1s)
+  ✓   8 e2e/course-authoring.spec.ts:514:1 › mobile plan editor navigates sections from a sticky outline bar (2.1s)
+  ✓   9 e2e/light-theme.spec.ts:4:3 › light UI survives light OS preference, locale change and reload (519ms)
+  ✓  10 e2e/light-theme.spec.ts:4:3 › light UI survives dark OS preference, locale change and reload (452ms)
+  ✓  11 e2e/plan-review.spec.ts:277:1 › author submits the current plan for review and sees it awaiting approval (310ms)
+  ✓  12 e2e/plan-review.spec.ts:290:1 › reviewer must disposition findings before approving, then approval is hash-bound (325ms)
+  ✓  13 e2e/plan-review.spec.ts:330:1 › review queue lists current submissions and opens the plan (176ms)
+  ✓  14 e2e/plan-review.spec.ts:342:1 › changed draft makes the old approval stale and blocks the review queue for editors (210ms)
+  ✓  15 e2e/plan-review.spec.ts:367:1 › review status fits a 390px viewport without horizontal overflow (181ms)
+  ✓  16 e2e/smoke.spec.ts:2:1 › staff login form is interactive (96ms)
+  ✓  17 e2e/smoke.spec.ts:11:1 › direct private URL redirects after an unauthenticated response (111ms)
+  ✓  18 e2e/smoke.spec.ts:36:1 › language preference survives reload and invitation query is preserved (422ms)
+  ✓  19 e2e/smoke.spec.ts:52:1 › MFA and recovery screens follow selected language without internal markers (951ms)
+  ✓  20 e2e/smoke.spec.ts:84:1 › 2FA verification auto-submits six digits and offers a recovery code fallback (439ms)
+  ✓  21 e2e/smoke.spec.ts:123:1 › settings hides system sections from staff lacking permissions and never loads their data (155ms)
+[WebServer] 12:23:46 AM [vite] http proxy error: /api/i/v1/courses
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1194:18)
+[WebServer]     at afterConnectMultiple (node:net:1784:7)
+[WebServer] 12:23:46 AM [vite] http proxy error: /api/i/v1/capabilities
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1194:18)
+[WebServer]     at afterConnectMultiple (node:net:1784:7)
+  ✓  22 e2e/studio-quality.spec.ts:126:1 › hover and navigation reuse the staff session (526ms)
+  ✓  23 e2e/studio-quality.spec.ts:145:1 › failed provider edit keeps the dialog open with an inline error and retries without a key (825ms)
+  ✓  24 e2e/studio-quality.spec.ts:176:1 › provider creation validates fields and uses a keyboard accessible Select (739ms)
+  ✓  25 e2e/studio-quality.spec.ts:197:3 › mobile sidebar opens, closes and retains light palette (light) (3.4s)
+  ✓  26 e2e/studio-quality.spec.ts:197:3 › mobile sidebar opens, closes and retains light palette (dark) (3.4s)
+  ✓  27 e2e/studio-quality.spec.ts:239:1 › desktop sidebar keeps grouped navigation and tooltips when collapsed (537ms)
+  ✓  28 e2e/studio-quality.spec.ts:259:1 › course creation is a dialog with a derived slug and a clear primary action (481ms)
+  ✓  29 e2e/studio-quality.spec.ts:275:1 › mobile sidebar has an explicit close control and returns focus (1.9s)
+  ✓  30 e2e/studio-quality.spec.ts:288:1 › account menu opens settings sections in a modal instead of routes (1.3s)
+  ✓  31 e2e/studio-quality.spec.ts:325:1 › settings modal turns on optional 2FA and lists devices and sign-in history (1.4s)
+  ✓  32 e2e/visual-editor.spec.ts:158:1 › visual editor edits a typed flow and autosaves with If-Match (1.5s)
+  ✓  33 e2e/visual-editor.spec.ts:181:1 › visual editor fits a 390px viewport (199ms)
+
+  33 passed (38.4s)

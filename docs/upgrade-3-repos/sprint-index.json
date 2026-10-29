@@ -106,7 +106,7 @@
         "S03"
       ],
       "path": "phases/P02-content/sprints/S04-graphics-publish",
-      "status": "in_progress",
+      "status": "locally_qualified",
       "story_ids": [
         "US-013",
         "US-014",

@@ -185,10 +185,11 @@
       ],
       "verification": {
         "evidence_status": "local_verified",
-        "method": "Backend package/publish/exchange/worker backoff + 130 tests; CMS publish panel + 70 unit/33 browser; Web learner published render + 45 unit/build",
-        "evidence_path": "acceptance/2026-10-29-S04-US015/REPORT.md",
-        "human_signoff": "pending",
-        "limitations": "no browser E2E for CMS publish panel/learner page; worker not run end-to-end with Web"
+        "method": "Backend 134 tests incl. enrollment gate + real-Web revalidate; CMS 70 unit/35 browser incl. publish panel; Web 48 unit + learner published browser + build",
+        "evidence_path": "acceptance/2026-10-30-S04-FINAL/REPORT.md",
+        "human_signoff": "approved",
+        "human_signoff_at": "2026-10-30T00:57:24+07:00",
+        "limitations": "learner browser default spec uses fixture API (sign-off run used real stack); assignment admin UI missing"
       },
       "approval": {
         "status": "pending",

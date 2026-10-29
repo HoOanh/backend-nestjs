@@ -1,4 +1,4 @@
-> Cập nhật30/10/2026 (lượt6): US-013/US-014 xong; US-015 xong backend package/publish/exchange, CMS publish panel, Web learner published render và worker revalidate retry. S04 chuyển locally_qualified; human sign-off/browser E2E learner vẫn pending.
+> Cập nhật30/10/2026 (lượt8): đóng 4 mục follow-up — enrollment gate cho public lecture, browser E2E CMS publish panel, browser E2E Web learner published lecture, worker revalidate chạy với Web production build thật. Human content/visual sign-off **APPROVED** sau checklist stack thật (24/24 assertion). S04 giữ locally_qualified; production deploy vẫn là gate riêng.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
@@ -38,11 +38,11 @@ Sprint mở ngày29/10/2026. Effort gốc14–22 person-days; hiện xong lát c
 
 Log/ảnh: [acceptance/2026-10-29-S04-US013](../acceptance/2026-10-29-S04-US013/REPORT.md).
 
-## Bước tiếp theo
+## Bước tiếp theo (sau follow-up30/10)
 
-1. US-014: narration beat IDs, focus/reveal/draw/highlight theo narration clock, pause/resume không lệch wall time, lint missing target.
-2. US-015: LecturePackage pin lesson/plan/visual/source/renderer, preview exchange one-time code, publish pointer + audit/outbox, cache invalidation retry, public projection không private source.
-3. Browser thật cho visual editor + Web renderer (ảnh, reduced-motion, alt).
+1. UI CMS cấp/thu hồi `CourseAssignment` để vận hành enrollment gate, không chỉ API admin.
+2. Preview external frame; TTS/audio thật thay clock mô phỏng.
+3. Production migration/deploy và UAT trên dữ liệu thật.
 
 Không tuyên bố S04 exit.
 
@@ -68,13 +68,21 @@ Giới hạn: narration clock là clock mô phỏng (chưa nối TTS/audio thậ
 - Publish transaction: pointer publication + state package + audit + outbox `lecture.published`; idempotent cùng package (không tạo publication/outbox trùng); creator không tự publish, approve cần reviewer độc lập.
 - Public snapshot không chứa answer key/private source text; exchange hết hạn/đã dùng/draft trả404.
 - Test `test/lectures.e2e-spec.ts` 3; backend128 tests.
-- **Chưa làm**: CMS publish/review UI, Web learner render package đã publish, worker cache invalidation retry (AC-015-03 mới partial), preview external frame.
-
 ## US-015 — hoàn tất local
 
 - Backend: package pin plan/visual/document revision + hash; approve độc lập; publish transaction pointer+audit+outbox; idempotent; public snapshot sanitized (không answer key/private text); preview exchange one-time10 phút.
 - CMS: panel Xuất bản bài giảng trong plan editor — tạo gói, duyệt, xuất bản, tạo mã preview; trạng thái/hash/thời gian; quyền write/review.
 - Web: learner lesson ưu tiên published lecture package; render lesson/plan sections/checkpoints/visual pinned; fallback documents khi chưa publish.
 - Worker: outbox `lecture.published` claim, HMAC gọi Web `/api/revalidate`, retry exponential bounded5 lần rồi failed; event chỉ tạo một lần/package.
-- Test: backend130 tests (thêm worker backoff2), CMS70/33 browser, Web45; build cả3 repo PASS.
-- Giới hạn: chưa browser E2E cho CMS publish panel/learner page; worker chưa chạy end-to-end với Web thật; preview external frame chưa có.
+- Test: backend134 tests (thêm enrollment gate + real-Web revalidate), CMS70/35 browser, Web48; build cả3 repo PASS.
+- Follow-up30/10: browser E2E CMS publish panel + Web learner published lecture PASS; worker revalidate chạy với Web production build thật PASS; public lecture endpoint đã có enrollment gate (assignment active).
+- Giới hạn còn lại: Web learner browser test mặc định dùng fixture API (phiên sign-off chạy stack thật); chưa có UI CMS cấp/thu hồi assignment; preview external frame + TTS/audio thật chưa có.
+
+## Follow-up 30/10 — đóng 4 mục
+
+- Enrollment gate: `GET /p/v1/lessons/{id}/lecture-package` yêu cầu learner session + `CourseAssignment` active, khoá không archived; 401/404 không leak; preview exchange token vẫn public. Web loader forward cookie và fallback khi401/403/404.
+- Browser: CMS `lecture-publish.spec.ts` 2 test (tạo→duyệt→xuất bản→preview code; reviewer-only không tạo gói); Web `lecture-published.spec.ts` render learner mobile390px. Sửa `VisualRenderer` để nhúng không lặp `<article>/<h1>`.
+- Worker: `lecture-revalidate.ts` tách khỏi main, HMAC đúng raw body, retry bounded; `test/revalidate.e2e-spec.ts` chạy với Web thật (processed, tampered401, lỗi URL giữ pending).
+- AC-015-01/02/03: PASS local (HTTP/Postgres + browser; AC-015-03 có real Web).
+- Bằng chứng: [acceptance/2026-10-30-S04-FINAL](../acceptance/2026-10-30-S04-FINAL/REPORT.md); sign-off checklist [SIGNOFF.md](../acceptance/2026-10-30-S04-FINAL/SIGNOFF.md), trạng thái [signoff.json](../acceptance/2026-10-30-S04-FINAL/signoff.json) `approved`, 24 assertion trong [signoff-run.json](../acceptance/2026-10-30-S04-FINAL/signoff-run.json).
+- Sign-off real stack: sửa flow sizing + beat chỉ active sau play; 24/24 check PASS. Human approval30/10.

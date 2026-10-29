@@ -1,0 +1,10 @@
+PASS test/revalidate.e2e-spec.ts
+  Lecture outbox → real Web revalidate (opt-in)
+    ✓ signs the exact body, marks the outbox event processed and rejects a tampered signature (102 ms)
+    ✓ keeps a failed delivery pending with bounded retry instead of losing the event (12 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        0.954 s, estimated 1 s
+Ran all test suites matching /test\/revalidate.e2e-spec.ts/i.

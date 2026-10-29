@@ -1,0 +1,148 @@
+Foundation checks passed: arc-academy-backend.
+Checking formatting...
+All matched files use Prettier code style!
+[Nest] 26986  - 10/30/2026, 12:45:18 AM   ERROR [AllExceptionsFilter] GET /api/p/v1/auth/google/start -> 503
+ServiceUnavailableException
+PASS test/foundation.e2e-spec.ts
+[Nest] 26986  - 10/30/2026, 12:45:19 AM   ERROR [AllExceptionsFilter] POST /api/i/v1/lessons/1e4432e9-f4b7-4c85-8ca3-58be3117a11a/plan-jobs -> 503
+ServiceUnavailableException
+PASS test/plan-ai.e2e-spec.ts
+[Nest] 26986  - 10/30/2026, 12:45:19 AM   ERROR [AllExceptionsFilter] GET /api/p/v1/courses -> 503
+ServiceUnavailableException
+[Nest] 26986  - 10/30/2026, 12:45:19 AM   ERROR [AllExceptionsFilter] GET /api/i/v1/courses -> 503
+ServiceUnavailableException
+PASS test/content.e2e-spec.ts
+PASS test/plan-reviews.e2e-spec.ts
+PASS test/lectures.e2e-spec.ts
+PASS test/visuals.e2e-spec.ts
+PASS test/ai-providers.e2e-spec.ts
+PASS test/teaching-plans.e2e-spec.ts
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+PASS src/modules/content/document-parser.spec.ts
+PASS src/workers/mailer.spec.ts
+PASS src/modules/teaching-plans/plan-ai.provider.spec.ts
+PASS src/workers/lecture-revalidate.spec.ts
+PASS src/common/http/response-envelope.interceptor.spec.ts
+[Nest] 26986  - 10/30/2026, 12:45:23 AM    WARN [ProviderHttpClient] Provider call failed with HTTP 429
+PASS src/modules/platform/ai-providers/provider-http.client.spec.ts
+PASS src/common/http/all-exceptions.filter.spec.ts
+PASS src/modules/visuals/visual.schema.spec.ts
+PASS src/config/env.validation.spec.ts
+PASS src/modules/platform/ai-providers/provider-protocol.spec.ts
+PASS src/modules/teaching-plans/plan-review.spec.ts
+PASS src/modules/teaching-plans/plan.schema.spec.ts
+PASS src/workers/lecture-outbox.spec.ts
+PASS src/workers/auth-email.template.spec.ts
+PASS src/common/i18n/locale.spec.ts
+---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
+File                                   | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                            
+---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
+All files                              |   85.06 |    66.31 |   82.69 |   87.68 |                                                                              
+ src                                   |      50 |      100 |       0 |   46.87 |                                                                              
+  app.module.ts                        |     100 |      100 |     100 |     100 |                                                                              
+  main.ts                              |       0 |      100 |       0 |       0 | 1-25                                                                         
+ src/common                            |   93.93 |    81.08 |   88.88 |   96.77 |                                                                              
+  app-setup.ts                         |     100 |       50 |     100 |     100 | 35                                                                           
+  swagger.ts                           |    92.5 |    82.85 |   85.71 |   95.94 | 94-106                                                                       
+ src/common/http                       |   94.28 |    69.49 |     100 |   93.54 |                                                                              
+  all-exceptions.filter.ts             |    92.5 |    72.34 |     100 |   91.89 | 88,92,99                                                                     
+  raw-response.decorator.ts            |     100 |      100 |     100 |     100 |                                                                              
+  request-id.middleware.ts             |    90.9 |       40 |     100 |    90.9 | 16                                                                           
+  response-envelope.interceptor.ts     |     100 |    71.42 |     100 |     100 | 9,23                                                                         
+ src/common/i18n                       |     100 |    91.66 |     100 |     100 |                                                                              
+  locale.middleware.ts                 |     100 |      100 |     100 |     100 |                                                                              
+  locale.ts                            |     100 |    91.66 |     100 |     100 | 17                                                                           
+ src/config                            |   96.29 |    76.92 |     100 |     100 |                                                                              
+  env.validation.ts                    |   96.29 |    76.92 |     100 |     100 | 5,75-82                                                                      
+ src/database                          |     100 |       75 |     100 |     100 |                                                                              
+  database.service.ts                  |     100 |       75 |     100 |     100 | 9                                                                            
+ src/health                            |    90.9 |    66.66 |      75 |   88.23 |                                                                              
+  health.controller.ts                 |   88.23 |    66.66 |      75 |   85.71 | 14,21                                                                        
+  health.module.ts                     |     100 |      100 |     100 |     100 |                                                                              
+ src/infrastructure                    |    90.9 |       75 |    62.5 |   96.29 |                                                                              
+  infrastructure.module.ts             |     100 |      100 |     100 |     100 |                                                                              
+  infrastructure.service.ts            |   88.88 |       75 |    62.5 |   95.65 | 21                                                                           
+ src/modules/content                   |   84.65 |     64.5 |   79.72 |   86.37 |                                                                              
+  content-enabled.guard.ts             |     100 |       80 |     100 |     100 | 5                                                                            
+  content.controller.ts                |   88.73 |    61.64 |      75 |   89.39 | 79,115,133,158,164,202,246                                                   
+  content.dto.ts                       |     100 |      100 |     100 |     100 |                                                                              
+  content.module.ts                    |     100 |      100 |     100 |     100 |                                                                              
+  content.service.ts                   |   86.61 |    82.25 |    85.1 |   88.52 | 87-97,222,236-250,265,337-342                                                
+  document-extraction.ts               |   80.76 |    66.66 |   66.66 |      80 | 34-35,42,45-46                                                               
+  document-parser.ts                   |   70.37 |    75.92 |   63.63 |   73.61 | 34-58,77,80,93,117                                                           
+  document-parser.worker.ts            |       0 |      100 |       0 |       0 | 1-10                                                                         
+  documents.service.ts                 |   80.71 |    47.31 |   83.67 |   83.33 | 46,81-92,202,208,219,237,260-268,308-322,356,368,380-395,433,470,477-478,522 
+ src/modules/lectures                  |   85.43 |    56.25 |   84.21 |   91.57 |                                                                              
+  lecture.controller.ts                |   91.89 |       60 |   81.81 |   93.75 | 57,64                                                                        
+  lecture.dto.ts                       |     100 |       50 |     100 |     100 | 9-22                                                                         
+  lecture.service.ts                   |    81.5 |    56.16 |   85.18 |   89.43 | 87,192-205,220,224,254,431-432                                               
+ src/modules/platform/access           |   81.18 |    59.01 |   72.72 |    83.9 |                                                                              
+  access.controller.ts                 |      70 |     61.9 |   66.66 |   79.16 | 43-44,62-64                                                                  
+  access.dto.ts                        |     100 |      100 |     100 |     100 |                                                                              
+  access.module.ts                     |     100 |      100 |     100 |     100 |                                                                              
+  access.service.ts                    |      70 |       40 |   71.42 |   66.66 | 10-13,25-30,48                                                               
+  student-access.controller.ts         |   91.66 |    66.66 |     100 |     100 | 17-22                                                                        
+ src/modules/platform/ai-providers     |   82.63 |    62.93 |      80 |   85.83 |                                                                              
+  ai-providers.controller.ts           |    87.5 |    62.79 |   73.33 |   91.66 | 50,71,88                                                                     
+  ai-providers.dto.ts                  |     100 |       50 |     100 |     100 | 92                                                                           
+  ai-providers.module.ts               |     100 |      100 |     100 |     100 |                                                                              
+  ai-providers.service.ts              |   75.42 |    59.59 |   86.84 |      80 | 79,127-132,183,186,231,253,255-259,290-310,329,333,345,347,423,476,481       
+  provider-http.client.ts              |    79.2 |     62.5 |   70.83 |   80.85 | 116-119,127,155,158,174,246,273,299,302,307,315-325                          
+  provider-protocol.ts                 |   96.29 |    92.85 |     100 |     100 | 56                                                                           
+ src/modules/platform/auth             |   79.35 |    64.89 |   81.25 |      80 |                                                                              
+  auth.decorators.ts                   |     100 |      100 |     100 |     100 |                                                                              
+  auth.dto.ts                          |     100 |      100 |     100 |     100 |                                                                              
+  auth.guard.ts                        |   91.66 |    79.62 |   85.71 |   91.07 | 82,87,90-92,113                                                              
+  auth.module.ts                       |     100 |      100 |     100 |     100 |                                                                              
+  auth.service.ts                      |   72.13 |    58.99 |      75 |   73.49 | 37,106-107,135,147-186,406,433,444,456,476-538                               
+  crypto.service.ts                    |   96.87 |       90 |     100 |   96.66 | 66                                                                           
+  google.service.ts                    |   33.33 |    38.88 |   42.85 |   31.48 | 38,46-165                                                                    
+  session.service.ts                   |   93.33 |    81.39 |   93.75 |   94.36 | 110,123-129,156                                                              
+ src/modules/platform/auth/controllers |   84.31 |    66.31 |      80 |   89.47 |                                                                              
+  common-auth.controller.ts            |   91.89 |    67.08 |     100 |     100 | 47-56,75-88,104-175                                                          
+  google.controller.ts                 |    92.3 |       70 |   66.66 |    90.9 | 27                                                                           
+  staff-auth.controller.ts             |   73.17 |    60.93 |   66.66 |      80 | 93-101,113-120                                                               
+  student-auth.controller.ts           |      76 |    73.52 |      50 |   73.91 | 41-43,51-53                                                                  
+ src/modules/platform/meta             |   94.28 |       75 |   33.33 |    93.1 |                                                                              
+  dto.ts                               |     100 |      100 |     100 |     100 |                                                                              
+  internal-meta.controller.ts          |    90.9 |       75 |      50 |   88.88 | 18                                                                           
+  meta.module.ts                       |     100 |      100 |     100 |     100 |                                                                              
+  public-meta.controller.ts            |   88.88 |       75 |       0 |   85.71 | 14                                                                           
+ src/modules/teaching-plans            |   93.39 |    76.12 |   95.51 |   96.67 |                                                                              
+  plan-ai.controller.ts                |   91.66 |    61.53 |   85.71 |   95.23 | 55                                                                           
+  plan-ai.dto.ts                       |     100 |       75 |     100 |     100 | 49-67                                                                        
+  plan-ai.prompt.ts                    |     100 |      100 |     100 |     100 |                                                                              
+  plan-ai.provider.ts                  |    92.5 |    71.42 |     100 |   94.11 | 56,65                                                                        
+  plan-ai.service.ts                   |   86.14 |    72.09 |   86.48 |   90.33 | 52,156,166,179,204,229,249,256,296-303,413,416,424,430,439,451,556,567       
+  plan-review.controller.ts            |   95.45 |    61.53 |     100 |     100 | 22-76                                                                        
+  plan-review.ts                       |     100 |      100 |     100 |     100 |                                                                              
+  plan.controller.ts                   |   96.42 |     64.7 |     100 |     100 | 30-80                                                                        
+  plan.dto.ts                          |     100 |      100 |     100 |     100 |                                                                              
+  plan.schema.ts                       |   87.69 |    55.55 |     100 |     100 | 66-68,90-101                                                                 
+  plan.service.ts                      |   94.09 |    83.33 |   98.14 |   97.96 | 182,355,372,514                                                              
+ src/modules/visuals                   |   85.03 |    60.63 |   87.27 |   89.66 |                                                                              
+  visual.controller.ts                 |   96.15 |     64.7 |     100 |     100 | 29-89                                                                        
+  visual.dto.ts                        |     100 |       50 |     100 |     100 | 5-38                                                                         
+  visual.schema.ts                     |   73.94 |     42.3 |   80.76 |   78.43 | 254-258,276,286-308                                                          
+  visual.service.ts                    |   90.62 |    74.35 |   90.47 |   96.42 | 89,110,293                                                                   
+ src/workers                           |   48.06 |    30.76 |   39.28 |   50.42 |                                                                              
+  auth-email.template.ts               |     100 |      100 |     100 |     100 |                                                                              
+  lecture-outbox.ts                    |     100 |        0 |     100 |     100 | 5                                                                            
+  lecture-revalidate.ts                |   81.39 |       75 |   22.22 |   82.05 | 37-65                                                                        
+  mailer.ts                            |   84.21 |    33.33 |   85.71 |   94.11 | 70                                                                           
+  main.ts                              |       0 |        0 |       0 |       0 | 1-126                                                                        
+---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
+
+Test Suites: 23 passed, 23 total
+Tests:       134 passed, 134 total
+Snapshots:   0 total
+Time:        7.895 s, estimated 8 s
+Ran all test suites.
+Exported public: 23 paths
+Exported internal: 70 paths
+public: audience and schema closure valid
+internal: audience and schema closure valid
+preview: audience and schema closure valid
+OpenAPI export is reproducible
+Bruno collection covers 105 documented operations

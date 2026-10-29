@@ -1,0 +1,60 @@
+[WebServer] (node:39807) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:39809) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 32 tests using 1 worker
+
+  -   1 e2e/acceptance.spec.ts:94:7 › S02 acceptance — actual browser, API, database and storage › TC01 — Đăng nhập thực tế, mật khẩu sai, TOTP sai, MFA và thư viện trống
+  -   2 e2e/acceptance.spec.ts:120:7 › S02 acceptance — actual browser, API, database and storage › TC02 — Tạo khoá, autosave, chương/bài, reorder và xoá node đã lưu
+  -   3 e2e/acceptance.spec.ts:174:7 › S02 acceptance — actual browser, API, database and storage › TC03 — Upload thật MD/TXT/PDF/DOCX, hash và citation đúng bản gốc
+  -   4 e2e/acceptance.spec.ts:214:7 › S02 acceptance — actual browser, API, database and storage › TC04 — Tệp sai, quá dung lượng, giả MIME, scan, PDF quá trang và DOCX expansion
+  -   5 e2e/acceptance.spec.ts:301:7 › S02 acceptance — actual browser, API, database and storage › TC05 — Scope, độc lập reviewer, author-only và cấp quyền học
+  -   6 e2e/acceptance.spec.ts:391:7 › S02 acceptance — actual browser, API, database and storage › TC06 — Học viên đọc nguồn, tải đúng bytes, XSS plaintext, VI/EN và mobile
+  -   7 e2e/acceptance.spec.ts:443:7 › S02 acceptance — actual browser, API, database and storage › TC07 — Revision mới và gỡ draft không phá nguồn đã xuất bản
+  -   8 e2e/acceptance.spec.ts:531:7 › S02 acceptance — actual browser, API, database and storage › TC08 — Lộ trình CRUD và reorder qua UI, mobile không tràn
+  -   9 e2e/acceptance.spec.ts:595:7 › S02 acceptance — actual browser, API, database and storage › TC09 — Offline giữ bản nháp, reconnect lưu, 412 không ghi đè và export
+  -  10 e2e/acceptance.spec.ts:642:7 › S02 acceptance — actual browser, API, database and storage › TC10 — Thu hồi quyền học có hiệu lực và lỗi client không xuất hiện
+(node:39820) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  11 e2e/auth-ux.spec.ts:2:5 › localized field errors, password visibility and keyboard language menu (988ms)
+  -  12 e2e/content-live.spec.ts:61:7 › content full-stack qualification › authoring → private upload → independent review → learner source, in VI/EN and light mode
+  -  13 e2e/content-live.spec.ts:193:7 › content full-stack qualification › stale editor preserves local draft and offers export
+[WebServer]  ⨯ Error: Backend request failed (404)
+[WebServer]     at i (.next/server/app/[locale]/courses/page.js:2:8135)
+[WebServer]     at async l (.next/server/app/[locale]/courses/page.js:1:9295)
+[WebServer]     at async o (.next/server/app/[locale]/courses/page.js:1:9428)
+[WebServer]     at async n (.next/server/app/[locale]/learn/dashboard/page.js:2:8916) {
+[WebServer]   status: 404,
+[WebServer]   digest: '1130513748'
+[WebServer] }
+  ✓  14 e2e/foundation.spec.ts:53:5 › public login is functional and private routes are guarded (267ms)
+  -  15 e2e/foundation.spec.ts:78:7 › full stack local qualification › email signup, verification, login, reset and session revocation
+  -  16 e2e/foundation.spec.ts:120:7 › full stack local qualification › staff login requires MFA, then guards CMS pages and logout
+  -  17 e2e/foundation.spec.ts:172:7 › full stack local qualification › English email and learning session remain English across SSR navigation
+  ✓  18 e2e/lecture-published.spec.ts:6:5 › learner renders the published lecture snapshot with its pinned visual (463ms)
+  ✓  19 e2e/light-theme.spec.ts:4:7 › light UI survives light OS preference, locale change and reload (561ms)
+  ✓  20 e2e/light-theme.spec.ts:4:7 › light UI survives dark OS preference, locale change and reload (552ms)
+  ✓  21 e2e/smoke.spec.ts:3:5 › original brand, bilingual landing and responsive layout (673ms)
+[WebServer]  ⨯ Error: Backend request failed (404)
+[WebServer]     at i (.next/server/app/[locale]/courses/page.js:2:8135)
+[WebServer]     at async l (.next/server/app/[locale]/courses/page.js:1:9295)
+[WebServer]     at async o (.next/server/app/[locale]/courses/page.js:1:9428)
+[WebServer]     at async n (.next/server/app/[locale]/learn/dashboard/page.js:2:8916) {
+[WebServer]   status: 404,
+[WebServer]   digest: '1130513748'
+[WebServer] }
+  ✓  22 e2e/smoke.spec.ts:41:5 › language switch preserves action tokens and English private redirects (546ms)
+  ✓  23 e2e/smoke.spec.ts:51:5 › auth errors render the selected locale without leaking backend messages (231ms)
+  -  24 e2e/teaching-plans.spec.ts:95:7 › US-010 actual browser authoring › PLAN01 — Nguồn thật, tạo giáo án và mapping đủ objective/script/visual/checkpoint
+  -  25 e2e/teaching-plans.spec.ts:212:7 › US-010 actual browser authoring › PLAN02 — Web preview dùng staff session, citation và không chứa đáp án
+  -  26 e2e/teaching-plans.spec.ts:251:7 › US-010 actual browser authoring › PLAN03 — Lint path cụ thể và read-only reviewer
+  -  27 e2e/teaching-plans.spec.ts:310:7 › US-010 actual browser authoring › PLAN04 — Offline, stale412 giữ buffer, export và navigation blocker
+  -  28 e2e/teaching-plans.spec.ts:346:7 › US-010 actual browser authoring › PLAN05 — Gemini thật, artifact có provenance, diff/apply và preview
+  ✓  29 e2e/ui-quality.spec.ts:4:7 › FAQ uses shadcn Tabs with keyboard navigation (vi) (443ms)
+  ✓  30 e2e/ui-quality.spec.ts:4:7 › FAQ uses shadcn Tabs with keyboard navigation (en) (450ms)
+  ✓  31 e2e/ui-quality.spec.ts:22:5 › mobile menu exposes section navigation and closes on selection (3.0s)
+  ✓  32 e2e/ui-quality.spec.ts:39:5 › failed sign in displays both an inline error and an error toast (238ms)
+
+  20 skipped
+  12 passed (9.5s)

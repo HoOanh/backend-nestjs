@@ -24,3 +24,7 @@ Ngày30/10/2026. Phạm vi: backend LecturePackage, approve/publish transaction,
 - Web: learner lesson đọc public published package, render objectives/sections/checkpoints/visual; private source text không nằm trong snapshot.
 - Worker: claim outbox `lecture.published`, gọi Web revalidate có HMAC, retry backoff bounded5 lần rồi failed; publish lặp không tạo event trùng.
 - AC-015-01/02 PASS local (HTTP/Postgres + Web build); AC-015-03 PASS local unit/idempotent, **chưa chạy worker end-to-end với Web thật**. Chưa có browser E2E cho learner published page và CMS panel.
+
+## Follow-up30/10 — superseded
+
+Báo cáo này giữ nguyên lát cắt backend ban đầu. Các giới hạn "chưa browser E2E/chưa worker với Web thật" đã được đóng và có bằng chứng mới tại [acceptance/2026-10-30-S04-FINAL/REPORT.md](../2026-10-30-S04-FINAL/REPORT.md). Human sign-off đã `approved` ngày30/10/2026.

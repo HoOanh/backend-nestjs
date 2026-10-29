@@ -1,0 +1,30 @@
+{
+  "sprint": "S04",
+  "scope": ["US-013", "US-014", "US-015"],
+  "status": "approved",
+  "decision": "APPROVED",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-10-30T00:57:24+07:00",
+  "requested_at": "2026-10-30",
+  "evidence": "acceptance/2026-10-30-S04-FINAL/REPORT.md",
+  "run_evidence": "acceptance/2026-10-30-S04-FINAL/signoff-run.json",
+  "data": {
+    "courseId": "1dfbef33-80f0-4011-a800-dd3f51ebc4b3",
+    "lessonId": "29c8813e-0901-4610-b5de-3e17a94b047f",
+    "packageId": "139e2d3d-6069-4b15-89e9-8d2c9b119533",
+    "visualId": "880d210a-eba1-4236-a31f-6136a8d55d80",
+    "mode": "real Postgres + backend + CMS dev + Web production build; fixture only for deterministic browser renderer tests"
+  },
+  "checklist": [
+    { "id": 1, "item": "Nội dung/mục tiêu/lời giảng khớp bản duyệt", "checked": true, "note": "lesson title, objective, narration render đúng plan v2; objective 2 chưa có section là finding đã biết và không render cho learner" },
+    { "id": 2, "item": "Đồ hoạ đúng ý đồ sư phạm và alt text", "checked": true, "note": "flow Guard → Pipe; đủ node trước khi play; alt text đúng" },
+    { "id": 3, "item": "Không lộ đáp án/giải thích riêng", "checked": true, "note": "DOM và API snapshot không có answerKey/explanation" },
+    { "id": 4, "item": "Nguồn hiển thị đúng, không lộ private source", "checked": true, "note": "chỉ title/section, không có text nguồn private" },
+    { "id": 5, "item": "Narration beat khớp lời giảng", "checked": true, "note": "2 beat; pause 1.3s không drift; resume tăng; target state đổi" },
+    { "id": 6, "item": "Creator không tự duyệt/publish", "checked": true, "note": "API 403 cả approve/publish; UI không có nút" },
+    { "id": 7, "item": "Enrollment gate + thu hồi assignment", "checked": true, "note": "outsider 404; thu hồi chặn ngay; API 404" },
+    { "id": 8, "item": "Light mode và mobile 390px", "checked": true, "note": "color-scheme light, không overflow" },
+    { "id": 9, "item": "Worker revalidate không mất event", "checked": true, "note": "real Web 3001: processed, tampered 401, lỗi URL pending+retry" }
+  ],
+  "notes": "ĐẠI CA duyệt trong phiên30/10/2026. Production deploy/migration, TTS/audio thật và preview external frame vẫn ngoài phạm vi."
+}

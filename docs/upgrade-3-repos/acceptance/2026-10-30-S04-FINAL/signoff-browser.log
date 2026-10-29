@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "ok": true,
+    "detail": "Lesson title from published snapshot rendered"
+  },
+  {
+    "id": 1,
+    "ok": true,
+    "detail": "Objective + narration match approved plan content"
+  },
+  {
+    "id": 2,
+    "ok": true,
+    "detail": "Visual semantic title + alt text rendered"
+  },
+  {
+    "id": 2,
+    "ok": true,
+    "detail": "Full flow visible before playback; beat state only starts on play"
+  },
+  {
+    "id": 3,
+    "ok": true,
+    "detail": "Private answer key/explanation absent from learner DOM"
+  },
+  {
+    "id": 4,
+    "ok": true,
+    "detail": "Pinned source title rendered"
+  },
+  {
+    "id": 8,
+    "ok": true,
+    "detail": "mobile 390px no overflow; color-scheme=light"
+  },
+  {
+    "id": 3,
+    "ok": true,
+    "detail": "API snapshot has no answerKey"
+  },
+  {
+    "id": 3,
+    "ok": true,
+    "detail": "API snapshot has no private explanation"
+  },
+  {
+    "id": 5,
+    "ok": true,
+    "detail": "Two narration beats pinned with rendererVersion"
+  },
+  {
+    "id": 7,
+    "ok": true,
+    "detail": "unassigned learner blocked (status 200, no lesson content: true)"
+  },
+  {
+    "id": 7,
+    "ok": true,
+    "detail": "unassigned learner cannot see lesson title"
+  },
+  {
+    "id": 7,
+    "ok": true,
+    "detail": "unassigned API gets 404"
+  },
+  {
+    "id": 7,
+    "ok": true,
+    "detail": "revoked learner blocked (status 200, no lesson content: true)"
+  },
+  {
+    "id": 7,
+    "ok": true,
+    "detail": "revoked learner cannot see lesson title"
+  },
+  {
+    "id": 6,
+    "ok": true,
+    "detail": "reviewer sees no approve button after publish"
+  },
+  {
+    "id": 6,
+    "ok": true,
+    "detail": "published timestamp visible in CMS panel"
+  },
+  {
+    "id": 5,
+    "ok": true,
+    "detail": "narration clock advanced to 1.3"
+  },
+  {
+    "id": 5,
+    "ok": true,
+    "detail": "active beat marks a visual target"
+  },
+  {
+    "id": 5,
+    "ok": true,
+    "detail": "pause holds elapsed at 1.3"
+  },
+  {
+    "id": 5,
+    "ok": true,
+    "detail": "resume advances to 1.7000000000000004"
+  },
+  {
+    "id": 6,
+    "ok": true,
+    "detail": "creator sees no approve/publish controls"
+  },
+  {
+    "id": 6,
+    "ok": true,
+    "detail": "creator API approve/publish both 403"
+  },
+  {
+    "id": 9,
+    "ok": true,
+    "detail": "Real Web 3001: outbox processed, tampered signature 401, failed URL stays pending with retry"
+  }
+]

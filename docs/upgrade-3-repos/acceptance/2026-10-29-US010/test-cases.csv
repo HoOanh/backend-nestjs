@@ -1,0 +1,22 @@
+﻿"ID","AC","Bước thực hiện","Mong đợi","Kết quả","Thời gian ms","Ảnh"
+"PLAN01","AC-010-01","1. Đăng nhập editor/reviewer bằng mật khẩu và TOTP thật; đăng nhập learner.
+2. Tạo lesson, upload Markdown qua storage thật, đợi extraction ready và gắn author-only.
+3. Mở editor, tạo giáo án, soạn lời giảng/ý đồ đồ hoạ, gắn objective/source và checkpoint.
+4. Đợi autosave ACK, kiểm findings rỗng, kiểm mobile390px/light-only.","Mapping đầy đủ, nguồn hash thật, saved chỉ sau ACK; mobile không tràn.","PASS","6092","images/PLAN01-editor-desktop.png
+images/PLAN01-editor-mobile.png"
+"PLAN02","AC-010-01","1. Mở preview từ CMS bằng staff session hiện hành.
+2. Kiểm lời giảng, câu hỏi, citation anchor và source text; kiểm serialized HTML không có answerKey.
+3. Kiểm mobile390px và bản EN.
+4. Dùng learner session mở cùng URL; gọi internal preview API.","Staff xem được draft và nguồn trong scope; không gửi answer key/explanation đáp án; learner không nhận draft/source, API401.","PASS","1133","images/PLAN02-web-preview-desktop.png
+images/PLAN02-web-preview-mobile.png
+images/PLAN02-web-preview-english.png
+images/PLAN02-student-denied.png"
+"PLAN03","AC-010-02","1. Bỏ objective mapping, đợi lint báo objective_required tại sections.0.objectiveIds.
+2. Gắn lại mapping; gửi checkpoint sai schema tới lint API.
+3. Reviewer mở editor, điều hướng section nhưng không sửa được; thử PATCH trực tiếp.","Lint trả rule/path cụ thể; malformed checkpoint có sections.0.checkpoints.0.question; reviewer read-only, PATCH403.","PASS","2456","images/PLAN03-lint-objective-missing.png
+images/PLAN03-reviewer-readonly.png"
+"PLAN04","AC-010-03","1. Tắt mạng browser thật, sửa narration và kiểm trạng thái ngoại tuyến.
+2. Nối lại, đợi server lưu; mở tab thứ hai.
+3. Tab1 lưu narration; tab2 gửi version cũ.
+4. Kiểm server giữ tab1, tab2 giữ buffer; export JSON và thử điều hướng rồi tiếp tục chỉnh sửa.","Offline giữ draft; reconnect có ACK; stale412 không ghi đè, export và navigation blocker hoạt động.","PASS","5314","images/PLAN04-offline.png
+images/PLAN04-conflict-buffer.png"

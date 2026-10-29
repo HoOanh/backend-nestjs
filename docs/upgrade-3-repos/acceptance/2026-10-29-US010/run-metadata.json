@@ -1,0 +1,20 @@
+{
+  "scope": "US-010; AI/review not executed",
+  "courseId": "424e53b6-6070-48aa-9838-ec2a23a58861",
+  "lessonId": "64977bf0-4102-4018-8688-4e69edef3b55",
+  "planId": "a4c8f0d7-85a3-44e5-a4a2-401632d63bff",
+  "screenshots": [
+    "images/PLAN01-editor-desktop.png",
+    "images/PLAN01-editor-mobile.png",
+    "images/PLAN02-web-preview-desktop.png",
+    "images/PLAN02-web-preview-mobile.png",
+    "images/PLAN02-web-preview-english.png",
+    "images/PLAN02-student-denied.png",
+    "images/PLAN03-lint-objective-missing.png",
+    "images/PLAN03-reviewer-readonly.png",
+    "images/PLAN04-offline.png",
+    "images/PLAN04-conflict-buffer.png"
+  ],
+  "browserErrors": [],
+  "auth": "Actual password/TOTP browser login; no injected session; no mocked HTTP"
+}

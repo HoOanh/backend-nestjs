@@ -77,9 +77,18 @@
         "S02"
       ],
       "path": "phases/P02-content/sprints/S03-teaching-plans",
-      "status": "draft",
+      "status": "in_progress",
       "story_ids": [
         "US-010",
+        "US-011",
+        "US-012"
+      ],
+      "authorized_scope": [
+        "US-010"
+      ],
+      "execution_report": "implementation/S03-REPORT.md",
+      "human_acceptance": "pending",
+      "not_implemented": [
         "US-011",
         "US-012"
       ]

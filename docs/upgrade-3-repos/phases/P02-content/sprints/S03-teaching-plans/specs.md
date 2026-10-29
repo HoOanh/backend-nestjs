@@ -1,3 +1,5 @@
+> Chỉ đạo29/10/2026: đã merge/push S02; bắt đầu US-010/S03 theo [execution contract](../../../../implementation/S03-REPORT.md). US-011/012 chưa triển khai trong lát cắt này; các gate lịch sử bên dưới được giữ để đối chiếu.
+
 # S03 — specs lát cắt
 
 DRAFT 0.2 · Pending approval · [SPEC-01](../../../../specs/01-CONTENT-DOCUMENTS.md) là invariant dùng chung.

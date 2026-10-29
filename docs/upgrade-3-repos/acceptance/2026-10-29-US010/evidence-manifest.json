@@ -1,0 +1,176 @@
+{
+  "baseRevisions": {
+    "backend-nestjs": "d9a5a3d",
+    "arc-academy-backend": "103f96b",
+    "arc-academy-cms": "5fba9bd",
+    "arc-academy-web": "26232e2"
+  },
+  "summary": {
+    "pass": 4,
+    "fail": 0,
+    "notExecuted": 0
+  },
+  "sources": [
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.schema.ts",
+      "bytes": 4012,
+      "sha256": "53d25702eb2c601e3d77c10558562f6bc6b19fd0094c465d31c86a7016f0d50a"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.service.ts",
+      "bytes": 9137,
+      "sha256": "bb71218a2b9867b3df2388ea90b9ab6385a1542c953ec262f233d9694c3a52e3"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.controller.ts",
+      "bytes": 2489,
+      "sha256": "f8b5033f5d7427055b6e8283ea01e72fc4ebc77d3975a7b014f41718eabfacb0"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.dto.ts",
+      "bytes": 3905,
+      "sha256": "0e5befcae4418638416d2a62e4acd269c09f2b1d937321a5474570b0e31200d6"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "prisma/schema/teaching-plans.prisma",
+      "bytes": 1160,
+      "sha256": "961e2d3016e1d7ea86dc2f8a4f11a3947ba1bd144dbea193315eb41069d6a7e9"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "prisma/migrations/20261029030000_teaching_plans/migration.sql",
+      "bytes": 2207,
+      "sha256": "a7960c4d293b7787f5bb77f935e7804f9fcb18a485b595ecdf71be6d9dbda5d1"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/modules/teaching-plans/PlanEditorPage.tsx",
+      "bytes": 25653,
+      "sha256": "9069538174e89551c226f8a364db50a9a3b3a4fc1e8a69e395e2e1a1f39324c9"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/modules/teaching-plans/plan.service.ts",
+      "bytes": 2636,
+      "sha256": "7d4864cb2d195528f1670d19845f68b35152c27242bd288d74f558699aaceac2"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/routes/_authenticated/lesson-plans.$lessonId.tsx",
+      "bytes": 500,
+      "sha256": "aec7bdd4f3cf23886fe592bc1374f861595129528cb799292290c53fb7cf84df"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/core/api/preview-transport.ts",
+      "bytes": 1240,
+      "sha256": "7db512c518810964c6fdb32bb35a9fb0868319a81e85cc32b0818a9ca25d26bc"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/features/teaching-plans/preview.server.ts",
+      "bytes": 1311,
+      "sha256": "d4aef3f0369957131e843ab2015b15282836b317d130cc603405d58f3519e910"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/features/teaching-plans/PlanRenderer.tsx",
+      "bytes": 5355,
+      "sha256": "83369514cff0abe5d0e16e180784920919b6b4b2cd51107577f7548d775dd668"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/app/[locale]/preview/teaching-plans/[planId]/page.tsx",
+      "bytes": 1248,
+      "sha256": "cf88dfc1767666565782e830eedeed1edf882f8921bb691060f676f45e1563b4"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "e2e/teaching-plans.spec.ts",
+      "bytes": 14166,
+      "sha256": "354d484d105f77c4266f219304f500cafbe18a14c93319a0bf2263f23101c0a4"
+    }
+  ],
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 3603,
+      "sha256": "b7dc9465d7784f48d07482403acc93a425cc6ff9a9730d33d40b0b8322e13747"
+    },
+    {
+      "path": "index.html",
+      "bytes": 5861,
+      "sha256": "5149fcb904d31f86887c9c4a24760cdd2998bce92593198a770451a35e7e3d7a"
+    },
+    {
+      "path": "test-cases.csv",
+      "bytes": 2319,
+      "sha256": "5f0264e256f2a70e147548bccf2b8997ea6cfc9798a618ab6ba6d0918ef5f6ac"
+    },
+    {
+      "path": "test-results.json",
+      "bytes": 3530,
+      "sha256": "83edf45762d697fd3f44c47622d85fd6d9eba1729ecdc40ffe0fe4bfe8ba5603"
+    },
+    {
+      "path": "run-metadata.json",
+      "bytes": 756,
+      "sha256": "ed836b646569938903ce066d2e2273a6806ef87136fa899eb504b89a05e8809c"
+    },
+    {
+      "path": "images/PLAN01-editor-desktop.png",
+      "bytes": 236328,
+      "sha256": "bf62eec2f67d412a55edc4d1edb4d5157d14b29c9800372bd8af31bf3fd3759d"
+    },
+    {
+      "path": "images/PLAN01-editor-mobile.png",
+      "bytes": 207503,
+      "sha256": "6b628d41a0e2579c582c9f35af0f15d93766f79e28fd357a9decd0a38fee89ec"
+    },
+    {
+      "path": "images/PLAN02-web-preview-desktop.png",
+      "bytes": 111552,
+      "sha256": "4f1cfbdc3eff9c9487e0b07f17583c5d6ad9a0799f91015dd18f31156ab1f949"
+    },
+    {
+      "path": "images/PLAN02-web-preview-mobile.png",
+      "bytes": 103167,
+      "sha256": "f7b52e470ca0a177c8dbb99ac7fcc93d0b58fc4f04dbe3c77ce77b7abf7af48b"
+    },
+    {
+      "path": "images/PLAN02-web-preview-english.png",
+      "bytes": 100952,
+      "sha256": "5950a0c1203833533ce24c1e61ae91533edf51726cea80d7989eb43145e1fe5a"
+    },
+    {
+      "path": "images/PLAN02-student-denied.png",
+      "bytes": 31858,
+      "sha256": "8491e297d5beb2b9d3acbf436980b303271f6edd6c243cec8a2342974e778b3c"
+    },
+    {
+      "path": "images/PLAN03-lint-objective-missing.png",
+      "bytes": 252638,
+      "sha256": "7ea724df892b4b22c737a4f2efabbcc3aeb0705d82225dfc6d40398efcf3cfe9"
+    },
+    {
+      "path": "images/PLAN03-reviewer-readonly.png",
+      "bytes": 231144,
+      "sha256": "a6944bbfd0d320b40588b30ec60df3efaf60d3965a8a1dd9310c47b67fcd6b59"
+    },
+    {
+      "path": "images/PLAN04-offline.png",
+      "bytes": 229959,
+      "sha256": "229967de8e83a848bb8daaba6236e35d33132cdd95db6703960b3746304ffa54"
+    },
+    {
+      "path": "images/PLAN04-conflict-buffer.png",
+      "bytes": 246489,
+      "sha256": "268e1b866bc6405eb8f3d3eb79a6962b3f891a53695e85c38d019e607d46dbb8"
+    }
+  ]
+}

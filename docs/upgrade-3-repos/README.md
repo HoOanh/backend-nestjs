@@ -48,3 +48,7 @@ Nguồn nội bộ: MVP `/Users/hominhoanh/Documents/source/backend-nestjs`, kh�
 
 
 Review bổ sung của ĐẠI CA: [Foundation rework — kiến trúc/i18n/brand/UI](implementation/FOUNDATION-REWORK.md).
+
+## Nguồn duy nhất cho shared docs/report
+
+Chỉ lưu specs/stories/report/ảnh/evidence của chương trình tại thư mục này. Ba repo Academy dùng symlink `docs/upgrade` trỏ về đây trong workspace; không copy hoặc đồng bộ report ra từng repo. Khi checkout độc lập, đọc bản chuẩn trên GitHub. Không rewrite lịch sử Git để xoá các bản sao cũ. Tài liệu riêng Web đã chuyển vào implementation/WEB-MARKETING-UI.md, các amendment riêng được hợp nhất có ghi phạm vi.

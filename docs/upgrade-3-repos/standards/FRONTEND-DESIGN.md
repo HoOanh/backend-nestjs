@@ -37,4 +37,7 @@ Chọn bản gốc `anthropics/skills/skills/frontend-design` thay vì bản rú
 
 Skill định hướng thiết kế; `arc-frontend-workspaces` quy định engineering; `arc-foundation-quality` quy định bằng chứng/gates. Academy giữ nhận diện thống nhất giữa các trang, light-only và nội dung đọc dễ; không đổi font/palette mỗi trang để tạo khác biệt. Tuân thủ ràng buộc Academy khi gợi ý aesthetic chung khác brief. Không bổ sung feature/screen chỉ để phô diễn component.
 
-Button, Input, Label, NativeSelect, Card được lấy từ registry ngày 28/10/2026 bằng CLI 4.23.0; provenance và adaptations ở `ui-registry.manifest.json`. NativeSelect phù hợp language switch hai lựa chọn; không bắt buộc Radix Select cho control đơn giản. HTML semantic cho article/section/form/layout được phép; native controls ở feature bị ESLint chặn.
+Button, Input, Label, NativeSelect, Card được lấy từ registry ngày 28/10/2026 bằng CLI 4.23.0; provenance và adaptations ở `ui-registry.manifest.json`. Language switch dùng shadcn DropdownMenu radio items, có keyboard navigation, selected state và focus return. HTML semantic cho article/section/form/layout được phép; native controls ở feature bị ESLint chặn.
+
+
+Review UI auth: form noValidate + React Hook Form/Zod; lỗi dịch VI/EN cạnh trường, aria-invalid/aria-describedby và focus trường lỗi đầu tiên. Có password hint, show/hide password; auth layout giới hạn max-width, form trắng rõ ràng, không chia đôi trống toàn viewport. Kiểm cả empty submit, invalid email/password, menu mở, Escape và mobile trước kết luận UI đạt.

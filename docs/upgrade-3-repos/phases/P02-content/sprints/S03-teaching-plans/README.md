@@ -1,3 +1,5 @@
+> Chỉ đạo29/10/2026: đã merge/push S02; bắt đầu US-010/S03 theo [execution contract](../../../../implementation/S03-REPORT.md). US-011/012 chưa triển khai trong lát cắt này; các gate lịch sử bên dưới được giữ để đối chiếu.
+
 # S03 — Giáo án và AI soạn bài từ content
 
 DRAFT 0.2 · Phase P02 · Release R1 · Gate chưa mở.

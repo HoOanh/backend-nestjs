@@ -1,0 +1,89 @@
+{
+  "scope": "US-010 / S03 manual authoring only",
+  "startTime": "2026-10-29T02:47:41.994Z",
+  "durationMs": 15800.05,
+  "summary": {
+    "pass": 4,
+    "fail": 0,
+    "notExecuted": 0
+  },
+  "baseRevisions": {
+    "backend-nestjs": "d9a5a3d",
+    "arc-academy-backend": "103f96b",
+    "arc-academy-cms": "5fba9bd",
+    "arc-academy-web": "26232e2"
+  },
+  "workingTree": "US-010 implementation is uncommitted; main already contains merged/pushed S02",
+  "browserErrors": [],
+  "results": [
+    {
+      "id": "PLAN01",
+      "ac": "AC-010-01",
+      "steps": [
+        "Đăng nhập editor/reviewer bằng mật khẩu và TOTP thật; đăng nhập learner.",
+        "Tạo lesson, upload Markdown qua storage thật, đợi extraction ready và gắn author-only.",
+        "Mở editor, tạo giáo án, soạn lời giảng/ý đồ đồ hoạ, gắn objective/source và checkpoint.",
+        "Đợi autosave ACK, kiểm findings rỗng, kiểm mobile390px/light-only."
+      ],
+      "expected": "Mapping đầy đủ, nguồn hash thật, saved chỉ sau ACK; mobile không tràn.",
+      "status": "PASS",
+      "durationMs": 6092,
+      "screenshots": [
+        "images/PLAN01-editor-desktop.png",
+        "images/PLAN01-editor-mobile.png"
+      ]
+    },
+    {
+      "id": "PLAN02",
+      "ac": "AC-010-01",
+      "steps": [
+        "Mở preview từ CMS bằng staff session hiện hành.",
+        "Kiểm lời giảng, câu hỏi, citation anchor và source text; kiểm serialized HTML không có answerKey.",
+        "Kiểm mobile390px và bản EN.",
+        "Dùng learner session mở cùng URL; gọi internal preview API."
+      ],
+      "expected": "Staff xem được draft và nguồn trong scope; không gửi answer key/explanation đáp án; learner không nhận draft/source, API401.",
+      "status": "PASS",
+      "durationMs": 1133,
+      "screenshots": [
+        "images/PLAN02-web-preview-desktop.png",
+        "images/PLAN02-web-preview-mobile.png",
+        "images/PLAN02-web-preview-english.png",
+        "images/PLAN02-student-denied.png"
+      ]
+    },
+    {
+      "id": "PLAN03",
+      "ac": "AC-010-02",
+      "steps": [
+        "Bỏ objective mapping, đợi lint báo objective_required tại sections.0.objectiveIds.",
+        "Gắn lại mapping; gửi checkpoint sai schema tới lint API.",
+        "Reviewer mở editor, điều hướng section nhưng không sửa được; thử PATCH trực tiếp."
+      ],
+      "expected": "Lint trả rule/path cụ thể; malformed checkpoint có sections.0.checkpoints.0.question; reviewer read-only, PATCH403.",
+      "status": "PASS",
+      "durationMs": 2456,
+      "screenshots": [
+        "images/PLAN03-lint-objective-missing.png",
+        "images/PLAN03-reviewer-readonly.png"
+      ]
+    },
+    {
+      "id": "PLAN04",
+      "ac": "AC-010-03",
+      "steps": [
+        "Tắt mạng browser thật, sửa narration và kiểm trạng thái ngoại tuyến.",
+        "Nối lại, đợi server lưu; mở tab thứ hai.",
+        "Tab1 lưu narration; tab2 gửi version cũ.",
+        "Kiểm server giữ tab1, tab2 giữ buffer; export JSON và thử điều hướng rồi tiếp tục chỉnh sửa."
+      ],
+      "expected": "Offline giữ draft; reconnect có ACK; stale412 không ghi đè, export và navigation blocker hoạt động.",
+      "status": "PASS",
+      "durationMs": 5314,
+      "screenshots": [
+        "images/PLAN04-offline.png",
+        "images/PLAN04-conflict-buffer.png"
+      ]
+    }
+  ]
+}

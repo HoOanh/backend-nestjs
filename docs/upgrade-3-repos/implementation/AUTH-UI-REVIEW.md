@@ -9,3 +9,7 @@ Sửa theo ảnh review của ĐẠI CA: popup validation native tiếng Anh, la
 - Web coverage runner gọi Node trực tiếp để tránh lỗi finalizer của executable shim trên máy local.
 - Đã xem screenshot desktop + mobile: Web .local/screenshots/auth-register-{desktop,errors,mobile}.png.
 - Không commit/push/deploy. Báo cáo foundation trước là lịch sử; NativeSelect language-switch decision đã được thay thế theo review này.
+
+## Hợp nhất ghi chú29/10/2026
+
+Bản Web/Backend trước đây có amendment mật khẩu8–128 ký tự; CMS vẫn giữ12–128 theo phạm vi chỉ đạo lúc đó. Xem [Web marketing/auth report](WEB-MARKETING-UI.md) để phân biệt phạm vi; không đồng nhất hai contract chỉ vì gom report.

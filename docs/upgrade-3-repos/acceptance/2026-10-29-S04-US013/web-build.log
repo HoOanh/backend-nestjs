@@ -1,7 +1,7 @@
    ▲ Next.js 15.5.28
 
    Creating an optimized production build ...
- ✓ Compiled successfully in 4.1s
+ ✓ Compiled successfully in 1430ms
    Linting and checking validity of types ...
    Collecting page data ...
    Generating static pages (0/4) ...
@@ -21,12 +21,12 @@ Route (app)                                                   Size  First Load J
 ├ ƒ /[locale]/learn/courses/[courseId]/lessons/[lessonId]   4.4 kB         162 kB
 ├ ƒ /[locale]/learn/dashboard                                166 B         120 kB
 ├ ƒ /[locale]/login                                          142 B         223 kB
-├ ƒ /[locale]/preview/teaching-plans/[planId]                131 B         103 kB
-├ ƒ /[locale]/preview/visuals/[visualId]                     131 B         103 kB
+├ ƒ /[locale]/preview/teaching-plans/[planId]                127 B         103 kB
+├ ƒ /[locale]/preview/visuals/[visualId]                   2.74 kB         128 kB
 ├ ƒ /[locale]/register                                       141 B         223 kB
 ├ ƒ /[locale]/reset-password                                 142 B         223 kB
 ├ ƒ /[locale]/verify-email                                   142 B         223 kB
-└ ƒ /api/revalidate                                          131 B         103 kB
+└ ƒ /api/revalidate                                          127 B         103 kB
 + First Load JS shared by all                               103 kB
   ├ chunks/84-ad428348e9f7a048.js                          46.5 kB
   ├ chunks/ab66e074-ecccd2203f9f9807.js                    54.2 kB

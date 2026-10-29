@@ -1,4 +1,4 @@
-> Cập nhật29/10/2026: S04 được mở theo chỉ đạo “push đi nhé rồi mở next step”. US-013 đã có backend typed revision, CMS visual editor và Web renderer/preview8 kind (AC-013-03 partial vì package thuộc US-015). US-014 mới xong backend beat schema/lint; CMS beat editor + Web clock player và US-015 chưa làm; S04 chưa đóng.
+> Cập nhật29/10/2026: S04 được mở theo chỉ đạo “push đi nhé rồi mở next step”. US-013 đã có backend typed revision, CMS visual editor và Web renderer/preview8 kind (AC-013-03 partial vì package thuộc US-015). US-014 đã có backend beat schema/lint, CMS beat editor và Web narration clock (clock mô phỏng, chưa nối TTS thật). US-015 chưa làm; S04 chưa đóng.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 

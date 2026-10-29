@@ -1,4 +1,4 @@
-> Cập nhật29/10/2026 (lượt3): US-013 xong CMS/Web. US-014 mới xong **backend beat schema/lint** (chưa có CMS beat editor và Web clock player). US-015 chưa bắt đầu. S04 chưa đóng.
+> Cập nhật30/10/2026 (lượt4): US-013 xong; US-014 xong backend + CMS beat editor + Web narration clock (DOM test pause/resume). US-015 chưa bắt đầu; S04 chưa đóng.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
@@ -28,9 +28,9 @@ Sprint mở ngày29/10/2026. Effort gốc14–22 person-days; hiện xong lát c
 
 | Gate | Kết quả |
 |---|---|
-| Backend quality | PASS;123/123 tests/20 suites; statements85.17%, branches66.94%, functions83.49%, lines87.53%; OpenAPI64 paths,97 Bruno ops, reproducible |
-| CMS quality/build | PASS;70 unit/15 files;33/33 browser (2 visual editor); product844 messages; codegen reproducible; production build |
-| Web quality/build | PASS;42 unit; preview transport allowlist teaching-plan/visual; codegen reproducible; production build |
+| Backend quality | PASS;125/125 tests/20 suites; statements85.16%, branches66.9%, functions83.54%, lines87.61%; OpenAPI64 paths,97 Bruno ops, reproducible |
+| CMS quality/build | PASS;70 unit/15 files;33/33 browser (2 visual editor); product i18n; codegen reproducible; production build |
+| Web quality/build | PASS;45 unit (clock2 + DOM player1); preview transport allowlist teaching-plan/visual; codegen reproducible; production build |
 | CMS visual browser với backend thật | NOT EXECUTED (fixture HTTP) |
 | Web renderer screenshot/regression | NOT EXECUTED |
 | US-014 narration beats/focus clock | NOT EXECUTED |
@@ -46,10 +46,17 @@ Log/ảnh: [acceptance/2026-10-29-S04-US013](../acceptance/2026-10-29-S04-US013/
 
 Không tuyên bố S04 exit.
 
-## US-014 — backend beat slice (partial)
+## US-014 — Đồng bộ narration với visual
 
-- Thêm `beats` optional vào visual schema: id/scriptSegmentId/startCue/endCue/focusTargets/action allowlist reveal|highlight|draw|pointer|clear; cửa sổ `endCue > startCue`; tối đa40 beat.
-- Lint: duplicate beat id, beat không có focus target, focus target không tồn tại trong payload, cửa sổ sai.
-- Service đối chiếu `scriptSegmentId` với section/checkpoint của teaching plan hiện hành; thiếu mapping trả `missing_script_segment` (không tự sửa/không mất nội dung).
-- Test: unit beat validation4 test; e2e visual5 test (beat hợp lệ, missing segment/target, action lạ400). Backend125 tests; statements85.16%.
-- **Chưa làm**: CMS beat editor, Web narration clock player (play/pause/resume), preview reveal/highlight, lint UI. AC-014-01/03 chưa có bằng chứng; AC-014-02 mới có backend.
+- Backend: `beats` optional trong visual schema (scriptSegmentId/startCue/endCue/focusTargets/action allowlist, cửa sổ dương, tối đa40); lint duplicate beat, thiếu/sai focus target, cửa sổ sai; đối chiếu scriptSegmentId với section/checkpoint của plan hiện hành (`missing_script_segment`).
+- CMS: beat editor trong visual editor — chọn action, đoạn lời giảng (section/checkpoint), start/end giây, focus target checkbox; lưu cùng revision If-Match; hiển thị lint.
+- Web: `NarrationClock` client phát theo elapsed của narration clock (interval cộng delta, không dùng Date/wall-clock), play/pause/reset giữ nguyên thời điểm; active beat áp `data-beat-state` lên `data-visual-target` (reveal ẩn target không focus, highlight/draw outline); reduced-motion hiển thị danh sách beat tĩnh, không autoplay.
+- Test: backend unit4 + e2e visual5 (beat hợp lệ/segment-missing/target-missing/action lạ); Web pure clock2 + DOM player1 (pause không drift); CMS visual service2 + browser visual editor2.
+
+| AC | Trạng thái | Ghi chú |
+|---|---|---|
+| AC-014-01 | PASS local | Beat theo elapsed; DOM test reveal/highlight target; preview clock |
+| AC-014-02 | PASS local | Backend `missing_script_segment`, `missing_beat_target`, schema action; CMS hiển thị findings |
+| AC-014-03 | PASS local | Pause/resume dùng elapsed, DOM test không lệch sau pause |
+
+Giới hạn: narration clock là clock mô phỏng (chưa nối TTS/audio thật); chưa có browser E2E real; reduced-motion chỉ kiểm bằng code path, chưa screenshot.

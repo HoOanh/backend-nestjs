@@ -32,6 +32,10 @@ Ngày29/10/2026, tiếp chỉ đạo hoàn tất S04 slice đầu. Phạm vi đ�
 - Web unit coverage toàn app9.7% — không suy luận chất lượng renderer từ số test pass.
 - Chưa có US-014 focus clock, US-015 preview exchange/publish/outbox; S04 chưa thể đóng.
 
-## Bổ sung US-014 backend (partial)
+## US-014 — narration beats (đã bổ sung)
 
-Beat schema/lint/plan-segment validation đã thêm, backend125 tests; chưa có CMS beat editor và Web narration clock player nên AC-014-01/03 chưa đạt. Chi tiết trong implementation/S04-REPORT.md.
+- Backend beat schema/lint/plan-segment validation;125 tests.
+- CMS beat editor (action/segment/start-end/focus targets) trong visual editor; browser visual editor2 test vẫn PASS.
+- Web narration clock: play/pause/reset theo elapsed, DOM test pause không drift; highlight/reveal targets; reduced-motion fallback.
+- Web45 tests, CMS70 unit/33 browser, build PASS. Chi tiết implementation/S04-REPORT.md.
+- Giới hạn: clock mô phỏng, chưa nối TTS/audio thật.

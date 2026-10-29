@@ -1,0 +1,21 @@
+
+Running 14 tests using 1 worker
+
+(node:94395) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/auth-ux.spec.ts:2:1 › localized field errors, password visibility and keyboard language menu (928ms)
+  ✓   2 e2e/light-theme.spec.ts:4:3 › light UI survives light OS preference, locale change and reload (494ms)
+  ✓   3 e2e/light-theme.spec.ts:4:3 › light UI survives dark OS preference, locale change and reload (490ms)
+  ✓   4 e2e/smoke.spec.ts:2:1 › staff login form is interactive (216ms)
+  ✓   5 e2e/smoke.spec.ts:11:1 › direct private URL redirects after an unauthenticated response (243ms)
+  ✓   6 e2e/smoke.spec.ts:36:1 › language preference survives reload and invitation query is preserved (489ms)
+  ✓   7 e2e/smoke.spec.ts:52:1 › MFA and recovery screens follow selected language without internal markers (548ms)
+  ✓   8 e2e/smoke.spec.ts:88:1 › file route guard denies staff lacking module permissions before loading module data (190ms)
+  ✓   9 e2e/studio-quality.spec.ts:68:1 › hover and navigation reuse the staff session (758ms)
+  ✓  10 e2e/studio-quality.spec.ts:83:1 › failed provider save shows toast and allows retry without a masked key (504ms)
+  ✓  11 e2e/studio-quality.spec.ts:108:1 › provider creation validates fields and uses a keyboard accessible Select (750ms)
+  ✓  12 e2e/studio-quality.spec.ts:129:3 › mobile sidebar opens, closes and retains light palette (light) (1.1s)
+  ✓  13 e2e/studio-quality.spec.ts:129:3 › mobile sidebar opens, closes and retains light palette (dark) (1.1s)
+  ✓  14 e2e/studio-quality.spec.ts:172:1 › desktop sidebar can collapse without horizontal overflow (432ms)
+
+  14 passed (9.0s)

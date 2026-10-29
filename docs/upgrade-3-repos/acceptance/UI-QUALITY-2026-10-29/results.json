@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-29",
+  "cms": {
+    "unitTests": 54,
+    "browserTests": 14,
+    "rulesTests": 5,
+    "lineCoveragePercent": 36.11,
+    "quality": "pass",
+    "build": "pass",
+    "mcp": "pass"
+  },
+  "web": {
+    "unitTests": 44,
+    "browserTests": 9,
+    "rulesTests": 5,
+    "lineCoveragePercent": 16.71,
+    "quality": "pass",
+    "build": "pass",
+    "mcp": "pass"
+  },
+  "limits": [
+    "Provider browser operations use HTTP contract fixtures; real provider credentials/upstream were not exercised.",
+    "Course catalog Accordion has no populated real-catalog browser scenario in this run.",
+    "Application coverage remains low; passing gates do not certify all product workflows.",
+    "Web browser tests use newly built production runtime on localhost:3101; other running previews were not restarted.",
+    "No commits, push or deploy."
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "scope": "US-010 regression + US-011 real Gemini; human review not executed",
+  "liveGeneration": {
+    "jobId": "b75622ae-449b-402d-a224-f79005d5d1c2",
+    "model": "gemini-3.5-flash-lite",
+    "modelVersion": "gemini-3.5-flash-lite",
+    "promptVersion": "arc-plan-authoring-2",
+    "inputHash": "53eb44730218116c1f54cd63bb9463d76a1970d36d9e36da6b3d8e14715be505",
+    "outputHash": "f759f2e36137b8a2d3b3b28f98a12a1df2642638321d397f6f96e8e435e27e62",
+    "providerRequestId": "jL3iavf7Btuw4-EPhfuJsAU",
+    "usageUnits": 780,
+    "sourceRefs": [
+      {
+        "id": "5ae0ad50-4b0b-42a1-aa1b-948483b81509",
+        "spanId": "0bc44f77-8723-47fa-bb6d-017ac501ab57",
+        "textHash": "5de71f4174e17527b9217c2560c239568e9fe49a182c116224d8f9be10b8288d"
+      }
+    ],
+    "beforeVersion": 6,
+    "afterVersion": 7,
+    "duplicateApplyVersionUnchanged": true,
+    "autoPublished": false
+  },
+  "courseId": "221a5ae0-56b0-4b02-ad78-6cd357fe5838",
+  "lessonId": "668722dc-a7b9-4b34-a823-419c193f5d5d",
+  "planId": "d0869fb3-101b-421e-8e67-e32265d77cd6",
+  "screenshots": [
+    "images/PLAN01-editor-desktop.png",
+    "images/PLAN01-editor-mobile.png",
+    "images/PLAN02-web-preview-desktop.png",
+    "images/PLAN02-web-preview-mobile.png",
+    "images/PLAN02-web-preview-english.png",
+    "images/PLAN02-student-denied.png",
+    "images/PLAN03-lint-objective-missing.png",
+    "images/PLAN03-reviewer-readonly.png",
+    "images/PLAN04-offline.png",
+    "images/PLAN04-conflict-buffer.png",
+    "images/PLAN05-gemini-draft-desktop.png",
+    "images/PLAN05-gemini-draft-mobile.png",
+    "images/PLAN05-gemini-applied.png",
+    "images/PLAN05-gemini-web-preview.png"
+  ],
+  "browserErrors": [],
+  "auth": "Actual password/TOTP browser login; no injected session; no mocked HTTP"
+}

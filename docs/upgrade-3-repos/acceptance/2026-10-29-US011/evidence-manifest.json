@@ -1,0 +1,261 @@
+{
+  "baseRevisions": {
+    "backend-nestjs": "772d69e",
+    "arc-academy-backend": "c3635ac",
+    "arc-academy-cms": "a7e870b",
+    "arc-academy-web": "782e31d"
+  },
+  "summary": {
+    "pass": 5,
+    "fail": 0,
+    "notExecuted": 0
+  },
+  "sources": [
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.schema.ts",
+      "bytes": 4012,
+      "sha256": "53d25702eb2c601e3d77c10558562f6bc6b19fd0094c465d31c86a7016f0d50a"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.service.ts",
+      "bytes": 9855,
+      "sha256": "164b33ed8db12e88a613cf16a086cdae0edb32c379c07572b813b75672b07c74"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.controller.ts",
+      "bytes": 2489,
+      "sha256": "f8b5033f5d7427055b6e8283ea01e72fc4ebc77d3975a7b014f41718eabfacb0"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan.dto.ts",
+      "bytes": 3905,
+      "sha256": "0e5befcae4418638416d2a62e4acd269c09f2b1d937321a5474570b0e31200d6"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "prisma/schema/teaching-plans.prisma",
+      "bytes": 1257,
+      "sha256": "b5255dc11228e3048b250f9d317f239b4aa2cd7315d4647468200eaa195d9c9d"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "prisma/migrations/20261029030000_teaching_plans/migration.sql",
+      "bytes": 2207,
+      "sha256": "a7960c4d293b7787f5bb77f935e7804f9fcb18a485b595ecdf71be6d9dbda5d1"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan-ai.service.ts",
+      "bytes": 18466,
+      "sha256": "591d68cdade6e205bc52ca7e89cc82099e5d1e7794d954e3d254f320eeb1e3bd"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan-ai.controller.ts",
+      "bytes": 2521,
+      "sha256": "31d9c3415025aaf9de4e40e3d3f82819ba7fdca750453e02429b183d217ece24"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan-ai.dto.ts",
+      "bytes": 2017,
+      "sha256": "02eddb2af3670d82fe9f3313f3e29bd099f1e4de619396e168594a769a3145ec"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/plan-ai.prompt.ts",
+      "bytes": 4093,
+      "sha256": "b9569eb1775def8aaa99f3c44dd9c18bab1b33076065c55de40505f6acd0cdf5"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "src/modules/teaching-plans/gemini-plan.provider.ts",
+      "bytes": 5295,
+      "sha256": "d8d949f750b586e4ad54dab8f15e6e67df06dd9082a78b1b01c2d7eeb67e15d2"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "prisma/schema/plan-ai.prisma",
+      "bytes": 1772,
+      "sha256": "12c8239db8d43157bd34b7966e7b91c43628fecbe5e18ed460f21d6694cc8a3b"
+    },
+    {
+      "repository": "arc-academy-backend",
+      "path": "prisma/migrations/20261029050000_plan_ai_jobs/migration.sql",
+      "bytes": 4189,
+      "sha256": "58c1707bb9cd997c688d0a314140261851e50e7d6457f83a6ae1c94041a827da"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/modules/teaching-plans/PlanEditorPage.tsx",
+      "bytes": 26502,
+      "sha256": "2c13cef83c8e3956c9043d1fc9ed2555d9ded25a56a5bcd0584e2b747a5f864a"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/modules/teaching-plans/plan.service.ts",
+      "bytes": 2636,
+      "sha256": "7d4864cb2d195528f1670d19845f68b35152c27242bd288d74f558699aaceac2"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/routes/_authenticated/lesson-plans.$lessonId.tsx",
+      "bytes": 500,
+      "sha256": "aec7bdd4f3cf23886fe592bc1374f861595129528cb799292290c53fb7cf84df"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/modules/teaching-plans/PlanAiPanel.tsx",
+      "bytes": 13283,
+      "sha256": "b055a3e35bdef568c500df73d8d94b26cc8f5a1f7b140636a3268d8a6d4c7c6c"
+    },
+    {
+      "repository": "arc-academy-cms",
+      "path": "src/modules/teaching-plans/plan-ai.service.ts",
+      "bytes": 2046,
+      "sha256": "949e0e3429a07333df89803a7b4ca1c29ba062afa10d3b53f740ff314867e6d7"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/core/api/preview-transport.ts",
+      "bytes": 1240,
+      "sha256": "7db512c518810964c6fdb32bb35a9fb0868319a81e85cc32b0818a9ca25d26bc"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/features/teaching-plans/preview.server.ts",
+      "bytes": 1311,
+      "sha256": "d4aef3f0369957131e843ab2015b15282836b317d130cc603405d58f3519e910"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/features/teaching-plans/PlanRenderer.tsx",
+      "bytes": 5355,
+      "sha256": "83369514cff0abe5d0e16e180784920919b6b4b2cd51107577f7548d775dd668"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "src/app/[locale]/preview/teaching-plans/[planId]/page.tsx",
+      "bytes": 1248,
+      "sha256": "cf88dfc1767666565782e830eedeed1edf882f8921bb691060f676f45e1563b4"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "e2e/teaching-plans.spec.ts",
+      "bytes": 14890,
+      "sha256": "44fa7e8e9be6b18d735d0ec2a8a8436df644a9ea9649b4cfc7249ea74dcbb57e"
+    },
+    {
+      "repository": "arc-academy-web",
+      "path": "e2e/acceptance/gemini-scenario.ts",
+      "bytes": 5686,
+      "sha256": "59148880dc163bec4a527871b1ba24d6748483f8cf384d8d47d2ec5e05f24c48"
+    }
+  ],
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 5665,
+      "sha256": "b022c9d61e06a5f92b0cf3a05d6f645e89f828c0d1c6e8fa5379486febad845d"
+    },
+    {
+      "path": "index.html",
+      "bytes": 7573,
+      "sha256": "23e0918f1c60badfba3b1bbcc1b165f30f1886b6e973c7c079bc020500f098c5"
+    },
+    {
+      "path": "test-cases.csv",
+      "bytes": 3100,
+      "sha256": "e888a8eb43d52ee862aa1c871773cee7ece52cd080981ed75561f4d8d2d1d4c3"
+    },
+    {
+      "path": "test-results.json",
+      "bytes": 5362,
+      "sha256": "ddc1d2bc6470117ae432f7d76b19ac7f19e9ec92fcafa697c376bffd7cc04ebc"
+    },
+    {
+      "path": "run-metadata.json",
+      "bytes": 1780,
+      "sha256": "4d2d6a03adfe97d8ae496e1a515c5b107fc52a39ce09334e43357ceb5247a710"
+    },
+    {
+      "path": "db-verification.json",
+      "bytes": 244,
+      "sha256": "392d0382390db563708dd000ff93bd1e42b971b80ba127c95e4dd103753058b1"
+    },
+    {
+      "path": "images/PLAN01-editor-desktop.png",
+      "bytes": 281738,
+      "sha256": "832d3d14d9b67d2fd26ea7f09d358ca54b067e6695fe1c5a8ec4537111b8419f"
+    },
+    {
+      "path": "images/PLAN01-editor-mobile.png",
+      "bytes": 250091,
+      "sha256": "ba86d135616d5f652b67da361d910bf6b38b0ab47a1550617b7796579bf6d1e1"
+    },
+    {
+      "path": "images/PLAN02-web-preview-desktop.png",
+      "bytes": 111129,
+      "sha256": "cfd1dc3eb5277b85e0d20c2810e80f01bc2627e91a15c3097d5439316eb68397"
+    },
+    {
+      "path": "images/PLAN02-web-preview-mobile.png",
+      "bytes": 103351,
+      "sha256": "c4c9239e81c6a36f6643e6327388605fd9386d9e3c39b75be53161bc0080c36f"
+    },
+    {
+      "path": "images/PLAN02-web-preview-english.png",
+      "bytes": 101165,
+      "sha256": "ae22ec9789a2ed277dc4669fde2736eda21e9e51222a886c267a8d1e84522081"
+    },
+    {
+      "path": "images/PLAN02-student-denied.png",
+      "bytes": 31858,
+      "sha256": "8491e297d5beb2b9d3acbf436980b303271f6edd6c243cec8a2342974e778b3c"
+    },
+    {
+      "path": "images/PLAN03-lint-objective-missing.png",
+      "bytes": 297227,
+      "sha256": "9d0d6b438456d86d5b30ea9a84c9b91d277df151e16352101e764b8251b7a9a5"
+    },
+    {
+      "path": "images/PLAN03-reviewer-readonly.png",
+      "bytes": 249500,
+      "sha256": "41e7ded2a811b768044b49aa014b59d13863598ee906a308803fa71eb050ae93"
+    },
+    {
+      "path": "images/PLAN04-offline.png",
+      "bytes": 282097,
+      "sha256": "fa5f182fc500cf9ca3f5596e9dc8af6cf4433736384235678756fe5e3ea26fbb"
+    },
+    {
+      "path": "images/PLAN04-conflict-buffer.png",
+      "bytes": 297797,
+      "sha256": "cdcaff621a80bd845a8c9b1618f11620f32e1df7a2690000123661b01daf6eb6"
+    },
+    {
+      "path": "images/PLAN05-gemini-draft-desktop.png",
+      "bytes": 417774,
+      "sha256": "20e88f2aa3885b095607171c5b924aad4af0c7a8214ff5c4974947fd2aeb24c8"
+    },
+    {
+      "path": "images/PLAN05-gemini-draft-mobile.png",
+      "bytes": 387908,
+      "sha256": "bacfe76c3266e4d7ed2507deada59f7376cc1f98a5291ca891f64f31a59e1b09"
+    },
+    {
+      "path": "images/PLAN05-gemini-applied.png",
+      "bytes": 425279,
+      "sha256": "b48f861bf0980142c061a5e582f180274dcc5dc99582e24679d5de957fd1cabd"
+    },
+    {
+      "path": "images/PLAN05-gemini-web-preview.png",
+      "bytes": 116241,
+      "sha256": "58861873e0ec377dddeb2eebe908a80d80442eeeed04fc6407b4db3ac4fb708a"
+    }
+  ]
+}

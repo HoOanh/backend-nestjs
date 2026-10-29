@@ -1,0 +1,14 @@
+PASS test/teaching-plans.e2e-spec.ts
+  Teaching plan authoring: actual HTTP/Postgres
+    ✓ protects lookup/create by session, role and ownership; create is idempotent (100 ms)
+    ✓ rejects missing/malformed/stale preconditions and invalid checkpoint schema without writes (92 ms)
+    ✓ rejects fabricated/foreign source revisions and preserves prior revision + audit atomically (107 ms)
+    ✓ returns exact lint paths for dangling refs and does not expose answer keys in staff preview (40 ms)
+    ✓ summarizes course plans with the same findings as lookup, scoped by ownership (75 ms)
+    ✓ flags source detachment/lesson changes, blocks lesson deletion and preserves history (39 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        2.451 s, estimated 3 s
+Ran all test suites matching /test\/teaching-plans.e2e-spec.ts/i.

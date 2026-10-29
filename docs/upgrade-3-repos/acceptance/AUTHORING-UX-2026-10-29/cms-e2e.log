@@ -1,0 +1,30 @@
+
+Running 26 tests using 1 worker
+
+[1/26] e2e/auth-ux.spec.ts:2:1 › localized field errors, password visibility and keyboard language menu
+[2/26] e2e/course-authoring.spec.ts:300:1 › course outline lists lessons compactly and edits a lesson in a side sheet
+[3/26] e2e/course-authoring.spec.ts:350:1 › lesson without a plan offers AI or manual start, then saves new sections
+[4/26] e2e/course-authoring.spec.ts:382:1 › plan editor shows outline, jumps to findings and sends chosen sources to AI
+[5/26] e2e/course-authoring.spec.ts:426:1 › course outline and plan editor fit a 390px viewport
+[6/26] e2e/course-authoring.spec.ts:447:1 › course list shows plan coverage, filters by category and fits mobile
+[7/26] e2e/course-authoring.spec.ts:469:1 › lessons drag across chapters with the mouse and chapters reorder by keyboard
+[8/26] e2e/course-authoring.spec.ts:514:1 › mobile plan editor navigates sections from a sticky outline bar
+[9/26] e2e/light-theme.spec.ts:4:3 › light UI survives light OS preference, locale change and reload
+[10/26] e2e/light-theme.spec.ts:4:3 › light UI survives dark OS preference, locale change and reload
+[11/26] e2e/smoke.spec.ts:2:1 › staff login form is interactive
+[12/26] e2e/smoke.spec.ts:11:1 › direct private URL redirects after an unauthenticated response
+[13/26] e2e/smoke.spec.ts:36:1 › language preference survives reload and invitation query is preserved
+[14/26] e2e/smoke.spec.ts:52:1 › MFA and recovery screens follow selected language without internal markers
+[15/26] e2e/smoke.spec.ts:84:1 › 2FA verification auto-submits six digits and offers a recovery code fallback
+[16/26] e2e/smoke.spec.ts:123:1 › settings hides system sections from staff lacking permissions and never loads their data
+[17/26] e2e/studio-quality.spec.ts:126:1 › hover and navigation reuse the staff session
+[18/26] e2e/studio-quality.spec.ts:145:1 › failed provider edit keeps the dialog open with an inline error and retries without a key
+[19/26] e2e/studio-quality.spec.ts:176:1 › provider creation validates fields and uses a keyboard accessible Select
+[20/26] e2e/studio-quality.spec.ts:197:3 › mobile sidebar opens, closes and retains light palette (light)
+[21/26] e2e/studio-quality.spec.ts:197:3 › mobile sidebar opens, closes and retains light palette (dark)
+[22/26] e2e/studio-quality.spec.ts:239:1 › desktop sidebar keeps grouped navigation and tooltips when collapsed
+[23/26] e2e/studio-quality.spec.ts:259:1 › course creation is a dialog with a derived slug and a clear primary action
+[24/26] e2e/studio-quality.spec.ts:275:1 › mobile sidebar has an explicit close control and returns focus
+[25/26] e2e/studio-quality.spec.ts:288:1 › account menu opens settings sections in a modal instead of routes
+[26/26] e2e/studio-quality.spec.ts:325:1 › settings modal turns on optional 2FA and lists devices and sign-in history
+  26 passed (41.8s)

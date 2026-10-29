@@ -84,12 +84,12 @@
         "US-012"
       ],
       "authorized_scope": [
-        "US-010"
+        "US-010",
+        "US-011"
       ],
       "execution_report": "implementation/S03-REPORT.md",
       "human_acceptance": "pending",
       "not_implemented": [
-        "US-011",
         "US-012"
       ]
     },

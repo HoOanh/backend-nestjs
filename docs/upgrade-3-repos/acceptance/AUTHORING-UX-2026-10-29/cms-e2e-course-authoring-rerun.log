@@ -1,0 +1,11 @@
+
+Running 7 tests using 1 worker
+
+[1/7] e2e/course-authoring.spec.ts:300:1 › course outline lists lessons compactly and edits a lesson in a side sheet
+[2/7] e2e/course-authoring.spec.ts:350:1 › lesson without a plan offers AI or manual start, then saves new sections
+[3/7] e2e/course-authoring.spec.ts:382:1 › plan editor shows outline, jumps to findings and sends chosen sources to AI
+[4/7] e2e/course-authoring.spec.ts:426:1 › course outline and plan editor fit a 390px viewport
+[5/7] e2e/course-authoring.spec.ts:447:1 › course list shows plan coverage, filters by category and fits mobile
+[6/7] e2e/course-authoring.spec.ts:469:1 › lessons drag across chapters with the mouse and chapters reorder by keyboard
+[7/7] e2e/course-authoring.spec.ts:514:1 › mobile plan editor navigates sections from a sticky outline bar
+  7 passed (18.9s)

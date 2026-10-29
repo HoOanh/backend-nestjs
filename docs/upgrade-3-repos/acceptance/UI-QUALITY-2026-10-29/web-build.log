@@ -1,0 +1,41 @@
+$ next build
+   ▲ Next.js 15.5.28
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 3.0s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/4) ...
+   Generating static pages (1/4) 
+   Generating static pages (2/4) 
+   Generating static pages (3/4) 
+ ✓ Generating static pages (4/4)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                                   Size  First Load JS
+┌ ○ /_not-found                                              994 B         104 kB
+├ ƒ /[locale]                                              4.27 kB         171 kB
+├ ƒ /[locale]/courses                                      2.73 kB         170 kB
+├ ƒ /[locale]/forgot-password                                140 B         222 kB
+├ ƒ /[locale]/learn/courses/[courseId]                       166 B         120 kB
+├ ƒ /[locale]/learn/courses/[courseId]/lessons/[lessonId]  4.18 kB         162 kB
+├ ƒ /[locale]/learn/dashboard                                166 B         120 kB
+├ ƒ /[locale]/login                                          140 B         222 kB
+├ ƒ /[locale]/preview/teaching-plans/[planId]                127 B         103 kB
+├ ƒ /[locale]/register                                       140 B         222 kB
+├ ƒ /[locale]/reset-password                                 140 B         222 kB
+├ ƒ /[locale]/verify-email                                   141 B         222 kB
+└ ƒ /api/revalidate                                          127 B         103 kB
++ First Load JS shared by all                               103 kB
+  ├ chunks/84-ad428348e9f7a048.js                          46.5 kB
+  ├ chunks/ab66e074-ecccd2203f9f9807.js                    54.2 kB
+  └ other shared chunks (total)                            1.92 kB
+
+
+ƒ Middleware                                               46.5 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

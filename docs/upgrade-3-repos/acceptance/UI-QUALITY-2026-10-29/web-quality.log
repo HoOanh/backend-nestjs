@@ -1,0 +1,156 @@
+$ pnpm foundation:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm product:check && pnpm api:check && pnpm test:rules
+$ node scripts/check-foundation.mjs
+Foundation checks passed: arc-academy-web.
+$ prettier --check "src/**/*.{ts,tsx,css}"
+Checking formatting...
+All matched files use Prettier code style!
+$ eslint src
+$ next typegen && tsc --noEmit
+Generating route types...
+✓ Route types generated successfully
+$ node node_modules/vitest/vitest.mjs run --coverage
+
+ RUN  v3.2.7 /Users/hominhoanh/Documents/source/arc-academy-web
+      Coverage enabled with v8
+
+ ✓ src/core/utils/cn.test.ts (1 test) 6ms
+ ✓ src/core/api/server-transport.test.ts (4 tests) 9ms
+ ✓ src/features/content/content.server.test.ts (4 tests) 8ms
+ ✓ src/core/auth/form-schema.test.ts (5 tests) 8ms
+ ✓ src/core/api/preview-transport.test.ts (2 tests) 7ms
+ ✓ src/core/i18n/locale.test.ts (9 tests) 11ms
+ ✓ src/core/api/display-error.test.ts (4 tests) 2ms
+ ✓ src/core/api/http-client.test.ts (10 tests) 19ms
+ ✓ src/core/query/client.test.ts (1 test) 10ms
+ ✓ src/core/ui/controls.test.tsx (4 tests) 78ms
+
+ Test Files  10 passed (10)
+      Tests  44 passed (44)
+   Start at  14:06:40
+   Duration  2.24s (transform 250ms, setup 1.38s, collect 1.71s, tests 158ms, environment 2.66s, prepare 1.65s)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   16.71 |    72.32 |   52.63 |   16.71 |                   
+ src               |       0 |        0 |       0 |       0 |                   
+  middleware.ts    |       0 |        0 |       0 |       0 | 1-38              
+ src/app           |       0 |      100 |     100 |       0 |                   
+  layout.tsx       |       0 |      100 |     100 |       0 | 2-6               
+  providers.tsx    |       0 |      100 |     100 |       0 | 3-16              
+ src/app/[locale]  |       0 |        0 |       0 |       0 |                   
+  error.tsx        |       0 |        0 |       0 |       0 | 1-13              
+  layout.tsx       |       0 |        0 |       0 |       0 | 1-44              
+  loading.tsx      |       0 |        0 |       0 |       0 | 1-11              
+  not-found.tsx    |       0 |        0 |       0 |       0 | 1-14              
+  page.tsx         |       0 |        0 |       0 |       0 | 1                 
+ ...ocale]/courses |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1                 
+ ...orgot-password |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-4               
+ ...[locale]/learn |       0 |        0 |       0 |       0 |                   
+  layout.tsx       |       0 |        0 |       0 |       0 | 1-57              
+ ...ses/[courseId] |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-5               
+ ...ons/[lessonId] |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-9               
+ ...earn/dashboard |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1                 
+ ...[locale]/login |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-4               
+ ...plans/[planId] |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-30              
+ ...cale]/register |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-4               
+ ...reset-password |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-8               
+ ...]/verify-email |       0 |        0 |       0 |       0 |                   
+  page.tsx         |       0 |        0 |       0 |       0 | 1-8               
+ ...api/revalidate |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 1-32              
+ src/core/api      |   92.67 |    88.23 |    92.3 |   92.67 |                   
+  display-error.ts |     100 |      100 |     100 |     100 |                   
+  error-message.ts |     100 |      100 |     100 |     100 |                   
+  http-client.ts   |     100 |    85.71 |     100 |     100 | 62,73,76,90-91    
+  ...-transport.ts |     100 |    88.88 |     100 |     100 | 27                
+  server-client.ts |       0 |        0 |       0 |       0 | 1-14              
+  ...-transport.ts |     100 |    92.85 |     100 |     100 | 24                
+ src/core/auth     |   74.57 |    90.47 |   33.33 |   74.57 |                   
+  form-schema.ts   |   95.65 |       95 |      50 |   95.65 | 15-16             
+  schema.ts        |       0 |        0 |       0 |       0 | 1-13              
+ src/core/brand    |       0 |       50 |      50 |       0 |                   
+  AuthFrame.tsx    |       0 |      100 |     100 |       0 | 2-90              
+  Brand.tsx        |       0 |        0 |       0 |       0 | 1-20              
+ src/core/config   |       0 |        0 |       0 |       0 |                   
+  env.ts           |       0 |        0 |       0 |       0 | 1-3               
+ src/core/i18n     |   14.73 |    66.66 |      50 |   14.73 |                   
+  ...eSwitcher.tsx |       0 |      100 |     100 |       0 | 2-73              
+  locale.ts        |     100 |     87.5 |     100 |     100 | 10                
+  navigation.ts    |       0 |        0 |       0 |       0 | 1-3               
+  request.ts       |       0 |        0 |       0 |       0 | 1-11              
+  routing.ts       |       0 |        0 |       0 |       0 | 1-8               
+ src/core/query    |     100 |      100 |     100 |     100 |                   
+  client.ts        |     100 |      100 |     100 |     100 |                   
+ src/core/ui       |   24.73 |      100 |    90.9 |   24.73 |                   
+  accordion.tsx    |       0 |      100 |     100 |       0 | 4-61              
+  auth-field.tsx   |       0 |      100 |     100 |       0 | 2-45              
+  button.tsx       |     100 |      100 |     100 |     100 |                   
+  card.tsx         |       0 |      100 |     100 |       0 | 2-72              
+  ...down-menu.tsx |       0 |      100 |     100 |       0 | 4-209             
+  input.tsx        |     100 |      100 |     100 |     100 |                   
+  label.tsx        |     100 |      100 |     100 |     100 |                   
+  ...ve-select.tsx |   82.22 |      100 |   66.66 |   82.22 | 45-53             
+  ...ord-input.tsx |       0 |      100 |     100 |       0 | 2-36              
+ src/core/utils    |     100 |      100 |     100 |     100 |                   
+  cn.ts            |     100 |      100 |     100 |     100 |                   
+ src/features/auth |       0 |    66.66 |   66.66 |       0 |                   
+  AuthForm.tsx     |       0 |      100 |     100 |       0 | 3-263             
+  ...OutButton.tsx |       0 |      100 |     100 |       0 | 2-35              
+  auth.service.ts  |       0 |        0 |       0 |       0 | 1-38              
+ ...atures/content |   22.49 |    63.63 |    62.5 |   22.49 |                   
+  CatalogPage.tsx  |       0 |        0 |       0 |       0 | 1-76              
+  CoursePage.tsx   |       0 |        0 |       0 |       0 | 1-50              
+  ...oadSource.tsx |       0 |      100 |     100 |       0 | 2-40              
+  ...mentsPage.tsx |       0 |        0 |       0 |       0 | 1-74              
+  ...ent.server.ts |     100 |    85.71 |     100 |     100 | 13                
+  schema.ts        |     100 |      100 |     100 |     100 |                   
+ ...atures/landing |       0 |    33.33 |   33.33 |       0 |                   
+  HomePage.tsx     |       0 |        0 |       0 |       0 | 1-321             
+  ...ningAtlas.tsx |       0 |      100 |     100 |       0 | 3-206             
+  ...onAnatomy.tsx |       0 |        0 |       0 |       0 | 1-109             
+ ...tures/learning |       0 |        0 |       0 |       0 |                   
+  ...boardPage.tsx |       0 |        0 |       0 |       0 | 1-115             
+ ...teaching-plans |       0 |        0 |       0 |       0 |                   
+  PlanRenderer.tsx |       0 |        0 |       0 |       0 | 1-126             
+  ...iew.server.ts |       0 |        0 |       0 |       0 | 1-41              
+-------------------|---------|----------|---------|---------|-------------------
+$ node scripts/check-product.mjs
+Product checks passed: 234 bilingual messages, matching placeholders, original logo and palette, no internal product labels.
+$ node scripts/check-generated.mjs
+Đã copy spec từ ../arc-academy-backend/packages/contracts/openapi/public.json
+🍻 orval v7.21.0 - A swagger client generator for typescript
+preview: Cleaning output folder
+Running afterAllFilesWrite hook...
+🎉 preview - Your OpenAPI spec has been converted into ready to use orval!
+browser: Cleaning output folder
+Running afterAllFilesWrite hook...
+🎉 browser - Your OpenAPI spec has been converted into ready to use orval!
+server: Cleaning output folder
+Running afterAllFilesWrite hook...
+🎉 server - Your OpenAPI spec has been converted into ready to use orval!
+Generated API client is reproducible
+$ node --test scripts/foundation-rules.test.mjs
+✔ feature cannot bypass shadcn with native controls (484.464041ms)
+✔ semantic document layout and UI wrappers remain valid (5.634458ms)
+✔ core cannot import feature composition (2.517333ms)
+✔ explicit TypeScript any remains an error (1.717208ms)
+✔ feature confirmations use accessible shadcn dialogs (1.600917ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 694.111417

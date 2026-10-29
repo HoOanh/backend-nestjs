@@ -1,0 +1,2 @@
+$ node scripts/check-mcp.mjs
+MCP verified: shadcn; 7 tools; @shadcn/button lookup OK.

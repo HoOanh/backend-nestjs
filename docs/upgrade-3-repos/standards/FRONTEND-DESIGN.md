@@ -41,3 +41,24 @@ Button, Input, Label, NativeSelect, Card được lấy từ registry ngày 28/1
 
 
 Review UI auth: form noValidate + React Hook Form/Zod; lỗi dịch VI/EN cạnh trường, aria-invalid/aria-describedby và focus trường lỗi đầu tiên. Có password hint, show/hide password; auth layout giới hạn max-width, form trắng rõ ràng, không chia đôi trống toàn viewport. Kiểm cả empty submit, invalid email/password, menu mở, Escape và mobile trước kết luận UI đạt.
+
+## Radix Themes — chỉ đạo thay thế 29/10/2026
+
+ĐẠI CA xác nhận danh sách component tại Radix Themes docs là chuẩn UI duy nhất cho CMS và Web; thay thế các đoạn shadcn/registry ở trên. Dùng trực tiếp `@radix-ui/themes` và `Theme` light; không giữ shadcn wrappers, NativeSelect, Sonner hoặc các UI primitive tự dựng. Dùng Dialog/AlertDialog, Select, Tabs, Callout và các component được Radix Themes liệt kê. Semantic HTML và input file phục vụ chọn file vẫn cần thiết. Giữ brand, VI/EN, quyền, focus, mobile và kiểm thử browser.
+
+## Shadcn theo Saora — chỉ đạo mới 29/10/2026
+
+ĐẠI CA chỉ định `saora-web` làm tham chiếu setup shadcn, thay thế mục Radix Themes ngay trước. Dùng shadcn components trong `src/components/ui`, `cn` tại `src/lib/utils`, Radix Primitives và Sonner; giữ token/brand ARC, light-only. Không dùng `@radix-ui/themes` hoặc NativeSelect. Sidebar CMS dùng SidebarProvider/Sidebar/SidebarInset, kiểm keyboard, mobile và session/API; không copy nghiệp vụ của Saora. Các mục Radix Themes phía trên là lịch sử, không phải quy tắc hiện hành.
+
+## Mẫu màn biên soạn — 29/10/2026
+
+Rút ra từ nâng cấp [AUTHORING-UX](../implementation/AUTHORING-UX-2026-10-29.md); áp dụng cho các màn biên soạn CMS sau này (đồ hoạ S04, review US-012).
+
+- Danh sách cấu trúc (chương/bài, phần giảng) là outline gọn: mỗi mục một dòng, trạng thái bằng Badge, hành động phụ trong menu ⋯. Không render toàn bộ form của mọi mục cùng lúc.
+- Chi tiết một mục mở bằng Sheet bên phải (desktop/mobile) hoặc cột nội dung khi có dàn ý; luôn có đường xem/sửa lại mục đã lưu, không chỉ nút Thêm.
+- Thêm nhanh bằng ô nhập inline + Enter. Thao tác phá huỷ dùng AlertDialog; thao tác bị nghiệp vụ chặn hiển thị disabled kèm lý do thay vì để API trả lỗi chung.
+- Sắp xếp bằng `@dnd-kit` với tay nắm riêng, DragOverlay, KeyboardSensor và announcements i18n; commit một lần khi thả; giữ Lên/Xuống trong menu.
+- Màn trống hướng vào hành động chính (vd. Tạo bằng AI / Tự soạn), không liệt kê mọi thiết lập. Thiết lập ít dùng (ngôn ngữ, xuất/nhập JSON, kiểm tra lại) gom vào menu ⋯.
+- Panel phụ (AI, nguồn, kết quả kiểm tra) dùng Sheet; giữ nội dung trong lúc animation đóng.
+- Mobile: danh sách chính dùng card/list thay table cuộn ngang; editor nhiều phần có thanh dính điều hướng trước/sau và dàn ý dạng Sheet; tiêu đề dài xuống dòng (line-clamp) thay vì cắt.
+- Autosave hiển thị trạng thái bằng component dùng chung `SaveStatus`; điều hướng chủ động phải chờ lượt lưu đang chạy, không dựa vào closure render cũ.

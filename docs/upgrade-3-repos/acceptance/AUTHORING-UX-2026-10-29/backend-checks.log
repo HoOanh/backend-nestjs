@@ -1,0 +1,16 @@
+[WARN] Unsupported engine: wanted: {"node":">=24.0.0 <25"} (current: {"node":"v22.23.2","pnpm":"11.23.0"})
+$ node scripts/check-api.mjs
+Exported public: 21 paths
+Exported internal: 56 paths
+public: audience and schema closure valid
+internal: audience and schema closure valid
+preview: audience and schema closure valid
+OpenAPI export is reproducible
+[WARN] Unsupported engine: wanted: {"node":">=24.0.0 <25"} (current: {"node":"v22.23.2","pnpm":"11.23.0"})
+$ node scripts/check-bruno.mjs
+Bruno collection covers 87 documented operations
+[WARN] Unsupported engine: wanted: {"node":">=24.0.0 <25"} (current: {"node":"v22.23.2","pnpm":"11.23.0"})
+$ tsc -p tsconfig.json --noEmit
+[WARN] Unsupported engine: wanted: {"node":">=24.0.0 <25"} (current: {"node":"v22.23.2","pnpm":"11.23.0"})
+$ eslint src scripts prisma test --ignore-pattern src/generated
+LINT_PASS

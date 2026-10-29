@@ -1,3 +1,5 @@
+> Cập nhật29/10/2026: US-010 đã commit, US-011 được ĐẠI CA mở và đã chạy Gemini thật; US-012 còn lại. Nâng cấp UX biên soạn (outline/sheet, AI-first, kéo-thả, mobile, danh sách) theo [AUTHORING-UX-2026-10-29](../../../../implementation/AUTHORING-UX-2026-10-29.md), chưa commit. Execution contract/evidence xem S03-REPORT; các gate lịch sử phía dưới không thay chỉ đạo mới.
+
 > Chỉ đạo29/10/2026: đã merge/push S02; bắt đầu US-010/S03 theo [execution contract](../../../../implementation/S03-REPORT.md). US-011/012 chưa triển khai trong lát cắt này; các gate lịch sử bên dưới được giữ để đối chiếu.
 
 # S03 — Giáo án và AI soạn bài từ content
@@ -14,8 +16,8 @@ Effort đề xuất **12–18 person-days**, không phải số ngày lịch ho�
 
 | Repo | Công việc trong sprint |
 |---|---|
-| arc-academy-backend |TeachingPlanRevision/schema/objective-source mapping; AI plan job/prompt/quota reservation; lint/review decisions.|
-| arc-academy-cms |Plan editor sections/script/checkpoints, nguồn trích dẫn, AI draft diff/apply và review queue.|
+| arc-academy-backend |TeachingPlanRevision/schema/objective-source mapping; AI plan job/prompt/quota reservation; lint/review decisions. Read model tóm tắt giáo án theo khoá và coverage.|
+| arc-academy-cms |Plan editor sections/script/checkpoints, nguồn trích dẫn, AI draft diff/apply và review queue. Outline khoá học + Sheet bài học, kéo-thả, trạng thái/coverage giáo án (UX-S03-01..06).|
 | arc-academy-web |Preview read model cho sections/narration/checkpoints và source citation navigation.|
 
 ## Hồ sơ sprint

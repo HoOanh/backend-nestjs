@@ -644,8 +644,8 @@
       "sprint_id": "S03",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented_local_verified",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-02"
@@ -669,9 +669,9 @@
       "acceptance_criteria": [
         {
           "id": "AC-011-01",
-          "given": "budget/source được phép",
+          "given": "budget/source được phép và model được chọn thuộc allow-list đang bật",
           "when": "chạy authoring job",
-          "then": "artifact schema-valid có prompt/model/input hash và citation"
+          "then": "artifact schema-valid có prompt/model/input hash và citation; model ngoài allow-list bị từ chối"
         },
         {
           "id": "AC-011-02",
@@ -684,16 +684,31 @@
           "given": "provider timeout hoặc apply stale",
           "when": "retry/reconcile",
           "then": "usage unknown hoặc412 rõ, không auto publish/double apply"
+        },
+        {
+          "id": "AC-011-04",
+          "given": "deployment công bố danh sách model dựng giáo án",
+          "when": "editor chọn model trên CMS hoặc để mặc định",
+          "then": "FE chỉ chọn trong danh sách server trả về, job ghi đúng model đã chọn; job có model không còn chạy được bị đóng kèm lý do và trả quota thay vì treo"
+        },
+        {
+          "id": "AC-011-05",
+          "given": "admin cấu hình provider/key/model trong CMS (Gemini native hoặc gateway OpenAI-compatible như OpenRouter, CKEY)",
+          "when": "lưu hoặc chạy authoring job",
+          "then": "key được mã hoá tại rest và không bao giờ trả lại qua API/log; chỉ model đang bật thuộc provider đang bật mới chọn được; không cần env AI hay restart"
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "local_verified",
+        "method": "86 backend tests / 53 HTTP-integration; 5 real-browser E2E groups with live Gemini; read-only DB postconditions; CMS quality/build",
+        "evidence_path": "acceptance/2026-10-29-US011/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved_for_implementation",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-29",
+        "scope": "Commit US-010, continue US-011; use Gemini with existing MVP env key"
       }
     },
     {

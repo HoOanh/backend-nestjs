@@ -14,7 +14,7 @@ Nguồn chuẩn user-stories.json; bản0.1 đã thay. S00/S01 đã có evidence
 |BO-01|BR-04,BR-06|FR-08|US-008|SPEC-01|[P02/S02](phases/P02-content/sprints/S02-course-documents/README.md)|R1|AC-008-01,AC-008-02,AC-008-03|
 |BO-01|BR-04,BR-06|FR-09|US-009|SPEC-01|[P02/S02](phases/P02-content/sprints/S02-course-documents/README.md)|R1|AC-009-01,AC-009-02,AC-009-03|
 |BO-02|BR-03,BR-06,BR-08|FR-10|US-010|SPEC-01|[P02/S03](phases/P02-content/sprints/S03-teaching-plans/README.md)|R1|AC-010-01,AC-010-02,AC-010-03|
-|BO-02|BR-04,BR-05,BR-06,BR-10|FR-11|US-011|SPEC-01|[P02/S03](phases/P02-content/sprints/S03-teaching-plans/README.md)|R1|AC-011-01,AC-011-02,AC-011-03|
+|BO-02|BR-04,BR-05,BR-06,BR-10|FR-11|US-011|SPEC-01|[P02/S03](phases/P02-content/sprints/S03-teaching-plans/README.md)|R1|AC-011-01,AC-011-02,AC-011-03,AC-011-04,AC-011-05|
 |BO-02|BR-03,BR-05,BR-06|FR-12|US-012|SPEC-01|[P02/S03](phases/P02-content/sprints/S03-teaching-plans/README.md)|R1|AC-012-01,AC-012-02,AC-012-03|
 |BO-03|BR-03,BR-07|FR-13|US-013|SPEC-02|[P02/S04](phases/P02-content/sprints/S04-graphics-publish/README.md)|R1|AC-013-01,AC-013-02,AC-013-03|
 |BO-03|BR-07,BR-09|FR-14|US-014|SPEC-02|[P02/S04](phases/P02-content/sprints/S04-graphics-publish/README.md)|R1|AC-014-01,AC-014-02,AC-014-03|
@@ -40,3 +40,5 @@ Nguồn chuẩn user-stories.json; bản0.1 đã thay. S00/S01 đã có evidence
 |BO-06|BR-07,BR-09,BR-10,BR-11|FR-34|US-034|SPEC-05|[P05/S11](phases/P05-production/sprints/S11-production/README.md)|R3|AC-034-01,AC-034-02,AC-034-03|
 |BO-06|BR-10,BR-13|FR-35|US-035|SPEC-05|[P05/S11](phases/P05-production/sprints/S11-production/README.md)|R3|AC-035-01,AC-035-02,AC-035-03|
 |BO-06|BR-13,BR-14|FR-36|US-036|SPEC-05|[P05/S11](phases/P05-production/sprints/S11-production/README.md)|R3|AC-036-01,AC-036-02,AC-036-03|
+
+Ràng buộc UX bổ sung UX-S03-01..06 (29/10/2026) gắn với US-007, US-010, US-011; không tạo story/AC mới. Xem [S03 specs](phases/P02-content/sprints/S03-teaching-plans/specs.md) và [AUTHORING-UX-2026-10-29](implementation/AUTHORING-UX-2026-10-29.md).

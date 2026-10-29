@@ -785,8 +785,8 @@
       "sprint_id": "S04",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "in_progress",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-03"
@@ -826,13 +826,16 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "partial_backend_verified",
+        "method": "Backend schema/API/lint + HTTP/Postgres tests (123 tests total); CMS visual editor and Web renderer not implemented",
+        "evidence_path": "acceptance/2026-10-29-S04-US013/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved_for_implementation",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-10-29",
+        "scope": "Push US-012 then open S04; first slice US-013 backend"
       }
     },
     {

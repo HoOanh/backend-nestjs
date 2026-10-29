@@ -77,7 +77,7 @@
         "S02"
       ],
       "path": "phases/P02-content/sprints/S03-teaching-plans",
-      "status": "in_progress",
+      "status": "locally_qualified",
       "story_ids": [
         "US-010",
         "US-011",
@@ -106,12 +106,13 @@
         "S03"
       ],
       "path": "phases/P02-content/sprints/S04-graphics-publish",
-      "status": "draft",
+      "status": "in_progress",
       "story_ids": [
         "US-013",
         "US-014",
         "US-015"
-      ]
+      ],
+      "execution_report": "implementation/S04-REPORT.md"
     },
     {
       "sprint_id": "S05",

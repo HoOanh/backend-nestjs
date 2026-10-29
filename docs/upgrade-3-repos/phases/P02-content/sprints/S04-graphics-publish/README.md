@@ -1,3 +1,5 @@
+> Cập nhật29/10/2026: S04 được mở theo chỉ đạo “push đi nhé rồi mở next step”. Lát cắt US-013 backend (typed visual revision/validate) đã triển khai local; CMS editor, Web renderer, US-014/US-015 chưa. Không commit/push phần S04.
+
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
 DRAFT 0.2 · Phase P02 · Release R1 · Gate chưa mở.

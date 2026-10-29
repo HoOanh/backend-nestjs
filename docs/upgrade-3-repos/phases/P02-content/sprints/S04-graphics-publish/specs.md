@@ -1,4 +1,4 @@
-> Cập nhật29/10/2026: S04 được mở theo chỉ đạo “push đi nhé rồi mở next step”. Lát cắt US-013 backend (typed visual revision/validate) đã triển khai local; CMS editor, Web renderer, US-014/US-015 chưa. Không commit/push phần S04.
+> Cập nhật29/10/2026: S04 được mở theo chỉ đạo “push đi nhé rồi mở next step”. US-013 đã có backend typed revision, CMS visual editor và Web renderer/preview8 kind (AC-013-03 partial vì package thuộc US-015). US-014/US-015 chưa triển khai; S04 chưa đóng.
 
 # S04 — specs lát cắt
 

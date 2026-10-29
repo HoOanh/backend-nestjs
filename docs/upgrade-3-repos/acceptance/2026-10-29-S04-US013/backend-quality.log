@@ -1,16 +1,16 @@
-## backend visuals slice 2026-10-29T16:27:00Z
+## backend visuals+preview 2026-10-29T16:52:04Z
 Checking formatting...
 All matched files use Prettier code style!
-PASS test/visuals.e2e-spec.ts
-[Nest] 54203  - 10/29/2026, 11:27:06 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/auth/google/start -> 503
+[Nest] 74614  - 10/29/2026, 11:52:11 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/auth/google/start -> 503
 ServiceUnavailableException
 PASS test/foundation.e2e-spec.ts
-[Nest] 54203  - 10/29/2026, 11:27:07 PM   ERROR [AllExceptionsFilter] POST /api/i/v1/lessons/0083b713-6887-42bb-8089-959701a18bee/plan-jobs -> 503
+[Nest] 74614  - 10/29/2026, 11:52:12 PM   ERROR [AllExceptionsFilter] POST /api/i/v1/lessons/1b3ae478-9e1a-4ac4-8052-55d655e9bd93/plan-jobs -> 503
 ServiceUnavailableException
 PASS test/plan-ai.e2e-spec.ts
-[Nest] 54203  - 10/29/2026, 11:27:07 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/courses -> 503
+PASS test/visuals.e2e-spec.ts
+[Nest] 74614  - 10/29/2026, 11:52:13 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/courses -> 503
 ServiceUnavailableException
-[Nest] 54203  - 10/29/2026, 11:27:07 PM   ERROR [AllExceptionsFilter] GET /api/i/v1/courses -> 503
+[Nest] 74614  - 10/29/2026, 11:52:13 PM   ERROR [AllExceptionsFilter] GET /api/i/v1/courses -> 503
 ServiceUnavailableException
 PASS test/content.e2e-spec.ts
 PASS test/plan-reviews.e2e-spec.ts
@@ -23,19 +23,19 @@ PASS src/workers/mailer.spec.ts
 PASS src/modules/teaching-plans/plan-ai.provider.spec.ts
 PASS src/common/http/response-envelope.interceptor.spec.ts
 PASS src/modules/platform/ai-providers/provider-http.client.spec.ts
-[Nest] 54203  - 10/29/2026, 11:27:10 PM    WARN [ProviderHttpClient] Provider call failed with HTTP 429
-PASS src/modules/visuals/visual.schema.spec.ts
+[Nest] 74614  - 10/29/2026, 11:52:15 PM    WARN [ProviderHttpClient] Provider call failed with HTTP 429
 PASS src/common/http/all-exceptions.filter.spec.ts
 PASS src/config/env.validation.spec.ts
-PASS src/modules/teaching-plans/plan-review.spec.ts
+PASS src/modules/visuals/visual.schema.spec.ts
 PASS src/modules/platform/ai-providers/provider-protocol.spec.ts
+PASS src/modules/teaching-plans/plan-review.spec.ts
 PASS src/modules/teaching-plans/plan.schema.spec.ts
 PASS src/workers/auth-email.template.spec.ts
 PASS src/common/i18n/locale.spec.ts
 ---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
 File                                   | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                            
 ---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
-All files                              |   85.11 |    66.98 |   83.44 |   87.47 |                                                                              
+All files                              |   85.17 |    66.94 |   83.49 |   87.53 |                                                                              
  src                                   |      50 |      100 |       0 |   46.87 |                                                                              
   app.module.ts                        |     100 |      100 |     100 |     100 |                                                                              
   main.ts                              |       0 |      100 |       0 |       0 | 1-25                                                                         
@@ -114,11 +114,11 @@ All files                              |   85.11 |    66.98 |   83.44 |   87.47 
   plan.dto.ts                          |     100 |      100 |     100 |     100 |                                                                              
   plan.schema.ts                       |   87.69 |    55.55 |     100 |     100 | 66-68,90-101                                                                 
   plan.service.ts                      |   94.09 |    83.33 |   98.14 |   97.96 | 182,355,372,514                                                              
- src/modules/visuals                   |   84.21 |    60.81 |   86.66 |   88.11 |                                                                              
-  visual.controller.ts                 |   95.83 |     64.7 |     100 |     100 | 23-75                                                                        
-  visual.dto.ts                        |     100 |       50 |     100 |     100 | 5-25                                                                         
+ src/modules/visuals                   |   85.12 |    60.25 |   87.23 |   88.88 |                                                                              
+  visual.controller.ts                 |   96.15 |     64.7 |     100 |     100 | 29-89                                                                        
+  visual.dto.ts                        |     100 |       50 |     100 |     100 | 5-38                                                                         
   visual.schema.ts                     |   73.07 |       40 |   78.26 |   75.55 | 242-246,264,274-296                                                          
-  visual.service.ts                    |    90.9 |    75.86 |   93.33 |   97.05 | 88,238                                                                       
+  visual.service.ts                    |   91.13 |    75.86 |   93.75 |   97.14 | 88,253                                                                       
  src/workers                           |   27.02 |       12 |   43.75 |   29.85 |                                                                              
   auth-email.template.ts               |     100 |      100 |     100 |     100 |                                                                              
   mailer.ts                            |   84.21 |    33.33 |   85.71 |   94.11 | 70                                                                           
@@ -128,14 +128,29 @@ All files                              |   85.11 |    66.98 |   83.44 |   87.47 
 Test Suites: 20 passed, 20 total
 Tests:       123 passed, 123 total
 Snapshots:   0 total
-Time:        7.299 s, estimated 9 s
+Time:        7.745 s
 Ran all test suites.
 Foundation checks passed: arc-academy-backend.
 Exported public: 21 paths
-Exported internal: 63 paths
+Exported internal: 64 paths
 public: audience and schema closure valid
 internal: audience and schema closure valid
-preview: audience and schema closure valid
-OpenAPI export is reproducible
-Bruno collection covers 96 documented operations
-COVERAGE {"lines":{"total":3027,"covered":2648,"skipped":0,"pct":87.47},"statements":{"total":3366,"covered":2865,"skipped":0,"pct":85.11},"functions":{"total":622,"covered":519,"skipped":0,"pct":83.44},"branches":{"total":1681,"covered":1126,"skipped":0,"pct":66.98},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":100}}
+/Users/oanhho/orca/workspaces/arc-academy-cms/arc-academy-backend/scripts/check-contracts.ts:39
+    throw new Error('Preview contract is not a read-only answer-free projection');
+          ^
+
+Error: Preview contract is not a read-only answer-free projection
+    at <anonymous> (/Users/oanhho/orca/workspaces/arc-academy-cms/arc-academy-backend/scripts/check-contracts.ts:39:11)
+    at Object.<anonymous> (/Users/oanhho/orca/workspaces/arc-academy-cms/arc-academy-backend/scripts/check-contracts.ts:46:1)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (/Users/oanhho/orca/workspaces/arc-academy-cms/arc-academy-backend/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/register-B1c7OH6V.cjs:22:2188)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:372:15)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:244:9)
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+
+Node.js v24.18.0
+Bruno collection covers 97 documented operations
+COVERAGE {"lines":{"total":3041,"covered":2662,"skipped":0,"pct":87.53},"statements":{"total":3380,"covered":2879,"skipped":0,"pct":85.17},"functions":{"total":624,"covered":521,"skipped":0,"pct":83.49},"branches":{"total":1685,"covered":1128,"skipped":0,"pct":66.94},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":100}}

@@ -57,7 +57,7 @@
       ],
       "verification": {
         "evidence_status": "partial_backend_verified",
-        "method": "Backend schema/API/lint + HTTP/Postgres tests (123 tests total); CMS visual editor and Web renderer not implemented",
+        "method": "Backend 123 tests incl. HTTP/Postgres visual e2e; CMS 70 unit + 33 browser (2 visual editor); Web 42 unit + build; OpenAPI64/Bruno97; AC-013-03 still partial until US-015 lecture package",
         "evidence_path": "acceptance/2026-10-29-S04-US013/REPORT.md",
         "human_signoff": "pending"
       },

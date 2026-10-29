@@ -1,20 +1,20 @@
-## backend visuals+preview 2026-10-29T16:52:04Z
+## backend beats slice 2026-10-29T16:59:15Z
 Checking formatting...
 All matched files use Prettier code style!
-[Nest] 74614  - 10/29/2026, 11:52:11 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/auth/google/start -> 503
+[Nest] 81171  - 10/29/2026, 11:59:21 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/auth/google/start -> 503
 ServiceUnavailableException
 PASS test/foundation.e2e-spec.ts
-[Nest] 74614  - 10/29/2026, 11:52:12 PM   ERROR [AllExceptionsFilter] POST /api/i/v1/lessons/1b3ae478-9e1a-4ac4-8052-55d655e9bd93/plan-jobs -> 503
+[Nest] 81171  - 10/29/2026, 11:59:22 PM   ERROR [AllExceptionsFilter] POST /api/i/v1/lessons/033417ef-9014-456a-a9a7-a907a6593504/plan-jobs -> 503
 ServiceUnavailableException
 PASS test/plan-ai.e2e-spec.ts
-PASS test/visuals.e2e-spec.ts
-[Nest] 74614  - 10/29/2026, 11:52:13 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/courses -> 503
+[Nest] 81171  - 10/29/2026, 11:59:22 PM   ERROR [AllExceptionsFilter] GET /api/p/v1/courses -> 503
 ServiceUnavailableException
-[Nest] 74614  - 10/29/2026, 11:52:13 PM   ERROR [AllExceptionsFilter] GET /api/i/v1/courses -> 503
+[Nest] 81171  - 10/29/2026, 11:59:22 PM   ERROR [AllExceptionsFilter] GET /api/i/v1/courses -> 503
 ServiceUnavailableException
 PASS test/content.e2e-spec.ts
 PASS test/plan-reviews.e2e-spec.ts
 PASS test/teaching-plans.e2e-spec.ts
+PASS test/visuals.e2e-spec.ts
 PASS test/ai-providers.e2e-spec.ts
 Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
 Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
@@ -23,19 +23,19 @@ PASS src/workers/mailer.spec.ts
 PASS src/modules/teaching-plans/plan-ai.provider.spec.ts
 PASS src/common/http/response-envelope.interceptor.spec.ts
 PASS src/modules/platform/ai-providers/provider-http.client.spec.ts
-[Nest] 74614  - 10/29/2026, 11:52:15 PM    WARN [ProviderHttpClient] Provider call failed with HTTP 429
+[Nest] 81171  - 10/29/2026, 11:59:25 PM    WARN [ProviderHttpClient] Provider call failed with HTTP 429
 PASS src/common/http/all-exceptions.filter.spec.ts
-PASS src/config/env.validation.spec.ts
 PASS src/modules/visuals/visual.schema.spec.ts
+PASS src/config/env.validation.spec.ts
 PASS src/modules/platform/ai-providers/provider-protocol.spec.ts
-PASS src/modules/teaching-plans/plan-review.spec.ts
 PASS src/modules/teaching-plans/plan.schema.spec.ts
+PASS src/modules/teaching-plans/plan-review.spec.ts
 PASS src/workers/auth-email.template.spec.ts
 PASS src/common/i18n/locale.spec.ts
 ---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
 File                                   | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                            
 ---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
-All files                              |   85.17 |    66.94 |   83.49 |   87.53 |                                                                              
+All files                              |   85.16 |     66.9 |   83.54 |   87.61 |                                                                              
  src                                   |      50 |      100 |       0 |   46.87 |                                                                              
   app.module.ts                        |     100 |      100 |     100 |     100 |                                                                              
   main.ts                              |       0 |      100 |       0 |       0 | 1-25                                                                         
@@ -114,11 +114,11 @@ All files                              |   85.17 |    66.94 |   83.49 |   87.53 
   plan.dto.ts                          |     100 |      100 |     100 |     100 |                                                                              
   plan.schema.ts                       |   87.69 |    55.55 |     100 |     100 | 66-68,90-101                                                                 
   plan.service.ts                      |   94.09 |    83.33 |   98.14 |   97.96 | 182,355,372,514                                                              
- src/modules/visuals                   |   85.12 |    60.25 |   87.23 |   88.88 |                                                                              
+ src/modules/visuals                   |   85.03 |    60.63 |   87.27 |   89.66 |                                                                              
   visual.controller.ts                 |   96.15 |     64.7 |     100 |     100 | 29-89                                                                        
   visual.dto.ts                        |     100 |       50 |     100 |     100 | 5-38                                                                         
-  visual.schema.ts                     |   73.07 |       40 |   78.26 |   75.55 | 242-246,264,274-296                                                          
-  visual.service.ts                    |   91.13 |    75.86 |   93.75 |   97.14 | 88,253                                                                       
+  visual.schema.ts                     |   73.94 |     42.3 |   80.76 |   78.43 | 254-258,276,286-308                                                          
+  visual.service.ts                    |   90.62 |    74.35 |   90.47 |   96.42 | 89,110,293                                                                   
  src/workers                           |   27.02 |       12 |   43.75 |   29.85 |                                                                              
   auth-email.template.ts               |     100 |      100 |     100 |     100 |                                                                              
   mailer.ts                            |   84.21 |    33.33 |   85.71 |   94.11 | 70                                                                           
@@ -126,9 +126,9 @@ All files                              |   85.17 |    66.94 |   83.49 |   87.53 
 ---------------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------
 
 Test Suites: 20 passed, 20 total
-Tests:       123 passed, 123 total
+Tests:       125 passed, 125 total
 Snapshots:   0 total
-Time:        7.745 s
+Time:        7.439 s, estimated 8 s
 Ran all test suites.
 Foundation checks passed: arc-academy-backend.
 Exported public: 21 paths
@@ -153,4 +153,4 @@ Error: Preview contract is not a read-only answer-free projection
 
 Node.js v24.18.0
 Bruno collection covers 97 documented operations
-COVERAGE {"lines":{"total":3041,"covered":2662,"skipped":0,"pct":87.53},"statements":{"total":3380,"covered":2879,"skipped":0,"pct":85.17},"functions":{"total":624,"covered":521,"skipped":0,"pct":83.49},"branches":{"total":1685,"covered":1128,"skipped":0,"pct":66.94},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":100}}
+COVERAGE {"lines":{"total":3067,"covered":2687,"skipped":0,"pct":87.61},"statements":{"total":3412,"covered":2906,"skipped":0,"pct":85.16},"functions":{"total":632,"covered":528,"skipped":0,"pct":83.54},"branches":{"total":1701,"covered":1138,"skipped":0,"pct":66.9},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":100}}

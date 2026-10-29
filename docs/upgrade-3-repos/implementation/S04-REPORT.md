@@ -1,4 +1,4 @@
-> Cập nhật29/10/2026 (lượt2): S04 mở theo chỉ đạo “push rồi mở next step”. US-013 đã có backend typed visual revision, CMS visual editor và Web renderer/preview cho8 kind. AC-013-03 vẫn partial vì lecture package/pinned render thuộc US-015. US-014/US-015 chưa triển khai; S04 chưa đóng.
+> Cập nhật29/10/2026 (lượt3): US-013 xong CMS/Web. US-014 mới xong **backend beat schema/lint** (chưa có CMS beat editor và Web clock player). US-015 chưa bắt đầu. S04 chưa đóng.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
@@ -45,3 +45,11 @@ Log/ảnh: [acceptance/2026-10-29-S04-US013](../acceptance/2026-10-29-S04-US013/
 3. Browser thật cho visual editor + Web renderer (ảnh, reduced-motion, alt).
 
 Không tuyên bố S04 exit.
+
+## US-014 — backend beat slice (partial)
+
+- Thêm `beats` optional vào visual schema: id/scriptSegmentId/startCue/endCue/focusTargets/action allowlist reveal|highlight|draw|pointer|clear; cửa sổ `endCue > startCue`; tối đa40 beat.
+- Lint: duplicate beat id, beat không có focus target, focus target không tồn tại trong payload, cửa sổ sai.
+- Service đối chiếu `scriptSegmentId` với section/checkpoint của teaching plan hiện hành; thiếu mapping trả `missing_script_segment` (không tự sửa/không mất nội dung).
+- Test: unit beat validation4 test; e2e visual5 test (beat hợp lệ, missing segment/target, action lạ400). Backend125 tests; statements85.16%.
+- **Chưa làm**: CMS beat editor, Web narration clock player (play/pause/resume), preview reveal/highlight, lint UI. AC-014-01/03 chưa có bằng chứng; AC-014-02 mới có backend.

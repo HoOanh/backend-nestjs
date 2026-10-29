@@ -31,3 +31,7 @@ Ngày29/10/2026, tiếp chỉ đạo hoàn tất S04 slice đầu. Phạm vi đ�
 - Web renderer chưa có browser screenshot/regression; chưa resolve asset URL cho image-annotation (hiển thị semantic fallback + nhãn, ghi rõ học liệu ảnh chưa xuất bản).
 - Web unit coverage toàn app9.7% — không suy luận chất lượng renderer từ số test pass.
 - Chưa có US-014 focus clock, US-015 preview exchange/publish/outbox; S04 chưa thể đóng.
+
+## Bổ sung US-014 backend (partial)
+
+Beat schema/lint/plan-segment validation đã thêm, backend125 tests; chưa có CMS beat editor và Web narration clock player nên AC-014-01/03 chưa đạt. Chi tiết trong implementation/S04-REPORT.md.

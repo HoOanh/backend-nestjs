@@ -848,8 +848,8 @@
       "sprint_id": "S04",
       "release": "R1",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "in_progress",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-03"
@@ -889,8 +889,10 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "partial_backend_verified",
+        "method": "Backend beat schema/lint + plan segment validation, 125 tests; CMS beat editor and Web narration clock player not implemented",
+        "evidence_path": "acceptance/2026-10-29-S04-US013/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
         "status": "pending",

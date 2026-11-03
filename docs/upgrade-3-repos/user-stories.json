@@ -978,7 +978,7 @@
       "release": "R1",
       "priority": "must",
       "status": "draft",
-      "implementation_status": "not_started",
+      "implementation_status": "implemented_local_verified",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-04"
@@ -1018,8 +1018,10 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "executed_qualified",
+        "method": "Backend classroom.e2e-spec.ts (Room versioning & immutable mid-session) + CMS Playwright classroom-authoring.spec.ts",
+        "evidence_path": "acceptance/2026-11-03-S05-classroom/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
         "status": "pending",
@@ -1038,7 +1040,7 @@
       "release": "R1",
       "priority": "must",
       "status": "draft",
-      "implementation_status": "not_started",
+      "implementation_status": "implemented_local_verified",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-04"
@@ -1079,8 +1081,10 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "executed_qualified",
+        "method": "Web Vitest (schema/speech) + Web Playwright classroom.spec.ts (pause/resume beat, text fallback, unmount cleanup)",
+        "evidence_path": "acceptance/2026-11-03-S05-classroom/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
         "status": "pending",
@@ -1099,7 +1103,7 @@
       "release": "R1",
       "priority": "must",
       "status": "draft",
-      "implementation_status": "not_started",
+      "implementation_status": "implemented_local_verified",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-04"
@@ -1141,8 +1145,10 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
-        "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
+        "evidence_status": "executed_qualified",
+        "method": "Backend classroom.e2e-spec.ts (multi-device resume, CAS takeover 409, event dedup, server-side grading) + Web Playwright classroom.spec.ts",
+        "evidence_path": "acceptance/2026-11-03-S05-classroom/REPORT.md",
+        "human_signoff": "pending"
       },
       "approval": {
         "status": "pending",

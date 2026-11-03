@@ -1,4 +1,4 @@
-> Cập nhật30/10/2026 (lượt8): đóng 4 mục follow-up — enrollment gate cho public lecture, browser E2E CMS publish panel, browser E2E Web learner published lecture, worker revalidate chạy với Web production build thật. Human content/visual sign-off **APPROVED** sau checklist stack thật (24/24 assertion). S04 giữ locally_qualified; production deploy vẫn là gate riêng.
+> Cập nhật02/11/2026: đóng follow-up còn lại trong code. CMS có tab Học viên (cấp/thu hồi assignment, admin `learning:access:grant`). Preview exchange trả snapshot đầy đủ và Web có route `/preview/lectures/{code}` cho phép CMS frame; NarrationClock đọc TTS `speechSynthesis` theo narration/checkpoint, fallback clock khi không có giọng. Production: `pnpm bootstrap:admin` (ceremony một lần + audit) và `pnpm prisma:deploy`. Deploy Railway/UAT hộp thư thật vẫn cần tài khoản Railway + Brevo của ĐẠI CA — máy này không có credential, chưa gọi host production.
 
 # S04 — Bài giảng đồ hoạ, preview và xuất bản
 
@@ -38,13 +38,13 @@ Sprint mở ngày29/10/2026. Effort gốc14–22 person-days; hiện xong lát c
 
 Log/ảnh: [acceptance/2026-10-29-S04-US013](../acceptance/2026-10-29-S04-US013/REPORT.md).
 
-## Bước tiếp theo (sau follow-up30/10)
+## Follow-up 02/11 — 3 mục trước S05
 
-1. UI CMS cấp/thu hồi `CourseAssignment` để vận hành enrollment gate, không chỉ API admin.
-2. Preview external frame; TTS/audio thật thay clock mô phỏng.
-3. Production migration/deploy và UAT trên dữ liệu thật.
+1. CMS tab Học viên trên course editor: `GET /i/v1/courses/{id}/assignments`, `GET /i/v1/students?email=`, grant/revoke sẵn có. Chỉ admin (`learning:access:grant`).
+2. Redeem preview dựng snapshot bài giảng (không answer key). Web `/[locale]/preview/lectures/[code]` nhúng được từ `CMS_ORIGIN`. NarrationClock phát `speechSynthesis` theo đoạn narration/checkpoint; không có giọng thì giữ clock mô phỏng.
+3. Ceremony `scripts/bootstrap-production-admin.ts` (`BOOTSTRAP_CEREMONY=confirm`, `NODE_ENV=production`, mật khẩu ≥16, từ chối nếu đã có admin). Migration production vẫn là `pnpm prisma:deploy` trỏ `DATABASE_PUBLIC_URL`. Chưa chạy Railway/Brevo trong phiên này.
 
-Không tuyên bố S04 exit.
+S05 vẫn chưa mở. Không tuyên bố production go-live.
 
 ## US-014 — Đồng bộ narration với visual
 

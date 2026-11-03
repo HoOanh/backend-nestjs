@@ -89,7 +89,9 @@
       ],
       "execution_report": "implementation/S03-REPORT.md",
       "human_acceptance": "pending",
-      "not_implemented": [
+      "implemented_scope": [
+        "US-010",
+        "US-011",
         "US-012"
       ]
     },
@@ -129,8 +131,15 @@
         "S04"
       ],
       "path": "phases/P03-classroom/sprints/S05-classroom-engine",
-      "status": "draft",
+      "status": "locally_qualified",
       "story_ids": [
+        "US-016",
+        "US-017",
+        "US-018"
+      ],
+      "execution_report": "implementation/S05-REPORT.md",
+      "human_acceptance": "pending",
+      "implemented_scope": [
         "US-016",
         "US-017",
         "US-018"

@@ -6,6 +6,14 @@ DRAFT 0.2 · S02/S03/S07/S10.
 
 Course: id/slug/title/description/category/status; Chapter: courseId/title/order; Lesson: chapterId/title/objectives/duration/publishedPackageId. CourseAssignment(accountId,courseId) và Enrollment biểu diễn quyền học. Roadmap gồm ordered milestones tham chiếu course/lesson. AuthoringWorkspace chứa working draft, không sửa published package.
 
+Đọc nội dung hoặc mở lớp không được tạo hay khôi phục CourseAssignment. Ghi danh là thao tác riêng, có policy và xác nhận tường minh; assignment đã thu hồi không được tự kích hoạt lại khi xem khóa học hoặc lớp.
+
+Course draft có `selfEnrollment` mặc định false. Tác giả có thể bật đăng ký miễn phí trong CMS; learner chỉ được tự ghi danh khi publication mới nhất đã duyệt chứa giá trị true và course chưa archive. POST ghi danh chỉ áp dụng cho actor hiện tại, idempotent khi assignment đang hoạt động, từ chối assignment đã thu hồi; DB và audit thay đổi cùng transaction. Đổi cấu hình draft không sửa policy publication cũ. Học thử và đăng ký trả phí chưa được biểu diễn bằng chính sách này.
+
+Import hiện tạo course/chapter/lesson mới dưới dạng draft trong một transaction; slug hoặc ID đã tồn tại phải bị từ chối, không upsert hay thay đổi published snapshot. Gói có đúng một lesson có thể kèm tài liệu Markdown: lưu bản gốc vào object storage, gắn author-only, phát outbox để worker trích xuất lại thay vì tin spans trong gói. Payload có giáo án, visual, classroom hoặc tài liệu cho nhiều lesson bị từ chối toàn bộ cho tới khi được hỗ trợ đầy đủ. Import không publish, duyệt hoặc cấp quyền học. Nghiệm thu tối thiểu: draft chưa xuất hiện trong catalog, không có assignment/publication; payload có nội dung chưa hỗ trợ và xung đột slug/ID không để lại course một phần.
+
+S3 và database không cùng transaction: object được tạo trước DB commit, xóa bù khi DB lỗi. Nếu tiến trình dừng giữa hai bước hoặc xóa bù thất bại, object chưa tham chiếu có thể còn lại; cần cơ chế reconciliation trước khi coi importer đủ điều kiện production.
+
 SourceDocument có owner/scope/visibility/purpose; DocumentRevision có sha256/objectKey/mime/size/version/extractionVersion/status; AttachmentLink gắn course/lesson và vai trò reference/student-readable/author-only. Extraction pipeline: pending_upload→uploaded→validating→extracting→ready; lỗi→failed/quarantined/needs_ocr. PDF text, DOCX, Markdown, TXT thuộc allowlist ban đầu; tài liệu scan không đọc được phải hiển thị needs_ocr, không tạo text giả. Không tự thêm OCR service vào baseline.
 
 SourceSpan chứa documentRevisionId/page nullable/sectionPath/charStart/charEnd/textHash; page chỉ tồn tại khi parser có page thật. DOCX không giữ pagination đáng tin thì citation dùng section/paragraph, không bịa page number. Extracted text giữ nguyên liên kết tới original, có parserVersion/language/warnings. Tài liệu dữ liệu cá nhân có visibility và redaction policy trước gửi provider.

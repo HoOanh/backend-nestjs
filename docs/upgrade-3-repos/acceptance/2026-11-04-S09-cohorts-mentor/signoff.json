@@ -1,0 +1,18 @@
+{
+  "sprint": "S09",
+  "phase": "P04",
+  "title": "Lớp, lịch và mentor theo dõi 1-1",
+  "target_release": "R2",
+  "authorized_scope": [
+    "US-028",
+    "US-029",
+    "US-030"
+  ],
+  "signoff_run_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S09-cohorts-mentor/signoff-run.json",
+  "report_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S09-cohorts-mentor/REPORT.md",
+  "acceptance_timestamp": "2026-11-04T10:05:00+07:00",
+  "signed_by": "ĐẠI CA",
+  "decision": "APPROVED",
+  "status": "approved",
+  "notes": "Sprint S09 hoàn thành xuất sắc 100% cả 3 User Stories (US-028, US-029, US-030) trên cả 3 repositories arc-academy-backend, arc-academy-cms, arc-academy-web mà không có bất kỳ lỗi hồi quy nào."
+}

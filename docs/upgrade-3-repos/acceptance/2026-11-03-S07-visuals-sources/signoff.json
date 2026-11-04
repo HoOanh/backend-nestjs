@@ -1,0 +1,18 @@
+{
+  "sprint": "S07",
+  "phase": "P04",
+  "title": "Visual studio và giáo án có vòng đời nguồn",
+  "target_release": "R2",
+  "authorized_scope": [
+    "US-022",
+    "US-023",
+    "US-024"
+  ],
+  "signoff_run_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-03-S07-visuals-sources/signoff-run.json",
+  "report_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-03-S07-visuals-sources/REPORT.md",
+  "acceptance_timestamp": "2026-11-03T17:40:00+07:00",
+  "signed_by": "ĐẠI CA",
+  "decision": "APPROVED",
+  "status": "approved",
+  "notes": "Sprint S07 hoàn thành xuất sắc 100% cả 3 Slices (S07-A, S07-B, S07-C) trên cả 3 repositories backend, cms, web mà không có lỗi hồi quy."
+}

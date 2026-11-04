@@ -1,0 +1,59 @@
+{
+  "at": "2026-11-03T17:35:00.000Z",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-03T17:40:00+07:00",
+  "sprint": "S07",
+  "scope": ["US-022", "US-023", "US-024"],
+  "checks": [
+    {
+      "id": 1,
+      "ok": true,
+      "detail": "AC-022-01: Approved 3D visual presets catalog served via GET /api/i/v1/visual-presets, authors validate against preset parametersSchema"
+    },
+    {
+      "id": 2,
+      "ok": true,
+      "detail": "AC-022-02: Interactive narration timeline scrubber in CMS & Web with semantic fallback text when reduced-motion enabled"
+    },
+    {
+      "id": 3,
+      "ok": true,
+      "detail": "AC-022-03: Publishing visual revisions does not mutate pinned active classroom sessions (visual immutability maintained)"
+    },
+    {
+      "id": 4,
+      "ok": true,
+      "detail": "AC-023-01: AI image generation records complete provenance metadata (model, promptVersion, sourceDocumentRef, rights, altDraft)"
+    },
+    {
+      "id": 5,
+      "ok": true,
+      "detail": "AC-023-02: Human Review Gate strictly enforces technical accuracy confirmation; unreviewed/rejected artifacts cannot be published or applied (HTTP 400/412)"
+    },
+    {
+      "id": 6,
+      "ok": true,
+      "detail": "AC-023-03: Idempotent job creation deduplicates retries; provider usage settlement non-zero (120 tokens/6,000 µUSD); single-apply rule prevents duplicate attachment (HTTP 409)"
+    },
+    {
+      "id": 7,
+      "ok": true,
+      "detail": "AC-024-01: Document revision impact analysis calculates diff summary (added/modified/removed) and flags breaking vs additive severity across lessons, plans, and visuals"
+    },
+    {
+      "id": 8,
+      "ok": true,
+      "detail": "AC-024-02: Draft fork with updated source (POST /api/i/v1/teaching-plans/fork-revision) updates citations to new revision while extraction gate blocks non-ready revisions (HTTP 412)"
+    },
+    {
+      "id": 9,
+      "ok": true,
+      "detail": "AC-024-03: Immutability & Citation Preservation verified; prior plan revisions and active/historical sessions retain old revision citations without history rewriting"
+    },
+    {
+      "id": 10,
+      "ok": true,
+      "detail": "Quality Gate: Backend (148 tests / 138 Bruno requests), CMS (72 tests / 970 bilingual strings), Web (58 tests / 324 bilingual strings) all pass 100%"
+    }
+  ]
+}

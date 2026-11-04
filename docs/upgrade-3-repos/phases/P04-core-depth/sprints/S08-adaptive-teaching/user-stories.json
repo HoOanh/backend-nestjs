@@ -1,8 +1,8 @@
 {
   "document_id": "ARC-S08-STORIES",
-  "version": "0.2",
-  "status": "draft",
-  "implementation_authorized": false,
+  "version": "1.0",
+  "status": "approved",
+  "implementation_authorized": true,
   "source": "../../../../user-stories.json",
   "stories": [
     {
@@ -15,8 +15,8 @@
       "sprint_id": "S08",
       "release": "R2",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "done",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-04"
@@ -60,13 +60,13 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-04T08:55:00+07:00"
       }
     },
     {
@@ -79,8 +79,8 @@
       "sprint_id": "S08",
       "release": "R2",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "done",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-02"
@@ -122,13 +122,13 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-04T08:55:00+07:00"
       }
     },
     {
@@ -141,8 +141,8 @@
       "sprint_id": "S08",
       "release": "R2",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "done",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-05"
@@ -183,13 +183,13 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-04T08:55:00+07:00"
       }
     }
   ]

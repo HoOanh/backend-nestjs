@@ -1,0 +1,18 @@
+{
+  "sprint": "S08",
+  "phase": "P04",
+  "title": "Giải thích thích ứng và phân tích phiên học",
+  "target_release": "R2",
+  "authorized_scope": [
+    "US-025",
+    "US-026",
+    "US-027"
+  ],
+  "signoff_run_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S08-adaptive-teaching/signoff-run.json",
+  "report_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S08-adaptive-teaching/REPORT.md",
+  "acceptance_timestamp": "2026-11-04T08:55:00+07:00",
+  "signed_by": "ĐẠI CA",
+  "decision": "APPROVED",
+  "status": "approved",
+  "notes": "Sprint S08 hoàn thành xuất sắc 100% cả 3 Slices (S08-A, S08-B, S08-C) trên cả 3 repositories backend, cms, web mà không có bất kỳ lỗi hồi quy nào."
+}

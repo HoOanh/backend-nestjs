@@ -1,0 +1,56 @@
+{
+  "at": "2026-11-03T16:15:00.000Z",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-03T16:20:00+07:00",
+  "sprint": "S06",
+  "courseId": "1dfbef33-80f0-4011-a800-dd3f51ebc4b3",
+  "lessonId": "29c8813e-0901-4610-b5de-3e17a94b047f",
+  "packageId": "139e2d3d-6069-4b15-89e9-8d2c9b119533",
+  "checks": [
+    {
+      "id": 1,
+      "ok": true,
+      "detail": "AC-019-01: SSE streaming emits accepted, delta, citation, and completed events with lecture-grounded citations"
+    },
+    {
+      "id": 2,
+      "ok": true,
+      "detail": "AC-019-02: Privacy guard blocks cross-course and draft documents, scoping citations only to pinned sourceRefs"
+    },
+    {
+      "id": 3,
+      "ok": true,
+      "detail": "AC-019-03: Message deduplication via clientMessageId and run recovery via GET /runs/:runId verified"
+    },
+    {
+      "id": 4,
+      "ok": true,
+      "detail": "AC-020-01: Server-side grading evaluates checkpoint attempts; client cannot spoof mastery flag"
+    },
+    {
+      "id": 5,
+      "ok": true,
+      "detail": "AC-020-02: LessonProgress provenance records progress status, score, and passedCheckpoints linked to sourceSessionId"
+    },
+    {
+      "id": 6,
+      "ok": true,
+      "detail": "AC-020-03: Duplicate checkpoint attempts are deduplicated idempotently without corrupting attempt counts"
+    },
+    {
+      "id": 7,
+      "ok": true,
+      "detail": "AC-021-01: Finish session triggers classroom.session.finished outbox event and generates deterministic SessionSummary with inputHash"
+    },
+    {
+      "id": 8,
+      "ok": true,
+      "detail": "AC-021-02: Summary access strictly gated to session owner (outsiders return 404); failed summary status preserves completed session"
+    },
+    {
+      "id": 9,
+      "ok": true,
+      "detail": "AC-021-03: Async summary worker retry and promptVersion update are idempotent without transcript or summary duplication"
+    }
+  ]
+}

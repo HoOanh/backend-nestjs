@@ -1,0 +1,71 @@
+{
+  "at": "2026-11-03T14:55:00.000Z",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-03T15:04:15+07:00",
+  "sprint": "S05",
+  "courseId": "1dfbef33-80f0-4011-a800-dd3f51ebc4b3",
+  "lessonId": "29c8813e-0901-4610-b5de-3e17a94b047f",
+  "packageId": "139e2d3d-6069-4b15-89e9-8d2c9b119533",
+  "checks": [
+    {
+      "id": 1,
+      "ok": true,
+      "detail": "Room created as draft and configured with persona, voice policy, and checkpoint policy"
+    },
+    {
+      "id": 2,
+      "ok": true,
+      "detail": "Binding draft package rejected with 409 Conflict, details require published package"
+    },
+    {
+      "id": 3,
+      "ok": true,
+      "detail": "Independent reviewer published room version v1; audit log and outbox message created"
+    },
+    {
+      "id": 4,
+      "ok": true,
+      "detail": "Publishing room version v2 does not alter active session snapshot; keeps pinned v1"
+    },
+    {
+      "id": 5,
+      "ok": true,
+      "detail": "Student with active assignment creates classroom session; outsider receives 404 Not Found"
+    },
+    {
+      "id": 6,
+      "ok": true,
+      "detail": "Learner pauses classroom session via /pause; resumes via /resume at same beat without drift"
+    },
+    {
+      "id": 7,
+      "ok": true,
+      "detail": "Text-first display guaranteed; speech synthesis fallback gracefully when TTS disabled"
+    },
+    {
+      "id": 8,
+      "ok": true,
+      "detail": "Checkpoint attempt graded server-side; client cannot spoof passed flag"
+    },
+    {
+      "id": 9,
+      "ok": true,
+      "detail": "Resource cleanup verified: speech cancelled and tick interval cleared on unmount/navigation"
+    },
+    {
+      "id": 10,
+      "ok": true,
+      "detail": "Session resume on secondary device recovers exact snapshot, lastAckSequence and checkpoint"
+    },
+    {
+      "id": 11,
+      "ok": true,
+      "detail": "Lease CAS takeover succeeds on Device B; subsequent request on Device A returns 409 stale_lease"
+    },
+    {
+      "id": 12,
+      "ok": true,
+      "detail": "Event deduplication confirmed (duplicate: true); finish session is idempotent with Idempotency-Key"
+    }
+  ]
+}

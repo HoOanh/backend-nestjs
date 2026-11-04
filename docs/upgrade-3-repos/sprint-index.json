@@ -301,7 +301,23 @@
         "S09"
       ],
       "path": "phases/P05-production/sprints/S10-migration",
-      "status": "draft",
+      "status": "approved",
+      "implementation_authorized": true,
+      "authorized_scope": [
+        "US-031",
+        "US-032",
+        "US-033"
+      ],
+      "implemented_scope": [
+        "US-031",
+        "US-032",
+        "US-033"
+      ],
+      "human_acceptance": "approved",
+      "human_acceptance_at": "2026-11-04T11:08:00+07:00",
+      "signoff_artifact": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S10-migration/signoff.json",
+      "execution_report": "implementation/S10-REPORT.md",
+      "readiness_report": "implementation/S10-READINESS.md",
       "story_ids": [
         "US-031",
         "US-032",

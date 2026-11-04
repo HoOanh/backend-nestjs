@@ -1,8 +1,9 @@
 {
   "document_id": "ARC-S10-STORIES",
   "version": "0.2",
-  "status": "draft",
-  "implementation_authorized": false,
+  "status": "approved",
+  "implementation_authorized": true,
+  "human_acceptance": "approved",
   "source": "../../../../user-stories.json",
   "stories": [
     {

@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-11-04T11:08:00+07:00",
+  "target": "S10-migration-three-repos",
+  "executed_by": "Antigravity Pair Programmer",
+  "approved_by": "ĐẠI CA",
+  "results": [
+    {
+      "repo": "arc-academy-backend",
+      "command": "pnpm test:e2e test/migration.e2e-spec.ts",
+      "status": "PASS",
+      "details": "14/14 tests passing covering dry-run, idempotent ETL, quarantine exceptions, provenance preservation, legacy URL resolve, and retention fingerprint purge protection."
+    },
+    {
+      "repo": "arc-academy-backend",
+      "command": "pnpm test:coverage",
+      "status": "PASS",
+      "details": "27/27 test suites passing, 174/174 tests, Statements 86.13%, Lines 88.96%."
+    },
+    {
+      "repo": "arc-academy-backend",
+      "command": "pnpm api:check && pnpm bruno:check",
+      "status": "PASS",
+      "details": "OpenAPI reproducible closure valid (44 public, 113 internal paths); Bruno collection covers 174 documented operations."
+    },
+    {
+      "repo": "arc-academy-cms",
+      "command": "pnpm test && pnpm foundation:check && pnpm test:rules",
+      "status": "PASS",
+      "details": "15/15 test files passing (72 tests), 5/5 foundation rules pass."
+    },
+    {
+      "repo": "arc-academy-cms",
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "details": "TSR route generation and TanStack Router typecheck clean."
+    },
+    {
+      "repo": "arc-academy-web",
+      "command": "pnpm test && pnpm foundation:check && pnpm test:rules",
+      "status": "PASS",
+      "details": "16/16 test files passing (61 tests), 5/5 foundation rules pass (light-only compliant)."
+    },
+    {
+      "repo": "arc-academy-web",
+      "command": "pnpm typecheck",
+      "status": "PASS",
+      "details": "Next.js route types generated successfully, 0 errors."
+    }
+  ]
+}

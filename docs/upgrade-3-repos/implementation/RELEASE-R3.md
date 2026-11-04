@@ -46,5 +46,6 @@ Release R3 là mốc bàn giao toàn diện cuối cùng trong lộ trình nâng
 - **Tài liệu vận hành**:
   - `BACKUP-RESTORE-RUNBOOK.md`
   - `CUTOVER-RUNBOOK.md`
+  - `CUTOVER-DRILL-REPORT.md`
   - `INCIDENT-RESPONSE.md`
   - `release-manifest.json`

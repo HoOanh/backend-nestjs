@@ -338,7 +338,23 @@
         "S10"
       ],
       "path": "phases/P05-production/sprints/S11-production",
-      "status": "draft",
+      "status": "approved",
+      "implementation_authorized": true,
+      "authorized_scope": [
+        "US-034",
+        "US-035",
+        "US-036"
+      ],
+      "implemented_scope": [
+        "US-034",
+        "US-035",
+        "US-036"
+      ],
+      "human_acceptance": "approved",
+      "human_acceptance_at": "2026-11-04T12:00:00+07:00",
+      "signoff_artifact": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S11-production/signoff.json",
+      "execution_report": "implementation/S11-REPORT.md",
+      "readiness_report": "implementation/S11-READINESS.md",
       "story_ids": [
         "US-034",
         "US-035",

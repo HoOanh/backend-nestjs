@@ -1,0 +1,18 @@
+{
+  "sprint": "S11",
+  "phase": "P05",
+  "title": "Nghiệm thu core và chuyển production",
+  "target_release": "R3",
+  "authorized_scope": [
+    "US-034",
+    "US-035",
+    "US-036"
+  ],
+  "signoff_run_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S11-production/signoff-run.json",
+  "report_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-04-S11-production/REPORT.md",
+  "acceptance_timestamp": "2026-11-04T12:00:00+07:00",
+  "signed_by": "ĐẠI CA",
+  "decision": "APPROVED",
+  "status": "approved",
+  "notes": "Sprint S11 hoàn thành 100% 3 User Stories (US-034, US-035, US-036) trên cả 4 repositories arc-academy-backend, arc-academy-cms, arc-academy-web, backend-nestjs: Core UAT & p95 SLA Latency budget, degraded voice capability fallback banner, backup off-host mã hoá & blank restore drill dưới 1 giây, outbox resilience chống chịu downstream failure, trung thực chiến lược RPO 24h, cửa sổ đóng băng ghi Writer Freeze 503 Retry-After, System Watermark v1.0.0, và runbook cấm lùi mù về legacy JSON. Toàn bộ Release R3 chính thức chuyển giao Production."
+}

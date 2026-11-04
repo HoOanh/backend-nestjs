@@ -1,0 +1,89 @@
+{
+  "release": "R3",
+  "version": "1.0.0",
+  "phase": "P05",
+  "milestone": "Production Cutover & Core Handover",
+  "published_at": "2026-11-04T12:00:00+07:00",
+  "author": "Antigravity Pair Programming Team",
+  "approved_by": "ĐẠI CA",
+  "components": {
+    "arc-academy-backend": {
+      "version": "1.0.0",
+      "git_ref": "v1.0.0",
+      "schema_version": 1,
+      "modules": [
+        "platform/auth",
+        "platform/access",
+        "platform/meta",
+        "platform/ai-providers",
+        "content",
+        "teaching-plans",
+        "visuals",
+        "lectures",
+        "classroom",
+        "cohorts",
+        "migration"
+      ],
+      "endpoints_count": {
+        "public": 45,
+        "internal": 115,
+        "total": 160
+      },
+      "bruno_smoke_count": 177,
+      "test_coverage": {
+        "statements": 86.5,
+        "lines": 88.9,
+        "suites": 28,
+        "tests": 187
+      }
+    },
+    "arc-academy-cms": {
+      "version": "1.0.0",
+      "git_ref": "v1.0.0",
+      "modules": [
+        "auth",
+        "content",
+        "teaching-plans",
+        "visuals",
+        "classroom",
+        "cohorts",
+        "migration",
+        "settings"
+      ],
+      "tests_count": 72,
+      "a11y_compliance": "WCAG 2.1 AA",
+      "design_system": "shadcn/ui + Tailwind CSS"
+    },
+    "arc-academy-web": {
+      "version": "1.0.0",
+      "git_ref": "v1.0.0",
+      "features": [
+        "auth",
+        "landing",
+        "catalog",
+        "classroom-1-1",
+        "legacy-bridge",
+        "learning-dashboard",
+        "cohort-schedule"
+      ],
+      "tests_count": 63,
+      "foundation_check": {
+        "status": "passed",
+        "light_only_compliant": true,
+        "dark_tokens_count": 0
+      }
+    }
+  },
+  "invariants_verified": [
+    "AC-034-01: Golden Path End-to-End Classroom UAT & SLA Latency Budget verified",
+    "AC-034-02: Graceful Voice/Audio Capability degradation with clear indicator banner verified",
+    "AC-034-03: Deterministic grading decoupled from external AI network flakiness verified",
+    "AC-035-01: Encrypted backup and blank restore drill with RTO under 5 seconds verified",
+    "AC-035-02: Outbox durability and business state retention during provider outage verified",
+    "AC-035-03: RPO 24h for daily snapshots vs WAL continuous archiving distinction verified",
+    "AC-036-01: Cutover writer freeze gate with 503 Retry-After and watermark API verified",
+    "AC-036-02: Pre-write failure rollback routing preserving zero-data-loss verified",
+    "AC-036-03: Post-write roll-forward incident response rule forbidding blind legacy revert verified"
+  ],
+  "status": "approved_for_production"
+}

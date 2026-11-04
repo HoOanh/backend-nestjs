@@ -2150,13 +2150,13 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-04T12:00:00+07:00"
       }
     },
     {
@@ -2211,13 +2211,13 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-04T12:00:00+07:00"
       }
     },
     {
@@ -2272,13 +2272,13 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-04T12:00:00+07:00"
       }
     }
   ],

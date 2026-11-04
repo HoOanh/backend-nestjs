@@ -1,0 +1,59 @@
+{
+  "at": "2026-11-04T10:00:00.000Z",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-04T10:05:00+07:00",
+  "sprint": "S09",
+  "scope": ["US-028", "US-029", "US-030"],
+  "checks": [
+    {
+      "id": 1,
+      "ok": true,
+      "detail": "AC-028-01: Cohort class, roster & occurrence UTC + IANA timezone. Student join creates/retrieves single primary session per (student, occurrence)."
+    },
+    {
+      "id": 2,
+      "ok": true,
+      "detail": "AC-028-02: Roster CSV import handles validation, prevents duplicates, reports errors, and rejects students joining outside valid session window."
+    },
+    {
+      "id": 3,
+      "ok": true,
+      "detail": "AC-028-03: Reschedule/cancel occurrence preserves audit trail, emits deduplicated notifications to enrolled students, and prevents rewriting past session history."
+    },
+    {
+      "id": 4,
+      "ok": true,
+      "detail": "AC-029-01: Mentor dashboard scoped strictly to assigned classes. Progress and session summaries are accessible within scope."
+    },
+    {
+      "id": 5,
+      "ok": true,
+      "detail": "AC-029-02: Revoked assignment immediately blocks mentor access (403 Forbidden). AuditLog recorded upon viewing session transcript (classroom:transcript:read)."
+    },
+    {
+      "id": 6,
+      "ok": true,
+      "detail": "AC-029-03: Dynamic class/student switching in mentor views maintains strictly scoped query keys without data leakage across accounts."
+    },
+    {
+      "id": 7,
+      "ok": true,
+      "detail": "AC-030-01: Module settings registry validates modules, dependencies, and capability/navigation consistency."
+    },
+    {
+      "id": 8,
+      "ok": true,
+      "detail": "AC-030-02: Attempting to disable core modules (auth, system) or modules with active dependents is rejected with impact report (409 Conflict) without DDL/data loss."
+    },
+    {
+      "id": 9,
+      "ok": true,
+      "detail": "AC-030-03: Classroom drain mode blocks new sessions (503 Service Unavailable) while preserving in-flight sessions until completed."
+    },
+    {
+      "id": 10,
+      "ok": true,
+      "detail": "Quality Gate: Backend (26 suites / 160 tests / 165 Bruno requests), CMS (15 suites / 72 tests / 1034 bilingual strings), Web (15 suites / 58 tests / 353 bilingual strings) all pass 100%."
+    }
+  ]
+}

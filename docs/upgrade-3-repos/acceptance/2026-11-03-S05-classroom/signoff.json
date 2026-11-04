@@ -1,0 +1,32 @@
+{
+  "sprint": "S05",
+  "scope": ["US-016", "US-017", "US-018"],
+  "status": "approved",
+  "decision": "APPROVED",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-03T15:04:15+07:00",
+  "requested_at": "2026-11-03",
+  "evidence": "acceptance/2026-11-03-S05-classroom/REPORT.md",
+  "run_evidence": "acceptance/2026-11-03-S05-classroom/signoff-run.json",
+  "data": {
+    "courseId": "1dfbef33-80f0-4011-a800-dd3f51ebc4b3",
+    "lessonId": "29c8813e-0901-4610-b5de-3e17a94b047f",
+    "packageId": "139e2d3d-6069-4b15-89e9-8d2c9b119533",
+    "mode": "real Postgres + backend + CMS dev + Web production build"
+  },
+  "checklist": [
+    { "id": 1, "item": "Tạo và cấu hình Room nháp, persona, voice policy, checkpoint policy", "checked": true, "note": "CMS UI và API internal hoàn chỉnh" },
+    { "id": 2, "item": "Chặn bind package draft", "checked": true, "note": "Backend trả 409 Conflict, UI chỉ list published package" },
+    { "id": 3, "item": "Reviewer độc lập publish version, ghi AuditLog và Outbox", "checked": true, "note": "Quyền classroom:room:publish được bảo vệ" },
+    { "id": 4, "item": "Bảo toàn snapshot giữa phiên khi có version mới", "checked": true, "note": "Mid-session immutability verified" },
+    { "id": 5, "item": "Enrollment gate: chỉ assignment active mới vào được phòng", "checked": true, "note": "Outsider trả 404 chống probe" },
+    { "id": 6, "item": "Giơ tay / Tạm dừng và Tiếp tục đúng beat", "checked": true, "note": "Pause/resume API và client state đồng bộ" },
+    { "id": 7, "item": "Text-first fallback và Web Speech TTS", "checked": true, "note": "Văn bản giảng dạy luôn sẵn sàng khi không bật audio" },
+    { "id": 8, "item": "Chấm điểm Checkpoint trên Server, chống giả mạo mastery", "checked": true, "note": "Server evaluate attempt và trả explanation" },
+    { "id": 9, "item": "Dọn dẹp tài nguyên khi unmount/chuyển route", "checked": true, "note": "Huỷ speech synthesis và clear interval timers" },
+    { "id": 10, "item": "Phục hồi tiến trình trên thiết bị khác (Multi-device resume)", "checked": true, "note": "Đồng bộ snapshot, lastAckSequence và checkpoint" },
+    { "id": 11, "item": "Single writer lease CAS và takeover", "checked": true, "note": "Tab cũ nhận 409 stale_lease sau khi tab mới takeover" },
+    { "id": 12, "item": "Khử trùng lặp Event và kết thúc idempotent", "checked": true, "note": "Deduplicate eventId và Idempotency-Key trên /finish" }
+  ],
+  "notes": "Chờ ĐẠI CA xem xét và phê duyệt Human Acceptance trước khi mở Gate S06."
+}

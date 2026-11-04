@@ -1,8 +1,10 @@
 {
   "document_id": "ARC-S07-STORIES",
-  "version": "0.2",
-  "status": "draft",
-  "implementation_authorized": false,
+  "version": "1.0",
+  "status": "approved",
+  "implementation_authorized": true,
+  "human_signoff": "approved",
+  "human_signoff_at": "2026-11-03T17:40:00+07:00",
   "source": "../../../../user-stories.json",
   "stories": [
     {
@@ -15,8 +17,8 @@
       "sprint_id": "S07",
       "release": "R2",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "done",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-03"
@@ -57,13 +59,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
+        "evidence_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-03-S07-visuals-sources/signoff.json",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
+      "human_signoff": "approved",
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-03T17:40:00+07:00"
       }
     },
     {
@@ -76,8 +80,8 @@
       "sprint_id": "S07",
       "release": "R2",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "done",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-03"
@@ -120,13 +124,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
+        "evidence_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-03-S07-visuals-sources/signoff.json",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
+      "human_signoff": "approved",
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-03T17:40:00+07:00"
       }
     },
     {
@@ -139,8 +145,8 @@
       "sprint_id": "S07",
       "release": "R2",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "done",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-02"
@@ -182,13 +188,15 @@
         }
       ],
       "verification": {
-        "evidence_status": "not_executed",
+        "evidence_status": "passed",
+        "evidence_path": "backend-nestjs/docs/upgrade-3-repos/acceptance/2026-11-03-S07-visuals-sources/signoff.json",
         "method": "unit/integration/API smoke/Playwright/UAT theo risk của AC"
       },
+      "human_signoff": "approved",
       "approval": {
-        "status": "pending",
-        "approved_by": null,
-        "approved_at": null
+        "status": "approved",
+        "approved_by": "ĐẠI CA",
+        "approved_at": "2026-11-03T17:40:00+07:00"
       }
     }
   ]

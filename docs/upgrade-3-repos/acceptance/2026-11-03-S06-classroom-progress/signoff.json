@@ -1,0 +1,29 @@
+{
+  "sprint": "S06",
+  "scope": ["US-019", "US-020", "US-021"],
+  "status": "approved",
+  "decision": "APPROVED",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-03T16:20:00+07:00",
+  "requested_at": "2026-11-03",
+  "evidence": "acceptance/2026-11-03-S06-classroom-progress/REPORT.md",
+  "run_evidence": "acceptance/2026-11-03-S06-classroom-progress/signoff-run.json",
+  "data": {
+    "courseId": "1dfbef33-80f0-4011-a800-dd3f51ebc4b3",
+    "lessonId": "29c8813e-0901-4610-b5de-3e17a94b047f",
+    "packageId": "139e2d3d-6069-4b15-89e9-8d2c9b119533",
+    "mode": "real Postgres + backend + CMS + Web Playwright E2E"
+  },
+  "checklist": [
+    { "id": 1, "item": "SSE streaming hội thoại AI kèm trích dẫn nguồn chuẩn xác", "checked": true, "note": "Frame accepted, delta, citation, completed hoạt động đúng chuẩn SSE" },
+    { "id": 2, "item": "Bảo vệ riêng tư, chặn rò rỉ tài liệu draft hoặc ngoài bài học", "checked": true, "note": "Chỉ truy xuất sourceRefs trong package đã xuất bản và ghim vào room" },
+    { "id": 3, "item": "Khử trùng lặp tin nhắn và endpoint kiểm tra run phục hồi kết nối", "checked": true, "note": "Deduplicate bằng clientMessageId, khôi phục qua GET /runs/:runId" },
+    { "id": 4, "item": "Chấm điểm Checkpoint trên Server, bảo vệ mastery", "checked": true, "note": "Server tính passed, không lộ đáp án cho client" },
+    { "id": 5, "item": "Theo dõi tiến độ học tập có nguồn gốc (LessonProgress provenance)", "checked": true, "note": "Bảng lesson_progress cập nhật tự động từ kết quả kiểm tra" },
+    { "id": 6, "item": "Chống sai lệch tiến độ khi nộp lại checkpoint", "checked": true, "note": "Idempotent checkpoint attempt deduplication" },
+    { "id": 7, "item": "Tạo SessionSummary bất đồng bộ sau khi kết thúc phiên", "checked": true, "note": "Outbox classroom.session.finished, hash SHA-256 xác thực" },
+    { "id": 8, "item": "Phân quyền truy cập tóm tắt và cô lập lỗi tóm tắt", "checked": true, "note": "Chặn outsider 404, lỗi tóm tắt không ảnh hưởng trạng thái hoàn thành phiên" },
+    { "id": 9, "item": "Worker retry và cập nhật prompt phiên bản mới không nhân bản bản ghi", "checked": true, "note": "Bản ghi summary được cập nhật tại chỗ, bảo toàn transcript" }
+  ],
+  "notes": "ĐẠI CA phê duyệt nghiệm thu toàn diện Sprint S06 trên 3 repo sau khi đạt 100% kiểm thử tự động và Playwright E2E."
+}

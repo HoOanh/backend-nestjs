@@ -1,0 +1,59 @@
+{
+  "at": "2026-11-04T08:50:00.000Z",
+  "signed_by": "ĐẠI CA",
+  "signed_at": "2026-11-04T08:55:00+07:00",
+  "sprint": "S08",
+  "scope": ["US-025", "US-026", "US-027"],
+  "checks": [
+    {
+      "id": 1,
+      "ok": true,
+      "detail": "AC-025-01: Adaptive explanation by objective (POST /api/p/v1/classroom/sessions/:id/explanations) returns grounded explanation matching preferred modality, approved visual analog schema, check-understanding question, and citations"
+    },
+    {
+      "id": 2,
+      "ok": true,
+      "detail": "AC-025-02: Invariant enforced: Adaptive explanation does not modify published roomVersion/package or mark checkpoint attempt passed (attempts count remains unchanged)"
+    },
+    {
+      "id": 3,
+      "ok": true,
+      "detail": "AC-025-03: Lecture resume returns learner cleanly to original beat (resumedBeatId) without mutating session sequence or historic state"
+    },
+    {
+      "id": 4,
+      "ok": true,
+      "detail": "AC-026-01: Grounding evaluation (POST /api/i/v1/ai/evaluations/grounding) calculates groundedness score, severity, and findings with evidence refs against verified source revisions"
+    },
+    {
+      "id": 5,
+      "ok": true,
+      "detail": "AC-026-02: Citations referencing unready revisions or non-existent spans are flagged high severity and rejected (unresolvable_citation/revision_mismatch); no fabricated citations exposed"
+    },
+    {
+      "id": 6,
+      "ok": true,
+      "detail": "AC-026-03: Prompt registry rollback (POST /api/i/v1/ai/prompt-registry/rollback) switches active pointer; past runs retain immutable promptVersion while new runs use the rolled-back approved version"
+    },
+    {
+      "id": 7,
+      "ok": true,
+      "detail": "AC-027-01: Learning insights (GET /api/i/v1/learning-insights/lessons/:lessonId) aggregate question counts, dropoff counts and rates by objective, and top confusion points"
+    },
+    {
+      "id": 8,
+      "ok": true,
+      "detail": "AC-027-02: K-Anonymity privacy threshold (< 3 sessions) flags insufficientEvidence, hides inferred confusion points, and prevents learner personal transcript leakage"
+    },
+    {
+      "id": 9,
+      "ok": true,
+      "detail": "AC-027-03: Rebuild projection (POST /api/i/v1/learning-insights/lessons/:lessonId/rebuild-projection) deduplicates events by (sessionId, eventId) preventing duplicate counts on re-execution"
+    },
+    {
+      "id": 10,
+      "ok": true,
+      "detail": "Quality Gate: Backend (25 suites / 151 tests / 144 Bruno requests), CMS (15 suites / 72 tests / 986 bilingual strings), Web (15 suites / 58 tests / 331 bilingual strings) all pass 100%"
+    }
+  ]
+}

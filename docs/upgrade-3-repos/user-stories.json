@@ -1921,8 +1921,8 @@
       "sprint_id": "S10",
       "release": "R3",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-01"
@@ -1983,8 +1983,8 @@
       "sprint_id": "S10",
       "release": "R3",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"
@@ -2042,8 +2042,8 @@
       "sprint_id": "S10",
       "release": "R3",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"
@@ -2104,8 +2104,8 @@
       "sprint_id": "S11",
       "release": "R3",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"
@@ -2169,8 +2169,8 @@
       "sprint_id": "S11",
       "release": "R3",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"
@@ -2230,8 +2230,8 @@
       "sprint_id": "S11",
       "release": "R3",
       "priority": "must",
-      "status": "draft",
-      "implementation_status": "not_started",
+      "status": "approved",
+      "implementation_status": "implemented",
       "work_kind": "implementation_after_approval",
       "business_objective_ids": [
         "BO-06"

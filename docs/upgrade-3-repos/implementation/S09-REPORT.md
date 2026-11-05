@@ -1,3 +1,5 @@
+> **Trạng thái hiện hành 05/11/2026:** R1 chưa đạt MVP; R2/R3 chưa được nghiệm thu hoàn thành sản phẩm. Các kết luận hoàn thành/APPROVED bên dưới chỉ phản ánh báo cáo lịch sử, không phải nghiệm thu sản phẩm hiện hành. Xem [trạng thái và việc tiếp theo](MVP-STATUS-2026-11-05.md).
+
 # S09 — Báo cáo Nghiệm thu Kỹ thuật & Chất lượng
 
 04/11/2026 · Release R2 · Phase P04 · Phạm vi: **US-028, US-029, US-030** · Trạng thái: **APPROVED (Nghiệm thu Đạt 100%)**

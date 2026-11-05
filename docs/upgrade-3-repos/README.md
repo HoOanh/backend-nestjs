@@ -1,3 +1,5 @@
+> **Trạng thái hiện hành 05/11/2026:** R1 chưa đạt MVP; R2/R3 chưa được nghiệm thu hoàn thành sản phẩm. Xem [trạng thái và việc tiếp theo](implementation/MVP-STATUS-2026-11-05.md); các mô tả trạng thái cũ bên dưới không thay thế kết luận này.
+
 > Chỉ đạo 28/10/2026: light-only, shadcn registry/MCP, rules/skills và coverage gates theo [Foundation quality](implementation/FOUNDATION-QUALITY.md). Chưa mở sprint tính năng mới.
 
 # Arc Irobot Academy — kế hoạch theo phase và sprint

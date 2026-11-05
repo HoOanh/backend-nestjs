@@ -1,3 +1,5 @@
+> **Trạng thái hiện hành 05/11/2026:** R1 chưa đạt MVP; R2/R3 chưa được nghiệm thu hoàn thành sản phẩm. Các kết luận hoàn thành/APPROVED bên dưới chỉ phản ánh báo cáo lịch sử, không phải nghiệm thu sản phẩm hiện hành. Xem [trạng thái và việc tiếp theo](MVP-STATUS-2026-11-05.md).
+
 # Báo cáo đóng gói Release R3: Chuyển giao Production toàn diện Arc Academy
 
 04/11/2026 · Phiên bản: **v1.0.0** · Phase: **P05** · Trạng thái: **SẴN SÀNG CHUYỂN GIAO PRODUCTION**

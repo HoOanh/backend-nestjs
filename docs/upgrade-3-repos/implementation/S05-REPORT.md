@@ -1,3 +1,5 @@
+> **Trạng thái hiện hành 05/11/2026:** R1 chưa đạt MVP; R2/R3 chưa được nghiệm thu hoàn thành sản phẩm. Các kết luận hoàn thành/APPROVED bên dưới chỉ phản ánh báo cáo lịch sử, không phải nghiệm thu sản phẩm hiện hành. Xem [trạng thái và việc tiếp theo](MVP-STATUS-2026-11-05.md).
+
 # S05 — Báo cáo triển khai: Room và engine AI 1-1 có state bền vững
 
 03/11/2026 · Trạng thái: **locally_qualified** · Human acceptance: **pending**

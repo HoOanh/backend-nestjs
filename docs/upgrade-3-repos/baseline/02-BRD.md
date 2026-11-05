@@ -42,7 +42,7 @@ KPI học tập đề xuất cho pilot: thời gian editor tạo một bài đ�
 
 Thanh toán nằm ngoài toàn bộ giai đoạn này; chưa xác định thiết kế hoặc thời điểm. Không có user story, entity, endpoint hay sprint cho khả năng đó.
 
-Thi cuối khoá/code runner/chứng chỉ nâng cao/forum cộng đồng không phải core của đợt này và không được xếp sprint triển khai. Dữ liệu legacy liên quan được kiểm kê/giữ archive hoặc read-only có quyết định khi cutover; không silently drop, không hứa parity các feature đã loại scope. Quiz/checkpoint kiểm tra hiểu bài vẫn thuộc core. Video1-1 người thật và đa tenant chưa nằm trong scope.
+Bài tập code cùng khả năng viết, chạy và kiểm tra/chấm là core của giai đoạn 1. Chỉ đạo 05/11/2026 của ĐẠI CA sửa nội dung BRD trước đây đã loại code runner; phải đối chiếu hành vi MVP và thiết kế giải pháp đáp ứng sản phẩm thực tế. Chi tiết ngôn ngữ, cách chấm và môi trường thực thi cần được đặc tả và kiểm chứng. Thi cuối khoá, chứng chỉ nâng cao và forum cộng đồng không thuộc core của đợt này và không được xếp sprint triển khai. Dữ liệu legacy liên quan được kiểm kê/giữ archive hoặc read-only có quyết định khi cutover; không silently drop, không hứa parity các feature đã loại scope. Quiz/checkpoint kiểm tra hiểu bài vẫn thuộc core. Video1-1 người thật và đa tenant chưa nằm trong scope.
 
 ## 5. Business rules
 

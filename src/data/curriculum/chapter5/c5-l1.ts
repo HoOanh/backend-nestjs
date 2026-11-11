@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 
 export const c5_l1: Lesson = {
   id: 'c5-l1',
-  title: 'Bài 01: PostgreSQL Storage Engine: 8KB Slotted Page, Heap Tuple, WAL & Checkpoint',
+  title: 'Bài 02: PostgreSQL Storage Engine: 8KB Slotted Page, Heap Tuple, WAL & Checkpoint',
   duration: '60 phút',
   tag: 'Database Storage Internals',
   theory: `

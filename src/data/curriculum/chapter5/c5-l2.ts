@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 
 export const c5_l2: Lesson = {
   id: 'c5-l2',
-  title: 'Bài 02: B-Tree Index: Fan-out 8KB, Page Split, Covering Index & Index-Only Scan',
+  title: 'Bài 03: B-Tree Index: Fan-out 8KB, Page Split, Covering Index & Index-Only Scan',
   duration: '60 phút',
   tag: 'B-Tree Index Internals',
   theory: `

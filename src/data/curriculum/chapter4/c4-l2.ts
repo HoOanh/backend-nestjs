@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 
 export const c4_l2: Lesson = {
   id: 'c4-l2',
-  title: 'Bài 03: NestJS Request Lifecycle Pipeline: Middleware -> Guard -> Interceptor -> Pipe -> Filter',
+  title: 'Bài 02: NestJS Request Lifecycle Pipeline: Middleware -> Guard -> Interceptor -> Pipe -> Filter',
   duration: '60 phút',
   tag: 'Execution Pipeline & Filters',
   theory: `

@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 
 export const c5_l3: Lesson = {
   id: 'c5-l3',
-  title: 'Bài 03: Cost-Based Optimizer: EXPLAIN (ANALYZE, BUFFERS), Seq Scan, Index Scan & Bitmap Scan',
+  title: 'Bài 04: Cost-Based Optimizer: EXPLAIN (ANALYZE, BUFFERS), Seq Scan, Index Scan & Bitmap Scan',
   duration: '60 phút',
   tag: 'Query Optimization & EXPLAIN',
   theory: `

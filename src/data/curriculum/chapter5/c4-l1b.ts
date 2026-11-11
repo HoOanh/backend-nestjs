@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 
 export const c4_l1b: Lesson = {
   id: 'c4-l1b',
-  title: 'Bài 02: Chuyên Đề Toàn Diện: Hiểu Toàn Bộ PostgreSQL Trong 1h30p (Kiến Trúc, SQL & Tối Ưu Hóa)',
+  title: 'Bài 01: Chuyên Đề Toàn Diện: Hiểu Toàn Bộ PostgreSQL Trong 1h30p (Kiến Trúc, SQL & Tối Ưu Hóa)',
   duration: '98 phút',
   tag: 'PostgreSQL Architecture & Video Masterclass',
   videoUrl: 'https://www.youtube.com/watch?v=OUlLQK_gN8k',

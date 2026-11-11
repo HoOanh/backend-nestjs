@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 
 export const c4_l3: Lesson = {
   id: 'c4-l3',
-  title: 'Bài 04: Đồ Thị DAG, Circular Dependency (forwardRef) & Hiểm Họa Hiệu Năng Scope.REQUEST',
+  title: 'Bài 03: Đồ Thị DAG, Circular Dependency (forwardRef) & Hiểm Họa Hiệu Năng Scope.REQUEST',
   duration: '60 phút',
   tag: 'DAG Graph & Scopes Danger',
   theory: `

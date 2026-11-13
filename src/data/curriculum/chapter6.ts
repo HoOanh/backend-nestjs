@@ -22,7 +22,7 @@ Trong một hệ thống Backend chịu tải cao, hàng nghìn giao dịch (Tra
   - **Non-Repeatable Read (Đọc không thể lặp lại):** Giao dịch A đọc dòng $X$ được giá trị $100$. Trong khi Giao dịch A vẫn đang chạy, Giao dịch B thực hiện UPDATE dòng $X$ thành $200$ và COMMIT. Giao dịch A đọc lại dòng $X$ lần thứ hai và nhận được giá trị $200$! Dữ liệu bị biến đổi ngay trong cùng một ngữ cảnh giao dịch.
   - **Phantom Read (Bản ghi bóng ma):** Giao dịch A truy vấn một dải dữ liệu (\`SELECT COUNT(*) WHERE status = 'PENDING'\`) được $10$ dòng. Giao dịch B thực hiện INSERT thêm $1$ dòng mới thỏa mãn điều kiện đó và COMMIT. Giao dịch A chạy lại câu lệnh cũ và thấy kết quả là $11$ dòng! Dòng mới xuất hiện như một "bóng ma".
   - **Write Skew (Lệch ghi do phụ thuộc chéo):** Hai giao dịch đồng thời đọc dữ liệu để kiểm tra một ràng buộc toàn vẹn chung (ví dụ: "Tổng số bác sĩ trực phải $\\ge 1$"). Giao dịch 1 đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ A sang nghỉ. Đồng thời, Giao dịch 2 cũng đọc thấy có 2 bác sĩ trực, liền chuyển Bác sĩ B sang nghỉ. Cả hai giao dịch đều COMMIT thành công, dẫn đến kết quả: Không còn bác sĩ nào trực, vi phạm nghiêm trọng ràng buộc nghiệp vụ.
-* **Hiện thực trong PostgreSQL:** PostgreSQL loại bỏ hoàn toàn cấp độ \`Read Uncommitted\` (tự động nâng lên \`Read Committed\`), và hiện thực cấp độ \`Repeatable Read\` bằng cơ chế **Snapshot Isolation** (ngăn chặn triệt để cả Dirty Read, Non-repeatable Read và Phantom Read mà không cần khóa bảng).
+* **Hiện thực trong PostgreSQL:** PostgreSQL chấp nhận cấu hình \`Read Uncommitted\` nhưng xử lý như \`Read Committed\`, nên transaction không đọc được dữ liệu chưa commit. \`Repeatable Read\` dùng snapshot ổn định, ngăn Dirty Read, Non-repeatable Read và Phantom Read; tuy vậy, vẫn có thể xảy ra serialization anomaly như Write Skew. \`Serializable\` phát hiện lịch chạy không tương đương thứ tự tuần tự và có thể hủy transaction với lỗi \`40001\` để ứng dụng thử lại.
 
 ---
 
@@ -207,15 +207,15 @@ export class FinancialTransactionService {
       quiz: [
         {
           id: 'c6-l1-q1',
-          question: 'Hiện tượng "Dirty Read" xảy ra khi nào và tại sao cơ sở dữ liệu PostgreSQL lại không bao giờ cho phép hiện tượng này xuất hiện?',
+          question: 'SQL standard cho phép Dirty Read ở mức nào, và PostgreSQL xử lý Read Uncommitted ra sao?',
           options: [
-            'Khi một giao dịch đọc dữ liệu chưa được commit của giao dịch khác; PostgreSQL không cho phép vì kiến trúc MVCC luôn yêu cầu snapshot hợp lệ dựa trên kiểm tra tính khả kiến xmin đã commit.',
+            'Dirty Read là đọc dữ liệu chưa commit; SQL standard cho phép ở Read Uncommitted, nhưng PostgreSQL ánh xạ mức này thành Read Committed và không để transaction đọc tuple chưa commit.',
             'Khi một bảng dữ liệu bị xóa nhầm bởi người quản trị; PostgreSQL ngăn chặn bằng cách bắt buộc phải nhập mật khẩu hai lớp.',
             'Khi câu lệnh SQL chứa các ký tự đặc biệt nguy hiểm; PostgreSQL tự động lọc bỏ các ký tự này thông qua bộ tiền xử lý.',
             'Khi bộ nhớ đệm CPU L2 bị tràn dữ liệu; PostgreSQL tự động chuyển toàn bộ các giao dịch sang lưu trữ tạm thời ngoài đĩa cứng.'
           ],
           correctIndex: 0,
-          explanation: 'Dirty Read là hiện tượng Transaction A đọc phải dữ liệu đang được sửa đổi dở dang bởi Transaction B (chưa commit). Trong PostgreSQL, kiến trúc MVCC dựa trên việc kiểm tra tính khả kiến (Tuple Visibility) của xmin. Một tuple chỉ khả kiến khi transaction tạo ra nó đã COMMIT thành công. Do đó, PostgreSQL hoàn toàn miễn nhiễm với Dirty Read ở mọi cấp độ.'
+          explanation: 'Dirty Read là hiện tượng một transaction đọc dữ liệu chưa commit của transaction khác. SQL standard cho phép hiện tượng này ở Read Uncommitted, nhưng PostgreSQL xử lý mức đó như Read Committed. MVCC không cho transaction nhìn thấy phiên bản tuple do transaction chưa commit tạo ra, nên PostgreSQL không có Dirty Read ở cả bốn mức đã nêu.'
         },
         {
           id: 'c6-l1-q2',
